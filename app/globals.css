@@ -1,0 +1,210 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+nav {
+  background-color: #0d1117 !important;
+}
+
+@layer base {
+  :root {
+    --background: 216 18% 7%;
+    --foreground: 0 0% 98%;
+    --card: 216 18% 9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 222 47% 6%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 187 80% 40%;
+    --primary-foreground: 0 0% 4%;
+    --secondary: 216 18% 14%;
+    --secondary-foreground: 0 0% 85%;
+    --muted: 216 18% 14%;
+    --muted-foreground: 0 0% 55%;
+    --accent: 187 80% 40%;
+    --accent-foreground: 0 0% 4%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 216 18% 16%;
+    --input: 216 18% 14%;
+    --ring: 187 80% 40%;
+    --chart-1: 187 80% 40%;
+    --chart-2: 187 70% 35%;
+    --chart-3: 160 60% 45%;
+    --chart-4: 25 80% 55%;
+    --chart-5: 0 65% 55%;
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "kern" 1, "liga" 1;
+    background-color: #0b0e11;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.11) transparent;
+  }
+
+  :focus-visible {
+    outline: 2px solid rgba(34, 211, 238, 0.55);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.11);
+    border-radius: 2px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.22);
+  }
+}
+
+@layer utilities {
+  .glow-cyan {
+    box-shadow: 0 0 24px rgba(34, 211, 238, 0.18), 0 4px 16px rgba(0, 0, 0, 0.5);
+  }
+  .glow-cyan-sm {
+    box-shadow: 0 0 12px rgba(34, 211, 238, 0.12), 0 2px 8px rgba(0, 0, 0, 0.35);
+  }
+  .glow-health-green {
+    box-shadow: 0 0 16px rgba(74, 222, 128, 0.25);
+  }
+  .glow-health-orange {
+    box-shadow: 0 0 16px rgba(251, 146, 60, 0.25);
+  }
+  .card-lift {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .card-lift:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 0 20px rgba(34, 211, 238, 0.08);
+  }
+  .label-uppercase {
+    @apply text-xs font-semibold uppercase tracking-widest text-white/50;
+  }
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out forwards;
+  }
+  .animate-consultant-fade {
+    animation: consultantFadeIn 0.3s ease-in-out forwards;
+  }
+  .animate-slide-up {
+    animation: slideUp 0.35s ease-out forwards;
+  }
+  .animate-slide-up-delay-1 {
+    animation: slideUp 0.35s ease-out 0.08s both;
+  }
+  .animate-slide-up-delay-2 {
+    animation: slideUp 0.35s ease-out 0.16s both;
+  }
+  .animate-slide-up-delay-3 {
+    animation: slideUp 0.35s ease-out 0.24s both;
+  }
+  .animate-slide-up-delay-4 {
+    animation: slideUp 0.35s ease-out 0.32s both;
+  }
+  .animate-slide-up-delay-5 {
+    animation: slideUp 0.35s ease-out 0.40s both;
+  }
+  .animate-slide-up-delay-6 {
+    animation: slideUp 0.35s ease-out 0.48s both;
+  }
+  .animate-pulse-health {
+    animation: pulseHealth 2s ease-in-out infinite;
+  }
+  .animate-pulse-progress {
+    animation: pulseProgress 1.8s ease-in-out infinite;
+  }
+  .edge-light {
+    border-top-color: rgba(255, 255, 255, 0.10);
+    border-left-color: rgba(255, 255, 255, 0.07);
+    border-right-color: rgba(255, 255, 255, 0.04);
+    border-bottom-color: rgba(255, 255, 255, 0.03);
+  }
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(12px);
+    border: 1px solid;
+    border-top-color: rgba(255, 255, 255, 0.10);
+    border-left-color: rgba(255, 255, 255, 0.07);
+    border-right-color: rgba(255, 255, 255, 0.04);
+    border-bottom-color: rgba(255, 255, 255, 0.03);
+  }
+  .tab-indicator {
+    position: relative;
+  }
+  .tab-indicator::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: currentColor;
+    border-radius: 2px 2px 0 0;
+    transition: opacity 150ms ease, transform 150ms ease;
+  }
+  .zebra-row:nth-child(even) {
+    background-color: rgba(255, 255, 255, 0.022);
+  }
+  .zebra-row:nth-child(odd) {
+    background-color: transparent;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes consultantFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulseHealth {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes pulseProgress {
+  0%, 100% { opacity: 1; filter: brightness(1); }
+  50% { opacity: 0.85; filter: brightness(1.15); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.04) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
