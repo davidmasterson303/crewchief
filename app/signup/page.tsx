@@ -111,7 +111,7 @@ export default function SignupPage() {
             <span className="text-xl font-semibold text-white tracking-tight">CrewChief</span>
           </Link>
           <h1 className="text-2xl font-bold text-white mb-2">Create your account</h1>
-          <p className="text-white/50 text-sm">Start managing your vehicles with AI</p>
+          <p className="text-white/50 text-sm">Add a vehicle and get its full dossier &mdash; plus an AI consultant that knows your car.</p>
         </div>
 
         <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl">

@@ -5,19 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Car, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { VehicleCard } from '@/components/VehicleCard';
-import { useVehicles } from '@/hooks/useVehicles';
+import { useVehicles, type GarageVehicle } from '@/hooks/useVehicles';
 
-const INTERIOR_URL = 'https://images.unsplash.com/photo-1605810230434-7631ac76ec81?auto=format&fit=crop&w=1920&q=80';
-
-const STAGGER_CLASSES = [
-  'animate-slide-up',
-  'animate-slide-up-delay-1',
-  'animate-slide-up-delay-2',
-  'animate-slide-up-delay-3',
-  'animate-slide-up-delay-4',
-  'animate-slide-up-delay-5',
-  'animate-slide-up-delay-6',
-];
+// Self-hosted (was hot-linked from Unsplash — a third-party outage or
+// rate limit would grey out the landing visual).
+const INTERIOR_URL = '/dark-roomb.jpeg';
 
 function VehicleCardSkeleton() {
   return (
@@ -41,13 +33,13 @@ export default function GaragePage() {
   const [makeFilter, setMakeFilter] = useState<string | null>(null);
 
   const uniqueMakes = useMemo(() => {
-    const makes = Array.from(new Set(vehicles.map((v: any) => v.make))).sort();
+    const makes = Array.from(new Set(vehicles.map((v: GarageVehicle) => v.make))).sort();
     return (makes as string[]).length > 1 ? (makes as string[]) : [];
   }, [vehicles]);
 
   const filteredVehicles = useMemo(() => {
     if (!makeFilter) return vehicles;
-    return vehicles.filter((v: any) => v.make === makeFilter);
+    return vehicles.filter((v: GarageVehicle) => v.make === makeFilter);
   }, [vehicles, makeFilter]);
 
   return (
@@ -89,11 +81,11 @@ export default function GaragePage() {
               </h1>
               <p className="text-base text-white/50">
                 {isLoading
-                  ? 'Loading vehicles...'
+                  ? 'Loading your garage…'
                   : queryError
                   ? 'Unable to load vehicles'
                   : vehicles.length === 0
-                  ? 'No vehicles yet'
+                  ? 'No vehicles yet — add one and CrewChief builds its dossier'
                   : `${vehicles.length} vehicle${vehicles.length !== 1 ? 's' : ''} tracked`}
               </p>
             </div>
@@ -150,8 +142,12 @@ export default function GaragePage() {
             {isLoading ? (
               [1, 2, 3].map((i) => <VehicleCardSkeleton key={i} />)
             ) : filteredVehicles.length > 0 ? (
-              filteredVehicles.map((vehicle: any, index: number) => (
-                <div key={vehicle.id} className={STAGGER_CLASSES[Math.min(index, STAGGER_CLASSES.length - 1)]}>
+              filteredVehicles.map((vehicle: GarageVehicle, index: number) => (
+                <div
+                  key={vehicle.id}
+                  className="animate-slide-up"
+                  style={{ animationDelay: `${Math.min(index * 90, 700)}ms` }}
+                >
                   <VehicleCard
                     vehicle={vehicle}
                     activeRecalls={vehicle.nhtsa_data?.[0]?.recalls?.length || 0}
@@ -159,6 +155,22 @@ export default function GaragePage() {
                   />
                 </div>
               ))
+            ) : !makeFilter ? (
+              <div className="col-span-full text-center py-20">
+                <Car className="h-10 w-10 text-white/25 mx-auto mb-5" />
+                <h2 className="text-xl font-semibold text-white mb-2">Your garage is empty</h2>
+                <p className="text-white/50 text-sm max-w-md mx-auto mb-7">
+                  Add a vehicle and CrewChief builds its dossier &mdash; known issues,
+                  factory maintenance schedule, fluid specs, and an AI consultant that
+                  knows your car.
+                </p>
+                <Link href="/onboard">
+                  <Button className="bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-xl transition-all h-10 px-5">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Your First Vehicle
+                  </Button>
+                </Link>
+              </div>
             ) : makeFilter ? (
               <div className="col-span-full text-center py-12">
                 <p className="text-white/50 text-base">No {makeFilter} vehicles in the garage.</p>

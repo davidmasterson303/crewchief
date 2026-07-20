@@ -3,6 +3,27 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 
+export interface GarageVehicle {
+  id: string;
+  year: number;
+  make: string;
+  model: string;
+  trim: string | null;
+  color: string | null;
+  current_mileage: number | null;
+  image_url: string | null;
+  custom_image_url: string | null;
+  performance_goal: string | null;
+  ownership_objective: string | null;
+  created_at: string;
+  vehicle_status: string | null;
+  avg_miles_per_month: number | null;
+  focal_point_x: number | null;
+  focal_point_y: number | null;
+  nhtsa_data: { recalls: unknown[] }[] | null;
+  vehicle_health_summary: { health_score: number; summary: string; red_flags: unknown }[] | null;
+}
+
 export function useVehicles() {
   return useQuery({
     queryKey: ['vehicles'],
@@ -20,7 +41,7 @@ export function useVehicles() {
         .order('created_at', { ascending: true });
 
       if (error) throw new Error(error.message);
-      return data || [];
+      return (data || []) as unknown as GarageVehicle[];
     },
     staleTime: 1000 * 60 * 5,
     gcTime: 1000 * 60 * 60,

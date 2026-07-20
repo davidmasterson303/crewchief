@@ -11,8 +11,19 @@ import { AuthProvider } from '@/components/AuthProvider';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'CrewChief - Your Personal Auto Ownership Consultant',
-  description: 'AI-powered vehicle maintenance strategy and cost optimization',
+  title: 'CrewChief — Your Personal Auto Ownership Consultant',
+  description:
+    'Track your vehicles, log service history, and get answers from an AI consultant that knows your car — its issues, schedule, and history.',
+  openGraph: {
+    title: 'CrewChief — Your Personal Auto Ownership Consultant',
+    description:
+      'An AI consultant that knows your car. Live demo with sample vehicles — no signup required.',
+    url: 'https://crewchief-demo.davidmasterson.co',
+    siteName: 'CrewChief',
+    images: [{ url: '/dark-roomb.jpeg', width: 1920, height: 1280 }],
+    type: 'website',
+  },
+  twitter: { card: 'summary_large_image' },
 };
 
 export default function RootLayout({
@@ -23,7 +34,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           <AuthProvider>
           <QueryProvider>
             <DemoBanner />

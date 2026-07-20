@@ -8,6 +8,10 @@ export function hasSupabaseConfig(): boolean {
   return !!(supabaseUrl && supabaseAnonKey);
 }
 
+// One client per tab — the previous implementation built a fresh client on
+// every call (and the Proxy below invoked it per property access).
+let browserClient: SupabaseClient | null = null;
+
 export function createBrowserSupabaseClient(): SupabaseClient {
   if (typeof window === 'undefined') {
     return createClient(supabaseUrl || '', supabaseAnonKey || '', {
@@ -17,7 +21,10 @@ export function createBrowserSupabaseClient(): SupabaseClient {
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error('Missing Supabase environment variables. Check NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.');
   }
-  return createBrowserClient(supabaseUrl, supabaseAnonKey);
+  if (!browserClient) {
+    browserClient = createBrowserClient(supabaseUrl, supabaseAnonKey);
+  }
+  return browserClient;
 }
 
 export function getClientSupabase(): SupabaseClient {

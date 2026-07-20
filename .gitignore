@@ -34,3 +34,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local working docs — never publish
+DEBUG_EXPORT.md
+DIAGNOSTIC_REPORT.md
+IMPLEMENTATION_PLAN.md
+TECH_DEBT_ASSESSMENT.md
+
+# scratch screenshots
+public/image*.png

@@ -5,6 +5,8 @@ import { genAI, flashStructuredConfig, flashConfig } from '@/lib/gemini';
 import { VEHICLE_RESEARCH_PROMPT, POWERTRAIN_OPTIONS_PROMPT, CONSULTANT_SYSTEM_PROMPT, CONSULTANT_DOCUMENT_VALIDATION_PROMPT } from '@/lib/prompts';
 import { getVehicleImage } from '@/lib/vehicle-images';
 import { logger } from '@/lib/logger';
+import { checkRateLimit } from '@/lib/rate-limit';
+import { parseWishlistCommands, parsePerformanceCommands, parseStatusCommands, parseInvoiceFlag } from '@/lib/consultant-commands';
 import { validateData, vehicleIdSchema, serviceItemSchema, maintenanceLineItemSchema, quoteRequestSchema } from '@/lib/validation';
 import { withRetry } from '@/lib/retry';
 import type { Vehicle, ServiceItem, MaintenanceLineItem, KnowledgeBase, ApiResponse, ConsultantContext } from '@/lib/types';
@@ -287,6 +289,14 @@ export async function createVehicle(vehicleData: {
 }
 
 export async function generateVehicleDossier(vehicleId: string, vehicleData?: any) {
+  // Cost control: server actions are publicly invokable POST endpoints
+  // and demo mode has no auth, so every Gemini-backed path is rate limited.
+  {
+    const rl = await checkRateLimit(`dossier:${vehicleId}`, 'ai');
+    if (!rl.allowed) {
+      return { success: false, error: `Too many AI requests. Try again in ${rl.retryAfterSeconds}s.` };
+    }
+  }
   try {
     const client = getServiceRoleClient();
 
@@ -656,6 +666,14 @@ export async function sendConsultantMessage(params: {
   modWishlistItems?: any[];
   isDemo?: boolean;
 }) {
+  // Cost control: server actions are publicly invokable POST endpoints
+  // and demo mode has no auth, so every Gemini-backed path is rate limited.
+  {
+    const rl = await checkRateLimit(`consultant:${params.vehicleId}`, 'ai');
+    if (!rl.allowed) {
+      return { success: false, error: `Too many AI requests. Try again in ${rl.retryAfterSeconds}s.` };
+    }
+  }
   try {
     const {
       vehicleId,
@@ -812,17 +830,9 @@ export async function sendConsultantMessage(params: {
     });
     let response = result.text || '';
 
-    const wishlistActions: Array<{ name: string; type: string; description: string }> = [];
-    const wishlistRegex = /\[ADD_TO_WISHLIST:\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^\]]+)\]/g;
-    let match;
-    while ((match = wishlistRegex.exec(response)) !== null) {
-      wishlistActions.push({
-        name: match[1].trim(),
-        type: match[2].trim(),
-        description: match[3].trim(),
-      });
-    }
-    response = response.replace(/\[ADD_TO_WISHLIST:\s*[^\]]+\]/g, '').trim();
+    const wishlistParse = parseWishlistCommands(response);
+    const wishlistActions = wishlistParse.commands;
+    response = wishlistParse.cleaned;
 
     let performanceUpdated = false;
     let invoiceProcessed = false;
@@ -833,86 +843,64 @@ export async function sendConsultantMessage(params: {
     if (!isDemo) {
       const client = getServiceRoleClient();
 
-      const perfRegex = /\[UPDATE_PERFORMANCE_STATS:\s*([^\]]+)\]/g;
-      while ((match = perfRegex.exec(response)) !== null) {
-        const statsData: any = {};
-        match[1].split('|').forEach((part: string) => {
-          const [key, val] = part.split('=').map((s: string) => s.trim());
-          const num = parseFloat(val);
-          if (key && !isNaN(num)) statsData[key] = num;
-        });
-        if (Object.keys(statsData).length > 0) {
-          const updateResult = await updateVehiclePerformanceStats(vehicleId, statsData);
-          if (updateResult.success) performanceUpdated = true;
-        }
+      const perfParse = parsePerformanceCommands(response);
+      response = perfParse.cleaned;
+      for (const statsData of perfParse.updates) {
+        const updateResult = await updateVehiclePerformanceStats(vehicleId, statsData);
+        if (updateResult.success) performanceUpdated = true;
       }
-      response = response.replace(/\[UPDATE_PERFORMANCE_STATS:\s*[^\]]+\]/g, '').trim();
 
-      const issueRegex = /\[UPDATE_ISSUE_STATUS:\s*([^|]+)\|([^\]]+)\]/g;
-      while ((match = issueRegex.exec(response)) !== null) {
-        const identifier = match[1].trim();
-        const status = match[2].trim();
-        if (!identifier || identifier.length < 2) {
-          console.warn('[UPDATE_ISSUE_STATUS] Skipped: invalid identifier', JSON.stringify(identifier));
-          continue;
-        }
-        if (['completed', 'not_interested'].includes(status)) {
-          const { error } = await client.from('known_issue_tracking')
-            .update({
-              status,
-              ...(status === 'completed' ? { completed_date: new Date().toISOString().split('T')[0] } : {}),
-            })
-            .eq('vehicle_id', vehicleId)
-            .ilike('issue_identifier', identifier);
-          if (!error) {
-            issueUpdates++;
-            if (status === 'completed') {
-              await client.from('wishlist_items')
-                .delete()
-                .eq('vehicle_id', vehicleId)
-                .eq('item_type', 'issue')
-                .ilike('item_name', identifier);
-            }
-          } else {
-            console.error('[UPDATE_ISSUE_STATUS] DB error:', error.message);
+      const issueParse = parseStatusCommands(response, 'UPDATE_ISSUE_STATUS');
+      response = issueParse.cleaned;
+      for (const cmd of issueParse.commands) {
+        const { error } = await client.from('known_issue_tracking')
+          .update({
+            status: cmd.status,
+            ...(cmd.status === 'completed' ? { completed_date: new Date().toISOString().split('T')[0] } : {}),
+          })
+          .eq('vehicle_id', vehicleId)
+          .ilike('issue_identifier', cmd.identifier);
+        if (!error) {
+          issueUpdates++;
+          if (cmd.status === 'completed') {
+            await client.from('wishlist_items')
+              .delete()
+              .eq('vehicle_id', vehicleId)
+              .eq('item_type', 'issue')
+              .ilike('item_name', cmd.identifier);
           }
+        } else {
+          console.error('[UPDATE_ISSUE_STATUS] DB error:', error.message);
         }
       }
-      response = response.replace(/\[UPDATE_ISSUE_STATUS:\s*[^\]]+\]/g, '').trim();
 
-      const modRegex = /\[UPDATE_MOD_STATUS:\s*([^|]+)\|([^\]]+)\]/g;
-      while ((match = modRegex.exec(response)) !== null) {
-        const modName = match[1].trim();
-        const status = match[2].trim();
-        if (!modName || modName.length < 2) {
-          console.warn('[UPDATE_MOD_STATUS] Skipped: invalid mod name', JSON.stringify(modName));
-          continue;
-        }
-        if (['completed', 'not_interested'].includes(status)) {
-          const { error } = await client.from('modification_tracking')
-            .update({
-              status,
-              ...(status === 'completed' ? { installed_date: new Date().toISOString().split('T')[0] } : {}),
-            })
-            .eq('vehicle_id', vehicleId)
-            .ilike('mod_name', modName);
-          if (!error) {
-            modUpdates++;
-            if (status === 'completed') {
-              await client.from('wishlist_items')
-                .delete()
-                .eq('vehicle_id', vehicleId)
-                .eq('item_type', 'modification')
-                .ilike('item_name', modName);
-            }
-          } else {
-            console.error('[UPDATE_MOD_STATUS] DB error:', error.message);
+      const modParse = parseStatusCommands(response, 'UPDATE_MOD_STATUS');
+      response = modParse.cleaned;
+      for (const cmd of modParse.commands) {
+        const { error } = await client.from('modification_tracking')
+          .update({
+            status: cmd.status,
+            ...(cmd.status === 'completed' ? { installed_date: new Date().toISOString().split('T')[0] } : {}),
+          })
+          .eq('vehicle_id', vehicleId)
+          .ilike('mod_name', cmd.identifier);
+        if (!error) {
+          modUpdates++;
+          if (cmd.status === 'completed') {
+            await client.from('wishlist_items')
+              .delete()
+              .eq('vehicle_id', vehicleId)
+              .eq('item_type', 'modification')
+              .ilike('item_name', cmd.identifier);
           }
+        } else {
+          console.error('[UPDATE_MOD_STATUS] DB error:', error.message);
         }
       }
-      response = response.replace(/\[UPDATE_MOD_STATUS:\s*[^\]]+\]/g, '').trim();
 
-      if (response.includes('[PROCESS_INVOICE]') && attachedDocuments && attachedDocuments.length > 0) {
+      const invoiceParse = parseInvoiceFlag(response);
+      response = invoiceParse.cleaned;
+      if (invoiceParse.flagged && attachedDocuments && attachedDocuments.length > 0) {
         for (const doc of attachedDocuments) {
           const processResult = await processConsultantInvoiceToMaintenance(vehicleId, doc.file_url, doc.file_type || 'image/jpeg');
           if (processResult.success) {
@@ -923,7 +911,6 @@ export async function sendConsultantMessage(params: {
           }
         }
       }
-      response = response.replace(/\[PROCESS_INVOICE\]/g, '').trim();
 
       if (performanceUpdated || issueUpdates > 0 || modUpdates > 0) {
         await invalidateHealthSummaryCache(vehicleId);
@@ -1332,6 +1319,14 @@ export async function processConsultantInvoiceToMaintenance(vehicleId: string, f
 }
 
 export async function generateVehicleHealthSummary(vehicleId: string, forceRefresh: boolean = false) {
+  // Cost control: server actions are publicly invokable POST endpoints
+  // and demo mode has no auth, so every Gemini-backed path is rate limited.
+  {
+    const rl = await checkRateLimit(`health:${vehicleId}`, 'ai');
+    if (!rl.allowed) {
+      return { success: false, error: `Too many AI requests. Try again in ${rl.retryAfterSeconds}s.` };
+    }
+  }
   try {
     const client = getServiceRoleClient();
 
@@ -1503,6 +1498,14 @@ export async function getVehicleHealthSummary(vehicleId: string) {
 }
 
 export async function generateModificationDetails(vehicleId: string, modName: string, vehicle: any, performanceMindset: string) {
+  // Cost control: server actions are publicly invokable POST endpoints
+  // and demo mode has no auth, so every Gemini-backed path is rate limited.
+  {
+    const rl = await checkRateLimit(`moddetails:${vehicleId}`, 'ai');
+    if (!rl.allowed) {
+      return { success: false, error: `Too many AI requests. Try again in ${rl.retryAfterSeconds}s.` };
+    }
+  }
   try {
     const client = getServiceRoleClient();
     const performanceGoal = vehicle.performance_goal || 'moderate';
@@ -2133,35 +2136,6 @@ export async function getMaintenanceLineItems(vehicleId: string) {
   }
 }
 
-export async function setupDatabase() {
-  try {
-    const client = getServiceRoleClient();
-    const { data, error } = await client
-      .from('maintenance_line_items')
-      .select('id')
-      .limit(1);
-
-    if (error) {
-      if (error.code === '42P01') {
-        return {
-          success: false,
-          error: 'Table does not exist. Please contact support.',
-          needsSetup: true,
-        };
-      }
-      return { success: false, error: error.message };
-    }
-
-    return {
-      success: true,
-      message: 'Database is properly configured! The maintenance_line_items table exists and is ready.',
-    };
-  } catch (error) {
-    console.error('Setup check error:', error);
-    return { success: false, error: 'Failed to verify database setup' };
-  }
-}
-
 function findMatchingItems(laborItem: any, partsItems: any[]): any | null {
   const laborDesc = laborItem.description.toLowerCase();
 
@@ -2414,6 +2388,14 @@ function combineLineItems(items: any[]): any[] {
 }
 
 export async function parseInvoiceLineItems(documentId: string, vehicleId: string, fileBase64?: string, mimeType?: string, bypassVehicleCheck: boolean = false) {
+  // Cost control: server actions are publicly invokable POST endpoints
+  // and demo mode has no auth, so every Gemini-backed path is rate limited.
+  {
+    const rl = await checkRateLimit(`invoice:${vehicleId}`, 'ai');
+    if (!rl.allowed) {
+      return { success: false, error: `Too many AI requests. Try again in ${rl.retryAfterSeconds}s.` };
+    }
+  }
   try {
     const client = getServiceRoleClient();
 
@@ -2828,71 +2810,6 @@ export async function uploadInvoice(formData: FormData) {
   } catch (error: any) {
     console.error('[Upload Failed]:', error);
     return { success: false, error: error.message };
-  }
-}
-
-export async function cleanupDuplicateMaintenanceItems() {
-  try {
-    const client = getServiceRoleClient();
-
-    logger.info('CLEANUP:START', 'Starting duplicate maintenance items cleanup');
-
-    const { data, error } = await client.rpc('cleanup_duplicate_maintenance_items');
-
-    if (error) {
-      logger.error('CLEANUP:RPC_ERROR', error as Error, { details: error });
-      return { success: false, error: error.message };
-    }
-
-    const deletedCount = data && data.length > 0 ? data[0].deleted_count : 0;
-    logger.info('CLEANUP:SUCCESS', 'Duplicate cleanup completed', { deletedCount });
-
-    return { success: true, deletedCount };
-  } catch (error) {
-    logger.error('CLEANUP:FAILED', error as Error);
-    return { success: false, error: (error as Error).message };
-  }
-}
-
-export async function purgeVehicleMaintenanceHistory(vehicleId: string) {
-  try {
-    const client = getServiceRoleClient();
-    logger.info('PURGE:START', 'Starting maintenance history purge', { vehicleId });
-
-    const [maintenanceResult, invoiceResult, documentsResult, serviceResult] = await Promise.all([
-      client.from('maintenance_line_items').delete().eq('vehicle_id', vehicleId),
-      client.from('invoice_line_items').delete().eq('vehicle_id', vehicleId),
-      client.from('vehicle_documents').delete().eq('vehicle_id', vehicleId),
-      client.from('service_items').delete().eq('vehicle_id', vehicleId)
-    ]);
-
-    const errors: string[] = [];
-
-    if (maintenanceResult.error) {
-      logger.warn('PURGE:MAINTENANCE_ERROR', 'Error deleting maintenance line items', { error: maintenanceResult.error });
-      errors.push('maintenance_line_items');
-    }
-
-    if (invoiceResult.error) {
-      logger.warn('PURGE:INVOICE_ERROR', 'Error deleting invoice line items', { error: invoiceResult.error });
-      errors.push('invoice_line_items');
-    }
-
-    if (documentsResult.error) {
-      logger.warn('PURGE:DOCUMENTS_ERROR', 'Error deleting vehicle documents', { error: documentsResult.error });
-      errors.push('vehicle_documents');
-    }
-
-    if (serviceResult.error) {
-      logger.warn('PURGE:SERVICE_ERROR', 'Error deleting service items', { error: serviceResult.error });
-      errors.push('service_items');
-    }
-
-    logger.info('PURGE:SUCCESS', 'Maintenance history purge completed', { vehicleId, errors: errors.length > 0 ? errors : undefined });
-    return { success: true };
-  } catch (error) {
-    logger.error('PURGE:FAILED', error as Error, { vehicleId });
-    return { success: false, error: (error as Error).message };
   }
 }
 

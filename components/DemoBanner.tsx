@@ -19,7 +19,7 @@ export default function DemoBanner() {
           </span>
           <span className="hidden sm:inline text-[#2a2a2a] select-none">·</span>
           <span className="hidden sm:inline text-xs text-[#EDE8DF]/25 tracking-wide">
-            Pre-loaded sample vehicles &mdash; AI Consultant is fully live
+            Shared demo garage &mdash; AI Consultant is fully live
           </span>
         </div>
         <a
