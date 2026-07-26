@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServiceRoleClient } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { checkRateLimit, getClientIdentifier, rateLimitResponse } from '@/lib/rate-limit';
+import { authorizeVehicleScopedRow } from '@/lib/api-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,14 +26,17 @@ export async function POST(request: NextRequest) {
       invoiceFile,
     } = body;
 
-    if (!itemId) {
-      return NextResponse.json(
-        { error: 'itemId is required' },
-        { status: 400 }
-      );
+    // Resolves the item's parent vehicle and proves the caller owns it before
+    // any privileged client is handed back. Demo items are rejected outright —
+    // demo data is shared, so a write would corrupt it for every visitor.
+    const access = await authorizeVehicleScopedRow('wishlist_items', itemId, {
+      intent: 'write',
+    });
+    if (!access.ok) {
+      return access.response;
     }
 
-    const client = getServiceRoleClient();
+    const client = access.client;
 
     const { data: wishlistItem, error: fetchError } = await client
       .from('wishlist_items')
@@ -113,7 +116,12 @@ export async function POST(request: NextRequest) {
       const baseUrl = request.nextUrl.origin;
       fetch(`${baseUrl}/api/performance-stats`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          // Forward the caller's session so this internal hop stays authorized
+          // once /api/performance-stats starts requiring one (task 0.5).
+          cookie: request.headers.get('cookie') ?? '',
+        },
         body: JSON.stringify({ vehicleId: wishlistItem.vehicle_id }),
         signal: controller.signal,
       })

@@ -3,6 +3,7 @@ import { getServiceRoleClient, getServerClient, createServerActionClient } from 
 import { logger } from '@/lib/logger';
 import { checkRateLimit, getClientIdentifier, rateLimitResponse } from '@/lib/rate-limit';
 import { isDemoVehicleId } from '@/lib/demo';
+import { authorizeVehicleAccess, authorizeVehicleScopedRow } from '@/lib/api-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -83,7 +84,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid item type' }, { status: 400 });
     }
 
-    const client = getServiceRoleClient();
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return access.response;
+    }
+
+    const client = access.client;
 
     const { data: existingItem } = await client
       .from('wishlist_items')
@@ -135,20 +141,27 @@ export async function DELETE(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const itemId = searchParams.get('itemId');
 
-    if (!itemId) {
-      return NextResponse.json({ error: 'itemId is required' }, { status: 400 });
+    const access = await authorizeVehicleScopedRow('wishlist_items', itemId, {
+      intent: 'write',
+    });
+    if (!access.ok) {
+      return access.response;
     }
 
-    const client = getServiceRoleClient();
-
-    const { error } = await client
+    const { error, count } = await access.client
       .from('wishlist_items')
-      .delete()
+      .delete({ count: 'exact' })
       .eq('id', itemId);
 
     if (error) {
       logger.error('WISHLIST_API:DELETE', error as Error, { itemId });
       return NextResponse.json({ error: 'Failed to delete wishlist item' }, { status: 400 });
+    }
+
+    // A delete that matched nothing must not report success — that is the
+    // exact bug pattern found in delete-maintenance-item (task 0.7).
+    if (count === 0) {
+      return NextResponse.json({ error: 'Wishlist item not found' }, { status: 404 });
     }
 
     return NextResponse.json({ success: true });

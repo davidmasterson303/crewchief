@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServiceRoleClient } from '@/lib/supabase';
 import { genAI, flashStructuredConfig } from '@/lib/gemini';
 import { logger } from '@/lib/logger';
 import { checkRateLimit, getClientIdentifier, rateLimitResponse } from '@/lib/rate-limit';
+import { authorizeVehicleAccess } from '@/lib/api-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,19 +20,25 @@ function computeModHash(items: string[]): string {
 
 export async function POST(request: NextRequest) {
   try {
-    const identifier = getClientIdentifier(request);
+    const { vehicleId, forceRefresh } = await request.json();
+
+    // Authorize before spending anything: this route invokes Gemini, so an
+    // unauthenticated caller must not get as far as the model.
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'read' });
+    if (!access.ok) {
+      return access.response;
+    }
+
+    // Meter AI spend per user rather than per IP — IP is the wrong unit for a
+    // cost control, since one user can hold many and many users share one.
+    const identifier = access.userId ?? getClientIdentifier(request);
     const rateLimit = await checkRateLimit(identifier, 'ai');
     if (!rateLimit.allowed) {
       logger.warn('PERF_STATS:RATE_LIMIT', 'Rate limit exceeded', { identifier });
       return rateLimitResponse(rateLimit) as NextResponse;
     }
 
-    const { vehicleId, forceRefresh } = await request.json();
-    if (!vehicleId) {
-      return NextResponse.json({ error: 'vehicleId required' }, { status: 400 });
-    }
-
-    const client = getServiceRoleClient();
+    const client = access.client;
 
     const { data: vehicle, error: vErr } = await client
       .from('vehicles')
@@ -42,6 +48,26 @@ export async function POST(request: NextRequest) {
 
     if (vErr || !vehicle) {
       return NextResponse.json({ error: 'Vehicle not found' }, { status: 404 });
+    }
+
+    // Demo vehicles serve their seeded stats and stop here. They have no
+    // perf_stats_mod_hash, so without this they would fall through to a Gemini
+    // call and a write on every anonymous page view — unbounded cost against
+    // shared data that anyone can trigger.
+    if (access.isDemo) {
+      return NextResponse.json({
+        success: true,
+        cached: true,
+        stats: {
+          stock_hp: vehicle.stock_hp,
+          stock_torque: vehicle.stock_torque,
+          stock_zero_to_sixty: vehicle.stock_zero_to_sixty,
+          modified_hp: vehicle.modified_hp,
+          modified_torque: vehicle.modified_torque,
+          modified_zero_to_sixty: vehicle.modified_zero_to_sixty,
+          completed_mods: [],
+        },
+      });
     }
 
     const { data: completedMods } = await client

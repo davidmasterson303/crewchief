@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServiceRoleClient } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { checkRateLimit, getClientIdentifier, rateLimitResponse } from '@/lib/rate-limit';
+import { authorizeVehicleAccess } from '@/lib/api-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +24,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const client = getServiceRoleClient();
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'read' });
+    if (!access.ok) {
+      return access.response;
+    }
+
+    const client = access.client;
 
     const { data: wishlistItems, error } = await client
       .from('wishlist_items')
