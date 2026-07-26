@@ -22,6 +22,7 @@ import {
 import { Loader as Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
+import { wishlistItemIdentifier } from '@/lib/wishlist-identifier';
 
 interface AddWishlistItemDialogProps {
   open: boolean;
@@ -59,9 +60,9 @@ export function AddWishlistItemDialog({
     try {
       setLoading(true);
 
-      const itemIdentifier = `manual:${formData.itemType}:${formData.itemName
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '_')}`;
+      // Canonical identifier — the `source` column records that this came in
+      // manually. Encoding it in the key is what broke dedupe across surfaces.
+      const itemIdentifier = wishlistItemIdentifier(formData.itemType, formData.itemName);
 
       const response = await fetch('/api/wishlist', {
         method: 'POST',

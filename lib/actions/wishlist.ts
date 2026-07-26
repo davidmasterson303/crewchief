@@ -2,6 +2,7 @@
 
 import { getServiceRoleClient } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
+import { wishlistItemIdentifier } from '@/lib/wishlist-identifier';
 
 type WishlistItemType = 'issue' | 'maintenance' | 'modification';
 
@@ -18,7 +19,7 @@ export async function addItemToWishlist(
 ): Promise<{ success: boolean; error?: string; data?: unknown; alreadyExisted?: boolean }> {
   try {
     const client = getServiceRoleClient();
-    const itemIdentifier = `dossier:${itemType}:${itemName.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`;
+    const itemIdentifier = wishlistItemIdentifier(itemType, itemName);
 
     const { data, error } = await client
       .from('wishlist_items')
@@ -78,7 +79,7 @@ export async function removeFromWishlist(
     const client = getServiceRoleClient();
 
     if (itemType) {
-      const itemIdentifier = `dossier:${itemType}:${itemName.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`;
+      const itemIdentifier = wishlistItemIdentifier(itemType, itemName);
       const { error } = await client
         .from('wishlist_items')
         .delete()

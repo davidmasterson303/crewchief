@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Loader as Loader2, Send, Plus, Search, MessageSquare, Paperclip, X, FileText, ExternalLink, Heart, Check, Wrench, TriangleAlert, Sparkles, PanelLeft } from 'lucide-react';
 import { logger } from '@/lib/logger';
 import { isDemoMode, isDemoVehicleId } from '@/lib/demo';
+import { wishlistItemIdentifier } from '@/lib/wishlist-identifier';
 import {
   sendConsultantMessage,
   createConsultantSession,
@@ -205,7 +206,12 @@ export default function ConsultantChat({
           vehicleId,
           itemType: action.type,
           itemName: action.name,
-          itemIdentifier: `consultant-${action.name.toLowerCase().replace(/\s+/g, '-')}`,
+          // Canonical identifier. This previously produced
+          // `consultant-cvt-fluid-flush` while the dossier stored
+          // `dossier:maintenance:cvt_fluid_flush` for the same item, so the
+          // unique constraint never fired and the same job could be added
+          // twice, shown as un-added, and fail to delete.
+          itemIdentifier: wishlistItemIdentifier(action.type, action.name),
           description: action.description,
           category: action.type === 'modification' ? 'modification' : action.type === 'maintenance' ? 'maintenance' : 'repair',
           source: 'consultant',
