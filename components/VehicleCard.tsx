@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usageProfileChip } from '@/lib/usage-profile';
+import { getHealthBand, useHealthBand } from '@/hooks/use-health-band';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -66,8 +67,16 @@ function HealthRing({ score }: { score: number }) {
   const radius = 26;
   const circumference = 2 * Math.PI * radius;
   const fill = (score / 100) * circumference;
-  const color = score >= 80 ? '#4ade80' : score >= 60 ? '#22d3ee' : '#fb923c';
-  const trackColor = score >= 80 ? 'rgba(74,222,128,0.10)' : score >= 60 ? 'rgba(34,211,238,0.10)' : 'rgba(251,146,60,0.10)';
+  /*
+    Reads the shared band table. This ring used to hand-roll its own three-band
+    ramp — green / brand cyan / orange at 80 and 60 — so the garage grid and
+    the dashboard disagreed about the same car: 30 was orange here and red in
+    the hero, and anything at or above 60 rendered in the brand accent, which
+    is precisely what the band system exists to stop.
+  */
+  const band = useHealthBand(score);
+  const color = band.color;
+  const trackColor = `rgba(${band.rgb},0.10)`;
   const isLow = score < 60;
 
   return (
@@ -185,9 +194,14 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary }: VehicleCa
   const getHealthPill = () => {
     if (!healthSummary) return null;
     const score = healthSummary.health_score;
-    if (score >= 80) return { label: 'Good', bg: 'bg-green-500/20', text: 'text-green-300', border: 'border-green-400/30', dot: 'bg-green-400' };
-    if (score >= 60) return { label: 'Fair', bg: 'bg-amber-500/20', text: 'text-amber-300', border: 'border-amber-400/30', dot: 'bg-amber-400' };
-    return { label: 'Needs Attention', bg: 'bg-red-500/20', text: 'text-red-300', border: 'border-red-400/30', dot: 'bg-red-400' };
+    /*
+      Same table again. This had only three bands and its own labels, so 20
+      read "Needs Attention" on the card and "Critical" in the hero — and its
+      colours disagreed with the ring beside it: 65 gave a cyan ring and an
+      amber pill on one card.
+    */
+    const band = getHealthBand(score);
+    return { label: band.label, color: band.color, rgb: band.rgb };
   };
 
   const healthPill = getHealthPill();
@@ -248,8 +262,18 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary }: VehicleCa
             {statusInfo.label}
           </div>
           {healthPill && (
-            <div className={`flex items-center gap-1.5 ${healthPill.bg} ${healthPill.border} border px-2.5 py-1 rounded-full text-xs font-semibold backdrop-blur-sm ${healthPill.text}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${healthPill.dot} flex-shrink-0`} />
+            <div
+              className="flex items-center gap-1.5 border px-2.5 py-1 rounded-full text-xs font-semibold backdrop-blur-sm"
+              style={{
+                color: healthPill.color,
+                background: `rgba(${healthPill.rgb},0.18)`,
+                borderColor: `rgba(${healthPill.rgb},0.32)`,
+              }}
+            >
+              <span
+                className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                style={{ background: healthPill.color }}
+              />
               {healthPill.label}
             </div>
           )}
