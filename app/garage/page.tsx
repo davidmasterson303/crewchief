@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Car, Plus } from 'lucide-react';
 import { VehicleCard } from '@/components/VehicleCard';
 import { useVehicles } from '@/hooks/useVehicles';
+import { AccountMenu } from '@/components/AccountMenu';
 
 export default function GaragePage() {
   const { data: vehicles = [], isLoading: loading, error: queryError } = useVehicles();
@@ -35,12 +36,15 @@ export default function GaragePage() {
               <Car className="h-7 w-7 text-cyan-400 transition-transform group-hover:scale-105" />
               <span className="text-xl font-semibold text-white tracking-tight">CrewChief</span>
             </Link>
-            <Link href="/onboard">
-              <Button className="bg-black border-2 border-cyan-400 hover:bg-cyan-400/10 text-cyan-400 font-semibold">
-                <Plus className="mr-2 h-4 w-4" />
-                Add Vehicle
-              </Button>
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link href="/onboard">
+                <Button className="bg-black border-2 border-cyan-400 hover:bg-cyan-400/10 text-cyan-400 font-semibold">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Vehicle
+                </Button>
+              </Link>
+              <AccountMenu />
+            </div>
           </div>
         </div>
       </nav>

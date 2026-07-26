@@ -89,6 +89,60 @@ beforeEach(() => {
   });
 });
 
+describe('deletion is reachable — Guideline 5.1.1(v) discoverability', () => {
+  /*
+    Apple checks that the option can be found, not just that it exists. Its
+    wording points at account settings specifically, and "buried more than a
+    tap or two into settings" is a listed rejection reason.
+
+    The chain is: AccountMenu -> /settings -> DeleteAccountDialog ->
+    deleteAccount(). Every link is a separate file, so any one of them can be
+    broken by an unrelated edit without anything failing. These assertions are
+    deliberately structural — they check the wiring exists, which is what
+    review actually inspects.
+
+    This was a real gap: the settings page shipped before anything linked to
+    it, so deletion was implemented but unreachable.
+  */
+  const read = (p: string) =>
+    require('node:fs').readFileSync(
+      require('node:path').join(__dirname, '..', '..', p),
+      'utf8'
+    );
+
+  it('the account menu links to settings', () => {
+    expect(read('components/AccountMenu.tsx')).toContain('href="/settings"');
+  });
+
+  it('settings renders the delete dialog', () => {
+    const settings = read('app/settings/page.tsx');
+    expect(settings).toContain('DeleteAccountDialog');
+  });
+
+  it('the dialog calls the real deletion action, not a deactivation', () => {
+    const dialog = read('components/DeleteAccountDialog.tsx');
+    expect(dialog).toContain('deleteAccount');
+
+    // Strip comments first. The prose here explains *why* we do not
+    // deactivate, and matching raw source flagged that explanation as the
+    // very thing it warns against.
+    const code = dialog
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*$/gm, '');
+
+    // Deactivation never satisfies the guideline — a flag flip presented as
+    // deletion is an explicit rejection reason.
+    expect(code).not.toMatch(/is_active|deactivate/i);
+  });
+
+  it('confirms completion to the user', () => {
+    // Apple expects the user to be told deletion actually happened.
+    expect(read('components/DeleteAccountDialog.tsx')).toMatch(
+      /toast\.success\([^)]*deleted/i
+    );
+  });
+});
+
 describe('deleteAccount — ordering', () => {
   it('purges storage BEFORE deleting the auth user', async () => {
     await deleteAccount();

@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { updateVehicleAvgMileage, updateVehicleMileage, updateVehicleStatus } from '@/app/actions';
 import { invalidateDashboardCache } from '@/lib/query-invalidation';
+import { AccountMenu } from '@/components/AccountMenu';
 
 interface DashboardLayoutProps {
   vehicle: any;
@@ -196,6 +197,9 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
               <ChevronLeft className="h-4 w-4" />
               <span className="hidden sm:inline">Garage</span>
             </Button>
+            {/* Hidden in demo mode — an anonymous visitor has no account to
+                manage, and a sign-out that does nothing is worse than absent. */}
+            {!isDemo && <AccountMenu />}
           </div>
 
           {scrolled && (
