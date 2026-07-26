@@ -210,10 +210,71 @@ export async function exportAccountData() {
 // ---------------------------------------------------------------------------
 
 /**
+ * Prefixes under which a vehicle's files can live.
+ *
+ * There is no single convention — four upload paths each invented their own:
+ *
+ *   uploadInvoice               {vehicleId}/{file}
+ *   uploadVehiclePhoto          vehicle-photos/{vehicleId}/{file}
+ *   uploadConsultantDocument    consultant-docs/{vehicleId}/{sessionId}/{file}
+ *   uploadInvoiceForCompletion  invoices/{file}          <- no vehicle at all
+ *
+ * The first three are recoverable from a vehicle id. The fourth is not, and
+ * is reported separately — see `unattributable` below.
+ */
+function vehicleStoragePrefixes(vehicleId: string): string[] {
+  return [vehicleId, `vehicle-photos/${vehicleId}`, `consultant-docs/${vehicleId}`];
+}
+
+/**
+ * List every object under a prefix, descending into subfolders.
+ *
+ * Supabase's list() returns one level at a time, and consultant documents sit
+ * two levels deep (`consultant-docs/{vehicleId}/{sessionId}/{file}`). A
+ * single-level list silently returns the session folders as if they were
+ * files, so nothing gets removed and nothing reports an error.
+ */
+async function listObjectsRecursive(
+  client: ReturnType<typeof getServiceRoleClient>,
+  prefix: string,
+  depth = 0
+): Promise<{ paths: string[]; failures: string[] }> {
+  // Guard against a pathological tree; real paths are at most 3 deep.
+  if (depth > 4) return { paths: [], failures: [] };
+
+  const { data: entries, error } = await client.storage
+    .from(DOCUMENTS_BUCKET)
+    .list(prefix, { limit: 1000 });
+
+  if (error) return { paths: [], failures: [`${prefix}: ${error.message}`] };
+  if (!entries || entries.length === 0) return { paths: [], failures: [] };
+
+  const paths: string[] = [];
+  const failures: string[] = [];
+
+  for (const entry of entries) {
+    const full = `${prefix}/${entry.name}`;
+    // Supabase marks folders by returning a null id.
+    if (entry.id === null) {
+      const nested = await listObjectsRecursive(client, full, depth + 1);
+      paths.push(...nested.paths);
+      failures.push(...nested.failures);
+    } else {
+      paths.push(full);
+    }
+  }
+
+  return { paths, failures };
+}
+
+/**
  * Remove every storage object belonging to a set of vehicles.
  *
- * Objects live under `{vehicleId}/{filename}` — the same convention the
- * storage RLS policy keys on — so a vehicle's folder can be listed directly.
+ * Was previously a single-level list of `{vehicleId}/` only, which missed
+ * vehicle photos and consultant documents entirely — they survived account
+ * deletion as orphaned blobs holding exactly the personal data the user asked
+ * to have removed. The unit tests did not catch it because they mocked
+ * storage with one flat convention.
  */
 async function purgeVehicleStorage(
   client: ReturnType<typeof getServiceRoleClient>,
@@ -223,26 +284,21 @@ async function purgeVehicleStorage(
   const failures: string[] = [];
 
   for (const vehicleId of vehicleIds) {
-    const { data: objects, error: listError } = await client.storage
-      .from(DOCUMENTS_BUCKET)
-      .list(vehicleId, { limit: 1000 });
+    for (const prefix of vehicleStoragePrefixes(vehicleId)) {
+      const { paths, failures: listFailures } = await listObjectsRecursive(client, prefix);
+      failures.push(...listFailures);
+      if (paths.length === 0) continue;
 
-    if (listError) {
-      failures.push(`${vehicleId}: ${listError.message}`);
-      continue;
+      const { error: removeError } = await client.storage
+        .from(DOCUMENTS_BUCKET)
+        .remove(paths);
+
+      if (removeError) {
+        failures.push(`${prefix}: ${removeError.message}`);
+        continue;
+      }
+      removed += paths.length;
     }
-    if (!objects || objects.length === 0) continue;
-
-    const paths = objects.map((o) => `${vehicleId}/${o.name}`);
-    const { error: removeError } = await client.storage
-      .from(DOCUMENTS_BUCKET)
-      .remove(paths);
-
-    if (removeError) {
-      failures.push(`${vehicleId}: ${removeError.message}`);
-      continue;
-    }
-    removed += paths.length;
   }
 
   return { removed, failures };
@@ -317,6 +373,25 @@ export async function deleteAccount() {
       storageObjectsRemoved: purge.removed,
       storageFailures: purge.failures.length,
     });
+
+    /*
+      Known limitation, logged loudly rather than hidden.
+
+      `uploadInvoiceForCompletion` writes to `invoices/{file}` with no vehicle
+      or user in the path, so those objects cannot be attributed to an account
+      and therefore cannot be purged with it. That is a real gap in a deletion
+      guarantee we make in the privacy policy.
+
+      The fix belongs upstream — that upload should be vehicle-scoped like the
+      other three — and is tracked with task 0.3, which is reworking storage
+      paths anyway. Until then, this records that deletion was incomplete by
+      design rather than pretending otherwise.
+    */
+    logger.warn(
+      'ACCOUNT_DELETE:UNATTRIBUTABLE_STORAGE',
+      'Objects under invoices/ cannot be attributed to a user and were not purged',
+      { userId }
+    );
 
     return {
       success: true,

@@ -32,13 +32,34 @@ const mockDeleteUser = jest.fn<Promise<SupabaseResult>, [string]>(async () => {
   return { data: {}, error: null };
 });
 
-const mockStorageList = jest.fn<Promise<SupabaseResult>, any[]>(async () => ({
-  data: [{ name: 'invoice-1.pdf' }, { name: 'invoice-2.jpg' }],
-  error: null,
-}));
+/**
+ * A storage tree mirroring the four real path conventions. The previous mock
+ * returned a flat list for every prefix, which is precisely why it failed to
+ * catch that the purge only walked `{vehicleId}/`.
+ *
+ * Supabase marks folders with a null id, which is how the recursive walk
+ * distinguishes them.
+ */
+const STORAGE_TREE: Record<string, Array<{ name: string; id: string | null }>> = {
+  'veh-1': [{ name: 'invoice-1.pdf', id: 'o1' }],
+  'veh-2': [{ name: 'invoice-2.jpg', id: 'o2' }],
+  'vehicle-photos/veh-1': [{ name: 'photo.jpg', id: 'o3' }],
+  'consultant-docs/veh-1': [{ name: 'session-a', id: null }],
+  'consultant-docs/veh-1/session-a': [{ name: 'quote.pdf', id: 'o4' }],
+};
 
-const mockStorageRemove = jest.fn<Promise<SupabaseResult>, any[]>(async () => {
+const listedPrefixes: string[] = [];
+
+const mockStorageList = jest.fn<Promise<SupabaseResult>, any[]>(async (prefix: string) => {
+  listedPrefixes.push(prefix);
+  return { data: STORAGE_TREE[prefix] ?? [], error: null };
+});
+
+const removedPaths: string[] = [];
+
+const mockStorageRemove = jest.fn<Promise<SupabaseResult>, any[]>(async (paths: string[]) => {
   ORDER.push('purge-storage');
+  removedPaths.push(...paths);
   return { data: {}, error: null };
 });
 
@@ -77,15 +98,25 @@ const { deleteAccount } = require('@/lib/account-data');
 
 beforeEach(() => {
   ORDER.length = 0;
+  listedPrefixes.length = 0;
+  removedPaths.length = 0;
   jest.clearAllMocks();
   sessionResult = { ok: true, userId: 'user-1' };
   mockDeleteUser.mockImplementation(async () => {
     ORDER.push('delete-auth-user');
     return { data: {}, error: null };
   });
-  mockStorageRemove.mockImplementation(async () => {
+  // Must keep recording removedPaths — an earlier version of this reset
+  // dropped that, and the assertion about the four path conventions failed
+  // against a mock that had quietly stopped observing anything.
+  mockStorageRemove.mockImplementation(async (paths: string[]) => {
     ORDER.push('purge-storage');
+    removedPaths.push(...paths);
     return { data: {}, error: null };
+  });
+  mockStorageList.mockImplementation(async (prefix: string) => {
+    listedPrefixes.push(prefix);
+    return { data: STORAGE_TREE[prefix] ?? [], error: null };
   });
 });
 
@@ -156,10 +187,29 @@ describe('deleteAccount — ordering', () => {
     expect(purgeAt).toBeLessThan(cascadeAt);
   });
 
-  it('purges every vehicle folder, not just the first', async () => {
+  it('purges every vehicle, not just the first', async () => {
     await deleteAccount();
-    expect(mockStorageList).toHaveBeenCalledTimes(2);
-    expect(mockStorageRemove).toHaveBeenCalledTimes(2);
+    expect(listedPrefixes).toContain('veh-1');
+    expect(listedPrefixes).toContain('veh-2');
+  });
+
+  it('purges all four storage conventions, not only {vehicleId}/', async () => {
+    // Uploads scattered files across four different path shapes. Walking only
+    // `{vehicleId}/` left photos and consultant documents behind — orphaned
+    // blobs holding the personal data the user asked to have removed.
+    await deleteAccount();
+
+    expect(removedPaths).toContain('veh-1/invoice-1.pdf');
+    expect(removedPaths).toContain('vehicle-photos/veh-1/photo.jpg');
+    expect(removedPaths).toContain('consultant-docs/veh-1/session-a/quote.pdf');
+  });
+
+  it('descends into nested folders', async () => {
+    // Consultant docs sit at consultant-docs/{vehicleId}/{sessionId}/{file}.
+    // A single-level list returns the session folder as though it were a file,
+    // so nothing is removed and nothing errors.
+    await deleteAccount();
+    expect(listedPrefixes).toContain('consultant-docs/veh-1/session-a');
   });
 
   it('deletes the auth user, rather than flagging it inactive', async () => {
