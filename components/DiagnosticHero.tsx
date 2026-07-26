@@ -5,25 +5,68 @@ import { useCountUp } from '@/hooks/use-count-up';
 import { useHealthBand } from '@/hooks/use-health-band';
 
 interface DiagnosticHeroProps {
-  imageUrl: string;
+  imageUrl?: string | null;
   vehicleName: string;
   healthScore?: number;
   focalX?: number | null;
+  /** 0–100. Vertical crop anchor for the desktop cover crop. */
   focalY?: number | null;
 }
 
-export default function DiagnosticHero({ imageUrl, vehicleName, healthScore, focalX, focalY }: DiagnosticHeroProps) {
+/**
+ * The page-width vehicle hero.
+ *
+ * ── The bug this shape exists to fix ────────────────────────────────────────
+ *
+ * This was a ~4:1 letterbox filled with `cover` and anchored at centre. Owner
+ * photos are 3:4 portrait phone snapshots with the car in the bottom half, so
+ * cover enlarged them ~3x and kept a horizontal band through the vertical
+ * centre — reliably sky, ceiling, or garage lights. The car was not in the
+ * hero at all. Nothing was malfunctioning: the geometry was unsurvivable, and
+ * `center` is the wrong default for the photographs this product receives.
+ *
+ * `.photo-hero` fixes it in two directions. Desktop crops low (`--focal-y`,
+ * defaulting to 80%) and grades the photo; at ≤640px the image switches to
+ * `contain` over a blurred copy of itself, so the whole car stays visible and
+ * nothing is cropped.
+ *
+ * It deliberately does not use `.photo-plate`. Cards keep the plate; a
+ * page-width hero is a different problem, and sharing one class is how the two
+ * drift into each other.
+ *
+ * ── --focal-y, and the column that already existed ──────────────────────────
+ *
+ * The v6 ticket asked for a new stored `hero_focal_y`. It is not needed:
+ * `vehicles.focal_point_y` has existed since March, is already piped through
+ * to this component, and already has an owner-facing editor in
+ * VehiclePhotoUploadDialog. A second column would be a second source of truth
+ * for one concept.
+ *
+ * The only real gap was the default, and CSS closes it. `--focal-y` is emitted
+ * *only* when a value is stored, so `object-position: 50% var(--focal-y, 80%)`
+ * gives the hero its low anchor while VehicleCard keeps its own behaviour off
+ * the same stored number.
+ *
+ * ── What was dropped, deliberately ──────────────────────────────────────────
+ *
+ * The image no longer parallaxes. It relied on `scale(1.12)` to have room to
+ * translate without exposing the edges, and any scale defeats the mobile
+ * `contain` behaviour whose entire purpose is that nothing is cropped. The
+ * content block still fades on scroll.
+ */
+export default function DiagnosticHero({
+  imageUrl,
+  vehicleName,
+  healthScore,
+  focalY,
+}: DiagnosticHeroProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scanDone, setScanDone] = useState(false);
   const [scrollY, setScrollY] = useState(0);
   const [mounted, setMounted] = useState(false);
 
-  const resolvedFocalX = focalX ?? 50;
-  const resolvedFocalY = focalY ?? 50;
-
-  // Shared primitives: same band table and same rAF loop as HealthSummary's
-  // ScoreRing. The local copies this replaced diverged — different easing, and
-  // no reduced-motion check at all.
+  // Shared primitives: the same band table and the same rAF loop as
+  // HealthSummary's ScoreRing, so the two can never disagree about one score.
   const band = useHealthBand(healthScore ?? 0);
   const displayScore = useCountUp(healthScore ?? 0, 1400, scanDone && !!healthScore);
 
@@ -35,83 +78,77 @@ export default function DiagnosticHero({ imageUrl, vehicleName, healthScore, foc
 
   useEffect(() => {
     const handleScroll = () => {
-      if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        const offset = Math.max(0, -rect.top);
-        setScrollY(offset);
-      }
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (rect) setScrollY(Math.max(0, -rect.top));
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const parallaxOffset = scrollY * 0.35;
   const fadeOpacity = Math.max(0, 1 - scrollY / 320);
 
-  const objectPosition = `${resolvedFocalX}% ${resolvedFocalY}%`;
+  /*
+    Emit the variable only when a value is actually stored. Passing '50%'
+    whenever the column is null would quietly reinstate the centred crop this
+    change exists to remove — the CSS fallback of 80% has to be allowed to win.
+  */
+  const focalStyle =
+    focalY != null ? ({ ['--focal-y']: `${focalY}%` } as React.CSSProperties) : undefined;
 
   return (
     <div
       ref={containerRef}
-      className="relative w-full overflow-hidden rounded-2xl border border-white/10"
-      style={{ height: '320px' }}
+      className={`photo-hero rounded-2xl border border-white/10${imageUrl ? '' : ' ph-empty'}`}
+      style={focalStyle}
     >
-      <div
-        className="photo-plate plate-deep absolute inset-0 w-full"
-        style={{
-          transform: `translateY(${parallaxOffset}px) scale(1.12)`,
-          transformOrigin: `${resolvedFocalX}% ${resolvedFocalY}%`,
-          height: '100%',
-        }}
-      >
-        <img
-          src={imageUrl}
-          alt={vehicleName}
-          className="w-full h-full object-cover"
-          style={{ objectPosition }}
-        />
-      </div>
+      {/* Both take the same src. The fill is display:none above 640px, so
+          desktop pays nothing for it. */}
+      {imageUrl && <img className="ph-fill" src={imageUrl} alt="" aria-hidden="true" />}
+      {imageUrl && <img className="ph-img" src={imageUrl} alt={vehicleName} />}
+      <div className="ph-tint" />
+      <div className="ph-bed" />
 
-      {mounted && !scanDone && (
+      {mounted && !scanDone && imageUrl && (
         <div
-          className="absolute left-0 right-0 h-[2px] z-20 pointer-events-none scan-line"
+          className="scan-line left-0 right-0 h-[2px] pointer-events-none"
+          /*
+            position and z-index are set inline on purpose. `.photo-hero > *`
+            sets `position: relative`, and a Tailwind `absolute` class is the
+            same specificity — which is exactly how `.above-stretch` knocked the
+            card's options menu out of its corner earlier. Inline always wins.
+          */
           style={{
-            background: 'linear-gradient(90deg, transparent 0%, rgba(34,211,238,0.0) 5%, rgba(34,211,238,1) 50%, rgba(34,211,238,0.0) 95%, transparent 100%)',
+            position: 'absolute',
+            zIndex: 4,
+            background:
+              'linear-gradient(90deg, transparent 0%, rgba(34,211,238,0) 5%, rgba(34,211,238,1) 50%, rgba(34,211,238,0) 95%, transparent 100%)',
             boxShadow: '0 0 18px 4px rgba(34,211,238,0.55), 0 0 40px 8px rgba(34,211,238,0.18)',
             animation: 'scanLine 0.85s cubic-bezier(0.4,0,0.6,1) forwards',
           }}
         />
       )}
 
-      {scanDone && (
-        <div
-          className="absolute inset-0 pointer-events-none z-10 scan-reveal"
-          style={{
-            background: 'linear-gradient(135deg, rgba(34,211,238,0.025) 0%, transparent 50%)',
-            opacity: fadeOpacity,
-          }}
-        />
-      )}
-
-      <div
-        className="absolute bottom-0 left-0 right-0 z-20 p-6 flex items-end justify-between"
-        style={{ opacity: fadeOpacity }}
-      >
+      <div className="ph-content" style={{ opacity: fadeOpacity }}>
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-white/40 mb-1">
-            {scanDone ? 'Diagnostics Complete' : 'Scanning...'}
+            {!imageUrl ? 'Add a photo' : scanDone ? 'Diagnostics Complete' : 'Scanning...'}
           </p>
-          {/* The one Newsreader element on this screen — see .display-serif. */}
-          <h2 className="display-serif text-3xl text-white tracking-tight">{vehicleName}</h2>
+          {/* A hero is the one place both serif roles are allowed at once — the
+              name and the hero numeral read as a single moment. */}
+          <h2 className="display-serif text-3xl sm:text-4xl text-white tracking-tight leading-none">
+            {vehicleName}
+          </h2>
         </div>
+
+        {/* The score renders once, here, and never on raw photography. */}
         {healthScore !== undefined && (
-          <div className="flex flex-col items-end">
+          <div className="ph-glass">
             <p className="text-xs text-white/40 uppercase tracking-wider mb-1">Health Score</p>
             <div className="flex items-baseline gap-1">
               {/* Numeral stays Inter: tabular figures matter more than flourish
                   on a value that animates digit by digit. */}
               <span
-                className="num text-4xl font-bold"
+                className="num text-4xl font-bold leading-none"
                 style={{
                   color: band.color,
                   filter: scanDone ? `drop-shadow(0 0 8px rgba(${band.rgb},0.45))` : 'none',
@@ -121,10 +158,10 @@ export default function DiagnosticHero({ imageUrl, vehicleName, healthScore, foc
               </span>
               <span className="text-base text-white/35">/100</span>
             </div>
-            {/* Qualitative label carries the same band colour as the numeral,
-                so hero and ScoreRing can never disagree on one dashboard. */}
+            {/* Derived from the score, never passed in — a hand-written label
+                is how 61 came to be called "Good". */}
             <p className="text-xs font-semibold mt-0.5" style={{ color: band.color }}>
-              {scanDone ? band.label : ' '}
+              {scanDone ? band.label : ' '}
             </p>
           </div>
         )}
@@ -132,20 +169,23 @@ export default function DiagnosticHero({ imageUrl, vehicleName, healthScore, foc
 
       <style jsx>{`
         @keyframes scanLine {
-          0%   { top: 0%; opacity: 0; }
-          5%   { opacity: 1; }
-          95%  { opacity: 1; }
-          100% { top: 100%; opacity: 0; }
+          0% {
+            top: 0%;
+            opacity: 0;
+          }
+          5% {
+            opacity: 1;
+          }
+          95% {
+            opacity: 1;
+          }
+          100% {
+            top: 100%;
+            opacity: 0;
+          }
         }
         .scan-line {
           top: 0;
-        }
-        .scan-reveal {
-          animation: revealFade 0.6s ease-out forwards;
-        }
-        @keyframes revealFade {
-          from { opacity: 0; }
-          to   { opacity: 1; }
         }
       `}</style>
     </div>
