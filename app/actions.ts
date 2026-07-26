@@ -7,6 +7,7 @@ import { getVehicleImage } from '@/lib/vehicle-images';
 import { logger } from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { authorizeVehicleAccess, authorizeVehicleScopedRow, requireSession } from '@/lib/api-auth';
+import { vehicleStoragePath, vehicleIdFromStoragePath } from '@/lib/storage-paths';
 import { parseWishlistCommands, parsePerformanceCommands, parseStatusCommands, parseInvoiceFlag } from '@/lib/consultant-commands';
 import { validateData, vehicleIdSchema, serviceItemSchema, maintenanceLineItemSchema, quoteRequestSchema } from '@/lib/validation';
 import { withRetry } from '@/lib/retry';
@@ -2156,10 +2157,24 @@ export async function getSignedInvoiceUrl(fileUrl: string) {
 
     const filePath = fileUrl.replace('placeholder://', '');
 
-    // Objects are stored under `{vehicleId}/{filename}`, which is also what
-    // the storage RLS policy keys on. Deriving the vehicle from the path lets
-    // us prove ownership before minting a URL that bypasses RLS for an hour.
-    const [pathVehicleId] = filePath.split('/');
+    /*
+      Every object now lives under `{vehicleId}/{kind}/…`, so ownership is
+      derivable from the path — which is what the storage RLS policy keys on
+      too. Proving it here matters because a signed URL bypasses RLS for its
+      lifetime, so the check has to happen before minting rather than relying
+      on the policy afterwards.
+
+      Legacy objects under `vehicle-photos/`, `consultant-docs/` and
+      `invoices/` return null and are refused: their first segment is not a
+      vehicle id, so ownership cannot be established. All such objects are
+      unreferenced orphans slated for removal.
+    */
+    const pathVehicleId = vehicleIdFromStoragePath(filePath);
+    if (!pathVehicleId) {
+      logger.warn('SIGNED_URL:UNSCOPED_PATH', 'Path has no vehicle prefix', { filePath });
+      return { success: false, error: 'File not found' };
+    }
+
     const access = await authorizeVehicleAccess(pathVehicleId, { intent: 'read' });
     if (!access.ok) {
       return { success: false, error: access.error };
@@ -2926,7 +2941,7 @@ export async function uploadInvoice(formData: FormData) {
 
     console.log(`[Upload] Starting upload for ${file.name} (${file.size} bytes)${bypassVehicleCheck ? ' [BYPASS VEHICLE CHECK]' : ''}`);
 
-    const fileName = `${vehicleId}/${Date.now()}-${file.name.replace(/\s/g, '_')}`;
+    const fileName = vehicleStoragePath(vehicleId, 'invoices', file.name);
     const arrayBuffer = await file.arrayBuffer();
     const base64Data = Buffer.from(arrayBuffer).toString('base64');
 
@@ -2983,6 +2998,24 @@ export async function uploadInvoice(formData: FormData) {
         .from('vehicle_documents')
         .delete()
         .eq('id', document.id);
+
+      /*
+        Remove the object too. Deleting only the row left the uploaded file
+        behind with nothing referencing it — and since a rejected parse is a
+        normal outcome (not an automotive invoice, wrong vehicle, unreadable
+        scan), this leaked on the common path. It accounts for the 54
+        unreferenced objects found in this bucket against 5 surviving rows.
+      */
+      const { error: orphanError } = await client.storage
+        .from('vehicle-documents')
+        .remove([fileName]);
+
+      if (orphanError) {
+        logger.error('UPLOAD_INVOICE:ORPHAN_CLEANUP', new Error(orphanError.message), {
+          vehicleId,
+          fileName,
+        });
+      }
 
       if (parseResult.error === 'NOT_AUTOMOTIVE_INVOICE') {
         return {
@@ -3055,8 +3088,7 @@ export async function uploadVehiclePhoto(formData: FormData) {
         .remove([vehicle.custom_image_storage_path]);
     }
 
-    const fileExt = file.name.split('.').pop();
-    const fileName = `vehicle-photos/${vehicleId}/${Date.now()}.${fileExt}`;
+    const fileName = vehicleStoragePath(vehicleId, 'photos', file.name);
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const fileBlob = new Blob([buffer], { type: file.type });
@@ -3253,7 +3285,7 @@ export async function uploadConsultantDocument(formData: FormData) {
       };
     }
 
-    const fileName = `consultant-docs/${vehicleId}/${sessionId}/${Date.now()}-${file.name.replace(/\s/g, '_')}`;
+    const fileName = vehicleStoragePath(vehicleId, 'consultant', file.name, [sessionId]);
     const buffer = Buffer.from(arrayBuffer);
     const fileBlob = new Blob([buffer], { type: file.type });
 
@@ -3649,7 +3681,8 @@ export async function moveServiceItemToHistory(
 }
 
 export async function uploadInvoiceForCompletion(
-  file: File
+  file: File,
+  vehicleId: string
 ): Promise<{ success: boolean; data?: { url: string }; error?: string }> {
   try {
     // Writes to storage before the file is attached to any vehicle.
@@ -3667,26 +3700,38 @@ export async function uploadInvoiceForCompletion(
       return { success: false, error: 'Only PDF, JPG, and PNG files are allowed' };
     }
 
-    const client = getServiceRoleClient();
-    const fileName = `invoices/${Date.now()}-${Math.random().toString(36).substring(2, 9)}-${file.name}`;
+    /*
+      This wrote to `.from('documents')` — a bucket that does not exist in
+      this project, which has only `vehicle-documents` and `garage-images`.
+      Every call failed silently since it was written, which is why
+      maintenance_line_items.invoice_url is NULL across every row: attaching
+      an invoice while marking work complete has never worked.
+    */
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
 
-    const { data, error } = await client.storage
-      .from('documents')
+    const client = access.client;
+    const fileName = vehicleStoragePath(vehicleId, 'invoices', file.name);
+
+    const { error } = await client.storage
+      .from('vehicle-documents')
       .upload(fileName, file, {
         cacheControl: '3600',
         upsert: false,
       });
 
     if (error) {
-      console.error('[Invoice Upload] Error:', error);
+      logger.error('INVOICE_UPLOAD:STORAGE', new Error(error.message), { vehicleId });
       return { success: false, error: 'Failed to upload invoice' };
     }
 
-    const { data: publicData } = client.storage
-      .from('documents')
-      .getPublicUrl(fileName);
-
-    return { success: true, data: { url: publicData.publicUrl } };
+    // The storage path, not a URL. The bucket becomes private in this task,
+    // so a URL is minted on demand via getSignedInvoiceUrl instead of being
+    // persisted — a stored public URL would outlive the permission that
+    // justified it.
+    return { success: true, data: { url: `placeholder://${fileName}` } };
   } catch (error: any) {
     console.error('[Invoice Upload] Exception:', error);
     return { success: false, error: error.message || 'Failed to upload invoice' };
