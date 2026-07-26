@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Car, Eye, EyeOff, Loader as Loader2, CircleCheck as CheckCircle2 } from 'lucide-react';
+import { Car, Eye, EyeOff, Loader as Loader2, CircleCheck as CheckCircle2, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { createBrowserSupabaseClient } from '@/lib/supabase';
 
@@ -16,6 +16,8 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [awaitingVerification, setAwaitingVerification] = useState(false);
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
 
   const passwordStrength = password.length === 0 ? null
     : password.length < 6 ? 'weak'
@@ -41,7 +43,13 @@ export default function SignupPage() {
 
     try {
       const client = createBrowserSupabaseClient();
-      const { data, error: signUpError } = await client.auth.signUp({ email, password });
+      const { data, error: signUpError } = await client.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
 
       if (signUpError) {
         setError(signUpError.message);
@@ -49,27 +57,110 @@ export default function SignupPage() {
         return;
       }
 
+      /*
+       * Supabase returns a session only when email confirmation is switched
+       * off for the project. When it is on, we get a user and no session —
+       * which is the signal that the address has not been proven yet.
+       *
+       * This previously called signInWithPassword() in that branch, handing
+       * out a full session anyway. That defeated verification entirely: you
+       * could register any address you did not control and be signed in as
+       * its owner. Do not reintroduce that fallback.
+       */
       if (data.session) {
         setSuccess(true);
         setTimeout(() => { router.push('/onboard'); router.refresh(); }, 1000);
         return;
       }
 
-      if (data.user && !data.session) {
-        const { error: signInError } = await client.auth.signInWithPassword({ email, password });
-        if (!signInError) {
-          setSuccess(true);
-          setTimeout(() => { router.push('/onboard'); router.refresh(); }, 1000);
-          return;
-        }
-      }
-
-      setSuccess(true);
+      setAwaitingVerification(true);
       setLoading(false);
     } catch {
       setError('Something went wrong. Please try again.');
       setLoading(false);
     }
+  }
+
+  async function handleResend() {
+    setResendState('sending');
+    setError(null);
+    try {
+      const client = createBrowserSupabaseClient();
+      const { error: resendError } = await client.auth.resend({
+        type: 'signup',
+        email,
+        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      });
+      // Supabase rate limits this server-side; surface its message rather
+      // than inventing our own cooldown.
+      setResendState(resendError ? 'error' : 'sent');
+      if (resendError) setError(resendError.message);
+    } catch {
+      setResendState('error');
+      setError('Could not resend the email. Please try again shortly.');
+    }
+  }
+
+  if (awaitingVerification) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center p-4"
+        style={{
+          backgroundImage: `linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.85)), url('/dark-roomb.jpeg')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
+      >
+        <div className="w-full max-w-md text-center">
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-10 backdrop-blur-xl">
+            <Mail className="h-14 w-14 text-info mx-auto mb-5" aria-hidden="true" />
+            <h2 className="text-2xl font-bold text-white mb-3">Confirm your email</h2>
+            <p className="text-white/55 text-sm leading-relaxed">
+              We sent a confirmation link to{' '}
+              <span className="text-white font-medium break-all">{email}</span>.
+              Open it to finish setting up your garage.
+            </p>
+
+            <div className="mt-7 pt-6 border-t border-white/10">
+              {resendState === 'sent' ? (
+                <p className="text-sm text-health-good">
+                  Sent again — check your inbox and spam folder.
+                </p>
+              ) : (
+                <>
+                  <p className="text-xs text-white/40 mb-3">Didn&apos;t get it?</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleResend}
+                    disabled={resendState === 'sending'}
+                    className="border-white/15 text-white/80 hover:text-white"
+                  >
+                    {resendState === 'sending' ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" aria-hidden="true" />
+                        Sending…
+                      </>
+                    ) : (
+                      'Resend confirmation email'
+                    )}
+                  </Button>
+                </>
+              )}
+
+              {error && <p className="text-sm text-red-400 mt-3">{error}</p>}
+            </div>
+
+            <p className="text-xs text-white/35 mt-6">
+              Already confirmed?{' '}
+              <Link href="/login" className="text-info hover:underline">
+                Sign in
+              </Link>
+            </p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (success) {
