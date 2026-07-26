@@ -56,11 +56,11 @@ export function CostBreakdownTable({ costBreakdown }: CostBreakdownTableProps) {
           <Table>
             <TableHeader>
               <TableRow className="border-info-border hover:bg-cyan-400/5">
-                <TableHead className="text-info">Item</TableHead>
-                <TableHead className="text-info text-right">Parts</TableHead>
-                <TableHead className="text-info text-right">Labor Hrs</TableHead>
-                <TableHead className="text-info text-right">Labor Cost</TableHead>
-                <TableHead className="text-info text-right">Total</TableHead>
+                <TableHead className="text-info-strong text-[11px] uppercase tracking-[0.04em] font-semibold">Item</TableHead>
+                <TableHead className="text-info-strong text-[11px] uppercase tracking-[0.04em] font-semibold text-right">Parts</TableHead>
+                <TableHead className="text-info-strong text-[11px] uppercase tracking-[0.04em] font-semibold text-right">Labor Hrs</TableHead>
+                <TableHead className="text-info-strong text-[11px] uppercase tracking-[0.04em] font-semibold text-right">Labor Cost</TableHead>
+                <TableHead className="text-info-strong text-[11px] uppercase tracking-[0.04em] font-semibold text-right">Total</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -117,13 +117,13 @@ export function CostBreakdownTable({ costBreakdown }: CostBreakdownTableProps) {
                   </TableRow>
                 );
               })}
-              <TableRow className="border-t-2 border-info-border bg-info-wash hover:bg-cyan-400/15">
+              <TableRow className="border-t-2 border-info-border bg-info-wash hover:bg-info-wash">
                 <TableCell colSpan={4} className="font-bold text-info text-right">
                   Estimated Total
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex flex-col">
-                    <Badge variant="outline" className="border-info-border text-info justify-center">
+                    <Badge variant="outline" className="justify-center rounded-full border-transparent bg-info-wash text-info-strong px-3.5 py-1.5 font-bold tabular-nums">
                       {formatCurrency(costBreakdown.total_low)} - {formatCurrency(costBreakdown.total_high)}
                     </Badge>
                   </div>

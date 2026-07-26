@@ -757,7 +757,20 @@ export default function ConsultantChat({
               ))}
             </div>
           )}
-          <div className="flex gap-2">
+          {/* Canonical composer order is [attach, input, send] — attach sits
+              beside the field, not stacked between field and send. */}
+          <div className="flex gap-2 items-end">
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={loading || uploadingFiles || selectedFiles.length >= 3}
+              aria-label="Attach a file"
+              title="Attach documents, invoices, or diagnostic reports"
+              className="tap-target-44 border-white/10 text-white/50 hover:text-cyan-400 hover:bg-cyan-400/8 hover:border-cyan-400/30 transition-all"
+            >
+              <Paperclip className="h-[17px] w-[17px]" />
+            </Button>
             <div className="flex flex-col flex-1 gap-2">
               <Textarea
                 placeholder="Ask me anything about your vehicle..."
@@ -769,30 +782,19 @@ export default function ConsultantChat({
                 disabled={loading || uploadingFiles}
               />
             </div>
-            <div className="flex flex-col gap-2">
-              <Button
-                variant="outline"
-                size="lg"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={loading || uploadingFiles || selectedFiles.length >= 3}
-                title="Attach documents, invoices, or diagnostic reports"
-                className="border-white/10 text-white/50 hover:text-cyan-400 hover:bg-cyan-400/8 hover:border-cyan-400/30 transition-all"
-              >
-                <Paperclip className="h-4 w-4" />
-              </Button>
-              <Button
-                onClick={() => handleSend()}
-                disabled={loading || uploadingFiles || (!input.trim() && selectedFiles.length === 0)}
-                size="lg"
-                className="bg-cyan-600 hover:bg-cyan-500 text-white border-0 transition-all disabled:opacity-40"
-              >
-                {uploadingFiles ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
+            <Button
+              onClick={() => handleSend()}
+              disabled={loading || uploadingFiles || (!input.trim() && selectedFiles.length === 0)}
+              size="lg"
+              aria-label="Send"
+              className="tap-target-44 bg-cyan-600 hover:bg-cyan-500 text-white border-0 transition-all disabled:opacity-40"
+            >
+              {uploadingFiles ? (
+                <Loader2 className="h-[15px] w-[15px] animate-spin" />
+              ) : (
+                <Send className="h-[15px] w-[15px]" />
+              )}
+            </Button>
           </div>
           <input
             ref={fileInputRef}

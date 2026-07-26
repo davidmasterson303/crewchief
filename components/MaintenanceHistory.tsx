@@ -267,7 +267,7 @@ export default function MaintenanceHistory({ vehicleId, documents, lineItems = [
             <div className="flex gap-1.5 flex-wrap">
               <button
                 onClick={() => setFilterType(null)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all h-9 ${filterType === null ? 'bg-cyan-400/10 text-cyan-300 border border-cyan-400/25' : 'bg-white/4 text-white/50 border border-white/10 hover:border-white/20 hover:text-white/70'}`}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all h-9 ${filterType === null ? 'bg-white/8 text-white border border-cyan-400/40' : 'bg-white/4 text-white/50 border border-white/10 hover:border-white/20 hover:text-white/70'}`}
               >
                 All
               </button>
@@ -275,7 +275,7 @@ export default function MaintenanceHistory({ vehicleId, documents, lineItems = [
                 <button
                   key={type}
                   onClick={() => setFilterType(filterType === type ? null : type)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all h-9 capitalize ${filterType === type ? 'bg-cyan-400/10 text-cyan-300 border border-cyan-400/25' : 'bg-white/4 text-white/50 border border-white/10 hover:border-white/20 hover:text-white/70'}`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all h-9 capitalize ${filterType === type ? 'bg-white/8 text-white border border-cyan-400/40' : 'bg-white/4 text-white/50 border border-white/10 hover:border-white/20 hover:text-white/70'}`}
                 >
                   {type}
                 </button>
