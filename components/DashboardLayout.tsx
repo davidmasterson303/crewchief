@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { updateVehicleAvgMileage, updateVehicleMileage, updateVehicleStatus } from '@/app/actions';
+import { USAGE_PROFILES, usageProfileChip } from '@/lib/usage-profile';
 import { invalidateDashboardCache } from '@/lib/query-invalidation';
 import { AccountMenu } from '@/components/AccountMenu';
 
@@ -70,12 +71,6 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
     backgroundPosition: `${focalX}% ${focalY}%`,
   } : undefined;
 
-  const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
-    daily_driver: { label: 'Daily Driver', color: 'text-green-300', bg: 'bg-green-500/12', border: 'border-green-400/25' },
-    weekend:      { label: 'Weekend',      color: 'text-info-strong', bg: 'bg-info-wash',    border: 'border-info-border' },
-    stored:       { label: 'Stored',       color: 'text-amber-300', bg: 'bg-amber-500/12', border: 'border-amber-400/25' },
-    for_sale:     { label: 'For Sale',     color: 'text-red-300',   bg: 'bg-red-500/12',   border: 'border-red-400/25' },
-  };
 
   const handleSaveStatus = async (status: string) => {
     if (isDemo) return;
@@ -84,7 +79,7 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
     setDisplayVehicle((d: any) => ({ ...d, vehicle_status: status }));
     const result = await updateVehicleStatus(vehicle.id, status as any);
     if (result.success) {
-      toast.success(`Status updated to ${STATUS_CONFIG[status]?.label}`);
+      toast.success(`Status updated to ${usageProfileChip(status).label}`);
       invalidateDashboardCache(vehicle.id);
     } else {
       toast.error('Failed to update status');
@@ -311,24 +306,24 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                       isDemo ? 'opacity-60 cursor-not-allowed' : 'hover:border-white/25 hover:bg-white/5'
                     } ${
                       displayVehicle.vehicle_status
-                        ? `${STATUS_CONFIG[displayVehicle.vehicle_status]?.bg} ${STATUS_CONFIG[displayVehicle.vehicle_status]?.border} ${STATUS_CONFIG[displayVehicle.vehicle_status]?.color}`
+                        ? usageProfileChip(displayVehicle.vehicle_status).className
                         : 'bg-white/5 border-white/15 text-white/50'
                     }`}
                   >
                     <Tag className="h-3.5 w-3.5" />
-                    {displayVehicle.vehicle_status ? STATUS_CONFIG[displayVehicle.vehicle_status]?.label : 'Set Status'}
+                    {displayVehicle.vehicle_status ? usageProfileChip(displayVehicle.vehicle_status).label : 'Set Status'}
                   </button>
                   {isStatusOpen && (
                     <div className="absolute top-full mt-1.5 right-0 z-50 bg-[#111] border border-white/12 rounded-xl shadow-xl shadow-black/50 py-1.5 min-w-[160px]">
-                      {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
+                      {Object.entries(USAGE_PROFILES).map(([key, cfg]) => (
                         <button
                           key={key}
                           onClick={() => handleSaveStatus(key)}
                           className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium transition-colors hover:bg-white/6 ${
-                            displayVehicle.vehicle_status === key ? cfg.color : 'text-white/65'
+                            displayVehicle.vehicle_status === key ? 'text-cyan-400' : 'text-white/65'
                           }`}
                         >
-                          <Tag className={`h-3.5 w-3.5 ${displayVehicle.vehicle_status === key ? cfg.color : 'text-white/30'}`} />
+                          <Tag className={`h-3.5 w-3.5 ${displayVehicle.vehicle_status === key ? 'text-cyan-400' : 'text-white/30'}`} />
                           {cfg.label}
                         </button>
                       ))}

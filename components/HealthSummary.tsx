@@ -129,7 +129,7 @@ export default function HealthSummary({ vehicleId, healthSummary, recalls = [], 
   // hero score can never disagree about which band a score falls in.
   const getScoreLabel = (score: number) => {
     const band = getHealthBand(score);
-    return { label: band.label, color: `text-health-${band.name}` };
+    return { label: band.label, color: band.textClass };
   };
 
   const getEmptyStatusMessage = (status: string, type: string): string => {

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { usageProfileChip } from '@/lib/usage-profile';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -60,12 +61,6 @@ interface VehicleCardProps {
   healthSummary?: any;
 }
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  daily_driver: { label: 'Daily Driver', color: 'text-green-300', bg: 'bg-green-500/15', border: 'border-green-400/30' },
-  weekend:      { label: 'Weekend',      color: 'text-info-strong', bg: 'bg-info-wash',    border: 'border-info-border' },
-  stored:       { label: 'Stored',       color: 'text-amber-300', bg: 'bg-amber-500/15', border: 'border-amber-400/30' },
-  for_sale:     { label: 'For Sale',     color: 'text-red-300',   bg: 'bg-red-500/15',   border: 'border-red-400/30' },
-};
 
 function HealthRing({ score }: { score: number }) {
   const radius = 26;
@@ -189,7 +184,7 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary }: VehicleCa
   if (isDeleted) return null;
 
   const statusKey = displayVehicle.vehicle_status || 'daily_driver';
-  const statusInfo = STATUS_CONFIG[statusKey] || STATUS_CONFIG['daily_driver'];
+  const statusInfo = usageProfileChip(statusKey);
 
   const getHealthPill = () => {
     if (!healthSummary) return null;
@@ -258,7 +253,7 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary }: VehicleCa
               {activeRecalls} Recall{activeRecalls !== 1 ? 's' : ''}
             </div>
           )}
-          <div className={`flex items-center gap-1.5 ${statusInfo.bg} ${statusInfo.border} border px-2.5 py-1 rounded-full text-xs font-semibold backdrop-blur-sm ${statusInfo.color}`}>
+          <div className={`flex items-center gap-1.5 ${statusInfo.className} border px-2.5 py-1 rounded-full text-xs font-semibold backdrop-blur-sm`}>
             <Tag className="h-3 w-3" />
             {statusInfo.label}
           </div>

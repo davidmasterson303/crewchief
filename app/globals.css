@@ -188,6 +188,16 @@ nav {
     background: linear-gradient(to top, rgb(0 0 0 / 0.88), rgb(0 0 0 / 0) 65%);
   }
 
+  /* Caps prose at a readable measure. In wide cards body copy was running to
+   * ~95 characters, well past the ~65-75 the eye tracks comfortably, so the
+   * return sweep starts losing the next line.
+   *
+   * For real paragraphs only. Labels, table cells and data rows want the
+   * width they are given — capping those just strands them mid-column. */
+  .measure {
+    max-width: 68ch;
+  }
+
   /* Grows the tap area to the 44px iOS minimum without inflating the visual
    * pill. Apply to any small chip that is a real standalone tap target. */
   .tap-target-44 {

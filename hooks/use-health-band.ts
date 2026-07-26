@@ -24,6 +24,19 @@ export interface HealthBand {
   rgb: string;
   /** Qualitative wording shown beside the score. */
   label: string;
+  /**
+   * The text colour as a **literal** class.
+   *
+   * Callers used to build this as `text-health-${band.name}`. Tailwind only
+   * ever sees literal strings, so three of the four never got generated and
+   * the label silently fell back to inherited foreground — HealthSummary
+   * printed "Fair" in plain white while DiagnosticHero printed the same score
+   * in the band colour, on the same dashboard.
+   *
+   * Spelling them out is what makes them real. Do not reconstruct this from
+   * `name`.
+   */
+  textClass: string;
 }
 
 /*
@@ -35,10 +48,10 @@ export interface HealthBand {
  * Thresholds are unchanged; only the words moved down a step.
  */
 const BANDS: ReadonlyArray<HealthBand & { min: number }> = [
-  { min: 80, name: 'good', color: 'var(--ring-good)', rgb: '127,206,156', label: 'Good' },
-  { min: 60, name: 'ok', color: 'var(--ring-ok)', rgb: '95,174,192', label: 'Fair' },
-  { min: 40, name: 'warn', color: 'var(--ring-warn)', rgb: '224,164,104', label: 'Needs attention' },
-  { min: -Infinity, name: 'bad', color: 'var(--ring-bad)', rgb: '224,136,130', label: 'Critical' },
+  { min: 80, name: 'good', color: 'var(--ring-good)', rgb: '127,206,156', label: 'Good', textClass: 'text-health-good' },
+  { min: 60, name: 'ok', color: 'var(--ring-ok)', rgb: '95,174,192', label: 'Fair', textClass: 'text-health-ok' },
+  { min: 40, name: 'warn', color: 'var(--ring-warn)', rgb: '224,164,104', label: 'Needs attention', textClass: 'text-health-warn' },
+  { min: -Infinity, name: 'bad', color: 'var(--ring-bad)', rgb: '224,136,130', label: 'Critical', textClass: 'text-health-bad' },
 ];
 
 /**

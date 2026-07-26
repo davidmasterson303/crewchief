@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ShieldAlert, ExternalLink, X, ChevronDown, ChevronUp, CircleCheck as CheckCircle2, Loader as Loader2 } from 'lucide-react';
+import { ShieldAlert, ExternalLink, X, ChevronDown, ChevronUp, Check, Loader as Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 
@@ -128,12 +128,12 @@ export default function RecallAlerts({ recalls, vehicleId, addressedCampaigns = 
                       <button
                         onClick={() => handleMarkAddressed(campaignNum)}
                         disabled={isAddressing}
-                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500/10 hover:bg-green-500/20 border border-green-400/20 hover:border-green-400/40 text-green-400/80 hover:text-green-300 text-xs font-medium transition-all disabled:opacity-50"
+                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/12 hover:border-white/20 text-white/70 hover:text-white text-xs font-medium transition-all disabled:opacity-50"
                       >
                         {isAddressing ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         ) : (
-                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          <Check className="h-3.5 w-3.5" />
                         )}
                         Mark addressed
                       </button>

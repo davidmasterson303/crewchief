@@ -6,9 +6,40 @@ const config: Config = {
     './pages/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
     './app/**/*.{js,ts,jsx,tsx,mdx}',
+    /*
+      hooks/ and lib/ hold shared class tables — the health-band ramp, the
+      usage-profile chips. Leaving them unscanned meant a class written there
+      only survived if some component happened to spell it out too, which is
+      luck, not a build step. text-health-ok, -warn and -bad were all being
+      dropped; text-health-good only made it because app/signup uses it
+      literally.
+    */
+    './hooks/**/*.{js,ts,jsx,tsx,mdx}',
+    './lib/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
     extend: {
+      /*
+        Tailwind 3.3's opacity modifier only accepts values present in this
+        scale — `border-white/8` is not "8% white", it is nothing at all, and
+        the utility is dropped silently. The element then falls back to
+        whatever it would have had otherwise, which for borders is the warm
+        --border brown rather than a white hairline.
+
+        354 utilities across the app were landing in that hole: /8 alone
+        appears 105 times, /12 42 times, /15 48 times. Nothing errored,
+        nothing failed to compile, and the result was only visible by reading
+        a computed border colour off a real element.
+
+        The default scale stops at multiples of 5 plus 25/75. Everything the
+        codebase actually reaches for is spelled out here.
+      */
+      opacity: {
+        2: '0.02', 3: '0.03', 4: '0.04', 6: '0.06', 8: '0.08',
+        12: '0.12', 14: '0.14', 15: '0.15', 16: '0.16', 18: '0.18',
+        35: '0.35', 45: '0.45', 55: '0.55', 65: '0.65', 85: '0.85',
+        98: '0.98',
+      },
       letterSpacing: {
         tighter: '-0.03em',
         tight: '-0.015em',
