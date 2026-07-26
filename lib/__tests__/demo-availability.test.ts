@@ -105,14 +105,26 @@ describe('anon-readable table list is explicit', () => {
     expect(ANON_READ_TABLES.required).toContain('vehicle_health_summary');
   });
 
-  it('keeps the known gaps visible rather than silently broken', () => {
-    // These are queried by the demo dashboard but 401 for anon today. Listed
-    // so the degradation is documented rather than discovered by a recruiter.
-    // Remove an entry only when the grant is actually restored.
-    expect(ANON_READ_TABLES.knownGaps).toEqual([
+  it('has no outstanding gaps — every table the demo queries is readable', () => {
+    // Was ['vehicle_knowledge_base', 'recall_actions'], closed 26 Jul.
+    // A table appearing here means part of the demo renders empty without
+    // erroring, which is how the last pair went unnoticed for eight weeks.
+    expect(ANON_READ_TABLES.knownGaps).toEqual([]);
+  });
+
+  it('guards all five tables the demo dashboard queries client-side', () => {
+    // The dashboard queries these directly with the anon key. Losing the
+    // grant on any of them empties part of the page silently, because the
+    // queries use maybeSingle() and a 401 resolves to null.
+    for (const table of [
+      'vehicles',
       'vehicle_knowledge_base',
+      'nhtsa_data',
+      'vehicle_health_summary',
       'recall_actions',
-    ]);
+    ]) {
+      expect(ANON_READ_TABLES.required).toContain(table);
+    }
   });
 
   it('never lists a table as both required and a known gap', () => {

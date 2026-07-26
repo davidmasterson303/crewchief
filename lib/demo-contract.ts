@@ -58,24 +58,24 @@ export const ANON_READ_TABLES = {
     'vehicle_health_summary',
     'nhtsa_data',
     'wishlist_items',
+    // Closed 26 Jul by 20260726140000. vehicle_knowledge_base needed only the
+    // SELECT grant — its policy was already demo-scoped. recall_actions had no
+    // demo clause at all and needed a policy too. Verified live afterwards.
+    'vehicle_knowledge_base',
+    'recall_actions',
   ],
   /**
-   * KNOWN GAP — queried by the demo dashboard but NOT readable by anon.
+   * Tables the demo queries that anon cannot read.
    *
-   * The June 2026 hardening migration revoked anon SELECT from every table,
-   * then restored only four. These two were missed, so on the live demo both
-   * queries 401 and resolve to null today:
+   * Empty as of 26 July 2026. It previously held vehicle_knowledge_base and
+   * recall_actions, which 401'd for eight weeks without anyone noticing: the
+   * client queries use maybeSingle(), so a 401 resolves to null and the page
+   * renders with a hole rather than an error.
    *
-   *   vehicle_knowledge_base  known issues, maintenance schedule, fluid
-   *                           specs, common mods — the structured dossier
-   *   recall_actions          which recall campaigns have been addressed
-   *
-   * The narrative content a visitor sees first comes from
-   * vehicle_health_summary and is unaffected, which is why this has gone
-   * unnoticed. Restoring these is tracked with task 0.1; the fix is a
-   * demo-scoped grant plus an is_demo RLS policy, NOT a blanket grant.
+   * Anything landing here again is a silent demo degradation. Prefer fixing
+   * it to recording it.
    */
-  knownGaps: ['vehicle_knowledge_base', 'recall_actions'],
+  knownGaps: [] as string[],
 } as const;
 
 /**
