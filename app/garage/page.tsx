@@ -6,6 +6,7 @@ import { Car, Plus } from 'lucide-react';
 import { VehicleCard } from '@/components/VehicleCard';
 import { useVehicles } from '@/hooks/useVehicles';
 import { AccountMenu } from '@/components/AccountMenu';
+import { RevealOnScroll } from '@/components/RevealOnScroll';
 
 export default function GaragePage() {
   const { data: vehicles = [], isLoading: loading, error: queryError } = useVehicles();
@@ -92,13 +93,16 @@ export default function GaragePage() {
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {vehicles.map((vehicle) => (
-              <VehicleCard
-                key={vehicle.id}
-                vehicle={vehicle}
-                activeRecalls={vehicle.nhtsa_data?.[0]?.recalls?.length || 0}
-                healthSummary={vehicle.vehicle_health_summary?.[0]}
-              />
+            {vehicles.map((vehicle, i) => (
+              // Index is per-grid, so the stagger restarts here rather than
+              // continuing a count from elsewhere on the page.
+              <RevealOnScroll key={vehicle.id} index={i} className="h-full">
+                <VehicleCard
+                  vehicle={vehicle}
+                  activeRecalls={vehicle.nhtsa_data?.[0]?.recalls?.length || 0}
+                  healthSummary={vehicle.vehicle_health_summary?.[0]}
+                />
+              </RevealOnScroll>
             ))}
           </div>
         )}

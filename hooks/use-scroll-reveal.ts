@@ -50,9 +50,25 @@ export function useScrollReveal<T extends HTMLElement>(threshold = 0.15) {
       typeof window !== 'undefined' &&
       window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
-    // Also covers browsers without IntersectionObserver: reveal rather than
-    // leave content stranded at opacity 0.
-    if (reduced || typeof IntersectionObserver === 'undefined') {
+    /*
+      Reveal immediately, without observing, when:
+
+        - motion is reduced
+        - IntersectionObserver is missing
+        - the document is hidden
+
+      That last one is not theoretical. IntersectionObserver does not fire at
+      all while `document.hidden` is true, so anything rendered in a
+      background tab — or by a headless screenshotter, link-preview
+      generator or print pipeline — stays at opacity 0 with no callback ever
+      arriving. Found while verifying this in a hidden browser pane: a fresh
+      observer on a plainly-visible element simply never fired.
+
+      Revealing early costs an animation. Not revealing costs the content.
+    */
+    const hidden = typeof document !== 'undefined' && document.hidden;
+
+    if (reduced || hidden || typeof IntersectionObserver === 'undefined') {
       reveal();
       return;
     }

@@ -6,6 +6,7 @@ import { Car, ArrowRight } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { VehicleCard } from '@/components/VehicleCard';
+import { RevealOnScroll } from '@/components/RevealOnScroll';
 import { supabase } from '@/lib/supabase';
 
 const LandingHero = dynamic(() => import('@/components/LandingHero'), { ssr: false });
@@ -96,13 +97,14 @@ export default function DemoPage() {
               ))}
             </>
           ) : vehicles.length > 0 ? (
-            vehicles.map((vehicle) => (
-              <VehicleCard
-                key={vehicle.id}
-                vehicle={vehicle}
-                activeRecalls={vehicle.nhtsa_data?.[0]?.recalls?.length || 0}
-                healthSummary={vehicle.vehicle_health_summary?.[0]}
-              />
+            vehicles.map((vehicle, i) => (
+              <RevealOnScroll key={vehicle.id} index={i} className="h-full">
+                <VehicleCard
+                  vehicle={vehicle}
+                  activeRecalls={vehicle.nhtsa_data?.[0]?.recalls?.length || 0}
+                  healthSummary={vehicle.vehicle_health_summary?.[0]}
+                />
+              </RevealOnScroll>
             ))
           ) : (
             <div className="col-span-full text-center py-12 text-white/40">
