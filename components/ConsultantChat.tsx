@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Loader as Loader2, Send, Plus, Search, MessageSquare, Paperclip, X, FileText, ExternalLink, Heart, Check, Wrench, TriangleAlert, Sparkles } from 'lucide-react';
+import { Loader as Loader2, Send, Plus, Search, MessageSquare, Paperclip, X, FileText, ExternalLink, Heart, Check, Wrench, TriangleAlert, Sparkles, PanelLeft } from 'lucide-react';
 import { logger } from '@/lib/logger';
 import { isDemoMode, isDemoVehicleId } from '@/lib/demo';
 import {
@@ -128,6 +128,7 @@ export default function ConsultantChat({
   const [loading, setLoading] = useState(false);
   const [thinkingStage, setThinkingStage] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const [uploadedDocuments, setUploadedDocuments] = useState<any[]>([]);
@@ -176,6 +177,7 @@ export default function ConsultantChat({
   };
 
   const loadSession = async (sessionId: string) => {
+    setSidebarOpen(false);
     const result = await getConsultantSession(sessionId);
     if (result.success && result.data) {
       setMessages(result.data.message_history || []);
@@ -446,8 +448,26 @@ export default function ConsultantChat({
   );
 
   return (
-    <div className="h-[calc(100vh-320px)] min-h-[520px] max-h-[760px] border border-white/10 rounded-2xl overflow-hidden flex bg-slate-950/90 shadow-xl shadow-black/40 animate-consultant-fade">
-      <div className="w-64 border-r border-white/8 flex flex-col bg-black/40 flex-shrink-0">
+    <div className="relative h-[calc(100vh-320px)] min-h-[520px] max-h-[760px] border border-white/10 rounded-2xl overflow-hidden flex bg-slate-950/90 shadow-xl shadow-black/40 animate-consultant-fade">
+      {/*
+        Below md the sidebar becomes a drawer. As a permanent flex child it
+        took 256px of a 375px viewport, leaving ~119px for the thread — the
+        messages were clipped mid-word and the conversation was unusable on a
+        phone. It stays a static column from md up.
+      */}
+      {sidebarOpen && (
+        <button
+          type="button"
+          aria-label="Close conversations"
+          onClick={() => setSidebarOpen(false)}
+          className="absolute inset-0 z-20 bg-black/60 md:hidden"
+        />
+      )}
+      <div
+        className={`${
+          sidebarOpen ? 'absolute inset-y-0 left-0 z-30 flex' : 'hidden'
+        } w-64 border-r border-white/8 flex-col bg-black/90 md:static md:z-auto md:flex md:bg-black/40 md:flex-shrink-0`}
+      >
         <div className="p-4 border-b border-white/8">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold text-sm text-white">Conversations</h3>
@@ -506,7 +526,18 @@ export default function ConsultantChat({
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        {/* Drawer handle — mobile only; the sidebar is always visible above md. */}
+        <div className="flex items-center gap-2 border-b border-white/8 px-4 py-2.5 md:hidden">
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(true)}
+            className="tap-target-44 flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <PanelLeft className="h-4 w-4" aria-hidden="true" />
+            Conversations
+          </button>
+        </div>
         <div ref={messagesContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden p-6 space-y-5">
           {messages.length === 0 ? (
             <div className="h-full flex items-center justify-center">

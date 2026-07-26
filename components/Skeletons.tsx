@@ -1,6 +1,19 @@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
 
+/**
+ * Ragged line lengths for placeholder text.
+ *
+ * Uniform full-width bars read as a loading *graphic* — a spinner in bar
+ * form. Varying the lengths reads as text arriving, because real prose does
+ * not end flush. Cycled so a block of any length still looks irregular.
+ */
+const TEXT_LINE_WIDTHS = ['w-full', 'w-[70%]', 'w-[86%]', 'w-[60%]'] as const;
+
+export function textLineWidth(index: number): string {
+  return TEXT_LINE_WIDTHS[index % TEXT_LINE_WIDTHS.length];
+}
+
 export function VehicleCardSkeleton() {
   return (
     <Card className="p-6 space-y-4">
@@ -80,8 +93,9 @@ export function IssueCardSkeleton() {
   return (
     <Card className="p-4 space-y-3">
       <Skeleton className="h-5 w-32" />
-      <Skeleton className="h-4 w-full" />
-      <Skeleton className="h-4 w-full" />
+      {Array.from({ length: 2 }).map((_, i) => (
+        <Skeleton key={i} className={`h-4 ${textLineWidth(i)}`} />
+      ))}
       <div className="flex gap-2 pt-2">
         <Skeleton className="h-8 w-20" />
         <Skeleton className="h-8 w-24" />
@@ -115,9 +129,9 @@ export function ChatMessageSkeleton() {
       <Skeleton className="h-8 w-8 rounded-full" />
       <div className="flex-1 space-y-2">
         <Skeleton className="h-4 w-24" />
-        <Skeleton className="h-3 w-full" />
-        <Skeleton className="h-3 w-full" />
-        <Skeleton className="h-3 w-32" />
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className={`h-3 ${textLineWidth(i)}`} />
+        ))}
       </div>
     </div>
   );

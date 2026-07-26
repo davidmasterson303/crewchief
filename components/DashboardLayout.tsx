@@ -199,7 +199,7 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
           </div>
 
           {scrolled && (
-            <div className="flex border-t border-white/8 overflow-x-auto">
+            <div className="flex border-t border-white/8 overflow-x-auto edge-fade-x">
               {tabs.map(({ key, label, icon: Icon, href }) => {
                 const isActive = currentPage === key;
                 return (
@@ -352,7 +352,7 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
         </div>
 
 
-        <div className="flex mb-8 border-b border-white/10 overflow-x-auto">
+        <div className="flex mb-8 border-b border-white/10 overflow-x-auto edge-fade-x">
           {tabs.map(({ key, label, icon: Icon, href }) => {
             const isActive = currentPage === key;
             return (

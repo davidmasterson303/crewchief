@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { getProfile, updateProfile, exportAccountData } from '@/app/account-actions';
 import { DeleteAccountDialog } from '@/components/DeleteAccountDialog';
+import { FormField } from '@/components/ui/form-field';
 import { useScrollReveal, revealDelay } from '@/hooks/use-scroll-reveal';
 
 /**
@@ -81,6 +82,13 @@ export default function SettingsPage() {
   const [distanceUnit, setDistanceUnit] = useState<DistanceUnit>('mi');
   const [vehicleCount, setVehicleCount] = useState(0);
 
+  // Derived, not stored — a separate error state can drift out of sync with
+  // the value it describes.
+  const nameError =
+    displayName.length > 60
+      ? `Display names are 60 characters or fewer — this one has ${displayName.length}.`
+      : null;
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -101,6 +109,7 @@ export default function SettingsPage() {
   }, []);
 
   async function handleSave() {
+    if (nameError) return;
     setSaving(true);
     const result = await updateProfile({ display_name: displayName, distance_unit: distanceUnit });
     setSaving(false);
@@ -163,18 +172,16 @@ export default function SettingsPage() {
             icon={User}
             index={0}
           >
-            <div className="space-y-2">
-              <Label htmlFor="display-name" className="text-muted-foreground">
-                Display name
-              </Label>
-              <Input
-                id="display-name"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Your name"
-                maxLength={60}
-              />
-            </div>
+            <FormField
+              id="display-name"
+              label="Display name"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder="Your name"
+              maxLength={60}
+              error={nameError}
+              hint="Shown in the app. Up to 60 characters."
+            />
           </SettingsSection>
 
           <SettingsSection
@@ -210,7 +217,7 @@ export default function SettingsPage() {
           </SettingsSection>
 
           <div className="flex justify-end">
-            <Button onClick={handleSave} disabled={saving} className="bg-primary hover:bg-accent">
+            <Button onClick={handleSave} disabled={saving || Boolean(nameError)} className="bg-primary hover:bg-accent">
               {saving ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden={true} />

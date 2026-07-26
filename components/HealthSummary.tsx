@@ -11,6 +11,7 @@ import {
   CircleCheck as CheckCircle,
   Activity,
   ShieldAlert,
+  ChevronRight,
 } from 'lucide-react';
 import { generateVehicleHealthSummary } from '@/app/actions';
 import { toast } from 'sonner';
@@ -258,9 +259,13 @@ export default function HealthSummary({ vehicleId, healthSummary, recalls = [], 
                 <p className="text-sm text-white/65 leading-relaxed mb-3">
                   {getEmptyStatusMessage(healthSummary.recall_status, 'recall')}
                 </p>
-                <div className="flex items-center gap-1 text-xs font-medium text-cyan-400/60 group-hover:text-cyan-400 transition-colors">
+                {/* Informational link, not a CTA — info rather than brand cyan. */}
+                <div className="flex items-center gap-1 text-xs font-medium text-info/70 group-hover:text-info-strong transition-colors">
                   <span>View recall history</span>
-                  <span className="group-hover:translate-x-0.5 transition-transform">→</span>
+                  <ChevronRight
+                    className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform"
+                    aria-hidden="true"
+                  />
                 </div>
               </div>
             }
@@ -293,7 +298,10 @@ export default function HealthSummary({ vehicleId, healthSummary, recalls = [], 
             <ul className="space-y-2">
               {healthSummary.recommendations.map((rec: string) => (
                 <li key={rec} className="text-sm text-white/75 flex items-start gap-2.5">
-                  <span className="text-cyan-400 font-bold mt-0.5 shrink-0">→</span>
+                  <ChevronRight
+                    className="h-4 w-4 mt-0.5 shrink-0 text-info"
+                    aria-hidden="true"
+                  />
                   <span className="leading-relaxed">{rec}</span>
                 </li>
               ))}
