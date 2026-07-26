@@ -6,6 +6,7 @@ import { VEHICLE_RESEARCH_PROMPT, POWERTRAIN_OPTIONS_PROMPT, CONSULTANT_SYSTEM_P
 import { getVehicleImage } from '@/lib/vehicle-images';
 import { logger } from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { authorizeVehicleAccess, authorizeVehicleScopedRow, requireSession } from '@/lib/api-auth';
 import { parseWishlistCommands, parsePerformanceCommands, parseStatusCommands, parseInvoiceFlag } from '@/lib/consultant-commands';
 import { validateData, vehicleIdSchema, serviceItemSchema, maintenanceLineItemSchema, quoteRequestSchema } from '@/lib/validation';
 import { withRetry } from '@/lib/retry';
@@ -109,6 +110,12 @@ function extractJSON(text: string): Record<string, unknown> {
 export async function decodeVIN(vin: string) {
   logger.info('VIN:DECODE_START', 'Starting VIN decode', { vinLength: vin.length });
   try {
+    // No vehicle association yet, but this writes rows — keep it off the open internet.
+    const session = await requireSession();
+    if (!session.ok) {
+      return { success: false, error: session.error };
+    }
+
     const client = getServiceRoleClient();
     if (vin.length !== 17) {
       logger.warn('VIN:INVALID_LENGTH', 'VIN length validation failed', { vinLength: vin.length });
@@ -298,6 +305,11 @@ export async function generateVehicleDossier(vehicleId: string, vehicleData?: an
     }
   }
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     const client = getServiceRoleClient();
 
     const vehicle = vehicleData || null;
@@ -478,6 +490,11 @@ export async function updateVehiclePowertrain(
   }
 ) {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     const client = getServiceRoleClient();
 
     const { error } = await client
@@ -510,6 +527,12 @@ export async function fetchPowertrainOptions(
   trim?: string
 ): Promise<{ success: boolean; data?: { engine_options: string[]; transmission_options: string[]; drivetrain_options: string[] }; error?: string }> {
   try {
+    // Gemini-backed: authenticate before spending.
+    const session = await requireSession();
+    if (!session.ok) {
+      return { success: false, error: session.error };
+    }
+
     const cacheKey = `${year}-${make}-${model}-${trim || ''}`.toLowerCase();
     const cached = powertrainCache.get(cacheKey);
     if (cached) {
@@ -570,6 +593,11 @@ export async function fetchPowertrainOptions(
 
 export async function getConsultantSessions(vehicleId: string) {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'read' });
+    if (!access.ok) {
+      return { success: false, error: access.error, data: [] };
+    }
+
     const client = getServiceRoleClient();
     const { data, error } = await client
       .from('consultant_conversations')
@@ -591,6 +619,11 @@ export async function getConsultantSessions(vehicleId: string) {
 
 export async function getConsultantSession(sessionId: string) {
   try {
+    const access = await authorizeVehicleScopedRow('consultant_conversations', sessionId, { intent: 'read' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     const client = getServiceRoleClient();
     const { data, error } = await client
       .from('consultant_conversations')
@@ -612,6 +645,11 @@ export async function getConsultantSession(sessionId: string) {
 
 export async function createConsultantSession(vehicleId: string, title: string) {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     const client = getServiceRoleClient();
     const { data, error } = await client
       .from('consultant_conversations')
@@ -675,6 +713,11 @@ export async function sendConsultantMessage(params: {
     }
   }
   try {
+    const access = await authorizeVehicleAccess(params.vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     const {
       vehicleId,
       sessionId,
@@ -905,7 +948,7 @@ export async function sendConsultantMessage(params: {
           const processResult = await processConsultantInvoiceToMaintenance(vehicleId, doc.file_url, doc.file_type || 'image/jpeg');
           if (processResult.success) {
             invoiceProcessed = true;
-            invoiceItemsProcessed += processResult.itemsProcessed;
+            invoiceItemsProcessed += processResult.itemsProcessed || 0;
             issueUpdates += processResult.issueUpdates || 0;
             modUpdates += processResult.modUpdates || 0;
           }
@@ -1004,7 +1047,14 @@ export async function deleteVehicle(vehicleId: string): Promise<DeleteVehicleRes
   const startTime = new Date().toISOString();
 
   try {
-    const client = getServiceRoleClient();
+    // Cascades through every child table. Without an ownership check this
+    // destroyed any vehicle in the database given only its id.
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, vehicleId, error: access.error };
+    }
+
+    const client = access.client;
 
     const { error: vehicleError, data } = await client
       .from('vehicles')
@@ -1052,6 +1102,11 @@ export async function updateIssueStatus(
   cost?: number
 ) {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     const client = getServiceRoleClient();
     const { error } = await client
       .from('known_issue_tracking')
@@ -1090,6 +1145,11 @@ export async function updateModificationStatus(
   costLabor?: number
 ) {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     const client = getServiceRoleClient();
     const { error } = await client
       .from('modification_tracking')
@@ -1120,6 +1180,11 @@ export async function updateModificationStatus(
 
 export async function getIssueTracking(vehicleId: string) {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'read' });
+    if (!access.ok) {
+      return { success: false, error: access.error, data: [] };
+    }
+
     const client = getServiceRoleClient();
     const { data, error } = await client
       .from('known_issue_tracking')
@@ -1140,6 +1205,11 @@ export async function getIssueTracking(vehicleId: string) {
 
 export async function getModificationTracking(vehicleId: string) {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'read' });
+    if (!access.ok) {
+      return { success: false, error: access.error, data: [] };
+    }
+
     const client = getServiceRoleClient();
     const { data, error } = await client
       .from('modification_tracking')
@@ -1160,6 +1230,11 @@ export async function getModificationTracking(vehicleId: string) {
 
 export async function invalidateHealthSummaryCache(vehicleId: string) {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     const client = getServiceRoleClient();
     const { error } = await client
       .from('vehicle_health_summary')
@@ -1175,6 +1250,11 @@ export async function invalidateHealthSummaryCache(vehicleId: string) {
 
 export async function syncInvoiceWithDossier(vehicleId: string, maintenanceItems: any[]) {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     const client = getServiceRoleClient();
 
     const allDescriptions = (maintenanceItems || []).map((item: any) =>
@@ -1249,6 +1329,11 @@ export async function syncInvoiceWithDossier(vehicleId: string, maintenanceItems
 
 export async function updateVehiclePerformanceStats(vehicleId: string, stats: { modified_hp?: number; modified_torque?: number; modified_zero_to_sixty?: number }) {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     const client = getServiceRoleClient();
     const updates: any = {};
     if (stats.modified_hp != null) updates.modified_hp = stats.modified_hp;
@@ -1266,6 +1351,11 @@ export async function updateVehiclePerformanceStats(vehicleId: string, stats: { 
 
 export async function processConsultantInvoiceToMaintenance(vehicleId: string, fileUrl: string, mimeType: string) {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     const client = getServiceRoleClient();
 
     const fetchResponse = await fetch(fileUrl);
@@ -1328,6 +1418,11 @@ export async function generateVehicleHealthSummary(vehicleId: string, forceRefre
     }
   }
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     const client = getServiceRoleClient();
 
     if (!forceRefresh) {
@@ -1478,6 +1573,11 @@ Format as valid JSON only, no markdown.`;
 
 export async function getVehicleHealthSummary(vehicleId: string) {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'read' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     const client = getServiceRoleClient();
     const { data, error } = await client
       .from('vehicle_health_summary')
@@ -1507,6 +1607,11 @@ export async function generateModificationDetails(vehicleId: string, modName: st
     }
   }
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     const client = getServiceRoleClient();
     const performanceGoal = vehicle.performance_goal || 'moderate';
 
@@ -1598,6 +1703,11 @@ Format as valid JSON only, no markdown or explanations.`;
 
 export async function getModificationDetails(vehicleId: string, modName: string) {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'read' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     const client = getServiceRoleClient();
     const { data, error } = await client
       .from('modification_details')
@@ -1620,6 +1730,11 @@ export async function getModificationDetails(vehicleId: string, modName: string)
 
 export async function getModificationDetailsBatch(vehicleId: string, modNames: string[]) {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'read' });
+    if (!access.ok) {
+      return { success: false, error: access.error, data: {} };
+    }
+
     if (modNames.length === 0) {
       return { success: true, data: {}, missing: [] };
     }
@@ -1674,6 +1789,11 @@ export async function getModificationDetailsBatch(vehicleId: string, modNames: s
 
 export async function processModDetailQueue(vehicleId: string, batchSize: number = 3) {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error, itemsProcessed: 0 };
+    }
+
     const client = getServiceRoleClient();
 
     const { data: queueItems, error: fetchError } = await client
@@ -1740,6 +1860,11 @@ export async function processModDetailQueue(vehicleId: string, batchSize: number
 
 export async function updateVehicleMileage(vehicleId: string, newMileage: number) {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     const client = getServiceRoleClient();
 
     const { data, error } = await client
@@ -1772,6 +1897,11 @@ export async function updateVehicleMileage(vehicleId: string, newMileage: number
 
 export async function updateVehicleAvgMileage(vehicleId: string, avgMilesPerMonth: number) {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     console.log(`[Update Avg Mileage] Starting update for vehicle ${vehicleId} to ${avgMilesPerMonth} miles/month`);
     const client = getServiceRoleClient();
 
@@ -1804,6 +1934,11 @@ export async function updateVehicleAvgMileage(vehicleId: string, avgMilesPerMont
 
 export async function updateVehicleStatus(vehicleId: string, status: 'daily_driver' | 'weekend' | 'stored' | 'for_sale') {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     const client = getServiceRoleClient();
     const { error } = await client
       .from('vehicles')
@@ -1825,6 +1960,11 @@ export async function updateVehicleStatus(vehicleId: string, status: 'daily_driv
 
 export async function updatePerformanceGoal(vehicleId: string, performanceGoal: 'mild' | 'moderate' | 'aggressive') {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     const client = getServiceRoleClient();
     const { error } = await client
       .from('vehicles')
@@ -1853,6 +1993,11 @@ export async function updateVehicleTCOFields(vehicleId: string, fields: {
   insurance_monthly?: number | null;
 }) {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     const client = getServiceRoleClient();
     const { error } = await client
       .from('vehicles')
@@ -1873,17 +2018,29 @@ export async function updateVehicleTCOFields(vehicleId: string, fields: {
   }
 }
 
+const DELETABLE_ITEM_TABLES = {
+  invoice_line_item: 'invoice_line_items',
+  service_item: 'service_items',
+  maintenance_line_item: 'maintenance_line_items',
+  document: 'vehicle_documents',
+} as const;
+
 export async function deleteMaintenanceLineItem(itemId: string, itemType: 'invoice_line_item' | 'service_item' | 'maintenance_line_item' | 'document') {
   try {
     console.log(`[Delete Action] Starting delete for ${itemType} with id: ${itemId}`);
-    console.log('[Delete Action] Environment check:', {
-      hasUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-      hasAnonKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      hasServiceRole: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-      url: process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30) + '...',
-    });
 
-    const client = getServiceRoleClient();
+    const scopedTable = DELETABLE_ITEM_TABLES[itemType];
+    if (!scopedTable) {
+      return { success: false, error: 'Invalid item type' };
+    }
+
+    // Resolves the row's parent vehicle and proves ownership before deleting.
+    const access = await authorizeVehicleScopedRow(scopedTable, itemId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
+    const client = access.client;
 
     let tableName: string;
 
@@ -1954,6 +2111,11 @@ export async function addMaintenanceHistory(
   notes?: string
 ) {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     const client = getServiceRoleClient();
     const { error } = await client
       .from('service_items')
@@ -1982,12 +2144,28 @@ export async function addMaintenanceHistory(
 
 export async function getSignedInvoiceUrl(fileUrl: string) {
   try {
-    const client = getServiceRoleClient();
     if (!fileUrl || !fileUrl.startsWith('placeholder://')) {
+      // Nothing to sign — this is already a stored URL. Still require a
+      // session so the action is not an open redirect-ish oracle.
+      const session = await requireSession();
+      if (!session.ok) {
+        return { success: false, error: session.error };
+      }
       return { success: true, url: fileUrl };
     }
 
     const filePath = fileUrl.replace('placeholder://', '');
+
+    // Objects are stored under `{vehicleId}/{filename}`, which is also what
+    // the storage RLS policy keys on. Deriving the vehicle from the path lets
+    // us prove ownership before minting a URL that bypasses RLS for an hour.
+    const [pathVehicleId] = filePath.split('/');
+    const access = await authorizeVehicleAccess(pathVehicleId, { intent: 'read' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
+    const client = access.client;
 
     const { data, error } = await client
       .storage
@@ -2008,6 +2186,11 @@ export async function getSignedInvoiceUrl(fileUrl: string) {
 
 export async function uploadInvoiceToMaintenanceItems(vehicleId: string, fileBase64: string, mimeType: string, fileName: string) {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     const client = getServiceRoleClient();
     const prompt = `Extract data from this invoice image. Return a JSON object with: shop_name, service_date, and an array of items. Each item must have: description (e.g., "Water Pump"), part_number (if visible), quantity, unit_cost, total_cost, and category (guess "Parts", "Labor", or "Misc").
 
@@ -2117,6 +2300,11 @@ Return ONLY valid JSON, no markdown formatting.`;
 
 export async function getMaintenanceLineItems(vehicleId: string) {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'read' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     const client = getServiceRoleClient();
     const { data, error } = await client
       .from('maintenance_line_items')
@@ -2397,6 +2585,11 @@ export async function parseInvoiceLineItems(documentId: string, vehicleId: strin
     }
   }
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     const client = getServiceRoleClient();
 
     const { data: vehicle } = await client
@@ -2712,12 +2905,24 @@ Return ONLY valid JSON, no markdown code blocks, no explanations.`;
 
 export async function uploadInvoice(formData: FormData) {
   try {
-    const client = getServiceRoleClient();
     const file = formData.get('file') as File;
     const vehicleId = formData.get('vehicleId') as string;
+    // NOTE: this flag does NOT bypass any authorization. It overrides an AI
+    // heuristic that flags an invoice as possibly belonging to a different
+    // vehicle, letting the owner confirm "yes, this really is for this car".
     const bypassVehicleCheck = formData.get('bypassVehicleCheck') === 'true';
 
     if (!file || !vehicleId) throw new Error('Missing file or vehicle ID');
+
+    // Uploads write to storage and insert document rows, so this must be an
+    // owner. Previously this action reached straight for the service-role
+    // client, letting an unauthenticated caller write into any vehicle.
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
+    const client = access.client;
 
     console.log(`[Upload] Starting upload for ${file.name} (${file.size} bytes)${bypassVehicleCheck ? ' [BYPASS VEHICLE CHECK]' : ''}`);
 
@@ -2815,7 +3020,6 @@ export async function uploadInvoice(formData: FormData) {
 
 export async function uploadVehiclePhoto(formData: FormData) {
   try {
-    const client = getServiceRoleClient();
     const file = formData.get('file') as File;
     const vehicleId = formData.get('vehicleId') as string;
     const focalXRaw = formData.get('focalX');
@@ -2826,6 +3030,13 @@ export async function uploadVehiclePhoto(formData: FormData) {
     if (!file || !vehicleId) {
       return { success: false, error: 'Missing file or vehicle ID' };
     }
+
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
+    const client = access.client;
 
     const { data: vehicle, error: vehicleError } = await client
       .from('vehicles')
@@ -2891,7 +3102,12 @@ export async function uploadVehiclePhoto(formData: FormData) {
 
 export async function removeVehiclePhoto(vehicleId: string) {
   try {
-    const client = getServiceRoleClient();
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
+    const client = access.client;
 
     const { data: vehicle, error: vehicleError } = await client
       .from('vehicles')
@@ -2947,6 +3163,11 @@ export async function validateConsultantDocument(
   error?: string;
 }> {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'read' });
+    if (!access.ok) {
+      return { success: false, isValid: false, error: access.error };
+    }
+
     const client = getServiceRoleClient();
 
     const { data: vehicle } = await client
@@ -3000,7 +3221,6 @@ export async function validateConsultantDocument(
 
 export async function uploadConsultantDocument(formData: FormData) {
   try {
-    const client = getServiceRoleClient();
     const file = formData.get('file') as File;
     const vehicleId = formData.get('vehicleId') as string;
     const sessionId = formData.get('sessionId') as string;
@@ -3008,6 +3228,13 @@ export async function uploadConsultantDocument(formData: FormData) {
     if (!file || !vehicleId || !sessionId) {
       return { success: false, error: 'Missing required fields' };
     }
+
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
+    const client = access.client;
 
     const arrayBuffer = await file.arrayBuffer();
     const base64Data = Buffer.from(arrayBuffer).toString('base64');
@@ -3081,7 +3308,13 @@ export async function uploadConsultantDocument(formData: FormData) {
 export async function fetchVehicleById(vehicleId: string) {
   try {
     console.log(`[Fetch Vehicle] Starting fetch for vehicle ${vehicleId}...`);
-    const client = getServiceRoleClient();
+
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'read' });
+    if (!access.ok) {
+      return { success: false, error: access.error, vehicle: null };
+    }
+
+    const client = access.client;
 
     const { data, error } = await client
       .from('vehicles')
@@ -3114,7 +3347,13 @@ export async function fetchVehicleById(vehicleId: string) {
 export async function fetchDashboardData(vehicleId: string) {
   try {
     console.log(`[Fetch Dashboard] Starting fetch for vehicle ${vehicleId}...`);
-    const client = getServiceRoleClient();
+
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'read' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
+    const client = access.client;
 
     const [vehicleResult, knowledgeResult, serviceItemsResult, nhtsaResult, bundlesResult, healthSummaryResult] = await Promise.all([
       client.from('vehicles').select('*').eq('id', vehicleId).maybeSingle(),
@@ -3169,7 +3408,13 @@ export async function fetchDashboardData(vehicleId: string) {
 export async function fetchConsultantPageData(vehicleId: string) {
   try {
     console.log(`[Fetch Consultant] Starting fetch for vehicle ${vehicleId}...`);
-    const client = getServiceRoleClient();
+
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'read' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
+    const client = access.client;
 
     const [vehicleResult, knowledgeResult, sessionsResult, wishlistResult, allServiceResult, maintenanceLineItemsResult, documentsResult, issueTrackingResult] = await Promise.all([
       client.from('vehicles').select('*').eq('id', vehicleId).maybeSingle(),
@@ -3245,6 +3490,11 @@ export async function createServiceItem(data: {
   notes?: string;
 }) {
   try {
+    const access = await authorizeVehicleAccess(data.vehicle_id, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     const client = getServiceRoleClient();
     const { data: serviceItem, error } = await client
       .from('service_items')
@@ -3274,6 +3524,11 @@ export async function createServiceItem(data: {
 
 export async function updateServiceItem(itemId: string, updates: any) {
   try {
+    const access = await authorizeVehicleScopedRow('service_items', itemId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     const client = getServiceRoleClient();
     const { data, error } = await client
       .from('service_items')
@@ -3296,8 +3551,14 @@ export async function updateServiceItem(itemId: string, updates: any) {
 
 export async function deleteServiceItem(itemId: string) {
   try {
-    const client = getServiceRoleClient();
-    const { error } = await client
+    const access = await authorizeVehicleScopedRow('service_items', itemId, {
+      intent: 'write',
+    });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
+    const { error } = await access.client
       .from('service_items')
       .delete()
       .eq('id', itemId);
@@ -3326,6 +3587,11 @@ export async function moveServiceItemToHistory(
   }
 ) {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     const client = getServiceRoleClient();
 
     const { data: serviceItem, error: fetchError } = await client
@@ -3386,6 +3652,12 @@ export async function uploadInvoiceForCompletion(
   file: File
 ): Promise<{ success: boolean; data?: { url: string }; error?: string }> {
   try {
+    // Writes to storage before the file is attached to any vehicle.
+    const session = await requireSession();
+    if (!session.ok) {
+      return { success: false, error: session.error };
+    }
+
     if (!file) {
       return { success: false, error: 'No file provided' };
     }
@@ -3592,6 +3864,11 @@ export async function generateEmailDraft(
   additionalNotes?: string
 ): Promise<{ success: boolean; data?: string; error?: string }> {
   try {
+    const access = await authorizeVehicleAccess(vehicle?.id, { intent: 'read' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     console.log('[Generate Email Draft] Starting email generation');
     const itemsList = serviceItems.map((item, idx) =>
       `${idx + 1}. ${item.description} (${item.category})`
@@ -3764,6 +4041,11 @@ export async function generateQuoteRequest(
   console.log(`[QUOTE:START] ${timestamp} - Generating quote for vehicle ${vehicleId}, ${selectedItemIds.length} items, zip: ${zipCode}, itemsProvided: ${!!items}`);
 
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     const healthCheck = await checkDatabaseHealth();
     if (!healthCheck.success) {
       console.error(`[QUOTE:ERROR_HEALTH] ${timestamp} - Database health check failed:`, healthCheck.error);
@@ -3957,6 +4239,11 @@ export async function savePreferredZipCode(
   zipCode: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     const client = getServiceRoleClient();
     const { error } = await client
       .from('vehicles')
@@ -3983,6 +4270,11 @@ export async function getQuoteRequestHistory(
   limit: number = 10
 ): Promise<{ success: boolean; data?: any[]; error?: string }> {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'read' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     const client = getServiceRoleClient();
     const { data, error } = await client
       .from('quote_requests')
@@ -4008,6 +4300,11 @@ export async function getQuoteRequestHistory(
 
 export async function getPerformanceModifications(vehicleId: string, performanceGoal?: 'mild' | 'moderate' | 'aggressive') {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'read' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     const client = getServiceRoleClient();
     let goal = performanceGoal;
 
@@ -4068,6 +4365,11 @@ export async function getPerformanceModifications(vehicleId: string, performance
 
 export async function getCachedPerformanceModifications(vehicleId: string, performanceGoal: 'mild' | 'moderate' | 'aggressive') {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'read' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     const client = getServiceRoleClient();
     const { data: cacheData, error: cacheError } = await client
       .from('performance_mod_cache')
@@ -4123,6 +4425,11 @@ export async function getModNamesOnly(vehicleId: string, performanceGoal: 'mild'
 
   const promise = (async () => {
     try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'read' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
       const client = getServiceRoleClient();
       const { data: cacheData, error: cacheError } = await client
         .from('mod_names_cache')
@@ -4211,6 +4518,11 @@ export async function getDetailedModsWithCachedDetails(vehicleId: string, perfor
 
   const promise = (async () => {
     try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'read' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
       const client = getServiceRoleClient();
       const { data: cacheData, error: cacheError } = await client
         .from('performance_mod_cache')
@@ -4249,6 +4561,11 @@ export async function getDetailedModsWithCachedDetails(vehicleId: string, perfor
 
 export async function preloadAllPerformanceModifications(vehicleId: string) {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     const client = getServiceRoleClient();
     console.log(`[PRELOAD:START] Beginning preload for vehicle ${vehicleId.substring(0, 8)}`);
     const t0 = Date.now();
@@ -4397,6 +4714,11 @@ export async function recomputeVehicleTier(vehicleId: string): Promise<{
   };
 }> {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false };
+    }
+
     const client = getServiceRoleClient();
 
     const [vehicleRes, knowledgeRes, trackingRes, backfillRes] = await Promise.all([
@@ -4554,6 +4876,11 @@ export async function getModsForEarnedTier(
   tier: 'mild' | 'moderate' | 'aggressive'
 ): Promise<{ success: boolean; data: any[] }> {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'read' });
+    if (!access.ok) {
+      return { success: false, data: [] };
+    }
+
     const client = getServiceRoleClient();
 
     const [knowledgeRes, trackingRes, cacheRes] = await Promise.all([
@@ -4596,6 +4923,11 @@ export async function generateBackfillMod(
   skippedModName: string
 ): Promise<{ success: boolean; modName?: string }> {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false };
+    }
+
     const client = getServiceRoleClient();
 
     const [vehicleRes, knowledgeRes, trackingRes] = await Promise.all([
@@ -4702,6 +5034,11 @@ export async function processSkipAndBackfill(
   tier: 'mild' | 'moderate' | 'aggressive'
 ): Promise<{ success: boolean; backfillTriggered: boolean; newTier?: 'mild' | 'moderate' | 'aggressive' }> {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, backfillTriggered: false };
+    }
+
     const client = getServiceRoleClient();
 
     // Record the skip
@@ -4791,6 +5128,11 @@ export async function processSkipAndBackfill(
 
 export async function ensureAggressiveModMinimum(vehicleId: string): Promise<{ success: boolean; generated: number }> {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, generated: 0 };
+    }
+
     const client = getServiceRoleClient();
 
     const [vehicleRes, knowledgeRes, trackingRes] = await Promise.all([
@@ -4917,6 +5259,11 @@ export async function updateModificationStatusWithTier(
   costLabor?: number
 ): Promise<{ success: boolean; newTier?: 'mild' | 'moderate' | 'aggressive'; backfillTriggered?: boolean }> {
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false };
+    }
+
     if (status === 'not_interested') {
       const result = await processSkipAndBackfill(vehicleId, modName, tier);
       return {
@@ -4992,6 +5339,11 @@ export async function generateQuoteRequestV2(
   });
 
   try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
     if (!selectedItemIds || selectedItemIds.length === 0) {
       return { success: false, error: 'Please select at least one item for the quote' };
     }
