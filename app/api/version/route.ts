@@ -19,9 +19,21 @@ import { NextResponse } from 'next/server';
  * commit being promoted, so a slow or failed deploy can't be mistaken for a
  * verified one.
  *
- * COMMIT_REF is set by Netlify. NEXT_PUBLIC_COMMIT_SHA is the local/dev
- * fallback. `unknown` is honest rather than convenient — a promote against an
- * unknown build should fail, not proceed on a guess.
+ * ── Why the values come via next.config.js ──────────────────────────────────
+ *
+ * Reading process.env here looks like it should be enough, and isn't. Netlify
+ * sets COMMIT_REF, BRANCH and HEAD during the **build** only — they are not
+ * among the variables passed to functions at runtime, so at request time they
+ * are simply absent. The first version of this route did exactly that and the
+ * CI site, deployed from git at main@fb5f7cb, answered `commit: "unknown"`.
+ *
+ * The `env` block in next.config.js inlines them at build time, which is the
+ * one moment they exist. The indirection is load-bearing — do not "simplify"
+ * it back to a bare process.env read.
+ *
+ * `unknown` is kept as the fallback because it is honest for local dev, and
+ * because a promote against a build that cannot identify itself should fail
+ * rather than proceed on a guess.
  */
 
 // Must never be cached — a stale answer here defeats the entire point.

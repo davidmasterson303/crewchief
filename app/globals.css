@@ -188,6 +188,42 @@ nav {
     background: linear-gradient(to top, rgb(0 0 0 / 0.88), rgb(0 0 0 / 0) 65%);
   }
 
+  /* Whole-card click without wrapping the card in an anchor.
+   *
+   * The obvious approach — put the card inside <a> — was tried by design and
+   * failed twice over: it swallowed the mileage pencil, whose 44px hit area
+   * then navigated to the dashboard instead of opening the editor, and a
+   * button nested in an anchor is invalid markup besides.
+   *
+   * So one real link inside the card grows a pseudo-element over the whole
+   * thing. The card keeps its own markup, screen readers get exactly one link
+   * with a sensible name, and anything that must stay independently clickable
+   * opts out with .above-stretch.
+   *
+   * The card needs `relative` or the ::after escapes to the nearest positioned
+   * ancestor and covers something else entirely. */
+  .stretch-link::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+  }
+
+  /* Sits above the stretched hit area. Every interactive control inside a
+   * stretched card needs this, or it becomes decoration.
+   *
+   * Raises the stacking and nothing else. It deliberately does NOT set
+   * `position`, because z-index needs a positioned element and the obvious
+   * shortcut — baking in `position: relative` — silently overrode `absolute`
+   * on the options menu and dropped it out of the card's top-right corner.
+   *
+   * So pair it explicitly:
+   *   already positioned:  className="above-stretch absolute top-3 right-3"
+   *   otherwise:           className="above-stretch relative" */
+  .above-stretch {
+    z-index: 2;
+  }
+
   /* Caps prose at a readable measure. In wide cards body copy was running to
    * ~95 characters, well past the ~65-75 the eye tracks comfortably, so the
    * return sweep starts losing the next line.

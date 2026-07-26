@@ -162,10 +162,6 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary }: VehicleCa
     setIsUpdatingMileage(false);
   };
 
-  const handleViewDashboard = () => {
-    router.push(`/dashboard/${vehicle.id}`);
-  };
-
   const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1517026575992-5e15ad95f780?q=80&w=2340&auto=format&fit=crop';
 
   const getVehicleImageUrl = () => {
@@ -197,7 +193,7 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary }: VehicleCa
   const healthPill = getHealthPill();
 
   return (
-    <div className="group card-lift border rounded-2xl overflow-hidden bg-[#0f1318]/90 backdrop-blur-sm h-full flex flex-col shadow-lg shadow-black/50 edge-light hover:border-cyan-400/30">
+    <div className="group card-lift relative border rounded-2xl overflow-hidden bg-[#0f1318]/90 backdrop-blur-sm h-full flex flex-col shadow-lg shadow-black/50 edge-light hover:border-cyan-400/30">
       <div className="relative aspect-[3/2] bg-slate-900/60 overflow-hidden group/image">
         {(() => {
           const focalX = vehicle.focal_point_x ?? 50;
@@ -221,7 +217,7 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary }: VehicleCa
               <div className="absolute inset-0 pointer-events-none" aria-hidden="true" style={{ background: 'linear-gradient(to top, rgba(9,11,15,0.92) 0%, rgba(9,11,15,0.45) 35%, rgba(9,11,15,0.10) 60%, transparent 100%)' }} />
 
               {showAdjustNudge && (
-                <div className="absolute bottom-2 left-2 right-2 z-10 opacity-0 group-hover/image:opacity-100 transition-opacity duration-200">
+                <div className="above-stretch absolute bottom-2 left-2 right-2 opacity-0 group-hover/image:opacity-100 transition-opacity duration-200">
                   <button
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowPhotoDialog(true); }}
                     className="w-full flex items-center gap-1.5 px-2.5 py-1.5 bg-black/70 hover:bg-black/85 border border-amber-400/35 rounded-lg text-amber-300/90 text-[11px] font-medium transition-all backdrop-blur-sm"
@@ -232,7 +228,7 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary }: VehicleCa
                 </div>
               )}
 
-              <div className={`absolute inset-0 bg-black/50 opacity-0 group-hover/image:opacity-100 transition-opacity duration-200 flex ${showAdjustNudge ? 'items-start pt-3' : 'items-center'} justify-center`}>
+              <div className={`above-stretch absolute inset-0 bg-black/50 opacity-0 group-hover/image:opacity-100 transition-opacity duration-200 flex ${showAdjustNudge ? 'items-start pt-3' : 'items-center'} justify-center`}>
                 <button
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowPhotoDialog(true); }}
                   className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full text-white text-sm font-medium transition-all backdrop-blur-sm"
@@ -265,7 +261,7 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary }: VehicleCa
           )}
         </div>
 
-        <div className="absolute top-3 right-3">
+        <div className="above-stretch absolute top-3 right-3">
           <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
             <DropdownMenu>
               <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
@@ -323,17 +319,19 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary }: VehicleCa
       </div>
 
       <div className="p-5 flex-1 flex flex-col gap-4">
-        <Link href={`/dashboard/${vehicle.id}`} className="block">
+        <div>
           <h3 className="text-xl font-bold text-white tracking-tight leading-tight">
             {vehicle.year} {vehicle.make}
           </h3>
           <p className="text-sm text-white/50 mt-0.5">{vehicle.model}{vehicle.trim ? ` · ${vehicle.trim}` : ''}</p>
-        </Link>
+        </div>
 
+        <div className="above-stretch relative">
         <MileageUpdatePrompt
           vehicle={displayVehicle}
           onUpdateClick={() => setShowMileageDialog(true)}
         />
+        </div>
 
         <div className="flex-1 space-y-3">
           {healthSummary && (
@@ -347,7 +345,7 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary }: VehicleCa
           )}
 
           <div
-            className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/8 hover:border-cyan-400/30 hover:bg-cyan-400/5 cursor-pointer transition-all group/mile"
+            className="above-stretch relative flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/8 hover:border-cyan-400/30 hover:bg-cyan-400/5 cursor-pointer transition-all group/mile"
             onClick={(e) => { e.preventDefault(); setShowMileageDialog(true); }}
           >
             <div>
@@ -366,13 +364,13 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary }: VehicleCa
           </div>
         </div>
 
-        <Button
-          onClick={handleViewDashboard}
-          className="w-full bg-cyan-600 hover:bg-cyan-500 text-white h-11 rounded-xl font-semibold text-sm border-0 glow-cyan-sm transition-all hover:scale-[1.01] active:scale-[0.99]"
+        <Link
+          href={`/dashboard/${vehicle.id}`}
+          className="stretch-link group/cta flex items-center justify-center gap-1.5 w-full h-11 rounded-xl text-sm font-semibold text-info hover:text-info-strong transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
         >
           View Dashboard
-          <ArrowRight className="ml-2 h-4 w-4" />
-        </Button>
+          <ArrowRight className="h-4 w-4 transition-transform group-hover/cta:translate-x-0.5" />
+        </Link>
       </div>
 
       <Dialog open={showMileageDialog} onOpenChange={setShowMileageDialog}>
