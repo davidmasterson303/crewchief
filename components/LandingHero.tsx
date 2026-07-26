@@ -151,7 +151,7 @@ export default function LandingHero({ isOpen, onEnter }: LandingHeroProps) {
                     <span className="relative z-10 text-sm font-medium text-cyan-300 group-hover:text-cyan-200 tracking-wide">
                       Take a Test Drive
                     </span>
-                    <ArrowRight className="relative z-10 h-3.5 w-3.5 text-info/70 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:text-cyan-400" />
+                    <ArrowRight className="relative z-10 h-3.5 w-3.5 text-cyan-400/70 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:text-cyan-400" />
                     <span className="relative z-10 text-xs text-white/30 ml-0.5">— no signup needed</span>
                   </button>
                 </Link>

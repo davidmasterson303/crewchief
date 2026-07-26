@@ -658,7 +658,7 @@ export default function ConsultantChat({
                               )}
                               <span className="flex-1 font-medium text-xs">{action.name}</span>
                               <span className="text-[10px] opacity-50 capitalize">{action.type}</span>
-                              {!isAdded && !isAdding && <span className="text-xs text-info font-semibold">+ Add</span>}
+                              {!isAdded && !isAdding && <span className="text-xs text-cyan-400 font-semibold">+ Add</span>}
                             </button>
                           );
                         })}

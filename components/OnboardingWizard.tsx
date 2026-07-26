@@ -562,7 +562,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
                     onDragOver={handleDragOver}
                     onDrop={handleDrop}
                   >
-                    <div className={`flex flex-col items-center gap-2 transition-colors ${isDragging ? 'text-info' : 'text-white/30'}`}>
+                    <div className={`flex flex-col items-center gap-2 transition-colors ${isDragging ? 'text-cyan-400' : 'text-white/30'}`}>
                       {isDragging ? (
                         <>
                           <ImageIcon className="h-8 w-8" />

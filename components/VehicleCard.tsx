@@ -367,7 +367,7 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary }: VehicleCa
                 <span className="text-xs text-white/40 font-normal ml-1">mi</span>
               </span>
             </div>
-            <Pencil className="h-3.5 w-3.5 text-white/30 group-hover/mile:text-info transition-colors" />
+            <Pencil className="h-3.5 w-3.5 text-white/30 group-hover/mile:text-cyan-400 transition-colors" />
           </div>
         </div>
 
