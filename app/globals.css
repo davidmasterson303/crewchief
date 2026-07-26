@@ -3,36 +3,102 @@
 @tailwind utilities;
 
 nav {
-  background-color: #0d1117 !important;
+  background-color: hsl(var(--surface-nav)) !important;
 }
 
+/*
+ * Design system v4 — "Artisan & Fluid".
+ *
+ * Two conventions live here, deliberately:
+ *   1. Tailwind/shadcn tokens as bare HSL triplets, consumed via hsl(var(--x)).
+ *   2. v4 tokens as literal colors, for values Tailwind does not map.
+ *
+ * The neutral ramp is warmed from blue-black to graphite. Hexes from the
+ * handoff are converted to HSL to match the existing convention rather than
+ * being pasted raw — the handoff calls for this explicitly.
+ */
 @layer base {
   :root {
-    --background: 216 18% 7%;
-    --foreground: 0 0% 98%;
-    --card: 216 18% 9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 222 47% 6%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 187 80% 40%;
-    --primary-foreground: 0 0% 4%;
-    --secondary: 216 18% 14%;
-    --secondary-foreground: 0 0% 85%;
-    --muted: 216 18% 14%;
-    --muted-foreground: 0 0% 55%;
-    --accent: 187 80% 40%;
-    --accent-foreground: 0 0% 4%;
-    --destructive: 0 72% 51%;
+    /* ── neutral ramp: warmed to graphite (was blue-black) ────────────── */
+    --background: 40 10% 6%;          /* #100F0D  surface-0 */
+    --surface-nav: 40 12% 5%;         /* #0E0D0B  top nav */
+    --surface-1: 36 11% 9%;           /* #1A1815  raised bars, tab strip */
+    --card: 34 12% 11%;               /* #201D19  surface-2, cards/panels */
+    --popover: 36 11% 9%;             /* #1A1815 */
+    --secondary: 20 9% 14%;           /* #262220  surface-3, wells/inputs */
+    --muted: 20 9% 14%;               /* #262220 */
+    --input: 20 9% 14%;               /* #262220 */
+    --border: 30 11% 18%;             /* #332E29 */
+
+    --foreground: 36 20% 95%;         /* #F5F3F0 */
+    --card-foreground: 36 20% 95%;
+    --popover-foreground: 36 20% 95%;
+    --secondary-foreground: 36 14% 85%;
+    --muted-foreground: 36 10% 55%;
+
+    /* ── brand: cyan, now reserved for CTA / focus / brand mark / ring ── */
+    --primary: 192 91% 36%;           /* #0891B2  cyan-600, button fill */
+    --primary-foreground: 190 60% 6%; /* #06181C */
+    --accent: 188 86% 53%;            /* #22D3EE  cyan-400, accent + glow */
+    --accent-foreground: 190 60% 6%;
+    --ring: 188 86% 53%;              /* focus ring stays brand cyan */
+
+    --destructive: 0 72% 51%;         /* #DC2626  solid, for button fills */
     --destructive-foreground: 0 0% 98%;
-    --border: 216 18% 16%;
-    --input: 216 18% 14%;
-    --ring: 187 80% 40%;
-    --chart-1: 187 80% 40%;
-    --chart-2: 187 70% 35%;
+
+    --chart-1: 188 86% 53%;
+    --chart-2: 192 91% 36%;
     --chart-3: 160 60% 45%;
     --chart-4: 25 80% 55%;
     --chart-5: 0 65% 55%;
-    --radius: 0.75rem;
+
+    /* ── radii: sharpened ─────────────────────────────────────────────── */
+    --radius: 0.875rem;               /* 14px, was 16px-equivalent */
+    --radius-xl: 20px;                /* hero photo modules only */
+
+    /* ── info: split out of brand cyan ────────────────────────────────── *
+     * Anything merely informational — column headers, plain links,
+     * non-CTA labels — uses this steel-blue so cyan reads unambiguously
+     * as "brand / primary action". Never use brand cyan for a plain label. */
+    --info: #8FB4C4;
+    --info-strong: #ACC9D6;
+    --info-wash: rgb(143 180 196 / 0.14);
+    --info-border: rgb(143 180 196 / 0.32);
+
+    /* ── semantic families ────────────────────────────────────────────── */
+    --confirm-green: #4ADE80;
+    --confirm-green-wash: rgb(74 222 128 / 0.14);
+    --confirm-green-border: rgb(74 222 128 / 0.35);
+
+    --attention-amber: #FB923C;
+    --attention-amber-wash: rgb(251 146 60 / 0.14);
+    --attention-amber-border: rgb(251 146 60 / 0.35);
+
+    /* critical is deliberately heavier than attention, so a scan lands on
+     * red first. Previously both sat at ~14% and read as equal weight. */
+    --critical-red: #F87171;
+    --critical-red-wash: rgb(248 113 113 / 0.22);
+    --critical-red-border: rgb(248 113 113 / 0.5);
+    --critical-red-solid: #DC2626;
+
+    /* ── health-ring band ramp ────────────────────────────────────────── *
+     * Dedicated and ~15% desaturated versus the chip semantics, so a
+     * mid-score ring never reads as "another issue chip". */
+    --ring-good: #7FCE9C;             /* >= 80 */
+    --ring-ok: #5FAEC0;               /* >= 60 */
+    --ring-warn: #E0A468;             /* >= 40 */
+    --ring-bad: #E08882;              /* <  40 */
+
+    /* Loaded via the stylesheet link in app/layout.tsx — see the note there
+     * on why this is not next/font. */
+    --font-display: 'Newsreader';
+
+    /* ── motion ───────────────────────────────────────────────────────── */
+    --ease-standard: cubic-bezier(0.16, 1, 0.3, 1);
+    --duration-scroll-reveal: 550ms;
+    --scroll-reveal-distance: 28px;
+    --duration-count-up: 900ms;
+    --duration-shimmer: 1600ms;
   }
 }
 
@@ -44,13 +110,12 @@ nav {
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "kern" 1, "liga" 1;
-    background-color: #0b0e11;
     scrollbar-width: thin;
     scrollbar-color: rgba(255,255,255,0.11) transparent;
   }
 
   :focus-visible {
-    outline: 2px solid rgba(34, 211, 238, 0.55);
+    outline: 2px solid hsl(var(--ring) / 0.55);
     outline-offset: 2px;
     border-radius: 4px;
   }
@@ -76,24 +141,101 @@ nav {
 }
 
 @layer utilities {
+  /* Reserved signature glow — health ring and the primary CTA ONLY.
+   * Do not add to card hovers, chips or nav: spending it everywhere is what
+   * made it read as decoration rather than emphasis. */
   .glow-cyan {
-    box-shadow: 0 0 24px rgba(34, 211, 238, 0.18), 0 4px 16px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 0 24px rgb(34 211 238 / 0.22), 0 4px 12px rgb(0 0 0 / 0.4);
   }
   .glow-cyan-sm {
-    box-shadow: 0 0 12px rgba(34, 211, 238, 0.12), 0 2px 8px rgba(0, 0, 0, 0.35);
+    box-shadow: 0 0 12px rgb(34 211 238 / 0.12), 0 2px 8px rgb(0 0 0 / 0.35);
   }
+  /* Alert glows stay — a real urgency cue on a real alert surface. */
+  .glow-attention {
+    box-shadow: 0 0 16px rgb(251 146 60 / 0.14);
+  }
+  .glow-critical {
+    box-shadow: 0 0 20px rgb(248 113 113 / 0.18);
+  }
+  /* Deprecated aliases — kept so existing markup keeps rendering while
+   * DS-4 sweeps call sites onto the names above. */
   .glow-health-green {
-    box-shadow: 0 0 16px rgba(74, 222, 128, 0.25);
+    box-shadow: 0 0 16px rgb(74 222 128 / 0.14);
   }
   .glow-health-orange {
-    box-shadow: 0 0 16px rgba(251, 146, 60, 0.25);
+    box-shadow: 0 0 16px rgb(251 146 60 / 0.14);
   }
+
+  /* Card hover: shadow-only. Colour is reserved for the ring/CTA signature. */
   .card-lift {
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition: transform 220ms var(--ease-standard), box-shadow 220ms var(--ease-standard);
   }
   .card-lift:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 0 20px rgba(34, 211, 238, 0.08);
+    transform: translateY(-2px);
+    box-shadow: 0 16px 32px rgb(0 0 0 / 0.45), 0 2px 8px rgb(0 0 0 / 0.3);
+  }
+  .card-press:active {
+    transform: scale(0.98);
+    transition: transform 80ms var(--ease-standard);
+  }
+
+  /* Signature photography treatment: bottom scrim + radial vignette, always
+   * together. The pairing is the ownable gesture — scrim alone is not. */
+  .vignette-frame {
+    background: radial-gradient(120% 100% at 50% 30%, rgb(0 0 0 / 0) 45%, rgb(0 0 0 / 0.35) 100%);
+  }
+  .scrim-bottom {
+    background: linear-gradient(to top, rgb(0 0 0 / 0.88), rgb(0 0 0 / 0) 65%);
+  }
+
+  /* Grows the tap area to the 44px iOS minimum without inflating the visual
+   * pill. Apply to any small chip that is a real standalone tap target. */
+  .tap-target-44 {
+    position: relative;
+  }
+  .tap-target-44::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+  }
+
+  /* Scroll-linked section entrance. Larger and slower than the mount
+   * stagger, so the two entrances read as different gestures.
+   *
+   * The `scripting: enabled` guard is load-bearing, not defensive: the hidden
+   * start state must only exist when JS can actually arrive to remove it.
+   * Without the guard, anything that paints without running the observer —
+   * JS disabled, SSR-only paint, print, static capture — strands the content
+   * at opacity 0 permanently. Default state is VISIBLE; JS opts into hiding. */
+  .scroll-reveal.in-view {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  @media (scripting: enabled) {
+    .scroll-reveal {
+      opacity: 0;
+      transform: translateY(var(--scroll-reveal-distance));
+      transition:
+        opacity var(--duration-scroll-reveal) var(--ease-standard),
+        transform var(--duration-scroll-reveal) var(--ease-standard);
+    }
+  }
+
+  /* Editorial serif, for exactly one element per screen — a vehicle title or
+   * the single largest hero number. Never UI chrome, labels or tabular data. */
+  .display-serif {
+    font-family: var(--font-display), Georgia, serif;
+    font-weight: 500;
+  }
+
+  /* Tabular figures wherever digits line up in columns. */
+  .num {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
   }
   .label-uppercase {
     @apply text-xs font-semibold uppercase tracking-widest text-white/50;
@@ -160,8 +302,12 @@ nav {
     border-radius: 2px 2px 0 0;
     transition: opacity 150ms ease, transform 150ms ease;
   }
+  /* Opt-in only, for genuinely dense data tables such as a full cost
+   * breakdown. Striping reads "spreadsheet" — ordinary list rows (wishlist,
+   * service history, chat) should use generous padding and a hairline
+   * divider instead. */
   .zebra-row:nth-child(even) {
-    background-color: rgba(255, 255, 255, 0.022);
+    background-color: rgb(255 255 255 / 0.018);
   }
   .zebra-row:nth-child(odd) {
     background-color: transparent;
@@ -207,4 +353,30 @@ nav {
   );
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/*
+ * Reduced motion. There was no handling of this anywhere before — every
+ * animation ran regardless of the user's system preference.
+ *
+ * This rule covers CSS transitions and animations only. JS-driven effects —
+ * the health-ring draw-in, count-up numbers, the IntersectionObserver
+ * scroll-reveal — must each check matchMedia themselves and jump straight to
+ * their end state, rather than being silently skipped mid-flight.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Reveal-on-scroll must land visible, not stay at opacity 0. */
+  .scroll-reveal {
+    opacity: 1;
+    transform: none;
+  }
 }

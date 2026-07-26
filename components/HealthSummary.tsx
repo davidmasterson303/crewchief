@@ -17,6 +17,8 @@ import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { invalidateDashboardCache } from '@/lib/query-invalidation';
 import RecallHistoryModal from './RecallHistoryModal';
+import { useCountUp } from '@/hooks/use-count-up';
+import { useHealthBand, getHealthBand } from '@/hooks/use-health-band';
 
 interface HealthSummaryProps {
   vehicleId: string;
@@ -28,32 +30,39 @@ interface HealthSummaryProps {
 function ScoreRing({ score }: { score: number }) {
   const radius = 29;
   const circumference = 2 * Math.PI * radius;
-  const fill = (score / 100) * circumference;
-  const color = score >= 80 ? '#4ade80' : score >= 60 ? '#22d3ee' : score >= 40 ? '#fb923c' : '#f87171';
-  const trackColor = score >= 80
-    ? 'rgba(74,222,128,0.12)'
-    : score >= 60
-    ? 'rgba(34,211,238,0.12)'
-    : score >= 40
-    ? 'rgba(251,146,60,0.12)'
-    : 'rgba(248,113,113,0.12)';
+
+  // Ring sweep and the printed number are driven by one value, so they
+  // resolve together rather than drifting apart.
+  const animated = useCountUp(score, 900);
+  const fill = (animated / 100) * circumference;
+
+  // Band is chosen from the *target* score: the colour should not cycle
+  // through red → amber → green while the ring draws in.
+  const band = useHealthBand(score);
 
   return (
     <div className="relative flex items-center justify-center w-20 h-20 flex-shrink-0">
       <svg width="80" height="80" viewBox="0 0 80 80" className="-rotate-90">
-        <circle cx="40" cy="40" r={radius} fill="none" stroke={trackColor} strokeWidth="6" />
         <circle
           cx="40" cy="40" r={radius}
           fill="none"
-          stroke={color}
+          stroke={`rgba(${band.rgb},0.12)`}
+          strokeWidth="6"
+        />
+        <circle
+          cx="40" cy="40" r={radius}
+          fill="none"
+          stroke={band.color}
           strokeWidth="6"
           strokeDasharray={`${fill} ${circumference}`}
           strokeLinecap="round"
-          style={{ filter: `drop-shadow(0 0 5px ${color}60)` }}
+          style={{ filter: `drop-shadow(0 0 5px rgba(${band.rgb},0.38))` }}
         />
       </svg>
       <div className="absolute flex flex-col items-center">
-        <span className="text-xl font-bold text-white tabular-nums leading-none">{score}</span>
+        <span className="num text-xl font-bold text-foreground leading-none">
+          {Math.round(animated)}
+        </span>
         <span className="text-xs text-white/40 mt-0.5">/100</span>
       </div>
     </div>
@@ -92,7 +101,7 @@ export default function HealthSummary({ vehicleId, healthSummary, recalls = [], 
         <CardContent className="space-y-4">
           {isRefreshing ? (
             <div className="flex items-center justify-center py-10">
-              <RefreshCw className="h-7 w-7 text-cyan-400 animate-spin" />
+              <RefreshCw className="h-7 w-7 text-info animate-spin" />
             </div>
           ) : (
             <>
@@ -115,11 +124,11 @@ export default function HealthSummary({ vehicleId, healthSummary, recalls = [], 
     );
   }
 
+  // Reads the shared band table, so the label, the ring and DiagnosticHero's
+  // hero score can never disagree about which band a score falls in.
   const getScoreLabel = (score: number) => {
-    if (score >= 80) return { label: 'Excellent', color: 'text-green-400' };
-    if (score >= 60) return { label: 'Good', color: 'text-cyan-400' };
-    if (score >= 40) return { label: 'Fair', color: 'text-orange-400' };
-    return { label: 'Needs Attention', color: 'text-red-400' };
+    const band = getHealthBand(score);
+    return { label: band.label, color: `text-health-${band.name}` };
   };
 
   const getEmptyStatusMessage = (status: string, type: string): string => {

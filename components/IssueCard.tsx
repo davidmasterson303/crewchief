@@ -49,7 +49,7 @@ export default function IssueCard({
       case 'Medium':
         return { cls: 'bg-transparent text-orange-300 border-orange-400/55', Icon: Wrench, label: 'Moderate' };
       case 'Low':
-        return { cls: 'bg-transparent text-cyan-400/75 border-cyan-400/35', Icon: Info, label: 'Minor' };
+        return { cls: 'bg-transparent text-info/85 border-info-border', Icon: Info, label: 'Minor' };
       default:
         return { cls: 'bg-transparent text-slate-300 border-slate-400/40', Icon: Info, label: severity };
     }

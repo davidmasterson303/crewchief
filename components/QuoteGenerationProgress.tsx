@@ -113,7 +113,7 @@ export function QuoteGenerationProgress({ items, zipCode }: QuoteGenerationProgr
                       {status === 'complete' ? (
                         <CheckCircle2 className="h-5 w-5 text-green-400" />
                       ) : status === 'active' ? (
-                        <Loader2 className="h-5 w-5 text-cyan-400 animate-spin" />
+                        <Loader2 className="h-5 w-5 text-info animate-spin" />
                       ) : (
                         <div className="h-5 w-5 rounded-full border-2 border-slate-600" />
                       )}
@@ -146,7 +146,9 @@ export function QuoteGenerationProgress({ items, zipCode }: QuoteGenerationProgr
                         transition={{ duration: 1.5, repeat: Infinity }}
                         className="flex-shrink-0"
                       >
-                        <Badge variant="outline" className="border-cyan-400/50 text-cyan-400 text-xs">
+                        {/* Status, not an action — informational, so info not
+                            brand cyan. The progress-bar fill stays cyan. */}
+                        <Badge variant="outline" className="border-info-border text-info text-xs">
                           Processing
                         </Badge>
                       </motion.div>

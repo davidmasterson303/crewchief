@@ -409,7 +409,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
             </>
           )}
           <div className="flex justify-center">
-            <div className="w-6 h-6 border-2 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin" />
+            <div className="w-6 h-6 border-2 border-info-border border-t-info rounded-full animate-spin" />
           </div>
         </div>
       </div>
@@ -517,7 +517,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
 
               {!powertrainReady && (
                 <div className="flex items-center gap-3 p-3.5 bg-cyan-500/8 border border-cyan-400/20 rounded-xl">
-                  <div className="w-4 h-4 border-2 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin flex-shrink-0" />
+                  <div className="w-4 h-4 border-2 border-info-border border-t-info rounded-full animate-spin flex-shrink-0" />
                   <p className="text-sm text-cyan-300/80">Checking available configurations...</p>
                 </div>
               )}

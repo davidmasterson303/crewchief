@@ -62,7 +62,7 @@ interface VehicleCardProps {
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
   daily_driver: { label: 'Daily Driver', color: 'text-green-300', bg: 'bg-green-500/15', border: 'border-green-400/30' },
-  weekend:      { label: 'Weekend',      color: 'text-cyan-300',  bg: 'bg-cyan-500/15',  border: 'border-cyan-400/30' },
+  weekend:      { label: 'Weekend',      color: 'text-info-strong', bg: 'bg-info-wash',    border: 'border-info-border' },
   stored:       { label: 'Stored',       color: 'text-amber-300', bg: 'bg-amber-500/15', border: 'border-amber-400/30' },
   for_sale:     { label: 'For Sale',     color: 'text-red-300',   bg: 'bg-red-500/15',   border: 'border-red-400/30' },
 };
@@ -219,7 +219,11 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary }: VehicleCa
                 onError={handleImageError}
                 loading="lazy"
               />
-              <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(9,11,15,0.92) 0%, rgba(9,11,15,0.45) 35%, rgba(9,11,15,0.10) 60%, transparent 100%)' }} />
+              {/* Signature photography treatment: radial vignette UNDER the
+                  bottom scrim. The pairing is the ownable gesture — a photo
+                  carrying only one of the two reads off-system. */}
+              <div className="absolute inset-0 vignette-frame pointer-events-none" aria-hidden="true" />
+              <div className="absolute inset-0 pointer-events-none" aria-hidden="true" style={{ background: 'linear-gradient(to top, rgba(9,11,15,0.92) 0%, rgba(9,11,15,0.45) 35%, rgba(9,11,15,0.10) 60%, transparent 100%)' }} />
 
               {showAdjustNudge && (
                 <div className="absolute bottom-2 left-2 right-2 z-10 opacity-0 group-hover/image:opacity-100 transition-opacity duration-200">

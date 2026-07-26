@@ -56,11 +56,11 @@ export function CostBreakdownTable({ costBreakdown }: CostBreakdownTableProps) {
           <Table>
             <TableHeader>
               <TableRow className="border-cyan-400/20 hover:bg-cyan-400/5">
-                <TableHead className="text-cyan-400">Item</TableHead>
-                <TableHead className="text-cyan-400 text-right">Parts</TableHead>
-                <TableHead className="text-cyan-400 text-right">Labor Hrs</TableHead>
-                <TableHead className="text-cyan-400 text-right">Labor Cost</TableHead>
-                <TableHead className="text-cyan-400 text-right">Total</TableHead>
+                <TableHead className="text-info">Item</TableHead>
+                <TableHead className="text-info text-right">Parts</TableHead>
+                <TableHead className="text-info text-right">Labor Hrs</TableHead>
+                <TableHead className="text-info text-right">Labor Cost</TableHead>
+                <TableHead className="text-info text-right">Total</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

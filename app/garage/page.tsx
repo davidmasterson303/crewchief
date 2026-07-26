@@ -22,6 +22,11 @@ export default function GaragePage() {
           backgroundAttachment: 'fixed'
         }}
       />
+      {/* Signature vignette — see app/demo/page.tsx. */}
+      <div
+        className="fixed inset-0 z-0 vignette-frame pointer-events-none"
+        aria-hidden="true"
+      />
 
       <nav className="relative z-20 border-b border-cyan-500/30" style={{ backgroundColor: '#000000', backdropFilter: 'blur(12px)' }}>
         <div className="max-w-7xl mx-auto px-6 lg:px-12 py-5">

@@ -71,7 +71,7 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
 
   const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
     daily_driver: { label: 'Daily Driver', color: 'text-green-300', bg: 'bg-green-500/12', border: 'border-green-400/25' },
-    weekend:      { label: 'Weekend',      color: 'text-cyan-300',  bg: 'bg-cyan-500/12',  border: 'border-cyan-400/25' },
+    weekend:      { label: 'Weekend',      color: 'text-info-strong', bg: 'bg-info-wash',    border: 'border-info-border' },
     stored:       { label: 'Stored',       color: 'text-amber-300', bg: 'bg-amber-500/12', border: 'border-amber-400/25' },
     for_sale:     { label: 'For Sale',     color: 'text-red-300',   bg: 'bg-red-500/12',   border: 'border-red-400/25' },
   };

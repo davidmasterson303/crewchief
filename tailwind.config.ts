@@ -24,7 +24,12 @@ const config: Config = {
         'gradient-conic':
           'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',
       },
+      fontFamily: {
+        // Editorial serif for hero moments only — see .display-serif.
+        display: ['var(--font-display)', 'Georgia', 'serif'],
+      },
       borderRadius: {
+        xl: 'var(--radius-xl)',
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
@@ -32,6 +37,25 @@ const config: Config = {
       colors: {
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
+        // Warmed elevation ladder, addressable as bg-surface-nav / bg-surface-1.
+        'surface-nav': 'hsl(var(--surface-nav))',
+        'surface-1': 'hsl(var(--surface-1))',
+        // Informational — links, column headers, non-CTA labels. Never a CTA.
+        info: {
+          DEFAULT: 'var(--info)',
+          strong: 'var(--info-strong)',
+          wash: 'var(--info-wash)',
+          border: 'var(--info-border)',
+        },
+        // Health-ring bands, deliberately distinct from chip semantics.
+        // Named `health`, not `ring` — Tailwind already owns `ring` for focus
+        // rings, and reusing it would silently clobber ring-* utilities.
+        health: {
+          good: 'var(--ring-good)',
+          ok: 'var(--ring-ok)',
+          warn: 'var(--ring-warn)',
+          bad: 'var(--ring-bad)',
+        },
         card: {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',

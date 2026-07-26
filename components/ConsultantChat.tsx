@@ -640,7 +640,7 @@ export default function ConsultantChat({
                     <AvatarFallback className="bg-white/10 text-white/70 text-xs">CC</AvatarFallback>
                   </Avatar>
                   <div className="bg-white/8 border border-white/8 rounded-2xl rounded-tl-sm p-4 flex items-center gap-3">
-                    <Loader2 className="h-4 w-4 animate-spin text-cyan-400 flex-shrink-0" />
+                    <Loader2 className="h-4 w-4 animate-spin text-info flex-shrink-0" />
                     <span className="text-sm text-white/50">{THINKING_STAGES[thinkingStage]}</span>
                   </div>
                 </div>
