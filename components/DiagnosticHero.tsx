@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useCountUp } from '@/hooks/use-count-up';
+import { useHealthBand } from '@/hooks/use-health-band';
 
 interface DiagnosticHeroProps {
   imageUrl: string;
@@ -8,25 +10,6 @@ interface DiagnosticHeroProps {
   healthScore?: number;
   focalX?: number | null;
   focalY?: number | null;
-}
-
-function useCountUp(target: number, duration: number, enabled: boolean) {
-  const [value, setValue] = useState(0);
-  useEffect(() => {
-    if (!enabled || target === 0) return;
-    setValue(0);
-    const start = performance.now();
-    let raf: number;
-    const tick = (now: number) => {
-      const t = Math.min((now - start) / duration, 1);
-      const eased = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-      setValue(Math.round(eased * target));
-      if (t < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [target, enabled]);
-  return value;
 }
 
 export default function DiagnosticHero({ imageUrl, vehicleName, healthScore, focalX, focalY }: DiagnosticHeroProps) {
@@ -38,7 +21,11 @@ export default function DiagnosticHero({ imageUrl, vehicleName, healthScore, foc
   const resolvedFocalX = focalX ?? 50;
   const resolvedFocalY = focalY ?? 50;
 
-  const displayScore = useCountUp(healthScore || 0, 1400, scanDone && !!healthScore);
+  // Shared primitives: same band table and same rAF loop as HealthSummary's
+  // ScoreRing. The local copies this replaced diverged — different easing, and
+  // no reduced-motion check at all.
+  const band = useHealthBand(healthScore ?? 0);
+  const displayScore = useCountUp(healthScore ?? 0, 1400, scanDone && !!healthScore);
 
   useEffect(() => {
     setMounted(true);
@@ -83,8 +70,11 @@ export default function DiagnosticHero({ imageUrl, vehicleName, healthScore, foc
           className="w-full h-full object-cover"
           style={{ objectPosition }}
         />
+        {/* Vignette sits under the scrim — the pairing is the signature. */}
+        <div className="absolute inset-0 vignette-frame pointer-events-none" aria-hidden="true" />
         <div
-          className="absolute inset-0"
+          className="absolute inset-0 pointer-events-none"
+          aria-hidden="true"
           style={{
             background: 'linear-gradient(to bottom, rgba(9,11,15,0.05) 0%, rgba(9,11,15,0.35) 55%, rgba(9,11,15,0.85) 100%)',
           }}
@@ -120,23 +110,31 @@ export default function DiagnosticHero({ imageUrl, vehicleName, healthScore, foc
           <p className="text-xs font-semibold uppercase tracking-widest text-white/40 mb-1">
             {scanDone ? 'Diagnostics Complete' : 'Scanning...'}
           </p>
-          <h2 className="text-2xl font-bold text-white tracking-tight">{vehicleName}</h2>
+          {/* The one Newsreader element on this screen — see .display-serif. */}
+          <h2 className="display-serif text-3xl text-white tracking-tight">{vehicleName}</h2>
         </div>
         {healthScore !== undefined && (
           <div className="flex flex-col items-end">
             <p className="text-xs text-white/40 uppercase tracking-wider mb-1">Health Score</p>
             <div className="flex items-baseline gap-1">
+              {/* Numeral stays Inter: tabular figures matter more than flourish
+                  on a value that animates digit by digit. */}
               <span
-                className="text-4xl font-bold tabular-nums"
+                className="num text-4xl font-bold"
                 style={{
-                  color: healthScore >= 80 ? '#4ade80' : healthScore >= 60 ? '#22d3ee' : '#fb923c',
-                  filter: scanDone ? `drop-shadow(0 0 8px ${healthScore >= 80 ? 'rgba(74,222,128,0.45)' : healthScore >= 60 ? 'rgba(34,211,238,0.45)' : 'rgba(251,146,60,0.45)'})` : 'none',
+                  color: band.color,
+                  filter: scanDone ? `drop-shadow(0 0 8px rgba(${band.rgb},0.45))` : 'none',
                 }}
               >
-                {scanDone ? displayScore : '—'}
+                {scanDone ? Math.round(displayScore) : '—'}
               </span>
               <span className="text-base text-white/35">/100</span>
             </div>
+            {/* Qualitative label carries the same band colour as the numeral,
+                so hero and ScoreRing can never disagree on one dashboard. */}
+            <p className="text-xs font-semibold mt-0.5" style={{ color: band.color }}>
+              {scanDone ? band.label : ' '}
+            </p>
           </div>
         )}
       </div>

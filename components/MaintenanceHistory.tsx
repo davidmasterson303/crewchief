@@ -409,13 +409,41 @@ export default function MaintenanceHistory({ vehicleId, documents, lineItems = [
                 {itemToDelete?.sourceDocId && (
                   <div className="bg-amber-500/8 border border-amber-500/20 rounded-xl p-3 space-y-2">
                     <div className="text-xs font-semibold text-amber-300">This item is from an uploaded invoice</div>
-                    <div className="space-y-2">
-                      <label className="flex items-center gap-2.5 cursor-pointer">
-                        <input type="radio" checked={!deleteAllFromInvoice} onChange={() => setDeleteAllFromInvoice(false)} className="text-cyan-500" />
+                    {/*
+                      These carried no shared `name`, so the browser treated
+                      them as two unrelated radios rather than one group: arrow
+                      keys did not move between them and assistive tech read
+                      them as separate controls. They only appeared to work
+                      because `checked` is driven from state.
+
+                      `accent-color` themes the native control from the design
+                      token, which is the correct mechanism for radios — the
+                      shared Input component is for text fields and does not
+                      apply here.
+                    */}
+                    <div
+                      className="space-y-2"
+                      role="radiogroup"
+                      aria-label="How much to delete"
+                    >
+                      <label className="flex items-center gap-2.5 cursor-pointer tap-target-44">
+                        <input
+                          type="radio"
+                          name="delete-scope"
+                          checked={!deleteAllFromInvoice}
+                          onChange={() => setDeleteAllFromInvoice(false)}
+                          style={{ accentColor: 'hsl(var(--accent))' }}
+                        />
                         <span className="text-sm text-white/80">Delete only this item</span>
                       </label>
-                      <label className="flex items-center gap-2.5 cursor-pointer">
-                        <input type="radio" checked={deleteAllFromInvoice} onChange={() => setDeleteAllFromInvoice(true)} className="text-cyan-500" />
+                      <label className="flex items-center gap-2.5 cursor-pointer tap-target-44">
+                        <input
+                          type="radio"
+                          name="delete-scope"
+                          checked={deleteAllFromInvoice}
+                          onChange={() => setDeleteAllFromInvoice(true)}
+                          style={{ accentColor: 'hsl(var(--accent))' }}
+                        />
                         <span className="text-sm text-white/80">Delete all items from this invoice</span>
                       </label>
                     </div>

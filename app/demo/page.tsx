@@ -54,6 +54,12 @@ export default function DemoPage() {
           backgroundAttachment: 'fixed'
         }}
       />
+      {/* Signature vignette — every photo surface carries it. Fixed here to
+          match the fixed background attachment above. */}
+      <div
+        className="fixed inset-0 z-0 vignette-frame pointer-events-none"
+        aria-hidden="true"
+      />
 
       <nav className="relative z-20 border-b border-white/10 bg-black/80 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-6 lg:px-12 py-4">

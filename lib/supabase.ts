@@ -1,8 +1,34 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { createBrowserClient, createServerClient as ssrCreateServerClient } from '@supabase/ssr';
 
+/*
+ * Supabase ships two generations of API key, and which one a project issues
+ * depends on when it was created:
+ *
+ *   legacy  anon (JWT, "eyJ...")        service_role (JWT, "eyJ...")
+ *   current sb_publishable_...          sb_secret_...
+ *
+ * Both are sent the same way — as the `apikey` header — so supabase-js does
+ * not care which it gets. Only the environment variable name differs. Accept
+ * either so the app works on a project of either generation, and so migrating
+ * off the legacy keys is an env change rather than a code change.
+ */
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
+/** Client-safe key: legacy anon JWT or modern publishable key. */
+export const supabaseAnonKey =
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  '';
+
+/** Server-only key: legacy service_role JWT or modern secret key. Never expose. */
+function getSecretKey(): string {
+  return (
+    process.env.SUPABASE_SECRET_KEY ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    ''
+  );
+}
 
 export function hasSupabaseConfig(): boolean {
   return !!(supabaseUrl && supabaseAnonKey);
@@ -41,8 +67,8 @@ export function createServerActionClient() {
   const { cookies } = require('next/headers');
   const cookieStore = cookies();
   return ssrCreateServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
@@ -61,11 +87,14 @@ export function createServerActionClient() {
 }
 
 export function getServerClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url = supabaseUrl;
+  const key = supabaseAnonKey;
 
   if (!url || !key) {
-    throw new Error(`Missing Supabase environment variables: url=${!!url}, key=${!!key}`);
+    throw new Error(
+      'Missing Supabase config. Set NEXT_PUBLIC_SUPABASE_URL and either ' +
+        'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY or NEXT_PUBLIC_SUPABASE_ANON_KEY.'
+    );
   }
 
   return createClient(url, key, {
@@ -77,14 +106,17 @@ export function getServerClient() {
 }
 
 export function getServiceRoleClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = supabaseUrl;
+  const secretKey = getSecretKey();
 
-  if (!url || !serviceRoleKey) {
-    throw new Error(`Missing Supabase service role environment variables: url=${!!url}, key=${!!serviceRoleKey}`);
+  if (!url || !secretKey) {
+    throw new Error(
+      'Missing Supabase server config. Set NEXT_PUBLIC_SUPABASE_URL and either ' +
+        'SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY.'
+    );
   }
 
-  return createClient(url, serviceRoleKey, {
+  return createClient(url, secretKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,

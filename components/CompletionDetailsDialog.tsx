@@ -56,7 +56,9 @@ export default function CompletionDetailsDialog({
 
     setUploadingFile(true);
     try {
-      const result = await uploadInvoiceForCompletion(file);
+      // serviceItem.vehicle_id scopes the upload to a vehicle, so the stored
+      // path carries its owner and the file can be authorized and purged.
+      const result = await uploadInvoiceForCompletion(file, serviceItem?.vehicle_id);
       if (result.success && result.data) {
         setFormData({ ...formData, invoiceUrl: result.data.url });
         toast.success('Invoice uploaded successfully');

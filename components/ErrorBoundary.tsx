@@ -175,8 +175,9 @@ export class ErrorBoundary extends Component<Props, State> {
                     )}
                     {this.state.errorCount > 1 && (
                       <div className="bg-yellow-500/10 border border-yellow-500/30 rounded p-2">
-                        <p className="text-yellow-400 font-semibold">
-                          ⚠️ This error has occurred {this.state.errorCount} times
+                        <p className="text-yellow-400 font-semibold flex items-center gap-1.5">
+                          <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                          This error has occurred {this.state.errorCount} times
                         </p>
                         <p className="text-xs text-yellow-300 mt-1">
                           There may be an infinite error loop. Consider checking

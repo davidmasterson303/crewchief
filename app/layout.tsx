@@ -10,6 +10,16 @@ import { AuthProvider } from '@/components/AuthProvider';
 
 const inter = Inter({ subsets: ['latin'] });
 
+/*
+ * Newsreader — the editorial serif, exposed as --font-display.
+ *
+ * Loaded with a stylesheet link rather than next/font. next/font would be
+ * preferable (self-hosted, no third-party request), but Next 13.5.1 has no
+ * font-override metadata for Newsreader — it is a variable font with optical
+ * sizing — and the build fails with "Failed to find font override values",
+ * hanging compilation rather than degrading. Revisit if Next is upgraded.
+ */
+
 export const metadata: Metadata = {
   title: 'CrewChief — Your Personal Auto Ownership Consultant',
   description:
@@ -33,6 +43,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           <AuthProvider>
