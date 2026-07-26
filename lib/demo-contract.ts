@@ -1,0 +1,100 @@
+/**
+ * What the public demo requires in order to work.
+ *
+ * The demo at crewchief-demo.davidmasterson.co is linked from David's
+ * portfolio and is being shown to recruiters. It must keep working while the
+ * authenticated product is built around it. Treat any change that breaks this
+ * contract as a release blocker, not a regression to fix later.
+ *
+ * ── Why this file exists ────────────────────────────────────────────────────
+ *
+ * The demo and the product pull in opposite directions. Everything Phase 0
+ * and 1 added — route middleware, session-gated server actions, RLS keyed to
+ * ownership — assumes an authenticated user. The demo has none, and survives
+ * on explicit carve-outs scattered across the codebase.
+ *
+ * That already failed once: the middleware added in task 0.9 protected
+ * /dashboard wholesale and bounced anonymous visitors from the demo to
+ * /login. It was caught by loading the page in a browser, not by any test.
+ *
+ * So the requirements live here, in one place, and are checked twice:
+ *
+ *   lib/__tests__/demo-availability.test.ts   static — runs in CI
+ *   scripts/verify-demo.mjs                   live  — run before any cutover
+ *
+ * Both import this file. Adding a requirement in one place tightens both.
+ */
+
+/** The three seeded demo vehicles. Mirrors lib/demo.ts. */
+export const DEMO_VEHICLE_IDS = [
+  'a1000000-0000-0000-0000-000000000001',
+  'a2000000-0000-0000-0000-000000000002',
+  'a3000000-0000-0000-0000-000000000003',
+] as const;
+
+/** Pages an anonymous visitor must be able to reach. */
+export const PUBLIC_DEMO_ROUTES = [
+  '/',
+  '/demo',
+  `/dashboard/${DEMO_VEHICLE_IDS[0]}`,
+  `/consultant/${DEMO_VEHICLE_IDS[0]}`,
+  `/documents/${DEMO_VEHICLE_IDS[0]}`,
+  `/vehicle-info/${DEMO_VEHICLE_IDS[0]}`,
+] as const;
+
+/**
+ * Tables the browser reads directly with the anon key.
+ *
+ * The dashboard and consultant pages query Supabase client-side rather than
+ * through an API route, so these need both a table-level SELECT grant for
+ * `anon` AND an RLS policy admitting is_demo rows. Revoking either silently
+ * empties part of the page — the queries use maybeSingle(), so a 401 returns
+ * null and the UI renders with a hole rather than an error.
+ */
+export const ANON_READ_TABLES = {
+  /** Confirmed reachable by anon. Breaking these visibly breaks the demo. */
+  required: [
+    'vehicles',
+    'vehicle_health_summary',
+    'nhtsa_data',
+    'wishlist_items',
+  ],
+  /**
+   * KNOWN GAP — queried by the demo dashboard but NOT readable by anon.
+   *
+   * The June 2026 hardening migration revoked anon SELECT from every table,
+   * then restored only four. These two were missed, so on the live demo both
+   * queries 401 and resolve to null today:
+   *
+   *   vehicle_knowledge_base  known issues, maintenance schedule, fluid
+   *                           specs, common mods — the structured dossier
+   *   recall_actions          which recall campaigns have been addressed
+   *
+   * The narrative content a visitor sees first comes from
+   * vehicle_health_summary and is unaffected, which is why this has gone
+   * unnoticed. Restoring these is tracked with task 0.1; the fix is a
+   * demo-scoped grant plus an is_demo RLS policy, NOT a blanket grant.
+   */
+  knownGaps: ['vehicle_knowledge_base', 'recall_actions'],
+} as const;
+
+/**
+ * Content that must appear for the demo to count as working.
+ * Used by the live verifier — cheap, stable strings, not brittle selectors.
+ */
+export const DEMO_SMOKE_EXPECTATIONS = {
+  demoPage: {
+    path: '/demo',
+    mustContain: ['Honda', 'Subaru', 'BMW'],
+    minLength: 2000,
+  },
+  dashboard: {
+    path: `/dashboard/${DEMO_VEHICLE_IDS[0]}`,
+    mustContain: ['Accord'],
+    minLength: 2000,
+  },
+} as const;
+
+export function isDemoVehicleId(id: string): boolean {
+  return (DEMO_VEHICLE_IDS as readonly string[]).includes(id);
+}
