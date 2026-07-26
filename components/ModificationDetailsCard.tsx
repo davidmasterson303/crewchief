@@ -155,7 +155,7 @@ export default function ModificationDetailsCard({ vehicleId, modName, vehicle, d
 
           {details.reliability_impact && (
             <div className="flex gap-3">
-              <AlertCircle className="h-4 w-4 text-cyan-400 flex-shrink-0 mt-0.5" />
+              <AlertCircle className="h-4 w-4 text-info flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <h5 className="text-white/80 text-xs font-semibold mb-1">Reliability Impact</h5>
                 <p className="text-white/60 text-xs leading-relaxed">{details.reliability_impact}</p>
@@ -185,7 +185,7 @@ export default function ModificationDetailsCard({ vehicleId, modName, vehicle, d
 
           {details.compatibility_notes && (
             <div className="flex gap-3">
-              <BarChart3 className="h-4 w-4 text-cyan-400 flex-shrink-0 mt-0.5" />
+              <BarChart3 className="h-4 w-4 text-info flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <h5 className="text-white/80 text-xs font-semibold mb-1">Compatibility</h5>
                 <p className="text-white/60 text-xs leading-relaxed">{details.compatibility_notes}</p>

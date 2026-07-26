@@ -103,13 +103,13 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
             >
               <div className="flex gap-4 items-start">
                 <div className="bg-info-wash p-3 rounded-lg border border-info-border flex-shrink-0">
-                  <FileText className="text-cyan-400 w-6 h-6" />
+                  <FileText className="text-info w-6 h-6" />
                 </div>
                 <div>
                   <h3 className="text-base font-semibold text-white flex items-center gap-2 flex-wrap">
                     {record.vendor}
                     {record.ai_extracted && (
-                      <span className="text-[10px] uppercase tracking-wider bg-info-wash text-cyan-300 px-2 py-0.5 rounded-full flex items-center gap-1 font-medium">
+                      <span className="text-[10px] uppercase tracking-wider bg-info-wash text-info px-2 py-0.5 rounded-full flex items-center gap-1 font-medium">
                         <CheckCircle2 className="w-3 h-3" />
                         AI Verified
                       </span>

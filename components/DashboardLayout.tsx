@@ -94,7 +94,7 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
 
   const getReliabilityBadge = (score: number) => {
     if (score >= 8) return { text: 'Excellent', color: 'bg-green-500/20 text-green-300 border-green-400/30' };
-    if (score >= 6) return { text: 'Good', color: 'bg-info-wash text-cyan-300 border-info-border' };
+    if (score >= 6) return { text: 'Good', color: 'bg-info-wash text-info border-info-border' };
     if (score >= 4) return { text: 'Fair', color: 'bg-yellow-500/20 text-yellow-300 border-yellow-400/30' };
     return { text: 'Poor', color: 'bg-red-500/20 text-red-300 border-red-400/30' };
   };
@@ -211,7 +211,7 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                     key={key}
                     href={href(vehicle.id)}
                     className={`relative flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium whitespace-nowrap transition-colors duration-150 ${
-                      isActive ? 'text-cyan-400 bg-info-wash' : 'text-white/50 hover:text-white/80 hover:bg-white/5'
+                      isActive ? 'text-cyan-400 bg-cyan-400/5' : 'text-white/50 hover:text-white/80 hover:bg-white/5'
                     }`}
                   >
                     <Icon className={`h-3.5 w-3.5 ${isActive ? 'text-cyan-400' : 'text-white/40'}`} />
@@ -364,7 +364,7 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                 key={key}
                 href={href(vehicle.id)}
                 className={`relative flex items-center gap-2 px-5 py-3.5 text-sm font-medium whitespace-nowrap transition-colors duration-150 ${
-                  isActive ? 'text-cyan-400 bg-info-wash' : 'text-white/50 hover:text-white/80 hover:bg-white/5'
+                  isActive ? 'text-cyan-400 bg-cyan-400/5' : 'text-white/50 hover:text-white/80 hover:bg-white/5'
                 }`}
               >
                 <Icon className={`h-4 w-4 ${isActive ? 'text-cyan-400' : 'text-white/40'}`} />

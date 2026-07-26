@@ -276,8 +276,8 @@ export function VehiclePhotoUploadDialog({
           ) : (
             <>
               <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-info-wash border border-info-border">
-                <Move className="h-3.5 w-3.5 text-cyan-400 flex-shrink-0" />
-                <p className="text-xs text-cyan-300/80">
+                <Move className="h-3.5 w-3.5 text-info flex-shrink-0" />
+                <p className="text-xs text-info/80">
                   Drag the image to position your car inside the banner frame.
                 </p>
               </div>
@@ -346,7 +346,7 @@ export function VehiclePhotoUploadDialog({
                 />
 
                 <div className="absolute top-2 right-2 flex items-center gap-1.5 bg-black/65 backdrop-blur-sm rounded-lg px-2 py-1 border border-white/10 pointer-events-none">
-                  <Move className="h-3 w-3 text-cyan-400" />
+                  <Move className="h-3 w-3 text-info" />
                   <span className="text-[10px] font-mono text-white/55">
                     {focalX.toFixed(0)}% {focalY.toFixed(0)}%
                   </span>

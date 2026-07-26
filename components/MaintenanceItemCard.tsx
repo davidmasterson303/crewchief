@@ -35,7 +35,7 @@ export default function MaintenanceItemCard({
       case 'High':
         return 'bg-transparent text-orange-300 border-orange-400/55';
       case 'Routine':
-        return 'bg-transparent text-cyan-400/75 border-cyan-400/35';
+        return 'bg-transparent text-info/75 border-cyan-400/35';
       default:
         return 'bg-transparent text-slate-300 border-slate-400/40';
     }

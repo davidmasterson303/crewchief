@@ -45,10 +45,10 @@ function getCategoryIcon(desc: string, category?: string) {
   if (d.includes('brake') || d.includes('rotor') || d.includes('pad') || c.includes('brake')) return { Icon: Disc, color: 'text-red-400', bg: 'bg-red-400/10 border-red-400/20' };
   if (d.includes('tire') || d.includes('wheel') || d.includes('alignment') || c.includes('tire')) return { Icon: Gauge, color: 'text-green-400', bg: 'bg-green-400/10 border-green-400/20' };
   if (d.includes('battery') || d.includes('spark') || d.includes('ignition') || d.includes('alternator') || c.includes('electrical')) return { Icon: Zap, color: 'text-yellow-400', bg: 'bg-yellow-400/10 border-yellow-400/20' };
-  if (d.includes('air') || d.includes('filter') || d.includes('intake') || c.includes('filter')) return { Icon: Wind, color: 'text-cyan-400', bg: 'bg-info-wash border-info-border' };
+  if (d.includes('air') || d.includes('filter') || d.includes('intake') || c.includes('filter')) return { Icon: Wind, color: 'text-info', bg: 'bg-info-wash border-info-border' };
   if (d.includes('inspect') || d.includes('diagnos') || d.includes('check') || c.includes('inspect')) return { Icon: ShieldCheck, color: 'text-teal-400', bg: 'bg-teal-400/10 border-teal-400/20' };
   if (d.includes('warn') || d.includes('recall') || c.includes('recall')) return { Icon: TriangleAlert, color: 'text-orange-400', bg: 'bg-orange-400/10 border-orange-400/20' };
-  return { Icon: Wrench, color: 'text-cyan-400', bg: 'bg-info-wash border-info-border' };
+  return { Icon: Wrench, color: 'text-info', bg: 'bg-info-wash border-info-border' };
 }
 
 export default function MaintenanceHistory({ vehicleId, documents, lineItems = [], completedServiceItems = [], maintenanceLineItems = [], onUploadComplete, onItemDeleted }: MaintenanceHistoryProps) {
@@ -223,7 +223,7 @@ export default function MaintenanceHistory({ vehicleId, documents, lineItems = [
 
   const getCategoryBadge = (record: MaintenanceRecord) => {
     if (record.is_combined) return <Badge variant="outline" className="bg-blue-400/10 text-blue-300 border-blue-400/25 text-xs font-medium">Combined</Badge>;
-    if (record.original_category === 'labor') return <Badge variant="outline" className="bg-info-wash text-cyan-300 border-cyan-400/25 text-xs font-medium">Labor</Badge>;
+    if (record.original_category === 'labor') return <Badge variant="outline" className="bg-info-wash text-info border-cyan-400/25 text-xs font-medium">Labor</Badge>;
     if (record.original_category === 'parts') return <Badge variant="outline" className="bg-green-400/10 text-green-300 border-green-400/25 text-xs font-medium">Parts</Badge>;
     if (record._type === 'service_item') return <Badge variant="outline" className="bg-amber-400/10 text-amber-300 border-amber-400/25 text-xs font-medium">Service</Badge>;
     if (record.category) return <Badge variant="outline" className="bg-white/6 text-white/50 border-white/12 text-xs font-medium capitalize">{record.category}</Badge>;
@@ -293,7 +293,7 @@ export default function MaintenanceHistory({ vehicleId, documents, lineItems = [
                 <FileText className="h-8 w-8 text-white/20" />
               </div>
               <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-info-wash border border-cyan-400/25 flex items-center justify-center">
-                <Upload className="h-3 w-3 text-cyan-400" />
+                <Upload className="h-3 w-3 text-info" />
               </div>
             </div>
             <h3 className="text-sm font-semibold text-white/70 mb-1">No maintenance records yet</h3>

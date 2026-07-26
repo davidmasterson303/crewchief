@@ -41,14 +41,14 @@ function StepIndicator({ currentStep, totalSteps, labels }: { currentStep: numbe
                 isCompleted
                   ? 'bg-cyan-500 text-black'
                   : isActive
-                  ? 'bg-info-wash border-2 border-cyan-400 text-cyan-400'
+                  ? 'bg-info-wash border-2 border-cyan-400 text-info'
                   : 'bg-white/5 border border-white/15 text-white/30'
               }`}>
                 {isCompleted ? <CheckCircle2 className="h-4 w-4" /> : stepNum}
               </div>
               {labels[i] && (
                 <span className={`text-[10px] mt-1.5 font-medium whitespace-nowrap ${
-                  isActive ? 'text-white/80' : isCompleted ? 'text-cyan-400/70' : 'text-white/25'
+                  isActive ? 'text-white/80' : isCompleted ? 'text-info/70' : 'text-white/25'
                 }`}>
                   {labels[i]}
                 </span>
@@ -446,7 +446,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
         <div className="mb-8 text-center">
           <div className="flex items-center justify-center gap-2 mb-2">
             <div className="w-7 h-7 rounded-lg bg-info-wash border border-info-border flex items-center justify-center">
-              <span className="text-cyan-400 font-bold text-sm">C</span>
+              <span className="text-info font-bold text-sm">C</span>
             </div>
             <span className="text-white font-semibold text-lg tracking-tight">CrewChief</span>
           </div>
@@ -518,7 +518,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
               {!powertrainReady && (
                 <div className="flex items-center gap-3 p-3.5 bg-info-wash border border-info-border rounded-xl">
                   <div className="w-4 h-4 border-2 border-info-border border-t-info rounded-full animate-spin flex-shrink-0" />
-                  <p className="text-sm text-cyan-300/80">Checking available configurations...</p>
+                  <p className="text-sm text-info/80">Checking available configurations...</p>
                 </div>
               )}
 
@@ -562,7 +562,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
                     onDragOver={handleDragOver}
                     onDrop={handleDrop}
                   >
-                    <div className={`flex flex-col items-center gap-2 transition-colors ${isDragging ? 'text-cyan-400' : 'text-white/30'}`}>
+                    <div className={`flex flex-col items-center gap-2 transition-colors ${isDragging ? 'text-info' : 'text-white/30'}`}>
                       {isDragging ? (
                         <>
                           <ImageIcon className="h-8 w-8" />
@@ -743,9 +743,9 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
             <div className="space-y-5">
               <div className="flex items-start gap-3 p-4 bg-info-wash border border-info-border rounded-xl">
                 <div className="w-5 h-5 rounded-full bg-info-wash border border-info-border flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <span className="text-cyan-400 text-xs font-bold">i</span>
+                  <span className="text-info text-xs font-bold">i</span>
                 </div>
-                <p className="text-sm text-cyan-300/80 leading-relaxed">
+                <p className="text-sm text-info/80 leading-relaxed">
                   We found multiple possible configurations for your vehicle. Please select the correct options.
                 </p>
               </div>

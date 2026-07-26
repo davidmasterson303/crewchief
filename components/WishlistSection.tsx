@@ -164,7 +164,7 @@ export function WishlistSection({ vehicleId }: WishlistSectionProps) {
       <div className="bg-slate-900/60 border border-white/10 rounded-2xl overflow-hidden">
         <div className="flex items-center justify-between px-6 py-5 border-b border-white/8">
           <div className="flex items-center gap-3">
-            <ListChecks className="h-5 w-5 text-cyan-400" />
+            <ListChecks className="h-5 w-5 text-info" />
             <div>
               <h2 className="text-base font-semibold text-white leading-tight">Wishlist</h2>
               {wishlistItems.length > 0 && (
@@ -366,7 +366,7 @@ export function WishlistSection({ vehicleId }: WishlistSectionProps) {
                           <span>{quote.zip_code}</span>
                         </div>
                         {(quote.estimated_total_low || quote.estimated_total_high) && (
-                          <p className="text-xs font-semibold text-cyan-400 mt-1.5">
+                          <p className="text-xs font-semibold text-info mt-1.5">
                             {formatCurrency(quote.estimated_total_low)} – {formatCurrency(quote.estimated_total_high)}
                           </p>
                         )}

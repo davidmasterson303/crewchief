@@ -109,7 +109,7 @@ export default function DocumentLibrary({ vehicleId }: DocumentLibraryProps) {
                           {doc.file_type}
                         </Badge>
                         {docLineItems.length > 0 && (
-                          <Badge variant="secondary" className="text-xs bg-info-wash border-info-border text-cyan-300">
+                          <Badge variant="secondary" className="text-xs bg-info-wash border-info-border text-info">
                             {docLineItems.length} items
                           </Badge>
                         )}
@@ -138,7 +138,7 @@ export default function DocumentLibrary({ vehicleId }: DocumentLibraryProps) {
                           <div key={item.id} className="bg-white/5 rounded p-3 border border-info-border">
                             <div className="flex items-start justify-between gap-2 mb-1">
                               <p className="text-sm font-medium text-white">{item.description}</p>
-                              <Badge variant="outline" className="text-xs capitalize flex-shrink-0 bg-info-wash border-info-border text-cyan-300">
+                              <Badge variant="outline" className="text-xs capitalize flex-shrink-0 bg-info-wash border-info-border text-info">
                                 {item.type}
                               </Badge>
                             </div>

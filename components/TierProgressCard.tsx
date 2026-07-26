@@ -30,7 +30,7 @@ const TIER_CONFIG: Record<Tier, TierConfig> = {
   mild: {
     label: 'Mild Builder',
     icon: Gauge,
-    color: 'text-cyan-400',
+    color: 'text-info',
     bgColor: 'bg-info-wash',
     borderColor: 'border-cyan-500/40',
     ringColor: 'ring-cyan-500/30',

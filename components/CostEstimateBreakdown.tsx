@@ -43,7 +43,7 @@ function CostRangeBar({ low, high, max }: { low: number; high: number; max: numb
       </div>
       <div className="flex justify-between mt-1.5 text-xs text-white/35 tabular-nums">
         <span>$0</span>
-        <span className="text-cyan-300 font-medium">{fmt(low)} – {fmt(high)}</span>
+        <span className="text-info font-medium">{fmt(low)} – {fmt(high)}</span>
         <span>{fmt(max)}</span>
       </div>
       <div
@@ -77,7 +77,7 @@ export function CostEstimateBreakdown({ estimate }: CostEstimateBreakdownProps) 
                   <DollarSign className="h-3 w-3" />
                   <span className="text-xs font-medium">Parts</span>
                 </div>
-                <p className="text-sm font-semibold text-cyan-300 tabular-nums">
+                <p className="text-sm font-semibold text-info tabular-nums">
                   {fmt(item.parts_cost_low)} – {fmt(item.parts_cost_high)}
                 </p>
               </div>
@@ -86,7 +86,7 @@ export function CostEstimateBreakdown({ estimate }: CostEstimateBreakdownProps) 
                   <Clock className="h-3 w-3" />
                   <span className="text-xs font-medium">Labor</span>
                 </div>
-                <p className="text-sm font-semibold text-cyan-300 tabular-nums">
+                <p className="text-sm font-semibold text-info tabular-nums">
                   {fmt(item.labor_cost_low)} – {fmt(item.labor_cost_high)}
                 </p>
                 <p className="text-xs text-white/30 mt-0.5">
@@ -98,7 +98,7 @@ export function CostEstimateBreakdown({ estimate }: CostEstimateBreakdownProps) 
             <div className="pt-2 border-t border-white/6">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs text-white/40 font-medium">Item Estimate</span>
-                <span className="text-sm font-bold text-cyan-400 tabular-nums">{fmt(itemLow)} – {fmt(itemHigh)}</span>
+                <span className="text-sm font-bold text-info tabular-nums">{fmt(itemLow)} – {fmt(itemHigh)}</span>
               </div>
               <CostRangeBar low={itemLow} high={itemHigh} max={itemHigh * 1.4} />
             </div>
@@ -116,7 +116,7 @@ export function CostEstimateBreakdown({ estimate }: CostEstimateBreakdownProps) 
           </div>
           <div className="text-right">
             <p className="text-xs text-white/35">Market avg</p>
-            <p className="text-sm font-semibold text-cyan-300 tabular-nums">
+            <p className="text-sm font-semibold text-info tabular-nums">
               {fmt(Math.round((estimate.total_low + estimate.total_high) / 2))}
             </p>
           </div>
@@ -135,7 +135,7 @@ export function CostEstimateBreakdown({ estimate }: CostEstimateBreakdownProps) 
           </div>
           <div className="flex justify-between mt-2 text-xs text-white/30 tabular-nums">
             <span>$0</span>
-            <span className="text-cyan-300/80 font-medium">
+            <span className="text-info/80 font-medium">
               {fmt(estimate.total_low)} — {fmt(estimate.total_high)}
             </span>
             <span>{fmt(maxPossible)}</span>
@@ -150,7 +150,7 @@ export function CostEstimateBreakdown({ estimate }: CostEstimateBreakdownProps) 
 
         {estimate.regional_labor_rate && (
           <p className="text-xs text-white/40 mt-4 flex items-start gap-1.5 leading-relaxed">
-            <Info className="h-3.5 w-3.5 text-cyan-400/60 flex-shrink-0 mt-0.5" />
+            <Info className="h-3.5 w-3.5 text-info/60 flex-shrink-0 mt-0.5" />
             {estimate.regional_labor_rate}
           </p>
         )}

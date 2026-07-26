@@ -189,7 +189,7 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
               ].map(({ icon: Icon, label, value }) => (
                 <div key={label} className="flex items-start gap-3 p-4 bg-white/4 rounded-xl border border-white/8">
                   <div className="w-8 h-8 rounded-lg bg-info-wash border border-info-border flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Icon className="h-4 w-4 text-cyan-400" />
+                    <Icon className="h-4 w-4 text-info" />
                   </div>
                   <div className="min-w-0">
                     <p className="label-uppercase mb-1">{label}</p>
@@ -205,7 +205,7 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-white text-base">
-                <Zap className="h-5 w-5 text-cyan-400" />
+                <Zap className="h-5 w-5 text-info" />
                 Performance Stats
               </CardTitle>
               <button
@@ -253,7 +253,7 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
                     },
                   ].map(({ icon: Icon, label, value, unit, delta }) => (
                     <div key={label} className="flex flex-col items-center justify-center p-5 bg-white/4 rounded-xl border border-white/8">
-                      <Icon className="h-6 w-6 text-cyan-400 mb-3" />
+                      <Icon className="h-6 w-6 text-info mb-3" />
                       <div className="text-center">
                         <div className="text-3xl font-bold text-white tabular-nums">
                           {value || '\u2014'}
@@ -270,7 +270,7 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
 
                 {perfLoading && hasPerformanceData && (
                   <div className="flex items-center justify-center gap-2 mt-4 text-xs text-white/35">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-cyan-400" />
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-info" />
                     Checking for updates...
                   </div>
                 )}
@@ -299,7 +299,7 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
         <Card className="bg-slate-900/60 border-white/10">
           <CardHeader className="pb-4">
             <CardTitle className="flex items-center gap-2 text-white text-base">
-              <Droplets className="h-5 w-5 text-cyan-400" />
+              <Droplets className="h-5 w-5 text-info" />
               Fluid Specifications
             </CardTitle>
           </CardHeader>
@@ -322,7 +322,7 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
         <Card className="bg-slate-900/60 border-white/10">
           <CardHeader className="pb-4">
             <CardTitle className="flex items-center gap-2 text-white text-base">
-              <Lightbulb className="h-5 w-5 text-cyan-400" />
+              <Lightbulb className="h-5 w-5 text-info" />
               Five Interesting Facts
             </CardTitle>
           </CardHeader>
@@ -331,7 +331,7 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
               <div className="space-y-3">
                 {interestingFacts.map((fact: string, index: number) => (
                   <div key={`fact-${index}`} className="flex gap-4 p-3.5 bg-white/3 rounded-xl border border-white/6">
-                    <div className="flex-shrink-0 w-6 h-6 rounded-lg bg-info-wash border border-info-border flex items-center justify-center text-xs font-bold text-cyan-400">
+                    <div className="flex-shrink-0 w-6 h-6 rounded-lg bg-info-wash border border-info-border flex items-center justify-center text-xs font-bold text-info">
                       {index + 1}
                     </div>
                     <p className="text-sm text-white/70 leading-relaxed flex-1">{fact}</p>

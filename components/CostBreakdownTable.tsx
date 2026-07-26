@@ -118,12 +118,12 @@ export function CostBreakdownTable({ costBreakdown }: CostBreakdownTableProps) {
                 );
               })}
               <TableRow className="border-t-2 border-cyan-400/40 bg-info-wash hover:bg-cyan-400/15">
-                <TableCell colSpan={4} className="font-bold text-cyan-400 text-right">
+                <TableCell colSpan={4} className="font-bold text-info text-right">
                   Estimated Total
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex flex-col">
-                    <Badge variant="outline" className="border-cyan-400 text-cyan-400 justify-center">
+                    <Badge variant="outline" className="border-cyan-400 text-info justify-center">
                       {formatCurrency(costBreakdown.total_low)} - {formatCurrency(costBreakdown.total_high)}
                     </Badge>
                   </div>

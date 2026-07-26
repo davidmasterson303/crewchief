@@ -549,7 +549,7 @@ export default function ConsultantChat({
             <div className="h-full flex items-center justify-center">
               <div className="text-center max-w-md animate-fade-in">
                 <div className="w-14 h-14 rounded-2xl bg-info-wash border border-info-border flex items-center justify-center mx-auto mb-5">
-                  <MessageSquare className="h-7 w-7 text-cyan-400" />
+                  <MessageSquare className="h-7 w-7 text-info" />
                 </div>
                 <h3 className="text-lg font-bold mb-2 text-white">Hey, CrewChief here.</h3>
                 <p className="text-white/55 mb-5 text-sm leading-relaxed">
@@ -658,7 +658,7 @@ export default function ConsultantChat({
                               )}
                               <span className="flex-1 font-medium text-xs">{action.name}</span>
                               <span className="text-[10px] opacity-50 capitalize">{action.type}</span>
-                              {!isAdded && !isAdding && <span className="text-xs text-cyan-400 font-semibold">+ Add</span>}
+                              {!isAdded && !isAdding && <span className="text-xs text-info font-semibold">+ Add</span>}
                             </button>
                           );
                         })}
@@ -740,7 +740,7 @@ export default function ConsultantChat({
                   className="flex items-center justify-between bg-info-wash border border-info-border p-2.5 rounded-xl"
                 >
                   <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <FileText className="h-4 w-4 text-cyan-400 flex-shrink-0" />
+                    <FileText className="h-4 w-4 text-info flex-shrink-0" />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium truncate text-white">{file.name}</p>
                       <p className="text-xs text-white/40">{(file.size / 1024 / 1024).toFixed(2)} MB</p>

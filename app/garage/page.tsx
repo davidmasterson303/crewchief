@@ -71,7 +71,7 @@ export default function GaragePage() {
           <div className="border border-info-border rounded-3xl text-center py-32 px-12 bg-gradient-to-b from-black/60 to-black/40 backdrop-blur-sm">
             <div className="mb-8">
               <div className="h-24 w-24 bg-gradient-to-br from-cyan-500/20 to-cyan-500/20 rounded-2xl flex items-center justify-center mx-auto">
-                <Car className="h-12 w-12 text-cyan-400" />
+                <Car className="h-12 w-12 text-info" />
               </div>
             </div>
             <h2 className="text-4xl font-bold mb-4 text-white tracking-tight">Your Garage is Empty</h2>

@@ -134,7 +134,7 @@ export default function HealthHistoryChart({ vehicleId, currentScore }: HealthHi
             <div className="text-center">
               <p className="text-xs text-white/35 mb-1 uppercase tracking-widest font-semibold">Current</p>
               <p className={`text-lg font-bold tabular-nums ${
-                lastScore >= 80 ? 'text-green-400' : lastScore >= 60 ? 'text-cyan-400' : lastScore >= 40 ? 'text-orange-400' : 'text-red-400'
+                lastScore >= 80 ? 'text-green-400' : lastScore >= 60 ? 'text-info' : lastScore >= 40 ? 'text-orange-400' : 'text-red-400'
               }`}>{lastScore}</p>
             </div>
           </div>

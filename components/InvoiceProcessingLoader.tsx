@@ -67,7 +67,7 @@ export default function InvoiceProcessingLoader({ isProcessing, fileName }: Invo
       <div className="max-w-md w-full space-y-6">
         {fileName && (
           <div className="flex items-center gap-2 p-3 bg-slate-800/50 rounded-lg border border-info-border">
-            <FileText className="h-4 w-4 text-cyan-400 flex-shrink-0" />
+            <FileText className="h-4 w-4 text-info flex-shrink-0" />
             <p className="text-sm text-slate-300 truncate">{fileName}</p>
           </div>
         )}
@@ -103,7 +103,7 @@ export default function InvoiceProcessingLoader({ isProcessing, fileName }: Invo
                 <span
                   className={`text-sm font-medium transition-colors ${
                     isActive
-                      ? 'text-cyan-300'
+                      ? 'text-info'
                       : isCompleted
                       ? 'text-green-300'
                       : 'text-slate-400'

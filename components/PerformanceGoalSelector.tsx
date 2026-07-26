@@ -21,7 +21,7 @@ const GOALS = [
     label: 'Mild',
     icon: Gauge,
     description: 'Subtle improvements, OEM+ reliability',
-    color: 'text-cyan-400',
+    color: 'text-info',
     bgColor: 'bg-info-wash',
     borderColor: 'border-info-border',
     hoverBg: 'hover:bg-cyan-500/30',

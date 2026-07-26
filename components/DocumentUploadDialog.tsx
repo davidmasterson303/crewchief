@@ -288,11 +288,11 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
                 >
                   {selectedFiles.length === 0 ? (
                     <div className="p-10 text-center">
-                      <div className={`transition-colors ${isDragging ? 'text-cyan-400' : 'text-white/25'}`}>
+                      <div className={`transition-colors ${isDragging ? 'text-info' : 'text-white/25'}`}>
                         {isDragging ? (
                           <>
                             <ImageIcon className="h-12 w-12 mx-auto mb-3" />
-                            <p className="text-base font-medium text-cyan-300">Drop files here</p>
+                            <p className="text-base font-medium text-info">Drop files here</p>
                           </>
                         ) : (
                           <>
@@ -337,7 +337,7 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
                           <div key={idx} className="flex items-center justify-between bg-white/5 border border-white/8 p-3 rounded-xl">
                             <div className="flex items-center gap-2.5 flex-1 min-w-0">
                               <div className="w-8 h-8 rounded-lg bg-info-wash border border-info-border flex items-center justify-center flex-shrink-0">
-                                <FileText className="h-4 w-4 text-cyan-400" />
+                                <FileText className="h-4 w-4 text-info" />
                               </div>
                               <div className="min-w-0">
                                 <p className="text-sm font-medium text-white truncate">{file.name}</p>
@@ -403,7 +403,7 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
                 )}
 
                 <div className="bg-info-wash border border-info-border rounded-xl p-4">
-                  <p className="text-xs font-semibold uppercase tracking-widest text-cyan-400/70 mb-1.5">AI Invoice Processing</p>
+                  <p className="text-xs font-semibold uppercase tracking-widest text-info/70 mb-1.5">AI Invoice Processing</p>
                   <p className="text-sm text-white/50 leading-relaxed">
                     Our AI automatically extracts service details, costs, line items, and dates from your invoices.
                   </p>

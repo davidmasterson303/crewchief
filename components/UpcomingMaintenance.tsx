@@ -62,7 +62,7 @@ const URGENCY_CONFIG = {
   upcoming: {
     border: 'border-l-cyan-400',
     glow: 'shadow-cyan-500/10',
-    badge: 'bg-info-wash text-cyan-400 border-info-border',
+    badge: 'bg-info-wash text-info border-info-border',
     label: 'On Track',
     dot: 'bg-cyan-400',
   },
@@ -199,8 +199,8 @@ function ForecastCard({
 
       {bundleHints.length > 0 && (
         <div className="flex items-start gap-1.5 bg-info-wash border border-info-border rounded-xl px-2.5 py-2">
-          <CheckCircle className="h-3 w-3 text-cyan-400 flex-shrink-0 mt-0.5" />
-          <p className="text-[10px] text-cyan-300/80 leading-snug">{bundleHints[0]}</p>
+          <CheckCircle className="h-3 w-3 text-info flex-shrink-0 mt-0.5" />
+          <p className="text-[10px] text-info/80 leading-snug">{bundleHints[0]}</p>
         </div>
       )}
 
@@ -380,7 +380,7 @@ export default function UpcomingMaintenance({ vehicle, knowledge, maintenanceLin
                   </span>
                 )}
                 {overdueCount === 0 && soonCount === 0 && baselineCount === 0 && (
-                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-info-wash text-cyan-400 border border-info-border">
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-info-wash text-info border border-info-border">
                     All on track
                   </span>
                 )}
@@ -431,7 +431,7 @@ export default function UpcomingMaintenance({ vehicle, knowledge, maintenanceLin
           <p className="text-xs text-white/20 mt-2">
             Based on {currentMileage.toLocaleString()} mi &amp; {avgMilesPerMonth.toLocaleString()} mi/mo avg.
             {syncedCount > 0 && (
-              <span className="text-cyan-400/50 ml-1">{syncedCount} item{syncedCount !== 1 ? 's' : ''} auto-linked from history.</span>
+              <span className="text-info/50 ml-1">{syncedCount} item{syncedCount !== 1 ? 's' : ''} auto-linked from history.</span>
             )}
           </p>
         </div>

@@ -151,7 +151,7 @@ export default function ResetPasswordPage() {
       <div className="min-h-screen flex items-center justify-center p-4" style={bgStyle}>
         <div className="w-full max-w-md text-center">
           <div className="bg-white/5 border border-white/10 rounded-2xl p-10 backdrop-blur-xl">
-            <Loader2 className="h-10 w-10 text-cyan-400 mx-auto mb-5 animate-spin" />
+            <Loader2 className="h-10 w-10 text-info mx-auto mb-5 animate-spin" />
             <p className="text-white/55 text-sm">Verifying reset link...</p>
             <p className="text-white/30 text-xs mt-3">
               If this takes too long,{' '}

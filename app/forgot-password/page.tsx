@@ -50,7 +50,7 @@ export default function ForgotPasswordPage() {
       >
         <div className="w-full max-w-md text-center">
           <div className="bg-white/5 border border-white/10 rounded-2xl p-10 backdrop-blur-xl">
-            <CheckCircle2 className="h-14 w-14 text-cyan-400 mx-auto mb-5" />
+            <CheckCircle2 className="h-14 w-14 text-info mx-auto mb-5" />
             <h2 className="text-2xl font-bold text-white mb-3">Check your email</h2>
             <p className="text-white/55 text-sm leading-relaxed mb-6">
               We sent a password reset link to <span className="text-white font-medium">{email}</span>.

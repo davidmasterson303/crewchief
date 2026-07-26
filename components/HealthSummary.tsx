@@ -234,7 +234,7 @@ export default function HealthSummary({ vehicleId, healthSummary, recalls = [], 
             <div className="flex items-center gap-2.5 mb-2">
               {issuesEmpty
                 ? <CheckCircle className="h-6 w-6 text-green-400" />
-                : <AlertCircle className="h-6 w-6 text-cyan-400" />}
+                : <AlertCircle className="h-6 w-6 text-info" />}
               <h4 className="text-sm font-semibold text-white">Known Issues</h4>
             </div>
             <p className="text-sm text-white/65 leading-relaxed">
@@ -292,7 +292,7 @@ export default function HealthSummary({ vehicleId, healthSummary, recalls = [], 
         {healthSummary.recommendations && healthSummary.recommendations.length > 0 && (
           <div className="bg-info-wash border border-info-border rounded-xl p-4">
             <div className="flex items-center gap-2 mb-3">
-              <TrendingUp className="h-5 w-5 text-cyan-400" />
+              <TrendingUp className="h-5 w-5 text-info" />
               <h4 className="font-semibold text-white text-sm">Recommendations</h4>
             </div>
             <ul className="space-y-2">

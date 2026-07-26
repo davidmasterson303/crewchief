@@ -117,7 +117,7 @@ export function QuoteDetailDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[95vw] lg:max-w-3xl max-h-[90vh] overflow-y-auto bg-slate-950 border-info-border">
         <DialogHeader>
-          <DialogTitle className="text-cyan-400 text-2xl">
+          <DialogTitle className="text-info text-2xl">
             {quote.name || 'Unnamed Quote'}
           </DialogTitle>
           <DialogDescription className="text-slate-400 text-base">
@@ -129,7 +129,7 @@ export function QuoteDetailDialog({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <Card className="border-info-border bg-slate-900/50">
               <CardContent className="p-4 space-y-2">
-                <div className="flex items-center gap-2 text-cyan-400">
+                <div className="flex items-center gap-2 text-info">
                   <DollarSign className="h-4 w-4" />
                   <span className="text-xs font-medium">Estimated Cost</span>
                 </div>
@@ -141,7 +141,7 @@ export function QuoteDetailDialog({
 
             <Card className="border-info-border bg-slate-900/50">
               <CardContent className="p-4 space-y-2">
-                <div className="flex items-center gap-2 text-cyan-400">
+                <div className="flex items-center gap-2 text-info">
                   <Package className="h-4 w-4" />
                   <span className="text-xs font-medium">Service Items</span>
                 </div>
@@ -153,7 +153,7 @@ export function QuoteDetailDialog({
 
             <Card className="border-info-border bg-slate-900/50">
               <CardContent className="p-4 space-y-2">
-                <div className="flex items-center gap-2 text-cyan-400">
+                <div className="flex items-center gap-2 text-info">
                   <MapPin className="h-4 w-4" />
                   <span className="text-xs font-medium">Zip Code</span>
                 </div>
@@ -167,7 +167,7 @@ export function QuoteDetailDialog({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium flex items-center gap-2 text-cyan-400">
+                <h3 className="text-sm font-medium flex items-center gap-2 text-info">
                   <FileText className="h-4 w-4" />
                   Cost Breakdown
                 </h3>
@@ -192,7 +192,7 @@ export function QuoteDetailDialog({
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium flex items-center gap-2 text-cyan-400">
+                <h3 className="text-sm font-medium flex items-center gap-2 text-info">
                   <Mail className="h-4 w-4" />
                   Email Draft
                 </h3>
@@ -218,7 +218,7 @@ export function QuoteDetailDialog({
 
           {quote.selected_items && quote.selected_items.length > 0 && (
             <div className="space-y-3">
-              <h3 className="text-sm font-medium text-cyan-400">Selected Services</h3>
+              <h3 className="text-sm font-medium text-info">Selected Services</h3>
               <div className="space-y-2">
                 {quote.selected_items.map((item, idx) => (
                   <Card
@@ -235,7 +235,7 @@ export function QuoteDetailDialog({
                         {item.category && (
                           <Badge
                             variant="secondary"
-                            className="text-xs bg-info-wash text-cyan-300 border-info-border whitespace-nowrap"
+                            className="text-xs bg-info-wash text-info border-info-border whitespace-nowrap"
                           >
                             {item.category}
                           </Badge>
@@ -250,7 +250,7 @@ export function QuoteDetailDialog({
 
           {quote.additional_notes && (
             <div className="space-y-3">
-              <h3 className="text-sm font-medium text-cyan-400">Additional Notes</h3>
+              <h3 className="text-sm font-medium text-info">Additional Notes</h3>
               <Card className="border-info-border bg-slate-900/50">
                 <CardContent className="p-4">
                   <p className="text-sm text-slate-300 whitespace-pre-wrap">

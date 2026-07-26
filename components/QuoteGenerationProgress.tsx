@@ -53,7 +53,7 @@ export function QuoteGenerationProgress({ items, zipCode }: QuoteGenerationProgr
           className="flex justify-center"
         >
           <div className="relative">
-            <Zap className="h-16 w-16 text-cyan-400" />
+            <Zap className="h-16 w-16 text-info" />
             <motion.div
               className="absolute inset-0 bg-info-wash rounded-full blur-xl"
               animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.8, 0.5] }}
@@ -61,7 +61,7 @@ export function QuoteGenerationProgress({ items, zipCode }: QuoteGenerationProgr
             />
           </div>
         </motion.div>
-        <h3 className="text-2xl font-bold text-cyan-400">Generating Your Quote</h3>
+        <h3 className="text-2xl font-bold text-info">Generating Your Quote</h3>
         <p className="text-slate-400">
           Analyzing {items.length} service {items.length === 1 ? 'item' : 'items'} for zip code {zipCode}
         </p>
@@ -70,7 +70,7 @@ export function QuoteGenerationProgress({ items, zipCode }: QuoteGenerationProgr
       <div className="space-y-2">
         <div className="flex items-center justify-between text-sm">
           <span className="text-slate-400">Overall Progress</span>
-          <span className="text-cyan-400 font-semibold">{Math.round(progress)}%</span>
+          <span className="text-info font-semibold">{Math.round(progress)}%</span>
         </div>
         <div className="h-2.5 bg-slate-800/80 rounded-full overflow-hidden">
           <div
@@ -124,7 +124,7 @@ export function QuoteGenerationProgress({ items, zipCode }: QuoteGenerationProgr
                           status === 'complete'
                             ? 'text-green-400'
                             : status === 'active'
-                            ? 'text-cyan-400'
+                            ? 'text-info'
                             : 'text-slate-500'
                         }`}
                       />
@@ -133,7 +133,7 @@ export function QuoteGenerationProgress({ items, zipCode }: QuoteGenerationProgr
                           status === 'complete'
                             ? 'text-green-400'
                             : status === 'active'
-                            ? 'text-cyan-400'
+                            ? 'text-info'
                             : 'text-slate-500'
                         }`}
                       >

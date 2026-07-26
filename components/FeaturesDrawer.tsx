@@ -125,7 +125,7 @@ export default function FeaturesDrawer({ open, onOpenChange }: FeaturesDrawerPro
             >
               <div className="flex-shrink-0 mt-0.5">
                 <div className="h-9 w-9 rounded-lg bg-info-wash border border-info-border flex items-center justify-center group-hover:bg-cyan-500/20 transition-colors">
-                  <Icon className="h-4 w-4 text-cyan-400" />
+                  <Icon className="h-4 w-4 text-info" />
                 </div>
               </div>
               <div className="flex-1 min-w-0">
@@ -138,7 +138,7 @@ export default function FeaturesDrawer({ open, onOpenChange }: FeaturesDrawerPro
                     {badge}
                   </Badge>
                 </div>
-                <p className="text-xs font-medium text-cyan-400 mb-1.5">{heading}</p>
+                <p className="text-xs font-medium text-info mb-1.5">{heading}</p>
                 <p className="text-xs text-gray-400 leading-relaxed">{body}</p>
               </div>
             </div>
@@ -146,7 +146,7 @@ export default function FeaturesDrawer({ open, onOpenChange }: FeaturesDrawerPro
 
           <div className="mt-2 p-4 rounded-xl bg-info-wash border border-info-border">
             <p className="text-xs text-gray-400 leading-relaxed">
-              <span className="text-cyan-400 font-medium">Built for the long haul.</span>{' '}
+              <span className="text-info font-medium">Built for the long haul.</span>{' '}
               CrewChief grows with your car. Every service record, every conversation, every decision you log makes future recommendations sharper and more personalized.
             </p>
           </div>

@@ -299,7 +299,7 @@ export default function TCOCard({ vehicle, vehicleId, onEditInputs }: TCOCardPro
                 label="Cost / Mile"
                 value={costPerMile > 0 ? `$${costPerMile.toFixed(2)}` : '—'}
                 sub="real-world"
-                accent="text-cyan-400"
+                accent="text-info"
               />
               <KPICard
                 label="Monthly Cost"

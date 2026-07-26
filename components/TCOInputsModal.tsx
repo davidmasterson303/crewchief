@@ -72,7 +72,7 @@ export default function TCOInputsModal({ open, onOpenChange, vehicleId, vehicle,
       <DialogContent className="bg-slate-900 border-white/10 max-w-md w-full">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-white text-base">
-            <DollarSign className="h-5 w-5 text-cyan-400" />
+            <DollarSign className="h-5 w-5 text-info" />
             Cost of Ownership Inputs
           </DialogTitle>
           <p className="text-xs text-white/40 mt-1">

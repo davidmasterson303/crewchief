@@ -377,7 +377,7 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
               <CardTitle className="text-white flex items-center gap-3">
                 <div className="relative">
                   <div className="absolute inset-0 bg-info-wash rounded-full animate-pulse blur" />
-                  <RefreshCw className="h-5 w-5 text-cyan-400 animate-spin relative" />
+                  <RefreshCw className="h-5 w-5 text-info animate-spin relative" />
                 </div>
                 <span>Vehicle Research In Progress</span>
               </CardTitle>
@@ -462,7 +462,7 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
           <CardHeader>
             <div>
               <CardTitle className="text-white flex items-center gap-2">
-                <AlertCircle className="h-5 w-5 text-cyan-400" />
+                <AlertCircle className="h-5 w-5 text-info" />
                 The Dossier
               </CardTitle>
               <CardDescription className="text-slate-400">AI-researched insights for your vehicle</CardDescription>
@@ -488,7 +488,7 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
                     >
                       <Icon className={`h-3.5 w-3.5 ${isActive ? 'text-cyan-400' : ''}`} />
                       <span className={`font-medium text-xs ${isActive ? 'text-white' : ''}`}>{label}</span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold tabular-nums ${isActive ? 'bg-info-wash text-cyan-300' : 'bg-white/8 text-white/35'}`}>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold tabular-nums ${isActive ? 'bg-cyan-400/10 text-cyan-300' : 'bg-white/8 text-white/35'}`}>
                         {count}
                       </span>
                       {isActive && (

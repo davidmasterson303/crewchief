@@ -58,7 +58,7 @@ export default function MaintenanceItemDetailsDialog({
         <SheetHeader className="pb-4 border-b border-white/8">
           <SheetTitle className="text-white text-lg leading-snug pr-6">{item.description}</SheetTitle>
           {item.category && (
-            <Badge variant="outline" className="w-fit capitalize bg-info-wash text-cyan-300 border-cyan-400/25 text-xs">
+            <Badge variant="outline" className="w-fit capitalize bg-info-wash text-info border-cyan-400/25 text-xs">
               {item.category}
             </Badge>
           )}
@@ -133,7 +133,7 @@ export default function MaintenanceItemDetailsDialog({
                   <p className="text-base font-bold text-white tabular-nums">${(item.cost_parts || 0).toFixed(2)}</p>
                 </div>
                 <div className="text-center p-3 bg-info-wash border border-info-border rounded-lg">
-                  <p className="text-xs text-cyan-400/70 mb-1">Total</p>
+                  <p className="text-xs text-info/70 mb-1">Total</p>
                   <p className="text-base font-bold text-white tabular-nums">${totalCost.toFixed(2)}</p>
                 </div>
               </div>

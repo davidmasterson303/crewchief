@@ -209,7 +209,7 @@ const ServiceItemsComponent = forwardRef<{ refreshWishlist: () => Promise<void> 
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-white flex items-center gap-2">
-              <Heart className="h-5 w-5 text-cyan-400" />
+              <Heart className="h-5 w-5 text-info" />
               My Wishlist
             </CardTitle>
             <Button onClick={() => setShowAddDialog(true)} className="bg-cyan-600 hover:bg-cyan-700 text-white border-0">
@@ -221,7 +221,7 @@ const ServiceItemsComponent = forwardRef<{ refreshWishlist: () => Promise<void> 
         <CardContent>
           {bundles.length > 0 && (
             <div className="mb-6 p-4 bg-info-wash border border-info-border rounded-lg">
-              <h4 className="font-semibold text-cyan-300 mb-2">Smart Bundling Opportunities</h4>
+              <h4 className="font-semibold text-info mb-2">Smart Bundling Opportunities</h4>
               {bundles.map((bundle: any) => (
                 <div key={bundle.id} className="bg-slate-800/50 p-3 rounded mb-2 border border-info-border">
                   <div className="flex items-start justify-between">
@@ -280,7 +280,7 @@ const ServiceItemsComponent = forwardRef<{ refreshWishlist: () => Promise<void> 
                             {getCategoryIcon(item.category)}
                           </div>
                           <span className="font-medium text-white">{item.description}</span>
-                          <Badge variant="outline" className="capitalize bg-info-wash text-cyan-300 border-info-border">
+                          <Badge variant="outline" className="capitalize bg-info-wash text-info border-info-border">
                             {item.category}
                           </Badge>
                         </div>
@@ -338,7 +338,7 @@ const ServiceItemsComponent = forwardRef<{ refreshWishlist: () => Promise<void> 
                           <span className="font-medium text-white text-lg">
                             {quote.name || `Quote for ${quote.selected_items?.length || 0} items`}
                           </span>
-                          <Badge variant="outline" className="bg-info-wash text-cyan-300 border-info-border">
+                          <Badge variant="outline" className="bg-info-wash text-info border-info-border">
                             {quote.zip_code}
                           </Badge>
                         </div>
@@ -346,7 +346,7 @@ const ServiceItemsComponent = forwardRef<{ refreshWishlist: () => Promise<void> 
                           Created {new Date(quote.created_at).toLocaleDateString()}
                         </p>
                         {quote.estimated_total_low && quote.estimated_total_high && (
-                          <p className="text-sm font-medium text-cyan-300">
+                          <p className="text-sm font-medium text-info">
                             Estimate: ${quote.estimated_total_low.toFixed(0)} - ${quote.estimated_total_high.toFixed(0)}
                           </p>
                         )}
