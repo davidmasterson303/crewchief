@@ -32,6 +32,22 @@ export function useCountUp(
       return;
     }
 
+    /*
+      requestAnimationFrame does not run while the document is hidden, so a
+      counter started in a background tab sits at 0 with no frame ever
+      arriving. Unlike a missed transition this is a *wrong number* on screen:
+      the hero rendered "0" beside the label "Fair", which is a health score of
+      74 describing itself as zero.
+
+      Same reasoning as use-scroll-reveal — animating early costs an
+      animation, not animating costs the content. Found the same way too, by
+      reading a value out of a hidden browser pane.
+    */
+    if (typeof document !== 'undefined' && document.hidden) {
+      setValue(target);
+      return;
+    }
+
     if (!enabled) {
       setValue(0);
       return;
