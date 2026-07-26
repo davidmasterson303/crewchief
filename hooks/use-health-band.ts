@@ -26,11 +26,19 @@ export interface HealthBand {
   label: string;
 }
 
+/*
+ * Labels are deliberately conservative. The previous ramp called anything
+ * from 60 up "Good", so a 61 — a car with real deferred maintenance — read
+ * as reassuring. For a tool whose job is telling you what needs attention,
+ * overstating condition is the more costly direction to be wrong in.
+ *
+ * Thresholds are unchanged; only the words moved down a step.
+ */
 const BANDS: ReadonlyArray<HealthBand & { min: number }> = [
-  { min: 80, name: 'good', color: 'var(--ring-good)', rgb: '127,206,156', label: 'Excellent' },
-  { min: 60, name: 'ok', color: 'var(--ring-ok)', rgb: '95,174,192', label: 'Good' },
-  { min: 40, name: 'warn', color: 'var(--ring-warn)', rgb: '224,164,104', label: 'Fair' },
-  { min: -Infinity, name: 'bad', color: 'var(--ring-bad)', rgb: '224,136,130', label: 'Needs Attention' },
+  { min: 80, name: 'good', color: 'var(--ring-good)', rgb: '127,206,156', label: 'Good' },
+  { min: 60, name: 'ok', color: 'var(--ring-ok)', rgb: '95,174,192', label: 'Fair' },
+  { min: 40, name: 'warn', color: 'var(--ring-warn)', rgb: '224,164,104', label: 'Needs attention' },
+  { min: -Infinity, name: 'bad', color: 'var(--ring-bad)', rgb: '224,136,130', label: 'Critical' },
 ];
 
 /**
