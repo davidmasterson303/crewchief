@@ -97,6 +97,14 @@ const ROUTE_POSTURE: Record<string, 'vehicle-scoped' | 'session' | 'public'> = {
   // Both delegate to server actions in app/actions.ts, which authorize there.
   'app/api/upload-document/route.ts': 'vehicle-scoped',
   'app/api/consultant/upload-document/route.ts': 'vehicle-scoped',
+  /*
+    Returns the commit SHA this deployment was built from — a public repo's
+    public commit id, and nothing else. No database, no session, no service
+    role. It has to be reachable unauthenticated because the thing asking is
+    scripts/promote-demo.mjs, checking from outside that a deploy actually
+    landed before the demo domain is moved onto it.
+  */
+  'app/api/version/route.ts': 'public',
 };
 
 /**
