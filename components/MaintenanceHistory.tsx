@@ -236,7 +236,7 @@ export default function MaintenanceHistory({ vehicleId, documents, lineItems = [
         <div className="flex items-center justify-between mb-4">
           <div>
             <CardTitle className="text-white flex items-center gap-2">
-              <Wrench className="h-5 w-5 text-cyan-400" />
+              <Wrench className="h-5 w-5 text-info" />
               Maintenance History
             </CardTitle>
             <p className="text-sm text-white/40 mt-0.5">

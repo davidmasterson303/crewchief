@@ -92,7 +92,7 @@ export default function HealthSummary({ vehicleId, healthSummary, recalls = [], 
       <Card className="bg-slate-900/60 border-white/10">
         <CardHeader>
           <CardTitle className="text-white flex items-center gap-2">
-            <Activity className="h-5 w-5 text-cyan-400" />
+            <Activity className="h-5 w-5 text-info" />
             Vehicle Health
           </CardTitle>
           <p className="text-sm text-white/50 mt-1">
@@ -194,7 +194,7 @@ export default function HealthSummary({ vehicleId, healthSummary, recalls = [], 
             <ScoreRing score={healthSummary.health_score} />
             <div>
               <CardTitle className="text-white flex items-center gap-2 mb-1">
-                <Activity className="h-5 w-5 text-cyan-400" />
+                <Activity className="h-5 w-5 text-info" />
                 Vehicle Health
               </CardTitle>
               <p className={`text-base font-semibold ${scoreInfo.color}`}>{scoreInfo.label}</p>

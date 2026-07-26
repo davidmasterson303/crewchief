@@ -112,7 +112,7 @@ export default function HealthHistoryChart({ vehicleId, currentScore }: HealthHi
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center justify-between text-white text-base">
           <div className="flex items-center gap-2">
-            <Activity className="h-5 w-5 text-cyan-400" />
+            <Activity className="h-5 w-5 text-info" />
             Health Trend
           </div>
           <div className={`flex items-center gap-1.5 text-sm font-medium ${trendColor}`}>

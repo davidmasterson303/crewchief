@@ -226,7 +226,7 @@ export default function TCOCard({ vehicle, vehicleId, onEditInputs }: TCOCardPro
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-white text-base">
-            <DollarSign className="h-5 w-5 text-cyan-400" />
+            <DollarSign className="h-5 w-5 text-info" />
             Total Cost of Ownership
           </CardTitle>
           <div className="flex items-center gap-2">

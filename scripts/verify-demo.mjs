@@ -31,8 +31,12 @@ const REQUIRED_ANON_TABLES = [
   'vehicle_health_summary',
   'nhtsa_data',
   'wishlist_items',
+  // Closed 26 Jul by 20260726140000, and verified live. These were known gaps
+  // for eight weeks: the client queries use maybeSingle(), so a 401 resolved
+  // to null and the dossier rendered with a hole rather than an error.
+  'vehicle_knowledge_base',
+  'recall_actions',
 ];
-const KNOWN_GAP_TABLES = ['vehicle_knowledge_base', 'recall_actions'];
 
 const DEFAULT_BASE = 'https://crewchief-demo.davidmasterson.co';
 const base = (process.argv[2] || DEFAULT_BASE).replace(/\/$/, '');
@@ -140,15 +144,6 @@ async function checkAnonData() {
     const status = await read(table);
     if (status === 200) pass(`${table} readable by anon`);
     else fail(`${table} returned ${status} for anon — demo content will be missing`);
-  }
-
-  for (const table of KNOWN_GAP_TABLES) {
-    const status = await read(table);
-    if (status === 200) {
-      pass(`${table} readable by anon — known gap now CLOSED, update the contract`);
-    } else {
-      warn(`${table} returned ${status} — known gap, dossier content is absent`);
-    }
   }
 }
 

@@ -43,11 +43,11 @@ export function CostBreakdownTable({ costBreakdown }: CostBreakdownTableProps) {
   return (
     <Card className="bg-slate-900/50 border-cyan-400/20">
       <CardHeader>
-        <CardTitle className="text-cyan-400 flex items-center gap-2">
+        <CardTitle className="text-foreground flex items-center gap-2">
           Cost Breakdown
         </CardTitle>
         <div className="flex items-start gap-2 text-sm text-muted-foreground">
-          <Info className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+          <Info className="h-4 w-4 text-info mt-0.5 flex-shrink-0" />
           <span>{costBreakdown.regional_labor_rate}</span>
         </div>
       </CardHeader>

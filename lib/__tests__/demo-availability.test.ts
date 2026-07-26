@@ -134,3 +134,35 @@ describe('anon-readable table list is explicit', () => {
     expect(overlap).toEqual([]);
   });
 });
+
+/**
+ * The live verifier is a .mjs script and cannot import this .ts contract, so
+ * it re-declares the table list. That duplication already drifted once: both
+ * gaps were closed in the contract while the script still announced them as
+ * open, so a passing run printed two misleading warnings.
+ *
+ * Comparing the source text is unglamorous but it is the only thing that
+ * actually binds the two together without a build step.
+ */
+describe('verify-demo.mjs stays in step with the contract', () => {
+  const script = readFileSync(
+    join(__dirname, '..', '..', 'scripts', 'verify-demo.mjs'),
+    'utf8'
+  );
+
+  it('checks exactly the tables the contract marks required', () => {
+    const block = script.match(/const REQUIRED_ANON_TABLES = \[([\s\S]*?)\];/);
+    expect(block).not.toBeNull();
+
+    const listed = (block![1].match(/'[a-z_]+'/g) ?? []).map((s) => s.slice(1, -1));
+    expect(listed.sort()).toEqual([...ANON_READ_TABLES.required].sort());
+  });
+
+  it('drops the known-gap branch once the contract records no gaps', () => {
+    // A gap list in the script with nothing in the contract to justify it
+    // means the script is reporting a state that no longer exists.
+    if (ANON_READ_TABLES.knownGaps.length === 0) {
+      expect(script).not.toContain('KNOWN_GAP_TABLES');
+    }
+  });
+});
