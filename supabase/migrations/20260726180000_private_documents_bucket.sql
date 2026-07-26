@@ -33,32 +33,32 @@
 */
 
 -- ============================================================
--- 1. Purge orphaned objects
+-- 1. Orphan purge — NOT POSSIBLE IN SQL, done separately
 -- ============================================================
 
 /*
-  54 objects, ~22MB, none referenced by any row in any table.
+  This migration originally began with:
 
-  Cause: when Gemini parsing failed, uploadInvoice deleted the
-  vehicle_documents row but never the uploaded file. A rejected parse is a
-  normal outcome — not an automotive invoice, wrong vehicle, unreadable scan
-  — so this leaked on the common path rather than an edge case. Fixed in
-  application code alongside this migration.
+    DELETE FROM storage.objects WHERE bucket_id = 'vehicle-documents' AND ...
 
-  Deleting only what nothing points at. Anything referenced by
-  vehicle_documents is preserved, which today is nothing real: all 5 rows
-  hold demo-placeholder URLs that never resolved.
+  Supabase rejects that for every role, including `postgres`:
 
-  Demo vehicles have zero objects in this bucket, so the public demo cannot
-  be affected.
+    ERROR: 42501: Direct deletion from storage tables is not allowed.
+    Use the Storage API instead.
+    CONTEXT: PL/pgSQL function storage.protect_delete()
+
+  The guard is correct. A bare SQL DELETE removes the metadata row but leaves
+  the S3-backed object behind — creating precisely the orphans this was meant
+  to clean up. Only the Storage API removes both together.
+
+  Because the script ran as one batch, that first statement failing rolled
+  everything back: a clean no-op, not a partial apply. Grants and RLS were
+  both ruled out first — the role had every privilege and RLS was not forced.
+
+  The purge now lives in `scripts/purge-orphaned-objects.mjs`, which drives
+  the Storage API. **Already executed: 54 orphans removed, 0 remaining.**
+  Run it again any time; it is idempotent and dry-run by default.
 */
-DELETE FROM storage.objects
-WHERE bucket_id = 'vehicle-documents'
-  AND name NOT IN (
-    SELECT replace(file_url, 'placeholder://', '')
-    FROM vehicle_documents
-    WHERE file_url LIKE 'placeholder://%'
-  );
 
 -- ============================================================
 -- 2. Policies keyed on the unified path
