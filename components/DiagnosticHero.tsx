@@ -57,7 +57,7 @@ export default function DiagnosticHero({ imageUrl, vehicleName, healthScore, foc
       style={{ height: '320px' }}
     >
       <div
-        className="absolute inset-0 w-full"
+        className="photo-plate plate-deep absolute inset-0 w-full"
         style={{
           transform: `translateY(${parallaxOffset}px) scale(1.12)`,
           transformOrigin: `${resolvedFocalX}% ${resolvedFocalY}%`,
@@ -69,15 +69,6 @@ export default function DiagnosticHero({ imageUrl, vehicleName, healthScore, foc
           alt={vehicleName}
           className="w-full h-full object-cover"
           style={{ objectPosition }}
-        />
-        {/* Vignette sits under the scrim — the pairing is the signature. */}
-        <div className="absolute inset-0 vignette-frame pointer-events-none" aria-hidden="true" />
-        <div
-          className="absolute inset-0 pointer-events-none"
-          aria-hidden="true"
-          style={{
-            background: 'linear-gradient(to bottom, rgba(9,11,15,0.05) 0%, rgba(9,11,15,0.35) 55%, rgba(9,11,15,0.85) 100%)',
-          }}
         />
       </div>
 

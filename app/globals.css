@@ -179,13 +179,66 @@ nav {
     transition: transform 80ms var(--ease-standard);
   }
 
-  /* Signature photography treatment: bottom scrim + radial vignette, always
-   * together. The pairing is the ownable gesture — scrim alone is not. */
+  /* Page-level atmosphere over a background photograph. Vignette only — a
+   * scrim belongs to a plate carrying text, not to a whole page. Used by the
+   * garage and demo backgrounds. */
   .vignette-frame {
     background: radial-gradient(120% 100% at 50% 30%, rgb(0 0 0 / 0) 45%, rgb(0 0 0 / 0.35) 100%);
   }
-  .scrim-bottom {
-    background: linear-gradient(to top, rgb(0 0 0 / 0.88), rgb(0 0 0 / 0) 65%);
+
+  /* The signature photography treatment, as one class.
+   *
+   * Vignette and scrim were two separate overlay divs that every photo
+   * surface had to remember to pair. Nothing did: `.scrim-bottom` was never
+   * used once, and VehicleCard and DiagnosticHero each hand-rolled their own
+   * inline gradient instead — with different values, which is the drift you
+   * get when the pairing is a convention rather than a thing.
+   *
+   * ::before is the vignette, ::after the scrim. Both are absolute, so they
+   * paint above static content — the <img> — while positioned children with a
+   * z-index still sit above them. That is why this does not touch child
+   * positioning: setting `position: relative` on `> *` would override
+   * `absolute` on the photo controls, which is exactly how .above-stretch
+   * dropped the options menu out of its corner an hour ago.
+   *
+   * Set the photograph with `backgroundImage` in the element's own style, or
+   * an <img> child. Never via a custom property the class reads: a url() in a
+   * custom property resolves against the stylesheet, not the page, so every
+   * page-relative path 404s silently. */
+  .photo-plate {
+    position: relative;
+    overflow: hidden;
+  }
+  .photo-plate::before,
+  .photo-plate::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .photo-plate::before {
+    background: radial-gradient(120% 100% at 50% 30%, rgb(0 0 0 / 0) 45%, rgb(0 0 0 / 0.35) 100%);
+  }
+  .photo-plate::after {
+    background: linear-gradient(
+      to top,
+      rgb(9 11 15 / 0.92) 0%,
+      rgb(9 11 15 / 0.45) 35%,
+      rgb(9 11 15 / 0.1) 60%,
+      transparent 100%
+    );
+  }
+
+  /* For a plate carrying a full text block rather than a chip or two. Ramps
+   * from the top so long copy stays legible over a busy photograph, instead
+   * of only the last line clearing the scrim. */
+  .photo-plate.plate-deep::after {
+    background: linear-gradient(
+      to bottom,
+      rgb(9 11 15 / 0.05) 0%,
+      rgb(9 11 15 / 0.35) 55%,
+      rgb(9 11 15 / 0.85) 100%
+    );
   }
 
   /* Whole-card click without wrapping the card in an anchor.

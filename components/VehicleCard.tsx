@@ -194,7 +194,7 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary }: VehicleCa
 
   return (
     <div className="group card-lift relative border rounded-2xl overflow-hidden bg-[#0f1318]/90 backdrop-blur-sm h-full flex flex-col shadow-lg shadow-black/50 edge-light hover:border-cyan-400/30">
-      <div className="relative aspect-[3/2] bg-slate-900/60 overflow-hidden group/image">
+      <div className="photo-plate aspect-[3/2] bg-slate-900/60 group/image">
         {(() => {
           const focalX = vehicle.focal_point_x ?? 50;
           const focalY = vehicle.focal_point_y ?? 50;
@@ -210,12 +210,6 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary }: VehicleCa
                 onError={handleImageError}
                 loading="lazy"
               />
-              {/* Signature photography treatment: radial vignette UNDER the
-                  bottom scrim. The pairing is the ownable gesture — a photo
-                  carrying only one of the two reads off-system. */}
-              <div className="absolute inset-0 vignette-frame pointer-events-none" aria-hidden="true" />
-              <div className="absolute inset-0 pointer-events-none" aria-hidden="true" style={{ background: 'linear-gradient(to top, rgba(9,11,15,0.92) 0%, rgba(9,11,15,0.45) 35%, rgba(9,11,15,0.10) 60%, transparent 100%)' }} />
-
               {showAdjustNudge && (
                 <div className="above-stretch absolute bottom-2 left-2 right-2 opacity-0 group-hover/image:opacity-100 transition-opacity duration-200">
                   <button
