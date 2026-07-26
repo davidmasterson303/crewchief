@@ -370,13 +370,13 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
 
     if (!knowledge || knowledge.research_status === 'pending') {
       return (
-        <Card className="bg-gradient-to-br from-slate-900/60 to-slate-900/40 border-cyan-400/30 overflow-hidden relative">
+        <Card className="bg-gradient-to-br from-slate-900/60 to-slate-900/40 border-info-border overflow-hidden relative">
           <div className="absolute inset-0 bg-gradient-to-r from-cyan-400/5 via-transparent to-cyan-400/5 animate-pulse" />
           <CardHeader className="relative">
             <div className="space-y-4">
               <CardTitle className="text-white flex items-center gap-3">
                 <div className="relative">
-                  <div className="absolute inset-0 bg-cyan-400/20 rounded-full animate-pulse blur" />
+                  <div className="absolute inset-0 bg-info-wash rounded-full animate-pulse blur" />
                   <RefreshCw className="h-5 w-5 text-cyan-400 animate-spin relative" />
                 </div>
                 <span>Vehicle Research In Progress</span>
@@ -458,7 +458,7 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
 
     return (
       <>
-        <Card className="bg-slate-900/50 border-cyan-400/20">
+        <Card className="bg-slate-900/50 border-info-border">
           <CardHeader>
             <div>
               <CardTitle className="text-white flex items-center gap-2">
@@ -488,7 +488,7 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
                     >
                       <Icon className={`h-3.5 w-3.5 ${isActive ? 'text-cyan-400' : ''}`} />
                       <span className={`font-medium text-xs ${isActive ? 'text-white' : ''}`}>{label}</span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold tabular-nums ${isActive ? 'bg-cyan-400/18 text-cyan-300' : 'bg-white/8 text-white/35'}`}>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold tabular-nums ${isActive ? 'bg-info-wash text-cyan-300' : 'bg-white/8 text-white/35'}`}>
                         {count}
                       </span>
                       {isActive && (

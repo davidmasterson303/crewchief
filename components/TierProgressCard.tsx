@@ -31,7 +31,7 @@ const TIER_CONFIG: Record<Tier, TierConfig> = {
     label: 'Mild Builder',
     icon: Gauge,
     color: 'text-cyan-400',
-    bgColor: 'bg-cyan-500/15',
+    bgColor: 'bg-info-wash',
     borderColor: 'border-cyan-500/40',
     ringColor: 'ring-cyan-500/30',
     description: 'Bolt-on improvements, OEM+ reliability',

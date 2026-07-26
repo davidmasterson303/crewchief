@@ -115,7 +115,7 @@ export function QuoteDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] lg:max-w-3xl max-h-[90vh] overflow-y-auto bg-slate-950 border-cyan-400/30">
+      <DialogContent className="max-w-[95vw] lg:max-w-3xl max-h-[90vh] overflow-y-auto bg-slate-950 border-info-border">
         <DialogHeader>
           <DialogTitle className="text-cyan-400 text-2xl">
             {quote.name || 'Unnamed Quote'}
@@ -127,7 +127,7 @@ export function QuoteDetailDialog({
 
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <Card className="border-cyan-400/20 bg-slate-900/50">
+            <Card className="border-info-border bg-slate-900/50">
               <CardContent className="p-4 space-y-2">
                 <div className="flex items-center gap-2 text-cyan-400">
                   <DollarSign className="h-4 w-4" />
@@ -139,7 +139,7 @@ export function QuoteDetailDialog({
               </CardContent>
             </Card>
 
-            <Card className="border-cyan-400/20 bg-slate-900/50">
+            <Card className="border-info-border bg-slate-900/50">
               <CardContent className="p-4 space-y-2">
                 <div className="flex items-center gap-2 text-cyan-400">
                   <Package className="h-4 w-4" />
@@ -151,7 +151,7 @@ export function QuoteDetailDialog({
               </CardContent>
             </Card>
 
-            <Card className="border-cyan-400/20 bg-slate-900/50">
+            <Card className="border-info-border bg-slate-900/50">
               <CardContent className="p-4 space-y-2">
                 <div className="flex items-center gap-2 text-cyan-400">
                   <MapPin className="h-4 w-4" />
@@ -175,13 +175,13 @@ export function QuoteDetailDialog({
                   variant="outline"
                   size="sm"
                   onClick={handleCopyBreakdown}
-                  className="gap-2 border-cyan-400/30 text-cyan-400 hover:bg-cyan-400/10"
+                  className="gap-2 border-info-border text-cyan-400 hover:bg-cyan-400/10"
                 >
                   <Copy className="h-4 w-4" />
                   Copy
                 </Button>
               </div>
-              <Card className="border-cyan-400/20 bg-slate-900/50 overflow-y-auto max-h-[400px]">
+              <Card className="border-info-border bg-slate-900/50 overflow-y-auto max-h-[400px]">
                 <CardContent className="p-4">
                   {quote.cost_breakdown && (
                     <CostEstimateBreakdown estimate={quote.cost_breakdown} />
@@ -200,13 +200,13 @@ export function QuoteDetailDialog({
                   variant="outline"
                   size="sm"
                   onClick={handleCopyEmail}
-                  className="gap-2 border-cyan-400/30 text-cyan-400 hover:bg-cyan-400/10"
+                  className="gap-2 border-info-border text-cyan-400 hover:bg-cyan-400/10"
                 >
                   <Copy className="h-4 w-4" />
                   Copy
                 </Button>
               </div>
-              <Card className="border-cyan-400/20 bg-slate-900/50 overflow-y-auto max-h-[400px]">
+              <Card className="border-info-border bg-slate-900/50 overflow-y-auto max-h-[400px]">
                 <CardContent className="p-4">
                   <pre className="text-xs whitespace-pre-wrap font-sans text-slate-300">
                     {quote.email_draft}
@@ -223,7 +223,7 @@ export function QuoteDetailDialog({
                 {quote.selected_items.map((item, idx) => (
                   <Card
                     key={`${item.id}-${idx}`}
-                    className="border-cyan-400/20 bg-slate-900/50"
+                    className="border-info-border bg-slate-900/50"
                   >
                     <CardContent className="p-3">
                       <div className="flex items-start justify-between gap-3">
@@ -235,7 +235,7 @@ export function QuoteDetailDialog({
                         {item.category && (
                           <Badge
                             variant="secondary"
-                            className="text-xs bg-cyan-400/20 text-cyan-300 border-cyan-400/30 whitespace-nowrap"
+                            className="text-xs bg-info-wash text-cyan-300 border-info-border whitespace-nowrap"
                           >
                             {item.category}
                           </Badge>
@@ -251,7 +251,7 @@ export function QuoteDetailDialog({
           {quote.additional_notes && (
             <div className="space-y-3">
               <h3 className="text-sm font-medium text-cyan-400">Additional Notes</h3>
-              <Card className="border-cyan-400/20 bg-slate-900/50">
+              <Card className="border-info-border bg-slate-900/50">
                 <CardContent className="p-4">
                   <p className="text-sm text-slate-300 whitespace-pre-wrap">
                     {quote.additional_notes}

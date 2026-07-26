@@ -56,7 +56,7 @@ export default function MaintenanceItemCard({
         <Button
           size="sm"
           variant="outline"
-          className="h-7 text-xs bg-cyan-500/10 text-cyan-400 border-cyan-400/50 hover:bg-cyan-500/20"
+          className="h-7 text-xs bg-info-wash text-cyan-400 border-cyan-400/50 hover:bg-cyan-500/20"
           onClick={() => onAddToHistory(item.item)}
           disabled={loading}
         >

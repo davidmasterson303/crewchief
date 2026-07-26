@@ -41,7 +41,7 @@ function StepIndicator({ currentStep, totalSteps, labels }: { currentStep: numbe
                 isCompleted
                   ? 'bg-cyan-500 text-black'
                   : isActive
-                  ? 'bg-cyan-500/20 border-2 border-cyan-400 text-cyan-400'
+                  ? 'bg-info-wash border-2 border-cyan-400 text-cyan-400'
                   : 'bg-white/5 border border-white/15 text-white/30'
               }`}>
                 {isCompleted ? <CheckCircle2 className="h-4 w-4" /> : stepNum}
@@ -445,7 +445,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
       <div className="w-full max-w-2xl">
         <div className="mb-8 text-center">
           <div className="flex items-center justify-center gap-2 mb-2">
-            <div className="w-7 h-7 rounded-lg bg-cyan-500/20 border border-cyan-400/30 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg bg-info-wash border border-info-border flex items-center justify-center">
               <span className="text-cyan-400 font-bold text-sm">C</span>
             </div>
             <span className="text-white font-semibold text-lg tracking-tight">CrewChief</span>
@@ -516,7 +516,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
               </div>
 
               {!powertrainReady && (
-                <div className="flex items-center gap-3 p-3.5 bg-cyan-500/8 border border-cyan-400/20 rounded-xl">
+                <div className="flex items-center gap-3 p-3.5 bg-info-wash border border-info-border rounded-xl">
                   <div className="w-4 h-4 border-2 border-info-border border-t-info rounded-full animate-spin flex-shrink-0" />
                   <p className="text-sm text-cyan-300/80">Checking available configurations...</p>
                 </div>
@@ -554,7 +554,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
                   <label
                     className={`flex flex-col items-center justify-center h-40 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-200 ${
                       isDragging
-                        ? 'border-cyan-400/70 bg-cyan-400/10 scale-[1.01]'
+                        ? 'border-cyan-400/70 bg-info-wash scale-[1.01]'
                         : 'border-white/15 hover:border-cyan-400/40 hover:bg-white/3'
                     }`}
                     onDragEnter={handleDragEnter}
@@ -629,7 +629,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
                       onClick={() => updateFormData('avg_miles_per_month', miles.toString())}
                       className={`px-3 py-2.5 rounded-lg border transition-all text-sm font-medium ${
                         formData.avg_miles_per_month === miles.toString()
-                          ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400/40'
+                          ? 'bg-info-wash text-cyan-300 border-cyan-400/40'
                           : 'border-white/12 bg-white/5 text-white/60 hover:bg-white/8 hover:border-white/20'
                       }`}
                     >
@@ -667,7 +667,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
                       key={value}
                       className={`flex items-center gap-3 p-4 border rounded-xl cursor-pointer transition-all ${
                         formData.ownership_objective === value
-                          ? 'bg-cyan-500/10 border-cyan-400/35'
+                          ? 'bg-info-wash border-cyan-400/35'
                           : 'border-white/10 bg-white/3 hover:bg-white/5 hover:border-white/15'
                       }`}
                       onClick={() => updateFormData('ownership_objective', value)}
@@ -712,7 +712,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
                       key={value}
                       className={`flex items-center gap-3 p-4 border rounded-xl cursor-pointer transition-all ${
                         formData.performance_mindedness === value
-                          ? 'bg-cyan-500/10 border-cyan-400/35'
+                          ? 'bg-info-wash border-cyan-400/35'
                           : 'border-white/10 bg-white/3 hover:bg-white/5 hover:border-white/15'
                       }`}
                       onClick={() => updateFormData('performance_mindedness', value)}
@@ -741,8 +741,8 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
 
           {step === clarificationStep && uncertaintyData && (
             <div className="space-y-5">
-              <div className="flex items-start gap-3 p-4 bg-cyan-500/8 border border-cyan-400/20 rounded-xl">
-                <div className="w-5 h-5 rounded-full bg-cyan-400/20 border border-cyan-400/30 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <div className="flex items-start gap-3 p-4 bg-info-wash border border-info-border rounded-xl">
+                <div className="w-5 h-5 rounded-full bg-info-wash border border-info-border flex items-center justify-center flex-shrink-0 mt-0.5">
                   <span className="text-cyan-400 text-xs font-bold">i</span>
                 </div>
                 <p className="text-sm text-cyan-300/80 leading-relaxed">
@@ -760,7 +760,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
                   >
                     {uncertaintyData.uncertainFields.engine.options?.map((option, idx) => (
                       <div key={idx} className={`flex items-center gap-3 p-3.5 border rounded-xl cursor-pointer transition-all ${
-                        formData.clarified_engine === option ? 'bg-cyan-500/10 border-cyan-400/35' : 'border-white/10 bg-white/3 hover:bg-white/5'
+                        formData.clarified_engine === option ? 'bg-info-wash border-cyan-400/35' : 'border-white/10 bg-white/3 hover:bg-white/5'
                       }`}
                         onClick={() => updateFormData('clarified_engine', option)}
                       >
@@ -782,7 +782,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
                   >
                     {uncertaintyData.uncertainFields.transmission.options?.map((option, idx) => (
                       <div key={idx} className={`flex items-center gap-3 p-3.5 border rounded-xl cursor-pointer transition-all ${
-                        formData.clarified_transmission === option ? 'bg-cyan-500/10 border-cyan-400/35' : 'border-white/10 bg-white/3 hover:bg-white/5'
+                        formData.clarified_transmission === option ? 'bg-info-wash border-cyan-400/35' : 'border-white/10 bg-white/3 hover:bg-white/5'
                       }`}
                         onClick={() => updateFormData('clarified_transmission', option)}
                       >
@@ -804,7 +804,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
                   >
                     {uncertaintyData.uncertainFields.drivetrain.options?.map((option, idx) => (
                       <div key={idx} className={`flex items-center gap-3 p-3.5 border rounded-xl cursor-pointer transition-all ${
-                        formData.clarified_drivetrain === option ? 'bg-cyan-500/10 border-cyan-400/35' : 'border-white/10 bg-white/3 hover:bg-white/5'
+                        formData.clarified_drivetrain === option ? 'bg-info-wash border-cyan-400/35' : 'border-white/10 bg-white/3 hover:bg-white/5'
                       }`}
                         onClick={() => updateFormData('clarified_drivetrain', option)}
                       >

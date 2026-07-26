@@ -66,7 +66,7 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
     if (isLoading) {
       return (
         <div className="min-h-screen bg-[#080808] flex items-center justify-center">
-          <div className="w-10 h-10 border-2 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin" />
+          <div className="w-10 h-10 border-2 border-info-border border-t-cyan-400 rounded-full animate-spin" />
         </div>
       );
     }
@@ -88,7 +88,7 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
           </div>
           <Button
             variant="outline"
-            className="border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10"
+            className="border-info-border text-cyan-400 hover:bg-cyan-500/10"
             onClick={() => toast.info('Upload feature available in full version')}
           >
             + Upload Invoice
@@ -102,14 +102,14 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
               className="bg-white/5 border border-white/10 rounded-xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-cyan-500/40 transition-colors"
             >
               <div className="flex gap-4 items-start">
-                <div className="bg-cyan-500/10 p-3 rounded-lg border border-cyan-500/20 flex-shrink-0">
+                <div className="bg-info-wash p-3 rounded-lg border border-info-border flex-shrink-0">
                   <FileText className="text-cyan-400 w-6 h-6" />
                 </div>
                 <div>
                   <h3 className="text-base font-semibold text-white flex items-center gap-2 flex-wrap">
                     {record.vendor}
                     {record.ai_extracted && (
-                      <span className="text-[10px] uppercase tracking-wider bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full flex items-center gap-1 font-medium">
+                      <span className="text-[10px] uppercase tracking-wider bg-info-wash text-cyan-300 px-2 py-0.5 rounded-full flex items-center gap-1 font-medium">
                         <CheckCircle2 className="w-3 h-3" />
                         AI Verified
                       </span>

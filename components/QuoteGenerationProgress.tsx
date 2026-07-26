@@ -55,7 +55,7 @@ export function QuoteGenerationProgress({ items, zipCode }: QuoteGenerationProgr
           <div className="relative">
             <Zap className="h-16 w-16 text-cyan-400" />
             <motion.div
-              className="absolute inset-0 bg-cyan-400/20 rounded-full blur-xl"
+              className="absolute inset-0 bg-info-wash rounded-full blur-xl"
               animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.8, 0.5] }}
               transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
             />
@@ -103,7 +103,7 @@ export function QuoteGenerationProgress({ items, zipCode }: QuoteGenerationProgr
                   status === 'complete'
                     ? 'bg-green-900/20 border-green-400/30'
                     : status === 'active'
-                    ? 'bg-cyan-900/20 border-cyan-400/40 shadow-lg shadow-cyan-500/10'
+                    ? 'bg-info-wash border-cyan-400/40 shadow-lg shadow-cyan-500/10'
                     : 'bg-slate-900/30 border-slate-700/30'
                 }`}
               >

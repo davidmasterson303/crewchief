@@ -66,7 +66,7 @@ export default function InvoiceProcessingLoader({ isProcessing, fileName }: Invo
 
       <div className="max-w-md w-full space-y-6">
         {fileName && (
-          <div className="flex items-center gap-2 p-3 bg-slate-800/50 rounded-lg border border-cyan-400/20">
+          <div className="flex items-center gap-2 p-3 bg-slate-800/50 rounded-lg border border-info-border">
             <FileText className="h-4 w-4 text-cyan-400 flex-shrink-0" />
             <p className="text-sm text-slate-300 truncate">{fileName}</p>
           </div>
@@ -82,7 +82,7 @@ export default function InvoiceProcessingLoader({ isProcessing, fileName }: Invo
                 key={step.label}
                 className={`flex items-center gap-3 p-3 rounded-lg transition-all duration-300 ${
                   isActive
-                    ? 'bg-cyan-400/10 border border-cyan-400/30'
+                    ? 'bg-info-wash border border-info-border'
                     : isCompleted
                     ? 'bg-green-400/5 border border-green-400/20'
                     : 'bg-slate-800/30 border border-slate-700/30'
@@ -93,7 +93,7 @@ export default function InvoiceProcessingLoader({ isProcessing, fileName }: Invo
                     <CheckCircle2 className="h-5 w-5 text-green-400 animate-pulse" />
                   ) : isActive ? (
                     <div className="relative w-5 h-5">
-                      <div className="absolute inset-0 bg-cyan-400/30 rounded-full animate-ping" />
+                      <div className="absolute inset-0 bg-info-wash rounded-full animate-ping" />
                       <div className="absolute inset-1 bg-cyan-400 rounded-full" />
                     </div>
                   ) : (

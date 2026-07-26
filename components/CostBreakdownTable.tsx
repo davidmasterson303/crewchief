@@ -41,7 +41,7 @@ export function CostBreakdownTable({ costBreakdown }: CostBreakdownTableProps) {
   };
 
   return (
-    <Card className="bg-slate-900/50 border-cyan-400/20">
+    <Card className="bg-slate-900/50 border-info-border">
       <CardHeader>
         <CardTitle className="text-foreground flex items-center gap-2">
           Cost Breakdown
@@ -52,10 +52,10 @@ export function CostBreakdownTable({ costBreakdown }: CostBreakdownTableProps) {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="border border-cyan-400/20 rounded-lg overflow-hidden">
+        <div className="border border-info-border rounded-lg overflow-hidden">
           <Table>
             <TableHeader>
-              <TableRow className="border-cyan-400/20 hover:bg-cyan-400/5">
+              <TableRow className="border-info-border hover:bg-cyan-400/5">
                 <TableHead className="text-info">Item</TableHead>
                 <TableHead className="text-info text-right">Parts</TableHead>
                 <TableHead className="text-info text-right">Labor Hrs</TableHead>
@@ -69,7 +69,7 @@ export function CostBreakdownTable({ costBreakdown }: CostBreakdownTableProps) {
                 const totalHigh = item.parts_cost_high + item.labor_cost_high;
 
                 return (
-                  <TableRow key={index} className="border-cyan-400/20 hover:bg-cyan-400/5">
+                  <TableRow key={index} className="border-info-border hover:bg-cyan-400/5">
                     <TableCell className="font-medium">
                       <div className="flex flex-col gap-1">
                         <span>{item.description}</span>
@@ -117,7 +117,7 @@ export function CostBreakdownTable({ costBreakdown }: CostBreakdownTableProps) {
                   </TableRow>
                 );
               })}
-              <TableRow className="border-t-2 border-cyan-400/40 bg-cyan-400/10 hover:bg-cyan-400/15">
+              <TableRow className="border-t-2 border-cyan-400/40 bg-info-wash hover:bg-cyan-400/15">
                 <TableCell colSpan={4} className="font-bold text-cyan-400 text-right">
                   Estimated Total
                 </TableCell>

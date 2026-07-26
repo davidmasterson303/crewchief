@@ -106,7 +106,7 @@ export function CostEstimateBreakdown({ estimate }: CostEstimateBreakdownProps) 
         );
       })}
 
-      <div className="bg-cyan-400/8 border border-cyan-400/20 rounded-xl p-5">
+      <div className="bg-info-wash border border-info-border rounded-xl p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
             <p className="text-xs text-info/70 font-semibold uppercase tracking-wider mb-0.5">Total Estimate Range</p>

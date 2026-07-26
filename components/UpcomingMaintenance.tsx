@@ -62,7 +62,7 @@ const URGENCY_CONFIG = {
   upcoming: {
     border: 'border-l-cyan-400',
     glow: 'shadow-cyan-500/10',
-    badge: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
+    badge: 'bg-info-wash text-cyan-400 border-info-border',
     label: 'On Track',
     dot: 'bg-cyan-400',
   },
@@ -147,7 +147,7 @@ function ForecastCard({
             <div className="flex items-center gap-1.5">
               <p className="text-sm font-semibold text-white leading-tight">{item.name}</p>
               {item.isSynced && (
-                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1 py-0.5 rounded bg-cyan-400/12 text-cyan-400 border border-cyan-400/20 leading-none">
+                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1 py-0.5 rounded bg-info-wash text-cyan-400 border border-info-border leading-none">
                   <LinkIcon className="h-2 w-2" />
                   Synced
                 </span>
@@ -198,7 +198,7 @@ function ForecastCard({
       </div>
 
       {bundleHints.length > 0 && (
-        <div className="flex items-start gap-1.5 bg-cyan-400/6 border border-cyan-400/20 rounded-xl px-2.5 py-2">
+        <div className="flex items-start gap-1.5 bg-info-wash border border-info-border rounded-xl px-2.5 py-2">
           <CheckCircle className="h-3 w-3 text-cyan-400 flex-shrink-0 mt-0.5" />
           <p className="text-[10px] text-cyan-300/80 leading-snug">{bundleHints[0]}</p>
         </div>
@@ -380,7 +380,7 @@ export default function UpcomingMaintenance({ vehicle, knowledge, maintenanceLin
                   </span>
                 )}
                 {overdueCount === 0 && soonCount === 0 && baselineCount === 0 && (
-                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-cyan-500/12 text-cyan-400 border border-cyan-400/20">
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-info-wash text-cyan-400 border border-info-border">
                     All on track
                   </span>
                 )}

@@ -147,7 +147,7 @@ export default function HealthSummary({ vehicleId, healthSummary, recalls = [], 
     return (
       <Card className={`border ${
         healthSummary.health_score >= 80 ? 'bg-green-500/8 border-green-400/20'
-        : healthSummary.health_score >= 60 ? 'bg-cyan-500/8 border-cyan-400/20'
+        : healthSummary.health_score >= 60 ? 'bg-info-wash border-info-border'
         : 'bg-orange-500/8 border-orange-400/20'
       }`}>
         <CardContent className="pt-5 pb-4">
@@ -230,7 +230,7 @@ export default function HealthSummary({ vehicleId, healthSummary, recalls = [], 
             </p>
           </div>
 
-          <div className={`p-4 rounded-xl border ${issuesEmpty ? 'bg-green-500/8 border-green-400/20' : 'bg-cyan-500/8 border-cyan-400/20'}`}>
+          <div className={`p-4 rounded-xl border ${issuesEmpty ? 'bg-green-500/8 border-green-400/20' : 'bg-info-wash border-info-border'}`}>
             <div className="flex items-center gap-2.5 mb-2">
               {issuesEmpty
                 ? <CheckCircle className="h-6 w-6 text-green-400" />
@@ -290,7 +290,7 @@ export default function HealthSummary({ vehicleId, healthSummary, recalls = [], 
         )}
 
         {healthSummary.recommendations && healthSummary.recommendations.length > 0 && (
-          <div className="bg-cyan-500/8 border border-cyan-400/20 rounded-xl p-4">
+          <div className="bg-info-wash border border-info-border rounded-xl p-4">
             <div className="flex items-center gap-2 mb-3">
               <TrendingUp className="h-5 w-5 text-cyan-400" />
               <h4 className="font-semibold text-white text-sm">Recommendations</h4>

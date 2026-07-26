@@ -513,7 +513,7 @@ export default function ConsultantChat({
                   onClick={() => handleSessionClick(session.id)}
                   className={`w-full text-left p-3 rounded-xl transition-all ${
                     activeSessionId === session.id
-                      ? 'bg-cyan-400/10 border border-cyan-400/25'
+                      ? 'bg-info-wash border border-cyan-400/25'
                       : 'hover:bg-white/5 border border-transparent'
                   }`}
                 >
@@ -548,7 +548,7 @@ export default function ConsultantChat({
           {messages.length === 0 ? (
             <div className="h-full flex items-center justify-center">
               <div className="text-center max-w-md animate-fade-in">
-                <div className="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-400/20 flex items-center justify-center mx-auto mb-5">
+                <div className="w-14 h-14 rounded-2xl bg-info-wash border border-info-border flex items-center justify-center mx-auto mb-5">
                   <MessageSquare className="h-7 w-7 text-cyan-400" />
                 </div>
                 <h3 className="text-lg font-bold mb-2 text-white">Hey, CrewChief here.</h3>
@@ -589,7 +589,7 @@ export default function ConsultantChat({
                     className={`flex-1 max-w-[80%] ${
                       msg.role === 'user'
                         ? 'bg-cyan-600/90 text-white rounded-2xl rounded-tr-sm'
-                        : 'bg-cyan-900/20 border border-cyan-400/12 text-white rounded-2xl rounded-tl-sm'
+                        : 'bg-info-wash border border-info-border text-white rounded-2xl rounded-tl-sm'
                     } p-4 overflow-hidden`}
                   >
                     {msg.documents && msg.documents.length > 0 && (
@@ -646,7 +646,7 @@ export default function ConsultantChat({
                               className={`flex items-center gap-2 w-full text-left p-2.5 rounded-xl text-sm transition-all ${
                                 isAdded
                                   ? 'bg-green-500/15 border border-green-400/25 text-green-300 cursor-default'
-                                  : 'bg-cyan-400/8 border border-cyan-400/20 text-cyan-200 hover:bg-cyan-400/15 hover:border-cyan-400/40'
+                                  : 'bg-info-wash border border-info-border text-cyan-200 hover:bg-cyan-400/15 hover:border-cyan-400/40'
                               }`}
                             >
                               {isAdding ? (
@@ -737,7 +737,7 @@ export default function ConsultantChat({
               {selectedFiles.map((file, idx) => (
                 <div
                   key={idx}
-                  className="flex items-center justify-between bg-cyan-400/8 border border-cyan-400/20 p-2.5 rounded-xl"
+                  className="flex items-center justify-between bg-info-wash border border-info-border p-2.5 rounded-xl"
                 >
                   <div className="flex items-center gap-2 flex-1 min-w-0">
                     <FileText className="h-4 w-4 text-cyan-400 flex-shrink-0" />

@@ -205,7 +205,7 @@ const ServiceItemsComponent = forwardRef<{ refreshWishlist: () => Promise<void> 
 
   return (
     <>
-      <Card className="bg-slate-900/50 border-cyan-400/20">
+      <Card className="bg-slate-900/50 border-info-border">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-white flex items-center gap-2">
@@ -220,10 +220,10 @@ const ServiceItemsComponent = forwardRef<{ refreshWishlist: () => Promise<void> 
         </CardHeader>
         <CardContent>
           {bundles.length > 0 && (
-            <div className="mb-6 p-4 bg-cyan-400/10 border border-cyan-400/30 rounded-lg">
+            <div className="mb-6 p-4 bg-info-wash border border-info-border rounded-lg">
               <h4 className="font-semibold text-cyan-300 mb-2">Smart Bundling Opportunities</h4>
               {bundles.map((bundle: any) => (
-                <div key={bundle.id} className="bg-slate-800/50 p-3 rounded mb-2 border border-cyan-400/20">
+                <div key={bundle.id} className="bg-slate-800/50 p-3 rounded mb-2 border border-info-border">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <p className="text-sm font-medium mb-1 text-white">{bundle.bundle_reason}</p>
@@ -231,7 +231,7 @@ const ServiceItemsComponent = forwardRef<{ refreshWishlist: () => Promise<void> 
                         Save {bundle.labor_saved_hours}h labor (≈${bundle.estimated_savings})
                       </p>
                     </div>
-                    <Button size="sm" variant="outline" className="border-cyan-400/30 text-cyan-400 hover:bg-cyan-400/10">
+                    <Button size="sm" variant="outline" className="border-info-border text-cyan-400 hover:bg-cyan-400/10">
                       View Bundle
                     </Button>
                   </div>
@@ -272,15 +272,15 @@ const ServiceItemsComponent = forwardRef<{ refreshWishlist: () => Promise<void> 
                 </div>
               ) : (
                 wishlistItems.map((item: any) => (
-                  <div key={item.id} className="p-4 border border-cyan-400/10 rounded-lg hover:border-cyan-400/30 transition-colors bg-slate-800/30">
+                  <div key={item.id} className="p-4 border border-info-border rounded-lg hover:border-cyan-400/30 transition-colors bg-slate-800/30">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <div className="p-1.5 bg-slate-950/50 rounded border border-cyan-400/20">
+                          <div className="p-1.5 bg-slate-950/50 rounded border border-info-border">
                             {getCategoryIcon(item.category)}
                           </div>
                           <span className="font-medium text-white">{item.description}</span>
-                          <Badge variant="outline" className="capitalize bg-cyan-400/10 text-cyan-300 border-cyan-400/30">
+                          <Badge variant="outline" className="capitalize bg-info-wash text-cyan-300 border-info-border">
                             {item.category}
                           </Badge>
                         </div>
@@ -325,7 +325,7 @@ const ServiceItemsComponent = forwardRef<{ refreshWishlist: () => Promise<void> 
                 quoteHistory.map((quote: any) => (
                   <div
                     key={quote.id}
-                    className="p-4 border border-cyan-400/10 rounded-lg hover:border-cyan-400/30 transition-colors bg-slate-800/30 cursor-pointer"
+                    className="p-4 border border-info-border rounded-lg hover:border-cyan-400/30 transition-colors bg-slate-800/30 cursor-pointer"
                     onClick={() => {
                       setSelectedQuote(quote);
                       setShowQuoteDetailDialog(true);
@@ -338,7 +338,7 @@ const ServiceItemsComponent = forwardRef<{ refreshWishlist: () => Promise<void> 
                           <span className="font-medium text-white text-lg">
                             {quote.name || `Quote for ${quote.selected_items?.length || 0} items`}
                           </span>
-                          <Badge variant="outline" className="bg-cyan-400/10 text-cyan-300 border-cyan-400/30">
+                          <Badge variant="outline" className="bg-info-wash text-cyan-300 border-info-border">
                             {quote.zip_code}
                           </Badge>
                         </div>
@@ -355,7 +355,7 @@ const ServiceItemsComponent = forwardRef<{ refreshWishlist: () => Promise<void> 
                         <Button
                           variant="outline"
                           size="sm"
-                          className="text-cyan-400 border-cyan-400/30 hover:bg-cyan-400/10"
+                          className="text-cyan-400 border-info-border hover:bg-cyan-400/10"
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedQuote(quote);
@@ -368,7 +368,7 @@ const ServiceItemsComponent = forwardRef<{ refreshWishlist: () => Promise<void> 
                         <Button
                           variant="outline"
                           size="sm"
-                          className="text-cyan-400 border-cyan-400/30 hover:bg-cyan-400/10"
+                          className="text-cyan-400 border-info-border hover:bg-cyan-400/10"
                           onClick={(e) => {
                             e.stopPropagation();
                             if (quote.email_draft) {

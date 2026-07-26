@@ -278,7 +278,7 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
                 <div
                   className={`border-2 border-dashed rounded-xl transition-all duration-200 ${
                     isDragging
-                      ? 'border-cyan-400/70 bg-cyan-400/8 scale-[1.005]'
+                      ? 'border-cyan-400/70 bg-info-wash scale-[1.005]'
                       : 'border-white/12 hover:border-white/20'
                   }`}
                   onDragEnter={handleDragEnter}
@@ -336,7 +336,7 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
                         {selectedFiles.map((file, idx) => (
                           <div key={idx} className="flex items-center justify-between bg-white/5 border border-white/8 p-3 rounded-xl">
                             <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                              <div className="w-8 h-8 rounded-lg bg-cyan-500/12 border border-cyan-400/20 flex items-center justify-center flex-shrink-0">
+                              <div className="w-8 h-8 rounded-lg bg-info-wash border border-info-border flex items-center justify-center flex-shrink-0">
                                 <FileText className="h-4 w-4 text-cyan-400" />
                               </div>
                               <div className="min-w-0">
@@ -402,7 +402,7 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
                   </div>
                 )}
 
-                <div className="bg-cyan-500/8 border border-cyan-400/15 rounded-xl p-4">
+                <div className="bg-info-wash border border-info-border rounded-xl p-4">
                   <p className="text-xs font-semibold uppercase tracking-widest text-cyan-400/70 mb-1.5">AI Invoice Processing</p>
                   <p className="text-sm text-white/50 leading-relaxed">
                     Our AI automatically extracts service details, costs, line items, and dates from your invoices.

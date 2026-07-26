@@ -22,8 +22,8 @@ const GOALS = [
     icon: Gauge,
     description: 'Subtle improvements, OEM+ reliability',
     color: 'text-cyan-400',
-    bgColor: 'bg-cyan-500/20',
-    borderColor: 'border-cyan-500/30',
+    bgColor: 'bg-info-wash',
+    borderColor: 'border-info-border',
     hoverBg: 'hover:bg-cyan-500/30',
   },
   {

@@ -258,7 +258,7 @@ export function QuoteRequestDialogV2({
     switch (category) {
       case 'maintenance': return 'bg-blue-500/12 text-blue-300 border-blue-400/25';
       case 'repair': return 'bg-orange-500/12 text-orange-300 border-orange-400/25';
-      case 'modification': return 'bg-cyan-500/12 text-cyan-300 border-cyan-400/25';
+      case 'modification': return 'bg-info-wash text-cyan-300 border-cyan-400/25';
       default: return 'bg-white/8 text-white/50 border-white/12';
     }
   };
@@ -270,7 +270,7 @@ export function QuoteRequestDialogV2({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-[#0d1117] border-white/12 p-0">
         <div className="px-6 pt-6 pb-5 border-b border-white/8">
           <div className="flex items-center gap-3 mb-1">
-            <div className="w-8 h-8 rounded-lg bg-cyan-400/12 border border-cyan-400/20 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-info-wash border border-info-border flex items-center justify-center">
               <FileText className="h-4 w-4 text-cyan-400" />
             </div>
             <DialogTitle className="text-lg font-semibold text-white">Request Quote</DialogTitle>
@@ -280,7 +280,7 @@ export function QuoteRequestDialogV2({
               <div key={s} className="flex items-center gap-2">
                 <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-all ${
                   s < state.step ? 'bg-cyan-500 text-white' :
-                  s === state.step ? 'bg-cyan-400/20 border border-cyan-400/50 text-cyan-300' :
+                  s === state.step ? 'bg-info-wash border border-cyan-400/50 text-cyan-300' :
                   'bg-white/6 border border-white/12 text-white/25'
                 }`}>
                   {s < state.step ? <CheckCircle className="h-3 w-3" /> : s}
@@ -334,7 +334,7 @@ export function QuoteRequestDialogV2({
                         onClick={() => dispatch({ type: 'TOGGLE_ITEM', itemId: item.id })}
                         className={`w-full text-left flex items-start gap-3 p-3.5 rounded-xl border transition-all ${
                           selected
-                            ? 'bg-cyan-400/8 border-cyan-400/35'
+                            ? 'bg-info-wash border-cyan-400/35'
                             : 'bg-white/3 border-white/8 hover:border-white/15 hover:bg-white/5'
                         }`}
                       >

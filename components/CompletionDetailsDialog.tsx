@@ -109,7 +109,7 @@ export default function CompletionDetailsDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="p-3 bg-slate-800/50 rounded border border-cyan-400/20">
+          <div className="p-3 bg-slate-800/50 rounded border border-info-border">
             <p className="text-sm text-slate-400">Service Item</p>
             <p className="font-medium text-white">{serviceItem?.description}</p>
           </div>
@@ -184,7 +184,7 @@ export default function CompletionDetailsDialog({
                   </button>
                 </div>
               ) : (
-                <label className="flex items-center justify-center w-full p-3 border border-dashed border-cyan-400/30 rounded hover:bg-cyan-400/5 cursor-pointer transition">
+                <label className="flex items-center justify-center w-full p-3 border border-dashed border-info-border rounded hover:bg-cyan-400/5 cursor-pointer transition">
                   <div className="flex items-center gap-2 text-sm text-slate-400">
                     <Upload className="h-4 w-4" />
                     Click to upload invoice (PDF, JPG, PNG)

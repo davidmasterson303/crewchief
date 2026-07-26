@@ -111,7 +111,7 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
         <DashboardLayout vehicle={cachedVehicle} currentPage="vehicle-info" vehicleImage={cachedVehicle.custom_image_url || cachedVehicle.image_url}>
           <div className="flex items-center justify-center py-32">
             <div className="flex flex-col items-center gap-3">
-              <div className="w-10 h-10 border-2 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin" />
+              <div className="w-10 h-10 border-2 border-info-border border-t-cyan-400 rounded-full animate-spin" />
               <p className="text-sm text-white/40">Loading vehicle info...</p>
             </div>
           </div>
@@ -121,7 +121,7 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
     return (
       <div className="min-h-screen bg-[#080808] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-2 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin" />
+          <div className="w-10 h-10 border-2 border-info-border border-t-cyan-400 rounded-full animate-spin" />
           <p className="text-sm text-white/40">Loading vehicle info...</p>
         </div>
       </div>
@@ -188,7 +188,7 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
                 { icon: Zap, label: 'Drivetrain', value: cleanPowertrain(knowledge?.drivetrain) },
               ].map(({ icon: Icon, label, value }) => (
                 <div key={label} className="flex items-start gap-3 p-4 bg-white/4 rounded-xl border border-white/8">
-                  <div className="w-8 h-8 rounded-lg bg-cyan-500/12 border border-cyan-400/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <div className="w-8 h-8 rounded-lg bg-info-wash border border-info-border flex items-center justify-center flex-shrink-0 mt-0.5">
                     <Icon className="h-4 w-4 text-cyan-400" />
                   </div>
                   <div className="min-w-0">
@@ -221,7 +221,7 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
           <CardContent>
             {perfLoading && !hasPerformanceData ? (
               <div className="flex flex-col items-center justify-center py-12">
-                <div className="w-8 h-8 border-2 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin mb-3" />
+                <div className="w-8 h-8 border-2 border-info-border border-t-cyan-400 rounded-full animate-spin mb-3" />
                 <p className="text-sm text-white/40">Analyzing performance specs...</p>
               </div>
             ) : (
@@ -331,7 +331,7 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
               <div className="space-y-3">
                 {interestingFacts.map((fact: string, index: number) => (
                   <div key={`fact-${index}`} className="flex gap-4 p-3.5 bg-white/3 rounded-xl border border-white/6">
-                    <div className="flex-shrink-0 w-6 h-6 rounded-lg bg-cyan-500/12 border border-cyan-400/20 flex items-center justify-center text-xs font-bold text-cyan-400">
+                    <div className="flex-shrink-0 w-6 h-6 rounded-lg bg-info-wash border border-info-border flex items-center justify-center text-xs font-bold text-cyan-400">
                       {index + 1}
                     </div>
                     <p className="text-sm text-white/70 leading-relaxed flex-1">{fact}</p>

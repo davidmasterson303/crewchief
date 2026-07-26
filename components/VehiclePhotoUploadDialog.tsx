@@ -224,7 +224,7 @@ export function VehiclePhotoUploadDialog({
               <div
                 className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer ${
                   isDraggingDrop
-                    ? 'border-cyan-400 bg-cyan-500/10'
+                    ? 'border-cyan-400 bg-info-wash'
                     : 'border-white/15 hover:border-cyan-400/50 hover:bg-white/[0.04]'
                 }`}
                 onDrop={handleDrop}
@@ -233,7 +233,7 @@ export function VehiclePhotoUploadDialog({
                 onClick={() => fileInputRef.current?.click()}
               >
                 <div className="flex flex-col items-center gap-3">
-                  <div className="h-12 w-12 bg-cyan-500/15 rounded-full flex items-center justify-center border border-cyan-400/25">
+                  <div className="h-12 w-12 bg-info-wash rounded-full flex items-center justify-center border border-cyan-400/25">
                     <Upload className="h-5 w-5 text-cyan-400" />
                   </div>
                   <div>
@@ -275,7 +275,7 @@ export function VehiclePhotoUploadDialog({
             </>
           ) : (
             <>
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-cyan-500/8 border border-cyan-400/20">
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-info-wash border border-info-border">
                 <Move className="h-3.5 w-3.5 text-cyan-400 flex-shrink-0" />
                 <p className="text-xs text-cyan-300/80">
                   Drag the image to position your car inside the banner frame.

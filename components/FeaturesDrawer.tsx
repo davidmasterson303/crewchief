@@ -124,7 +124,7 @@ export default function FeaturesDrawer({ open, onOpenChange }: FeaturesDrawerPro
               className="group flex gap-4 p-4 rounded-xl border border-gray-800 hover:border-cyan-500/40 hover:bg-gray-900/60 transition-all duration-200"
             >
               <div className="flex-shrink-0 mt-0.5">
-                <div className="h-9 w-9 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center group-hover:bg-cyan-500/20 transition-colors">
+                <div className="h-9 w-9 rounded-lg bg-info-wash border border-info-border flex items-center justify-center group-hover:bg-cyan-500/20 transition-colors">
                   <Icon className="h-4 w-4 text-cyan-400" />
                 </div>
               </div>
@@ -144,7 +144,7 @@ export default function FeaturesDrawer({ open, onOpenChange }: FeaturesDrawerPro
             </div>
           ))}
 
-          <div className="mt-2 p-4 rounded-xl bg-cyan-500/5 border border-cyan-500/20">
+          <div className="mt-2 p-4 rounded-xl bg-info-wash border border-info-border">
             <p className="text-xs text-gray-400 leading-relaxed">
               <span className="text-cyan-400 font-medium">Built for the long haul.</span>{' '}
               CrewChief grows with your car. Every service record, every conversation, every decision you log makes future recommendations sharper and more personalized.

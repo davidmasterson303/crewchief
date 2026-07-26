@@ -30,7 +30,7 @@ export default function GaragePage() {
         aria-hidden="true"
       />
 
-      <nav className="relative z-20 border-b border-cyan-500/30" style={{ backgroundColor: '#000000', backdropFilter: 'blur(12px)' }}>
+      <nav className="relative z-20 border-b border-info-border" style={{ backgroundColor: '#000000', backdropFilter: 'blur(12px)' }}>
         <div className="max-w-7xl mx-auto px-6 lg:px-12 py-5">
           <div className="flex items-center justify-between">
             <Link href="/" className="flex items-center space-x-3 group">
@@ -68,7 +68,7 @@ export default function GaragePage() {
             <p className="text-sm text-gray-400">Check console for more details</p>
           </div>
         ) : vehicles.length === 0 ? (
-          <div className="border border-cyan-500/30 rounded-3xl text-center py-32 px-12 bg-gradient-to-b from-black/60 to-black/40 backdrop-blur-sm">
+          <div className="border border-info-border rounded-3xl text-center py-32 px-12 bg-gradient-to-b from-black/60 to-black/40 backdrop-blur-sm">
             <div className="mb-8">
               <div className="h-24 w-24 bg-gradient-to-br from-cyan-500/20 to-cyan-500/20 rounded-2xl flex items-center justify-center mx-auto">
                 <Car className="h-12 w-12 text-cyan-400" />

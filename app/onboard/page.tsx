@@ -75,7 +75,7 @@ export default function OnboardPage() {
 
         <div className="text-center mb-10">
           <div className="flex justify-center mb-6">
-            <div className="h-20 w-20 bg-cyan-500/15 rounded-2xl flex items-center justify-center border border-cyan-400/25">
+            <div className="h-20 w-20 bg-info-wash rounded-2xl flex items-center justify-center border border-cyan-400/25">
               <Car className="h-10 w-10 text-cyan-400" />
             </div>
           </div>
