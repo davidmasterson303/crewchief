@@ -49,6 +49,93 @@ const VEHICLE_SCOPED_TABLES = [
   'recall_actions',
 ] as const;
 
+export interface Profile {
+  id: string;
+  display_name: string | null;
+  avatar_storage_path: string | null;
+  distance_unit: 'mi' | 'km';
+  currency: string;
+  notification_preferences: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Fields a user is allowed to change. Deliberately not the whole row. */
+export interface ProfileUpdate {
+  display_name?: string | null;
+  distance_unit?: 'mi' | 'km';
+  currency?: string;
+  notification_preferences?: Record<string, unknown>;
+}
+
+export async function getProfile() {
+  const session = await requireSession();
+  if (!session.ok) {
+    return { success: false, error: session.error, profile: null };
+  }
+
+  const client = getServiceRoleClient();
+
+  const { data, error } = await client
+    .from('profiles')
+    .select('*')
+    .eq('id', session.userId)
+    .maybeSingle();
+
+  if (error) {
+    logger.error('PROFILE:READ', new Error(error.message), { userId: session.userId });
+    return { success: false, error: 'Failed to load profile', profile: null, vehicleCount: 0 };
+  }
+
+  // Returned alongside the profile so the delete confirmation can state what
+  // will actually be destroyed without the settings page making a second
+  // round trip, or worse, only knowing after an export has been run.
+  const { count } = await client
+    .from('vehicles')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', session.userId);
+
+  return {
+    success: true,
+    profile: (data as Profile) ?? null,
+    vehicleCount: count ?? 0,
+  };
+}
+
+export async function updateProfile(updates: ProfileUpdate) {
+  const session = await requireSession();
+  if (!session.ok) {
+    return { success: false, error: session.error };
+  }
+
+  // Allowlist rather than spreading the caller's object: a server action
+  // takes whatever the client sends, so passing it straight through would
+  // let someone rewrite id or created_at.
+  const patch: ProfileUpdate = {};
+  if ('display_name' in updates) patch.display_name = updates.display_name?.trim() || null;
+  if ('distance_unit' in updates) patch.distance_unit = updates.distance_unit;
+  if ('currency' in updates) patch.currency = updates.currency;
+  if ('notification_preferences' in updates) {
+    patch.notification_preferences = updates.notification_preferences;
+  }
+
+  if (patch.distance_unit && !['mi', 'km'].includes(patch.distance_unit)) {
+    return { success: false, error: 'Invalid distance unit' };
+  }
+
+  const { error } = await getServiceRoleClient()
+    .from('profiles')
+    .update(patch)
+    .eq('id', session.userId);
+
+  if (error) {
+    logger.error('PROFILE:UPDATE', new Error(error.message), { userId: session.userId });
+    return { success: false, error: 'Failed to save changes' };
+  }
+
+  return { success: true };
+}
+
 /**
  * Export everything belonging to the caller as one JSON document.
  *

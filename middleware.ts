@@ -23,6 +23,7 @@ export const PROTECTED_ROUTES = [
   '/documents',
   '/vehicle-info',
   '/onboard',
+  '/settings',
 ] as const;
 
 /** Pages a signed-in user has no reason to see. */
@@ -156,6 +157,7 @@ export const config = {
     '/documents/:path*',
     '/vehicle-info/:path*',
     '/onboard/:path*',
+    '/settings/:path*',
     '/login',
     '/signup',
   ],
