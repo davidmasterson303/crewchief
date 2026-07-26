@@ -278,7 +278,7 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
                 <div
                   className={`border-2 border-dashed rounded-xl transition-all duration-200 ${
                     isDragging
-                      ? 'border-cyan-400/70 bg-info-wash scale-[1.005]'
+                      ? 'border-cyan-400/70 bg-cyan-400/10 scale-[1.005]'
                       : 'border-white/12 hover:border-white/20'
                   }`}
                   onDragEnter={handleDragEnter}

@@ -223,7 +223,7 @@ export default function MaintenanceHistory({ vehicleId, documents, lineItems = [
 
   const getCategoryBadge = (record: MaintenanceRecord) => {
     if (record.is_combined) return <Badge variant="outline" className="bg-blue-400/10 text-blue-300 border-blue-400/25 text-xs font-medium">Combined</Badge>;
-    if (record.original_category === 'labor') return <Badge variant="outline" className="bg-info-wash text-info border-cyan-400/25 text-xs font-medium">Labor</Badge>;
+    if (record.original_category === 'labor') return <Badge variant="outline" className="bg-info-wash text-info border-info-border text-xs font-medium">Labor</Badge>;
     if (record.original_category === 'parts') return <Badge variant="outline" className="bg-green-400/10 text-green-300 border-green-400/25 text-xs font-medium">Parts</Badge>;
     if (record._type === 'service_item') return <Badge variant="outline" className="bg-amber-400/10 text-amber-300 border-amber-400/25 text-xs font-medium">Service</Badge>;
     if (record.category) return <Badge variant="outline" className="bg-white/6 text-white/50 border-white/12 text-xs font-medium capitalize">{record.category}</Badge>;
@@ -267,7 +267,7 @@ export default function MaintenanceHistory({ vehicleId, documents, lineItems = [
             <div className="flex gap-1.5 flex-wrap">
               <button
                 onClick={() => setFilterType(null)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all h-9 ${filterType === null ? 'bg-info-wash text-cyan-300 border border-info-border' : 'bg-white/4 text-white/50 border border-white/10 hover:border-white/20 hover:text-white/70'}`}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all h-9 ${filterType === null ? 'bg-cyan-400/10 text-cyan-300 border border-cyan-400/25' : 'bg-white/4 text-white/50 border border-white/10 hover:border-white/20 hover:text-white/70'}`}
               >
                 All
               </button>
@@ -275,7 +275,7 @@ export default function MaintenanceHistory({ vehicleId, documents, lineItems = [
                 <button
                   key={type}
                   onClick={() => setFilterType(filterType === type ? null : type)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all h-9 capitalize ${filterType === type ? 'bg-info-wash text-cyan-300 border border-info-border' : 'bg-white/4 text-white/50 border border-white/10 hover:border-white/20 hover:text-white/70'}`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all h-9 capitalize ${filterType === type ? 'bg-cyan-400/10 text-cyan-300 border border-cyan-400/25' : 'bg-white/4 text-white/50 border border-white/10 hover:border-white/20 hover:text-white/70'}`}
                 >
                   {type}
                 </button>
@@ -292,7 +292,7 @@ export default function MaintenanceHistory({ vehicleId, documents, lineItems = [
               <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
                 <FileText className="h-8 w-8 text-white/20" />
               </div>
-              <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-info-wash border border-cyan-400/25 flex items-center justify-center">
+              <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-info-wash border border-info-border flex items-center justify-center">
                 <Upload className="h-3 w-3 text-info" />
               </div>
             </div>

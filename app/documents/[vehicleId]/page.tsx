@@ -66,7 +66,7 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
     if (isLoading) {
       return (
         <div className="min-h-screen bg-[#080808] flex items-center justify-center">
-          <div className="w-10 h-10 border-2 border-info-border border-t-cyan-400 rounded-full animate-spin" />
+          <div className="w-10 h-10 border-2 border-info-border border-t-info rounded-full animate-spin" />
         </div>
       );
     }
@@ -88,7 +88,7 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
           </div>
           <Button
             variant="outline"
-            className="border-info-border text-cyan-400 hover:bg-cyan-500/10"
+            className="border-info-border text-info hover:bg-cyan-500/10"
             onClick={() => toast.info('Upload feature available in full version')}
           >
             + Upload Invoice

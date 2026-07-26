@@ -147,7 +147,7 @@ function ForecastCard({
             <div className="flex items-center gap-1.5">
               <p className="text-sm font-semibold text-white leading-tight">{item.name}</p>
               {item.isSynced && (
-                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1 py-0.5 rounded bg-info-wash text-cyan-400 border border-info-border leading-none">
+                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1 py-0.5 rounded bg-info-wash text-info border border-info-border leading-none">
                   <LinkIcon className="h-2 w-2" />
                   Synced
                 </span>

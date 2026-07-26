@@ -193,7 +193,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 <Button
                   onClick={this.handleReset}
                   variant="outline"
-                  className="gap-2 border-info-border text-cyan-400 hover:bg-cyan-400/10"
+                  className="gap-2 border-info-border text-info hover:bg-cyan-400/10"
                 >
                   <RefreshCw className="h-4 w-4" />
                   Try Again

@@ -58,7 +58,7 @@ export default function MaintenanceItemDetailsDialog({
         <SheetHeader className="pb-4 border-b border-white/8">
           <SheetTitle className="text-white text-lg leading-snug pr-6">{item.description}</SheetTitle>
           {item.category && (
-            <Badge variant="outline" className="w-fit capitalize bg-info-wash text-info border-cyan-400/25 text-xs">
+            <Badge variant="outline" className="w-fit capitalize bg-info-wash text-info border-info-border text-xs">
               {item.category}
             </Badge>
           )}
@@ -165,7 +165,7 @@ export default function MaintenanceItemDetailsDialog({
               rel="noopener noreferrer"
               className="flex items-center gap-3 p-4 bg-white/4 border border-white/8 rounded-xl hover:border-cyan-400/30 hover:bg-cyan-400/5 transition-all group"
             >
-              <div className="w-10 h-10 bg-info-wash border border-cyan-400/25 rounded-xl flex items-center justify-center flex-shrink-0">
+              <div className="w-10 h-10 bg-info-wash border border-info-border rounded-xl flex items-center justify-center flex-shrink-0">
                 <FileText className="h-5 w-5 text-cyan-400" />
               </div>
               <div className="flex-1 min-w-0">

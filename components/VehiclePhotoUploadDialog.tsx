@@ -224,7 +224,7 @@ export function VehiclePhotoUploadDialog({
               <div
                 className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer ${
                   isDraggingDrop
-                    ? 'border-cyan-400 bg-info-wash'
+                    ? 'border-cyan-400 bg-cyan-400/10'
                     : 'border-white/15 hover:border-cyan-400/50 hover:bg-white/[0.04]'
                 }`}
                 onDrop={handleDrop}
@@ -233,7 +233,7 @@ export function VehiclePhotoUploadDialog({
                 onClick={() => fileInputRef.current?.click()}
               >
                 <div className="flex flex-col items-center gap-3">
-                  <div className="h-12 w-12 bg-info-wash rounded-full flex items-center justify-center border border-cyan-400/25">
+                  <div className="h-12 w-12 bg-info-wash rounded-full flex items-center justify-center border border-info-border">
                     <Upload className="h-5 w-5 text-cyan-400" />
                   </div>
                   <div>

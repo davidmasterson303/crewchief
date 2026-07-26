@@ -105,7 +105,7 @@ export default function DocumentLibrary({ vehicleId }: DocumentLibraryProps) {
                     <div className="mt-1">{getDocumentIcon(doc.file_type)}</div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <Badge variant="outline" className="capitalize bg-info-wash border-info-border text-cyan-300">
+                        <Badge variant="outline" className="capitalize bg-info-wash border-info-border text-info">
                           {doc.file_type}
                         </Badge>
                         {docLineItems.length > 0 && (

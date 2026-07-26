@@ -35,7 +35,7 @@ export default function MaintenanceItemCard({
       case 'High':
         return 'bg-transparent text-orange-300 border-orange-400/55';
       case 'Routine':
-        return 'bg-transparent text-info/75 border-cyan-400/35';
+        return 'bg-transparent text-info/75 border-info-border';
       default:
         return 'bg-transparent text-slate-300 border-slate-400/40';
     }
@@ -56,7 +56,7 @@ export default function MaintenanceItemCard({
         <Button
           size="sm"
           variant="outline"
-          className="h-7 text-xs bg-info-wash text-cyan-400 border-cyan-400/50 hover:bg-cyan-500/20"
+          className="h-7 text-xs bg-info-wash text-info border-info-border hover:bg-cyan-500/20"
           onClick={() => onAddToHistory(item.item)}
           disabled={loading}
         >

@@ -258,7 +258,7 @@ export function QuoteRequestDialogV2({
     switch (category) {
       case 'maintenance': return 'bg-blue-500/12 text-blue-300 border-blue-400/25';
       case 'repair': return 'bg-orange-500/12 text-orange-300 border-orange-400/25';
-      case 'modification': return 'bg-info-wash text-info border-cyan-400/25';
+      case 'modification': return 'bg-info-wash text-info border-info-border';
       default: return 'bg-white/8 text-white/50 border-white/12';
     }
   };
@@ -280,7 +280,7 @@ export function QuoteRequestDialogV2({
               <div key={s} className="flex items-center gap-2">
                 <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-all ${
                   s < state.step ? 'bg-cyan-500 text-white' :
-                  s === state.step ? 'bg-info-wash border border-cyan-400/50 text-info' :
+                  s === state.step ? 'bg-cyan-400/10 border border-cyan-400/50 text-cyan-400' :
                   'bg-white/6 border border-white/12 text-white/25'
                 }`}>
                   {s < state.step ? <CheckCircle className="h-3 w-3" /> : s}
@@ -334,7 +334,7 @@ export function QuoteRequestDialogV2({
                         onClick={() => dispatch({ type: 'TOGGLE_ITEM', itemId: item.id })}
                         className={`w-full text-left flex items-start gap-3 p-3.5 rounded-xl border transition-all ${
                           selected
-                            ? 'bg-info-wash border-cyan-400/35'
+                            ? 'bg-cyan-400/10 border-cyan-400/35'
                             : 'bg-white/3 border-white/8 hover:border-white/15 hover:bg-white/5'
                         }`}
                       >

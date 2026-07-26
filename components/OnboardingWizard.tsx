@@ -41,7 +41,7 @@ function StepIndicator({ currentStep, totalSteps, labels }: { currentStep: numbe
                 isCompleted
                   ? 'bg-cyan-500 text-black'
                   : isActive
-                  ? 'bg-info-wash border-2 border-cyan-400 text-info'
+                  ? 'bg-cyan-400/10 border-2 border-cyan-400 text-cyan-400'
                   : 'bg-white/5 border border-white/15 text-white/30'
               }`}>
                 {isCompleted ? <CheckCircle2 className="h-4 w-4" /> : stepNum}
@@ -554,7 +554,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
                   <label
                     className={`flex flex-col items-center justify-center h-40 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-200 ${
                       isDragging
-                        ? 'border-cyan-400/70 bg-info-wash scale-[1.01]'
+                        ? 'border-cyan-400/70 bg-cyan-400/10 scale-[1.01]'
                         : 'border-white/15 hover:border-cyan-400/40 hover:bg-white/3'
                     }`}
                     onDragEnter={handleDragEnter}
@@ -629,7 +629,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
                       onClick={() => updateFormData('avg_miles_per_month', miles.toString())}
                       className={`px-3 py-2.5 rounded-lg border transition-all text-sm font-medium ${
                         formData.avg_miles_per_month === miles.toString()
-                          ? 'bg-info-wash text-cyan-300 border-cyan-400/40'
+                          ? 'bg-cyan-400/10 text-cyan-300 border-cyan-400/40'
                           : 'border-white/12 bg-white/5 text-white/60 hover:bg-white/8 hover:border-white/20'
                       }`}
                     >
@@ -667,7 +667,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
                       key={value}
                       className={`flex items-center gap-3 p-4 border rounded-xl cursor-pointer transition-all ${
                         formData.ownership_objective === value
-                          ? 'bg-info-wash border-cyan-400/35'
+                          ? 'bg-cyan-400/10 border-cyan-400/35'
                           : 'border-white/10 bg-white/3 hover:bg-white/5 hover:border-white/15'
                       }`}
                       onClick={() => updateFormData('ownership_objective', value)}
@@ -712,7 +712,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
                       key={value}
                       className={`flex items-center gap-3 p-4 border rounded-xl cursor-pointer transition-all ${
                         formData.performance_mindedness === value
-                          ? 'bg-info-wash border-cyan-400/35'
+                          ? 'bg-cyan-400/10 border-cyan-400/35'
                           : 'border-white/10 bg-white/3 hover:bg-white/5 hover:border-white/15'
                       }`}
                       onClick={() => updateFormData('performance_mindedness', value)}
@@ -760,7 +760,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
                   >
                     {uncertaintyData.uncertainFields.engine.options?.map((option, idx) => (
                       <div key={idx} className={`flex items-center gap-3 p-3.5 border rounded-xl cursor-pointer transition-all ${
-                        formData.clarified_engine === option ? 'bg-info-wash border-cyan-400/35' : 'border-white/10 bg-white/3 hover:bg-white/5'
+                        formData.clarified_engine === option ? 'bg-cyan-400/10 border-cyan-400/35' : 'border-white/10 bg-white/3 hover:bg-white/5'
                       }`}
                         onClick={() => updateFormData('clarified_engine', option)}
                       >
@@ -782,7 +782,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
                   >
                     {uncertaintyData.uncertainFields.transmission.options?.map((option, idx) => (
                       <div key={idx} className={`flex items-center gap-3 p-3.5 border rounded-xl cursor-pointer transition-all ${
-                        formData.clarified_transmission === option ? 'bg-info-wash border-cyan-400/35' : 'border-white/10 bg-white/3 hover:bg-white/5'
+                        formData.clarified_transmission === option ? 'bg-cyan-400/10 border-cyan-400/35' : 'border-white/10 bg-white/3 hover:bg-white/5'
                       }`}
                         onClick={() => updateFormData('clarified_transmission', option)}
                       >
@@ -804,7 +804,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
                   >
                     {uncertaintyData.uncertainFields.drivetrain.options?.map((option, idx) => (
                       <div key={idx} className={`flex items-center gap-3 p-3.5 border rounded-xl cursor-pointer transition-all ${
-                        formData.clarified_drivetrain === option ? 'bg-info-wash border-cyan-400/35' : 'border-white/10 bg-white/3 hover:bg-white/5'
+                        formData.clarified_drivetrain === option ? 'bg-cyan-400/10 border-cyan-400/35' : 'border-white/10 bg-white/3 hover:bg-white/5'
                       }`}
                         onClick={() => updateFormData('clarified_drivetrain', option)}
                       >

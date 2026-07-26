@@ -175,7 +175,7 @@ export function QuoteDetailDialog({
                   variant="outline"
                   size="sm"
                   onClick={handleCopyBreakdown}
-                  className="gap-2 border-info-border text-cyan-400 hover:bg-cyan-400/10"
+                  className="gap-2 border-info-border text-info hover:bg-cyan-400/10"
                 >
                   <Copy className="h-4 w-4" />
                   Copy
@@ -200,7 +200,7 @@ export function QuoteDetailDialog({
                   variant="outline"
                   size="sm"
                   onClick={handleCopyEmail}
-                  className="gap-2 border-info-border text-cyan-400 hover:bg-cyan-400/10"
+                  className="gap-2 border-info-border text-info hover:bg-cyan-400/10"
                 >
                   <Copy className="h-4 w-4" />
                   Copy

@@ -513,7 +513,7 @@ export default function ConsultantChat({
                   onClick={() => handleSessionClick(session.id)}
                   className={`w-full text-left p-3 rounded-xl transition-all ${
                     activeSessionId === session.id
-                      ? 'bg-info-wash border border-cyan-400/25'
+                      ? 'bg-cyan-400/10 border border-cyan-400/25'
                       : 'hover:bg-white/5 border border-transparent'
                   }`}
                 >
@@ -646,7 +646,7 @@ export default function ConsultantChat({
                               className={`flex items-center gap-2 w-full text-left p-2.5 rounded-xl text-sm transition-all ${
                                 isAdded
                                   ? 'bg-green-500/15 border border-green-400/25 text-green-300 cursor-default'
-                                  : 'bg-info-wash border border-info-border text-cyan-200 hover:bg-cyan-400/15 hover:border-cyan-400/40'
+                                  : 'bg-info-wash border border-info-border text-info hover:bg-cyan-400/15 hover:border-cyan-400/40'
                               }`}
                             >
                               {isAdding ? (

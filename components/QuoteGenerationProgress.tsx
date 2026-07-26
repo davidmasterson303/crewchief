@@ -103,7 +103,7 @@ export function QuoteGenerationProgress({ items, zipCode }: QuoteGenerationProgr
                   status === 'complete'
                     ? 'bg-green-900/20 border-green-400/30'
                     : status === 'active'
-                    ? 'bg-info-wash border-cyan-400/40 shadow-lg shadow-cyan-500/10'
+                    ? 'bg-cyan-400/10 border-cyan-400/40 shadow-lg shadow-cyan-500/10'
                     : 'bg-slate-900/30 border-slate-700/30'
                 }`}
               >

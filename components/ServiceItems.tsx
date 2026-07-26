@@ -231,7 +231,7 @@ const ServiceItemsComponent = forwardRef<{ refreshWishlist: () => Promise<void> 
                         Save {bundle.labor_saved_hours}h labor (≈${bundle.estimated_savings})
                       </p>
                     </div>
-                    <Button size="sm" variant="outline" className="border-info-border text-cyan-400 hover:bg-cyan-400/10">
+                    <Button size="sm" variant="outline" className="border-info-border text-info hover:bg-cyan-400/10">
                       View Bundle
                     </Button>
                   </div>
@@ -355,7 +355,7 @@ const ServiceItemsComponent = forwardRef<{ refreshWishlist: () => Promise<void> 
                         <Button
                           variant="outline"
                           size="sm"
-                          className="text-cyan-400 border-info-border hover:bg-cyan-400/10"
+                          className="text-info border-info-border hover:bg-cyan-400/10"
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedQuote(quote);
@@ -368,7 +368,7 @@ const ServiceItemsComponent = forwardRef<{ refreshWishlist: () => Promise<void> 
                         <Button
                           variant="outline"
                           size="sm"
-                          className="text-cyan-400 border-info-border hover:bg-cyan-400/10"
+                          className="text-info border-info-border hover:bg-cyan-400/10"
                           onClick={(e) => {
                             e.stopPropagation();
                             if (quote.email_draft) {

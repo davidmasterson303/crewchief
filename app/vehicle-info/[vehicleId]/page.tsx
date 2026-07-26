@@ -111,7 +111,7 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
         <DashboardLayout vehicle={cachedVehicle} currentPage="vehicle-info" vehicleImage={cachedVehicle.custom_image_url || cachedVehicle.image_url}>
           <div className="flex items-center justify-center py-32">
             <div className="flex flex-col items-center gap-3">
-              <div className="w-10 h-10 border-2 border-info-border border-t-cyan-400 rounded-full animate-spin" />
+              <div className="w-10 h-10 border-2 border-info-border border-t-info rounded-full animate-spin" />
               <p className="text-sm text-white/40">Loading vehicle info...</p>
             </div>
           </div>
@@ -121,7 +121,7 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
     return (
       <div className="min-h-screen bg-[#080808] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-2 border-info-border border-t-cyan-400 rounded-full animate-spin" />
+          <div className="w-10 h-10 border-2 border-info-border border-t-info rounded-full animate-spin" />
           <p className="text-sm text-white/40">Loading vehicle info...</p>
         </div>
       </div>
@@ -221,7 +221,7 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
           <CardContent>
             {perfLoading && !hasPerformanceData ? (
               <div className="flex flex-col items-center justify-center py-12">
-                <div className="w-8 h-8 border-2 border-info-border border-t-cyan-400 rounded-full animate-spin mb-3" />
+                <div className="w-8 h-8 border-2 border-info-border border-t-info rounded-full animate-spin mb-3" />
                 <p className="text-sm text-white/40">Analyzing performance specs...</p>
               </div>
             ) : (

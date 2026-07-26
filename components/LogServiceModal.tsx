@@ -152,7 +152,7 @@ export function LogServiceModal({
                 onClick={() => setTab(id)}
                 className={`flex-1 flex flex-col items-center gap-1 px-2 py-2 rounded-lg text-[11px] font-medium transition-all ${
                   tab === id
-                    ? 'bg-info-wash text-cyan-300 border border-info-border'
+                    ? 'bg-cyan-400/10 text-cyan-300 border border-cyan-400/25'
                     : 'text-white/40 hover:text-white/70 hover:bg-white/5'
                 }`}
               >
