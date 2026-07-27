@@ -79,10 +79,41 @@ export async function GET(request: NextRequest): Promise<Response> {
         .order('service_date', { ascending: false })
     ]);
 
-    if (docsResult.error) logger.warn('API:LOAD_MAINTENANCE', 'Docs query error', { error: docsResult.error.message });
-    if (lineItemsResult.error) logger.warn('API:LOAD_MAINTENANCE', 'Line items query error', { error: lineItemsResult.error.message });
-    if (serviceItemsResult.error) logger.warn('API:LOAD_MAINTENANCE', 'Service items query error', { error: serviceItemsResult.error.message });
-    if (maintenanceItemsResult.error) logger.warn('API:LOAD_MAINTENANCE', 'Maintenance items query error', { error: maintenanceItemsResult.error.message });
+    /*
+      A failed query must not be reported as an empty one.
+
+      Each of these errors used to be logged as a warning and then flattened
+      by `|| []` into an empty array under `success: true`. So a total
+      credential failure produced a 200 reading "no documents, no line items,
+      no service history" — indistinguishable from a vehicle that genuinely has
+      none, and accompanied by a log line saying "loaded successfully".
+
+      That is not hypothetical. On both deployed Netlify projects this route
+      currently returns exactly that, because their service-role key is
+      rejected with "Invalid API key" — see the sibling route
+      /api/v1/load-vehicle, which calls the same client and surfaces the real
+      error because it checks. Silence here is why nobody noticed.
+
+      Partial failure is treated the same as total: a caller shown three of
+      four datasets, told it succeeded, will render "no maintenance records"
+      and be wrong.
+    */
+    const failures = [
+      ['documents', docsResult.error],
+      ['invoice line items', lineItemsResult.error],
+      ['completed service items', serviceItemsResult.error],
+      ['maintenance line items', maintenanceItemsResult.error],
+    ].filter(([, error]) => error) as Array<[string, { message: string }]>;
+
+    if (failures.length > 0) {
+      for (const [label, error] of failures) {
+        logger.error('API:LOAD_MAINTENANCE', new Error(`${label}: ${error.message}`), { vehicleId });
+      }
+      return Response.json(
+        { success: false, error: 'Failed to load maintenance data' } as ApiResponse,
+        { status: 500 }
+      );
+    }
 
     logger.info('API:LOAD_MAINTENANCE', 'Maintenance data loaded successfully', {
       docsCount: docsResult.data?.length || 0,
