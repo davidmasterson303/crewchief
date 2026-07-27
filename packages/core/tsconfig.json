@@ -1,0 +1,25 @@
+{
+  /*
+    Standalone on purpose. The package must typecheck without the Next app's
+    tsconfig, because a mobile client will compile it with its own toolchain —
+    if it only ever builds as part of the web app, "portable" is an assertion
+    nobody has tested.
+
+    Deliberately no "dom" lib: a module that reaches for document or window
+    fails here rather than in an Expo bundle three weeks later. That is the
+    same property lib/__tests__/portability.test.ts asserts statically, enforced
+    a second way by the compiler.
+  */
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["es2020"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src/**/*.ts"]
+}

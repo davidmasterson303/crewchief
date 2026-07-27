@@ -25,6 +25,8 @@ import { join, dirname } from 'node:path';
 
 const ROOT = join(__dirname, '..', '..');
 const LIB = join(ROOT, 'lib');
+/** Modules already living in the shared package. Held to the same rule. */
+const CORE = join(ROOT, 'packages', 'core', 'src');
 
 /**
  * Import specifiers a React Native bundle cannot take.
@@ -123,7 +125,6 @@ const PORTABLE = [
   'lib/retry.ts',
   'lib/routes.ts',
   'lib/storage-paths.ts',
-  'lib/tco-calculator.ts',
   'lib/types.ts',
   'lib/usage-profile.ts',
   'lib/utils.ts',
@@ -155,6 +156,7 @@ const NOT_PORTABLE: Record<string, string> = {
 
 describe('the portable half of lib/', () => {
   const all = sourceFiles(LIB).map((f) => f.slice(ROOT.length + 1)).sort();
+  const moved = sourceFiles(CORE).map((f) => f.slice(ROOT.length + 1)).sort();
 
   it('accounts for every module in lib/', () => {
     // A module in neither list is one nobody has classified, and it would slip
@@ -166,6 +168,21 @@ describe('the portable half of lib/', () => {
   it.each(PORTABLE)('%s has no non-portable dependency, transitively', (rel) => {
     expect(blocker(join(ROOT, rel))).toBeNull();
   });
+
+  it('has moved at least one module into the package', () => {
+    // Guards the guard: if the walk of packages/core/src silently found
+    // nothing, the assertion below would pass vacuously.
+    expect(moved.length).toBeGreaterThan(0);
+  });
+
+  it.each(sourceFiles(CORE).map((f) => f.slice(ROOT.length + 1)))(
+    '%s is still portable now that it lives in the package',
+    (rel) => {
+      // The rule does not stop applying once a module has moved — this is
+      // where a later edit would reintroduce a Supabase import unnoticed.
+      expect(blocker(join(ROOT, rel))).toBeNull();
+    }
+  );
 
   it.each(Object.keys(NOT_PORTABLE))('%s really is blocked', (rel) => {
     // Stops the stay-behind list rotting: a module that becomes portable

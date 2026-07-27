@@ -26,7 +26,7 @@
  * that: it pins actual numbers, so a change to the model has to be deliberate.
  */
 
-import { calculateTCO, estimateResaleValue, type TCOVehicle } from '@/lib/tco-calculator';
+import { calculateTCO, estimateResaleValue, type TCOVehicle } from '@crewchief/core/tco-calculator';
 
 describe('TCO Calculator', () => {
   const mockVehicle: TCOVehicle = {

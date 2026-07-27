@@ -53,8 +53,16 @@ const STATIC_ANALYSIS_SUITES = [
  */
 const DECLARED_SIMULATIONS = ['rls-ownership.test.ts'];
 
+/*
+  App code is `@/…`, a relative path, or the shared workspace package.
+
+  The `@crewchief/` arm was added when Phase 2.4 moved the first module into
+  packages/core — and this suite failed the moment it did, which is the
+  behaviour to keep. A suite whose subject moves out from under it should stop
+  the build, not quietly start passing for the wrong reason.
+*/
 const IMPORTS_APP_CODE =
-  /(?:from\s+|require\()\s*['"](?:@\/|\.\.?\/)(?!.*__tests__)/;
+  /(?:from\s+|require\()\s*['"](?:@crewchief\/|@\/|\.\.?\/)(?!.*__tests__)/;
 
 function suites(): string[] {
   return readdirSync(TESTS_DIR).filter((f) => f.endsWith('.test.ts'));

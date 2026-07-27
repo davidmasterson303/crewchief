@@ -8,6 +8,8 @@ const customJestConfig = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   testEnvironment: 'jest-environment-jsdom',
   moduleNameMapper: {
+    // Order matters: the scoped alias must be tried before the '@/' catch-all.
+    '^@crewchief/core/(.*)$': '<rootDir>/packages/core/src/$1',
     '^@/(.*)$': '<rootDir>/$1',
   },
   testMatch: [
