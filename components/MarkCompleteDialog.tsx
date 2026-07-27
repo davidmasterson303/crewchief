@@ -58,7 +58,7 @@ export function MarkCompleteDialog({
     try {
       setLoading(true);
 
-      const response = await fetch('/api/wishlist/complete', {
+      const response = await fetch('/api/v1/wishlist/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

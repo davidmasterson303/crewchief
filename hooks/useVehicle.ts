@@ -6,7 +6,7 @@ export function useVehicle(vehicleId: string | null | undefined) {
     queryFn: async () => {
       if (!vehicleId) throw new Error('Vehicle ID is required');
 
-      const response = await fetch(`/api/load-vehicle?vehicleId=${vehicleId}`);
+      const response = await fetch(`/api/v1/load-vehicle?vehicleId=${vehicleId}`);
       if (!response.ok) {
         throw new Error('Failed to load vehicle');
       }

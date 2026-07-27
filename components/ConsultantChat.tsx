@@ -315,7 +315,7 @@ export default function ConsultantChat({
     if (addedWishlistItems.has(key)) return;
     setAddingWishlistItem(key);
     try {
-      const response = await fetch('/api/wishlist', {
+      const response = await fetch('/api/v1/wishlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -401,7 +401,7 @@ export default function ConsultantChat({
         formData.append('vehicleId', vehicleId);
         formData.append('sessionId', sessionId);
 
-        const response = await fetch('/api/consultant/upload-document', {
+        const response = await fetch('/api/v1/consultant/upload-document', {
           method: 'POST',
           body: formData,
         });

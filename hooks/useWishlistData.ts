@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 async function fetchWishlistItems(vehicleId: string) {
-  const response = await fetch(`/api/wishlist?vehicleId=${vehicleId}`);
+  const response = await fetch(`/api/v1/wishlist?vehicleId=${vehicleId}`);
   if (!response.ok) {
     throw new Error('Failed to fetch wishlist items');
   }

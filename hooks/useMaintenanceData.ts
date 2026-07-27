@@ -13,7 +13,7 @@ export function useMaintenanceData(vehicleId: string | null | undefined) {
     queryFn: async () => {
       if (!vehicleId) throw new Error('Vehicle ID is required');
 
-      const response = await fetch(`/api/load-maintenance-data?vehicleId=${vehicleId}`);
+      const response = await fetch(`/api/v1/load-maintenance-data?vehicleId=${vehicleId}`);
       if (!response.ok) {
         throw new Error('Failed to load maintenance data');
       }

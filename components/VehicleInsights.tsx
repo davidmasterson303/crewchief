@@ -217,7 +217,7 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
     };
 
     const triggerPerfStatsRecalc = () => {
-      fetch('/api/performance-stats', {
+      fetch('/api/v1/performance-stats', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ vehicleId: vehicle.id }),

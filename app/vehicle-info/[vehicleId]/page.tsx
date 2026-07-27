@@ -74,7 +74,7 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
     if (!data?.vehicle) return;
     setPerfLoading(true);
     try {
-      const response = await fetch('/api/performance-stats', {
+      const response = await fetch('/api/v1/performance-stats', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ vehicleId: params.vehicleId, forceRefresh }),

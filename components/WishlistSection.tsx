@@ -50,7 +50,7 @@ export function WishlistSection({ vehicleId }: WishlistSectionProps) {
   const { data: wishlistItems = [], isLoading: loading } = useQuery({
     queryKey: ['wishlist', vehicleId],
     queryFn: async () => {
-      const response = await fetch(`/api/wishlist?vehicleId=${vehicleId}`);
+      const response = await fetch(`/api/v1/wishlist?vehicleId=${vehicleId}`);
       const data = await response.json();
       if (!response.ok) throw new Error('Failed to load wishlist');
       return data.wishlistItems || [];
@@ -71,7 +71,7 @@ export function WishlistSection({ vehicleId }: WishlistSectionProps) {
   const handleDelete = async (itemId: string) => {
     try {
       setDeletingId(itemId);
-      const response = await fetch(`/api/wishlist?itemId=${itemId}`, { method: 'DELETE' });
+      const response = await fetch(`/api/v1/wishlist?itemId=${itemId}`, { method: 'DELETE' });
       const data = await response.json();
       if (response.ok && data.success) {
         queryClient.invalidateQueries({ queryKey: ['wishlist', vehicleId] });

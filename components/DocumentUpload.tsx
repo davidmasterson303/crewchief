@@ -53,7 +53,7 @@ export default function DocumentUpload({ vehicleId }: DocumentUploadProps) {
         formData.append('file', file);
         formData.append('vehicleId', vehicleId);
 
-        const response = await fetch('/api/upload-document', {
+        const response = await fetch('/api/v1/upload-document', {
           method: 'POST',
           body: formData,
         });

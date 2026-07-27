@@ -5,7 +5,7 @@
  * @jest-environment node
  *
  * A ratchet, in the shape of `auth-posture.test.ts`, and it exists because of
- * one concrete instance. `app/api/wishlist/complete/route.ts` recomputed
+ * one concrete instance. `app/api/v1/wishlist/complete/route.ts` (then at `app/api/wishlist/complete`) recomputed
  * performance stats by POSTing to
  * `${request.nextUrl.origin}/api/performance-stats` with the caller's session
  * cookie attached, so the inner route could authorize the hop.
@@ -129,7 +129,7 @@ describe('the internal-fetch posture', () => {
   });
 
   it('keeps the wishlist route calling the recompute in process', () => {
-    const source = readFileSync(join(ROOT, 'app/api/wishlist/complete/route.ts'), 'utf8');
+    const source = readFileSync(join(ROOT, 'app/api/v1/wishlist/complete/route.ts'), 'utf8');
 
     expect(source).toContain("from '@/lib/performance-stats'");
     expect(source).toContain('recomputePerformanceStats');

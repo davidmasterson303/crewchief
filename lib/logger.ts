@@ -9,7 +9,7 @@
  *   import { logger } from '@/lib/logger';
  *
  *   logger.info('USER:LOGIN', 'User logged in successfully', { userId: '123' });
- *   logger.error('API:FETCH', new Error('Failed to fetch'), { endpoint: '/api/vehicles' });
+ *   logger.error('API:FETCH', new Error('Failed to fetch'), { endpoint: '/api/v1/vehicles' });
  *   logger.debug('COMPONENT:RENDER', 'Rendering dashboard', { vehicleId: '456' });
  */
 

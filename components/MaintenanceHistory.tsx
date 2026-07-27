@@ -69,7 +69,7 @@ export default function MaintenanceHistory({ vehicleId, documents, lineItems = [
     itemType: 'invoice_line_item' | 'service_item' | 'maintenance_line_item' | 'document'
   ): Promise<DeleteMaintenanceItemResult> => {
     try {
-      const response = await fetch('/api/delete-maintenance-item', {
+      const response = await fetch('/api/v1/delete-maintenance-item', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ itemId, itemType }),

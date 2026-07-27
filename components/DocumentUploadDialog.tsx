@@ -102,7 +102,7 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
           formData.append('bypassVehicleCheck', 'true');
         }
 
-        const response = await fetch('/api/upload-document', {
+        const response = await fetch('/api/v1/upload-document', {
           method: 'POST',
           body: formData,
         });
@@ -160,7 +160,7 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
       invalidateDashboardCache(vehicleId);
 
       if (totalItemsExtracted > 0) {
-        fetch('/api/performance-stats', {
+        fetch('/api/v1/performance-stats', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ vehicleId, forceRefresh: true }),
@@ -204,7 +204,7 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
       formData.append('vehicleId', vehicleId);
       formData.append('bypassVehicleCheck', 'true');
 
-      const response = await fetch('/api/upload-document', {
+      const response = await fetch('/api/v1/upload-document', {
         method: 'POST',
         body: formData,
       });
