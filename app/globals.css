@@ -95,6 +95,11 @@ nav {
 
     /* ── motion ───────────────────────────────────────────────────────── */
     --ease-standard: cubic-bezier(0.16, 1, 0.3, 1);
+    /* Utility reveals — a hover-revealed control should feel instant, not
+     * animated. The v7 card ticket names --duration-fast; the other motion
+     * tokens here are named for their one purpose, so this is the odd one out
+     * deliberately: it is the house speed for "appear", not for a moment. */
+    --duration-fast: 140ms;
     --duration-scroll-reveal: 550ms;
     --scroll-reveal-distance: 28px;
     --duration-count-up: 900ms;
@@ -437,6 +442,36 @@ nav {
     transform: translate(-50%, -50%);
     width: max(100%, 44px);
     height: max(100%, 44px);
+  }
+
+  /*
+   * A utility that belongs to a data line but is not the point of it — the
+   * mileage edit pencil on a garage card.
+   *
+   * Editing is not what anyone is doing on a browse grid, so the control is
+   * quiet at rest. Three rules make that safe rather than merely tidy:
+   *
+   *   - `opacity`, never `display:none` or `visibility` — it must stay in the
+   *     tab order. A keyboard user cannot hover to discover it.
+   *   - `:focus-visible` reveals it, so tabbing to it shows you where you are.
+   *   - `@media (hover: none)` pins it visible. On a touch device there is no
+   *     hover to reveal anything, so a hover-only affordance is simply gone.
+   *
+   * Pair with `.tap-target-44` in the markup — the visual glyph is ~14px and
+   * needs the hit area regardless of whether it is currently painted.
+   */
+  .meta-edit {
+    opacity: 0;
+    transition: opacity var(--duration-fast) var(--ease-standard);
+  }
+  .meta-row:hover .meta-edit,
+  .meta-edit:focus-visible {
+    opacity: 1;
+  }
+  @media (hover: none) {
+    .meta-edit {
+      opacity: 1;
+    }
   }
 
   /* Scroll-linked section entrance. Larger and slower than the mount

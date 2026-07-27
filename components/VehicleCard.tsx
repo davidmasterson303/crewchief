@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usageProfileChip } from '@/lib/usage-profile';
-import { getHealthBand, useHealthBand } from '@/hooks/use-health-band';
+import { useHealthBand } from '@/hooks/use-health-band';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -32,7 +32,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  CircleAlert as AlertCircle,
   Trash2,
   ArrowRight,
   Pencil,
@@ -43,6 +42,8 @@ import {
   Clock,
   Tag,
   Crosshair,
+  ShieldAlert,
+  TriangleAlert,
 } from 'lucide-react';
 import { updateVehicleMileage } from '@/app/actions';
 import { logger } from '@/lib/logger';
@@ -56,49 +57,90 @@ import { supabase } from '@/lib/supabase';
 import { MileageUpdatePrompt } from './MileageUpdatePrompt';
 import { VehiclePhotoUploadDialog } from './VehiclePhotoUploadDialog';
 
+/**
+ * A condition worth interrupting a browse for.
+ *
+ * Kept separate from `statusLabel`/usage profile on purpose. Both used to be a
+ * glass chip at the same corner of the photo, so an active safety recall was
+ * the same shape and position as a trim label and differed only in hue.
+ * Conditions now get their own ribbon; the chip is identity only.
+ */
+export interface VehicleCardAlert {
+  /** Short and countable — "2 recalls", "Service overdue". Never a sentence. */
+  label: string;
+  tone: 'critical' | 'attention';
+}
+
 interface VehicleCardProps {
   vehicle: any;
   activeRecalls: number;
   healthSummary?: any;
+  /**
+   * Optional override. When omitted, `activeRecalls` is promoted to a critical
+   * alert, which is how all three current call sites behave — so none of them
+   * had to change. Pass this to add conditions the card cannot derive.
+   */
+  alerts?: VehicleCardAlert[];
 }
 
 
+/*
+ * The card's primary element.
+ *
+ * v7 moved this out of a filled well beside the summary text and onto the
+ * card's right edge at 56px, top-aligned with the title. The score is the
+ * reason the product exists; it was previously smaller than the mileage.
+ *
+ * 56px outer / 46px inner is the ticket's geometry: r + strokeWidth/2 must
+ * equal 28 for the outer edge to land on 56, so r = 25.5 at a 5px stroke,
+ * which puts the inner edge at 23 — a 46px hole. Do not adjust one without
+ * the other.
+ *
+ * Reads the shared band table. This ring used to hand-roll its own three-band
+ * ramp — green / brand cyan / orange at 80 and 60 — so the garage grid and
+ * the dashboard disagreed about the same car: 30 was orange here and red in
+ * the hero, and anything at or above 60 rendered in the brand accent, which
+ * is precisely what the band system exists to stop.
+ *
+ * Deliberately still. No count-up, and — new in v7 — no low-score pulse
+ * either. Both were single-card moments; three of them side by side in the
+ * garage grid read as noise, and the band colour already carries severity.
+ */
 function HealthRing({ score }: { score: number }) {
-  const radius = 26;
+  const radius = 25.5;
   const circumference = 2 * Math.PI * radius;
   const fill = (score / 100) * circumference;
-  /*
-    Reads the shared band table. This ring used to hand-roll its own three-band
-    ramp — green / brand cyan / orange at 80 and 60 — so the garage grid and
-    the dashboard disagreed about the same car: 30 was orange here and red in
-    the hero, and anything at or above 60 rendered in the brand accent, which
-    is precisely what the band system exists to stop.
-  */
   const band = useHealthBand(score);
   const color = band.color;
   const trackColor = `rgba(${band.rgb},0.10)`;
-  const isLow = score < 60;
 
   return (
-    <div className={`relative flex items-center justify-center w-16 h-16 flex-shrink-0 ${isLow ? 'animate-pulse-health' : ''}`}>
-      <svg width="64" height="64" viewBox="0 0 64 64" className="-rotate-90">
-        <circle cx="32" cy="32" r={radius} fill="none" stroke={trackColor} strokeWidth="5" />
-        <circle
-          cx="32" cy="32" r={radius}
-          fill="none"
-          stroke={color}
-          strokeWidth="5"
-          strokeDasharray={`${fill} ${circumference}`}
-          strokeLinecap="round"
-          style={{ filter: `drop-shadow(0 0 4px ${color}50)` }}
-        />
-      </svg>
-      <span className="absolute text-sm font-bold text-white tabular-nums">{score}</span>
+    <div className="flex flex-col items-center gap-1 flex-shrink-0">
+      <div className="relative flex items-center justify-center w-14 h-14">
+        <svg width="56" height="56" viewBox="0 0 56 56" className="-rotate-90">
+          <circle cx="28" cy="28" r={radius} fill="none" stroke={trackColor} strokeWidth="5" />
+          <circle
+            cx="28" cy="28" r={radius}
+            fill="none"
+            stroke={color}
+            strokeWidth="5"
+            strokeDasharray={`${fill} ${circumference}`}
+            strokeLinecap="round"
+            style={{ filter: `drop-shadow(0 0 4px ${color}50)` }}
+          />
+        </svg>
+        <span className="num absolute text-lg font-bold text-white">{score}</span>
+      </div>
+      {/* `short`, not `label` — "Needs attention" does not fit under 56px in a
+          three-up grid. Same band, abbreviated; never a different judgement. */}
+      <span className="text-[11px] font-semibold leading-none" style={{ color }}>
+        {band.short}
+      </span>
     </div>
   );
 }
 
-export function VehicleCard({ vehicle, activeRecalls, healthSummary }: VehicleCardProps) {
+export function VehicleCard({ vehicle, activeRecalls, healthSummary, alerts }: VehicleCardProps) {
   const router = useRouter();
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDeleted, setIsDeleted] = useState(false);
@@ -171,14 +213,28 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary }: VehicleCa
     setIsUpdatingMileage(false);
   };
 
-  const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1517026575992-5e15ad95f780?q=80&w=2340&auto=format&fit=crop';
-
-  const getVehicleImageUrl = () => {
-    if (imageError) return FALLBACK_IMAGE;
+  /*
+   * Returns undefined when this vehicle genuinely has no usable photo, and the
+   * card renders no strip at all.
+   *
+   * There used to be a hardcoded images.unsplash.com stock car here, used both
+   * as the empty state and as the onError target. That meant three things at
+   * once: no vehicle could ever *be* photo-less, every photo-less garage made a
+   * third-party CDN request on load, and a broken image silently substituted a
+   * stranger's car for the owner's. A card that is complete without a photo is
+   * better than a card that is never allowed to lack one.
+   *
+   * The DEMO_IMAGES override stays until migration 20260726230000 has been
+   * applied everywhere. Deleting it before then would send the demo cards back
+   * to the Pexels CDN this map was introduced to get them off — the database
+   * still holds those URLs. Delete both together, not this one first.
+   */
+  const getVehicleImageUrl = (): string | undefined => {
+    if (imageError) return undefined;
     if (isDemoVehicleId(vehicle.id) && DEMO_IMAGES[vehicle.id]) {
       return DEMO_IMAGES[vehicle.id];
     }
-    return vehicle.custom_image_url || vehicle.image_url || FALLBACK_IMAGE;
+    return vehicle.custom_image_url || vehicle.image_url || undefined;
   };
 
   const handleImageError = () => {
@@ -191,95 +247,175 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary }: VehicleCa
   const statusKey = displayVehicle.vehicle_status || 'daily_driver';
   const statusInfo = usageProfileChip(statusKey);
 
-  const getHealthPill = () => {
-    if (!healthSummary) return null;
-    const score = healthSummary.health_score;
-    /*
-      Same table again. This had only three bands and its own labels, so 20
-      read "Needs Attention" on the card and "Critical" in the hero — and its
-      colours disagreed with the ring beside it: 65 gave a cyan ring and an
-      amber pill on one card.
-    */
-    const band = getHealthBand(score);
-    return { label: band.label, color: band.color, rgb: band.rgb };
-  };
+  const photoUrl = getVehicleImageUrl();
 
-  const healthPill = getHealthPill();
+  /*
+   * The band pill that used to sit in this chip row is gone.
+   *
+   * It printed `band.label` beside the recall badge and the usage chip, while
+   * the ring printed the same score a few centimetres below — the dashboard's
+   * D5 defect ("the score prints twice"), on the garage surface, which the v7
+   * ticket did not mention because it described the score as only a small
+   * footer run. With the ring promoted to the card's primary element, a second
+   * rendering of the same number is exactly the noise v7 exists to remove.
+   */
+
+  /*
+   * `activeRecalls` is a count, so the label is derivable — no call site had to
+   * change. An explicit `alerts` prop wins when passed.
+   */
+  const resolvedAlerts: VehicleCardAlert[] =
+    alerts ??
+    (activeRecalls > 0
+      ? [{ label: `${activeRecalls} recall${activeRecalls !== 1 ? 's' : ''}`, tone: 'critical' }]
+      : []);
+
+  /* Any critical entry makes the whole ribbon critical — a scan must not have
+   * to read the row to find out whether the red one is in there. */
+  const ribbonCritical = resolvedAlerts.some((a) => a.tone === 'critical');
+  const RibbonIcon = ribbonCritical ? ShieldAlert : TriangleAlert;
+
+  /* Identity, never condition. Neutral for all four profiles by design — see
+   * lib/usage-profile.ts. Rendered over the strip when there is one, and in
+   * the body when there is not, so a photo-less card still says what the car
+   * is for. */
+  const nicknameChip = (
+    <div className={`flex items-center gap-1.5 ${statusInfo.className} border px-2.5 py-1 rounded-full text-xs font-semibold backdrop-blur-sm`}>
+      <Tag className="h-3 w-3" />
+      {statusInfo.label}
+    </div>
+  );
 
   return (
     <div className="group card-lift relative border rounded-2xl overflow-hidden bg-[#0f1318]/90 backdrop-blur-sm h-full flex flex-col shadow-lg shadow-black/50 edge-light hover:border-cyan-400/30">
-      <div className="photo-plate aspect-[3/2] bg-slate-900/60 group/image">
-        {(() => {
-          const focalX = vehicle.focal_point_x ?? 50;
-          const focalY = vehicle.focal_point_y ?? 50;
-          const hasCustomFocal = vehicle.custom_image_url && vehicle.focal_point_x != null;
-          const showAdjustNudge = vehicle.custom_image_url && vehicle.focal_point_x == null;
-          return (
-            <>
-              <img
-                src={getVehicleImageUrl()}
-                alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-                className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
-                style={{ objectPosition: `${focalX}% ${focalY}%` }}
-                onError={handleImageError}
-                loading="lazy"
-              />
-              {showAdjustNudge && (
-                <div className="above-stretch absolute bottom-2 left-2 right-2 opacity-0 group-hover/image:opacity-100 transition-opacity duration-200">
+      {/*
+        96px, down from a 3:2 plate that was ~158px tall.
+        Identity only — enough to tell three cars apart at a glance, not a
+        feature. And it renders only when there is a photograph: no empty
+        plate, no placeholder icon, no stock car. See getVehicleImageUrl.
+      */}
+      {photoUrl && (
+        <div className="photo-plate h-24 bg-slate-900/60 group/image">
+          {(() => {
+            const focalX = vehicle.focal_point_x ?? 50;
+            const focalY = vehicle.focal_point_y ?? 50;
+            const showAdjustNudge = vehicle.custom_image_url && vehicle.focal_point_x == null;
+            return (
+              <>
+                <img
+                  src={photoUrl}
+                  alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+                  className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
+                  style={{ objectPosition: `${focalX}% ${focalY}%` }}
+                  onError={handleImageError}
+                  loading="lazy"
+                />
+
+                {/* Compact at 96px. The full-width bar this replaced covered
+                    most of a strip this short. */}
+                {showAdjustNudge && (
+                  <div className="above-stretch absolute bottom-2 left-2 opacity-0 group-hover/image:opacity-100 transition-opacity duration-200">
+                    <button
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowPhotoDialog(true); }}
+                      className="tap-target-44 flex items-center gap-1.5 px-2 py-1 bg-black/70 hover:bg-black/85 border border-amber-400/35 rounded-md text-amber-300/90 text-[11px] font-medium transition-all backdrop-blur-sm"
+                    >
+                      <Crosshair className="h-3 w-3 flex-shrink-0" />
+                      Adjust focus
+                    </button>
+                  </div>
+                )}
+
+                <div className="above-stretch absolute inset-0 bg-black/50 opacity-0 group-hover/image:opacity-100 transition-opacity duration-200 flex items-center justify-center">
                   <button
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowPhotoDialog(true); }}
-                    className="w-full flex items-center gap-1.5 px-2.5 py-1.5 bg-black/70 hover:bg-black/85 border border-amber-400/35 rounded-lg text-amber-300/90 text-[11px] font-medium transition-all backdrop-blur-sm"
+                    className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full text-white text-xs font-medium transition-all backdrop-blur-sm"
+                    aria-label="Change vehicle photo"
                   >
-                    <Crosshair className="h-3 w-3 flex-shrink-0" />
-                    Adjust Photo Focus for a better view
+                    <Camera className="h-3.5 w-3.5" />
+                    Change Photo
                   </button>
                 </div>
-              )}
+              </>
+            );
+          })()}
 
-              <div className={`above-stretch absolute inset-0 bg-black/50 opacity-0 group-hover/image:opacity-100 transition-opacity duration-200 flex ${showAdjustNudge ? 'items-start pt-3' : 'items-center'} justify-center`}>
-                <button
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowPhotoDialog(true); }}
-                  className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full text-white text-sm font-medium transition-all backdrop-blur-sm"
-                  aria-label="Change vehicle photo"
-                >
-                  <Camera className="h-4 w-4" />
-                  Change Photo
-                </button>
-              </div>
-            </>
-          );
-        })()}
-
-        <div className="absolute top-3 left-3 flex flex-wrap items-center gap-1.5">
-          {activeRecalls > 0 && (
-            <div className="flex items-center gap-1.5 bg-red-500/90 text-white px-2.5 py-1 rounded-full text-xs font-semibold shadow-lg backdrop-blur-sm">
-              <AlertCircle className="h-3.5 w-3.5" />
-              {activeRecalls} Recall{activeRecalls !== 1 ? 's' : ''}
-            </div>
-          )}
-          <div className={`flex items-center gap-1.5 ${statusInfo.className} border px-2.5 py-1 rounded-full text-xs font-semibold backdrop-blur-sm`}>
-            <Tag className="h-3 w-3" />
-            {statusInfo.label}
-          </div>
-          {healthPill && (
-            <div
-              className="flex items-center gap-1.5 border px-2.5 py-1 rounded-full text-xs font-semibold backdrop-blur-sm"
-              style={{
-                color: healthPill.color,
-                background: `rgba(${healthPill.rgb},0.18)`,
-                borderColor: `rgba(${healthPill.rgb},0.32)`,
-              }}
-            >
-              <span
-                className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                style={{ background: healthPill.color }}
-              />
-              {healthPill.label}
-            </div>
-          )}
+          <div className="absolute top-2 left-2">{nicknameChip}</div>
         </div>
+      )}
 
-        <div className="above-stretch absolute top-3 right-3">
+      {/*
+        Conditions, in their own slot. Full-bleed so it reads as a property of
+        the card rather than another chip floating on the photo. One line,
+        joined with ' · ' — never stacked, never wrapped; past two entries the
+        caller summarises ("3 issues").
+      */}
+      {resolvedAlerts.length > 0 && (
+        <div
+          className="flex items-center gap-1.5 px-4 py-[7px] text-xs font-semibold border-y"
+          style={
+            ribbonCritical
+              ? {
+                  color: 'var(--critical-red)',
+                  background: 'var(--critical-red-wash)',
+                  borderColor: 'var(--critical-red-border)',
+                }
+              : {
+                  color: 'var(--attention-amber)',
+                  background: 'var(--attention-amber-wash)',
+                  borderColor: 'var(--attention-amber-border)',
+                }
+          }
+        >
+          <RibbonIcon className="h-3.5 w-3.5 flex-shrink-0" />
+          <span className="truncate">{resolvedAlerts.map((a) => a.label).join(' · ')}</span>
+        </div>
+      )}
+
+      <div className="p-5 flex-1 flex flex-col gap-4">
+        {/* Reading order starts here: score, name, condition, detail. */}
+        <div className="flex items-start gap-3">
+          <div className="flex-1 min-w-0">
+            <h3 className="text-xl font-bold text-white tracking-tight leading-tight">
+              {vehicle.year} {vehicle.make}
+            </h3>
+            <p className="text-sm text-white/50 mt-0.5">{vehicle.model}{vehicle.trim ? ` · ${vehicle.trim}` : ''}</p>
+
+            {/* With no strip the chip has nowhere to sit, and the card would
+                stop saying what the car is for. */}
+            {!photoUrl && <div className="mt-2 flex">{nicknameChip}</div>}
+
+            {/*
+              Mileage as a meta line, replacing a filled bordered well with its
+              own hover state. It was the largest thing on the card, which said
+              the most important fact about a vehicle is how far it has driven.
+              No fill, no border, no nesting.
+            */}
+            <div className="meta-row above-stretch relative mt-3 flex items-center gap-1.5">
+              <Gauge className="h-3 w-3 text-white/40 flex-shrink-0" />
+              <span className="text-[13px] text-secondary-foreground">
+                <span className="num font-semibold">{displayVehicle.current_mileage.toLocaleString()}</span>
+                <span className="text-muted-foreground font-normal"> mi mileage</span>
+              </span>
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowMileageDialog(true); }}
+                className="meta-edit tap-target-44 text-white/40 hover:text-cyan-400 transition-colors"
+                aria-label={`Update mileage for ${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {healthSummary && <HealthRing score={healthSummary.health_score} />}
+
+          {/*
+            The options menu used to live inside the photo plate. With the strip
+            now conditional, that put delete, change-photo and update-mileage
+            behind having a photograph — so the vehicle most likely to need
+            "Change Photo" was the one that could not reach it. It is a flex
+            child of the header row instead, which exists unconditionally.
+          */}
+          <div className="above-stretch relative flex-shrink-0">
           <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
             <DropdownMenu>
               <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
@@ -333,16 +469,19 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary }: VehicleCa
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+          </div>
         </div>
-      </div>
 
-      <div className="p-5 flex-1 flex flex-col gap-4">
-        <div>
-          <h3 className="text-xl font-bold text-white tracking-tight leading-tight">
-            {vehicle.year} {vehicle.make}
-          </h3>
-          <p className="text-sm text-white/50 mt-0.5">{vehicle.model}{vehicle.trim ? ` · ${vehicle.trim}` : ''}</p>
-        </div>
+        {/*
+          The health summary used to be boxed in a well beside the ring. The
+          ring has moved to the header, and this is prose — so it is unboxed,
+          and capped at a readable measure rather than run to the card's width.
+        */}
+        {healthSummary?.summary && (
+          <p className="measure text-xs text-white/60 leading-relaxed line-clamp-2">
+            {healthSummary.summary}
+          </p>
+        )}
 
         <div className="above-stretch relative">
         <MileageUpdatePrompt
@@ -351,40 +490,11 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary }: VehicleCa
         />
         </div>
 
-        <div className="flex-1 space-y-3">
-          {healthSummary && (
-            <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/8">
-              <HealthRing score={healthSummary.health_score} />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-white/50 uppercase tracking-widest mb-0.5">Health</p>
-                <p className="text-xs text-white/60 line-clamp-2 leading-relaxed">{healthSummary.summary}</p>
-              </div>
-            </div>
-          )}
-
-          <div
-            className="above-stretch relative flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/8 hover:border-cyan-400/30 hover:bg-cyan-400/5 cursor-pointer transition-all group/mile"
-            onClick={(e) => { e.preventDefault(); setShowMileageDialog(true); }}
-          >
-            <div>
-              <p className="text-xs font-semibold text-white/50 uppercase tracking-widest mb-0.5">
-                <span className="flex items-center gap-1">
-                  <Gauge className="h-3 w-3" />
-                  Mileage
-                </span>
-              </p>
-              <span className="text-base font-bold text-white tabular-nums tracking-tight">
-                {displayVehicle.current_mileage.toLocaleString()}
-                <span className="text-xs text-white/40 font-normal ml-1">mi</span>
-              </span>
-            </div>
-            <Pencil className="h-3.5 w-3.5 text-white/30 group-hover/mile:text-cyan-400 transition-colors" />
-          </div>
-        </div>
-
+        {/* mt-auto, so CTAs align across a row of unequal-height cards. The
+            grid must stay align-items: stretch for this to hold. */}
         <Link
           href={`/dashboard/${vehicle.id}`}
-          className="stretch-link group/cta flex items-center justify-center gap-1.5 w-full h-11 rounded-xl text-sm font-semibold text-info hover:text-info-strong transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
+          className="stretch-link group/cta mt-auto flex items-center justify-center gap-1.5 w-full h-11 rounded-xl text-sm font-semibold text-info hover:text-info-strong transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
         >
           View Dashboard
           <ArrowRight className="h-4 w-4 transition-transform group-hover/cta:translate-x-0.5" />

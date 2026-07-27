@@ -25,6 +25,16 @@ export interface HealthBand {
   /** Qualitative wording shown beside the score. */
   label: string;
   /**
+   * The same band, abbreviated — for the label under the garage card's 56px
+   * ring, where "Needs attention" will not fit in a three-up grid.
+   *
+   * It is an **abbreviation, never a different judgement.** `label` is the
+   * canonical wording and was set deliberately conservative (see below);
+   * shortening it here must not walk that back. Everywhere with room uses
+   * `label`.
+   */
+  short: string;
+  /**
    * The text colour as a **literal** class.
    *
    * Callers used to build this as `text-health-${band.name}`. Tailwind only
@@ -48,10 +58,10 @@ export interface HealthBand {
  * Thresholds are unchanged; only the words moved down a step.
  */
 const BANDS: ReadonlyArray<HealthBand & { min: number }> = [
-  { min: 80, name: 'good', color: 'var(--ring-good)', rgb: '127,206,156', label: 'Good', textClass: 'text-health-good' },
-  { min: 60, name: 'ok', color: 'var(--ring-ok)', rgb: '95,174,192', label: 'Fair', textClass: 'text-health-ok' },
-  { min: 40, name: 'warn', color: 'var(--ring-warn)', rgb: '224,164,104', label: 'Needs attention', textClass: 'text-health-warn' },
-  { min: -Infinity, name: 'bad', color: 'var(--ring-bad)', rgb: '224,136,130', label: 'Critical', textClass: 'text-health-bad' },
+  { min: 80, name: 'good', color: 'var(--ring-good)', rgb: '127,206,156', label: 'Good', short: 'Good', textClass: 'text-health-good' },
+  { min: 60, name: 'ok', color: 'var(--ring-ok)', rgb: '95,174,192', label: 'Fair', short: 'Fair', textClass: 'text-health-ok' },
+  { min: 40, name: 'warn', color: 'var(--ring-warn)', rgb: '224,164,104', label: 'Needs attention', short: 'Attention', textClass: 'text-health-warn' },
+  { min: -Infinity, name: 'bad', color: 'var(--ring-bad)', rgb: '224,136,130', label: 'Critical', short: 'Critical', textClass: 'text-health-bad' },
 ];
 
 /**
