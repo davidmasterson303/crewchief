@@ -121,19 +121,21 @@ function renderMarkdownLine(line: string, key: number) {
  * of "we no longer know" is to claim nothing, not to recompute from today's
  * garage and backdate it onto an old answer.
  */
-type ContextKind = 'knowledge' | 'service' | 'issues' | 'mods' | 'recalls';
+type ContextKind = 'knowledge' | 'service' | 'issues' | 'mods' | 'wishlist' | 'recalls';
 
 const CONTEXT_LABELS: Record<ContextKind, string> = {
   knowledge: 'Knowledge base',
   service: 'Service records',
   issues: 'Issue history',
   mods: 'Mod profile',
+  wishlist: 'Wishlist',
   recalls: 'Recall data',
 };
 
 function contextIcon(kind: ContextKind) {
   if (kind === 'issues' || kind === 'recalls') return <TriangleAlert className="h-2.5 w-2.5" />;
   if (kind === 'mods') return <Sparkles className="h-2.5 w-2.5" />;
+  if (kind === 'wishlist') return <Heart className="h-2.5 w-2.5" />;
   return <Wrench className="h-2.5 w-2.5" />;
 }
 
@@ -157,7 +159,18 @@ function suppliedContext(ctx: {
   if (nonEmpty(ctx.knowledge)) kinds.push('knowledge');
   if (nonEmpty(ctx.completedItems) || nonEmpty(ctx.maintenanceLineItems)) kinds.push('service');
   if (nonEmpty(ctx.issueTracking)) kinds.push('issues');
-  if (nonEmpty(ctx.modTracking) || nonEmpty(ctx.modWishlistItems)) kinds.push('mods');
+  /*
+   * `modTracking` and `modWishlistItems` are two different things and were
+   * briefly collapsed into one "Mod profile" chip. They must not be:
+   * `modWishlistItems` is loaded from the `wishlist_items` table (see
+   * app/consultant/[vehicleId]/page.tsx), and on the demo Accord that table
+   * holds an oil-dilution check, a brake fluid flush and a CVT fluid flush —
+   * maintenance, not modifications. The chip claimed a mod profile the car does
+   * not have, which is the same overclaim this whole function exists to remove.
+   * The upstream prop name is what misleads; the label here tells the truth.
+   */
+  if (nonEmpty(ctx.modTracking)) kinds.push('mods');
+  if (nonEmpty(ctx.modWishlistItems)) kinds.push('wishlist');
   if (nonEmpty(ctx.nhtsaData?.recalls)) kinds.push('recalls');
   return kinds;
 }
