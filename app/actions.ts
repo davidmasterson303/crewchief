@@ -7,6 +7,7 @@ import { getVehicleImage } from '@/lib/vehicle-images';
 import { logger } from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { authorizeVehicleAccess, authorizeVehicleScopedRow, requireSession } from '@/lib/api-auth';
+import { isDemoVehicleId } from '@/lib/demo';
 import { vehicleStoragePath, vehicleIdFromStoragePath } from '@/lib/storage-paths';
 import { parseWishlistCommands, parsePerformanceCommands, parseStatusCommands, parseInvoiceFlag } from '@/lib/consultant-commands';
 import { validateData, vehicleIdSchema, serviceItemSchema, maintenanceLineItemSchema, quoteRequestSchema } from '@/lib/validation';
@@ -703,6 +704,9 @@ export async function sendConsultantMessage(params: {
   nhtsaData?: any;
   healthSummary?: any;
   modWishlistItems?: any[];
+  /** @deprecated Client-supplied and ignored. Demo status is derived from the
+   *  vehicle id server-side — see the note in the body. Callers may still pass
+   *  it; nothing reads it. */
   isDemo?: boolean;
 }) {
   // Cost control: server actions are publicly invokable POST endpoints
@@ -714,7 +718,43 @@ export async function sendConsultantMessage(params: {
     }
   }
   try {
-    const access = await authorizeVehicleAccess(params.vehicleId, { intent: 'write' });
+    /*
+     * The intent has to match what this function actually does, and what it
+     * does depends on whether the vehicle is a demo vehicle.
+     *
+     * ── The bug ───────────────────────────────────────────────────────────
+     *
+     * This asked for 'write' unconditionally. `authorizeVehicleAccess` denies
+     * demo vehicles any write ("Demo vehicles are read-only", 403), so **every
+     * consultant message on a demo vehicle returned an error** — on the
+     * recruiter-facing demo, whose own banner advertises the AI consultant as
+     * live. Confirmed in production before this fix, not inferred.
+     *
+     * The write intent was never right for the demo path: every mutation below
+     * is already inside `if (!isDemoVehicle)`. In demo mode this function calls
+     * Gemini and returns a string. It writes nothing, so it needs read access.
+     *
+     * ── Why this is derived and not taken from params ─────────────────────
+     *
+     * `params.isDemo` is client-supplied and must never decide an
+     * authorization or persistence question. Trusting it for the intent would
+     * let a caller pass isDemo:true for a *real* vehicle and downgrade the
+     * check to a demo read. Trusting it for the guard below would be worse in
+     * the other direction: isDemo:false on a demo vehicle would enter the
+     * persistence branch and hand a client-controlled sessionId to the
+     * service-role client. Until now the unconditional 'write' happened to
+     * mask that second path by rejecting demo vehicles outright — relaxing the
+     * intent without also fixing the guard would have opened it.
+     *
+     * `isDemoVehicleId` is a pure check against a hardcoded id list, and it is
+     * the same function authorizeVehicleAccess itself uses, so the two cannot
+     * disagree about what a demo vehicle is.
+     */
+    const isDemoVehicle = isDemoVehicleId(params.vehicleId);
+
+    const access = await authorizeVehicleAccess(params.vehicleId, {
+      intent: isDemoVehicle ? 'read' : 'write',
+    });
     if (!access.ok) {
       return { success: false, error: access.error };
     }
@@ -737,7 +777,6 @@ export async function sendConsultantMessage(params: {
       nhtsaData,
       healthSummary,
       modWishlistItems,
-      isDemo,
     } = params;
 
     const knownIssues = (knowledge?.known_issues || [])
@@ -884,7 +923,10 @@ export async function sendConsultantMessage(params: {
     let issueUpdates = 0;
     let modUpdates = 0;
 
-    if (!isDemo) {
+    /* Server-derived, not params.isDemo — see the note on the intent above.
+     * Everything in this block writes, and all of it is skipped for demo
+     * vehicles. */
+    if (!isDemoVehicle) {
       const client = getServiceRoleClient();
 
       const perfParse = parsePerformanceCommands(response);
