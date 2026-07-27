@@ -191,6 +191,74 @@ async function checkAnonData() {
     if (status === 200) pass(`${table} readable by anon`);
     else fail(`${table} returned ${status} for anon — demo content will be missing`);
   }
+
+  await checkVehicleImages(url, key);
+}
+
+/*
+ * Do the demo vehicles' photos actually resolve, and are they ours?
+ *
+ * Two failures this catches, both of which happened.
+ *
+ * The photos used to be live images.pexels.com URLs — a third-party runtime
+ * dependency on the recruiter-facing demo. Nothing checked for that, so nothing
+ * would have noticed it coming back.
+ *
+ * Then, when they moved to local files, the migration that repointed image_url
+ * ran before the build carrying the files was deployed. For about four minutes
+ * every demo hero was a 404 while the database confidently pointed at
+ * /vehicles/<slug>/hero-3x2.jpg. The existing checks all passed throughout:
+ * pages returned 200, tables were readable, and the *strings* "Honda",
+ * "Subaru", "BMW" were present. Only the images were missing.
+ *
+ * Asserting the database's paths against the deployment being verified is what
+ * closes that gap — it compares the two halves that have to agree.
+ */
+async function checkVehicleImages(supabaseUrl, key) {
+  console.log('\nVehicle photos the demo points at');
+  let rows;
+  try {
+    const res = await fetch(
+      `${supabaseUrl}/rest/v1/vehicles?select=make,model,image_url&is_demo=eq.true`,
+      { headers: { apikey: key, Authorization: `Bearer ${key}` } }
+    );
+    if (!res.ok) {
+      warn(`could not read demo vehicles to check photos (HTTP ${res.status})`);
+      return;
+    }
+    rows = await res.json();
+  } catch (error) {
+    warn(`could not read demo vehicles to check photos — ${error.message}`);
+    return;
+  }
+
+  for (const v of rows) {
+    const label = `${v.make} ${v.model}`;
+    if (!v.image_url) {
+      warn(`${label} has no image_url`);
+      continue;
+    }
+
+    // Off-origin means a third-party CDN is back in the critical path.
+    if (/^https?:\/\//i.test(v.image_url)) {
+      fail(`${label} points off-origin: ${v.image_url.slice(0, 60)}`);
+      continue;
+    }
+
+    const imageUrl = `${base}${v.image_url}`;
+    try {
+      const res = await fetch(imageUrl, { method: 'GET', redirect: 'follow' });
+      const type = res.headers.get('content-type') || '';
+      if (res.ok && type.startsWith('image/')) {
+        pass(`${label} — ${v.image_url}`);
+      } else {
+        fail(`${label} — ${v.image_url} returned ${res.status} ${type || '(no content-type)'}`);
+        console.log('        the database points at a file this build does not serve');
+      }
+    } catch (error) {
+      fail(`${label} — could not fetch ${v.image_url}: ${error.message}`);
+    }
+  }
 }
 
 console.log(`\nVerifying demo at ${base}`);
