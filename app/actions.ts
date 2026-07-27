@@ -9,6 +9,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { authorizeVehicleAccess, authorizeVehicleScopedRow, requireSession } from '@/lib/api-auth';
 import { isDemoVehicleId } from '@crewchief/core/demo';
 import { vehicleStoragePath, vehicleIdFromStoragePath } from '@crewchief/core/storage-paths';
+import { withTimeout, TimeoutError } from '@crewchief/core/retry';
 import { parseWishlistCommands, parsePerformanceCommands, parseStatusCommands, parseInvoiceFlag } from '@crewchief/core/consultant-commands';
 import { validateData, vehicleIdSchema, serviceItemSchema, maintenanceLineItemSchema, quoteRequestSchema } from '@crewchief/core/validation';
 import { withRetry } from '@crewchief/core/retry';
@@ -199,6 +200,17 @@ export async function createVehicle(vehicleData: {
   // authoritative even when the body ignores it, which is one careless edit
   // away from being trusted.
 }) {
+  /*
+    Stage timing, because the first thing anyone asked about the onboarding
+    hang was "which part is slow" and nobody could answer it.
+
+    Measured 28 Jul, warm server, real prompt: NHTSA decode ~0.6s, each
+    Supabase call ~0.2s, the Gemini research call ~23s. The AI layer is the
+    whole story and everything else is noise — but that was an inference until
+    it was measured, and this makes the next run answer for itself.
+  */
+  const createStartedAt = Date.now();
+
   logger.info('VEHICLE:CREATE_START', 'Creating new vehicle', {
     make: vehicleData.make,
     model: vehicleData.model,
@@ -240,11 +252,19 @@ export async function createVehicle(vehicleData: {
       return { success: false, error: 'Failed to save vehicle' };
     }
 
-    logger.info('VEHICLE:CREATED', 'Vehicle record created', { vehicleId: vehicle.id });
+    logger.info('VEHICLE:CREATED', 'Vehicle record created', {
+      vehicleId: vehicle.id,
+      msSinceStart: Date.now() - createStartedAt,
+    });
 
     try {
       logger.debug('VEHICLE:GENERATE_IMAGE', 'Generating vehicle image');
+      const imageStartedAt = Date.now();
       await getVehicleImage(vehicle.id, vehicle);
+      logger.info('VEHICLE:IMAGE_DONE', 'Vehicle image stage complete', {
+        vehicleId: vehicle.id,
+        ms: Date.now() - imageStartedAt,
+      });
     } catch (error) {
       logger.warn('VEHICLE:IMAGE_FAILED', 'Failed to generate vehicle image', {
         error: (error as Error).message,
@@ -292,13 +312,31 @@ export async function createVehicle(vehicleData: {
       });
     }
 
-    logger.info('VEHICLE:CREATE_SUCCESS', 'Vehicle fully created', { vehicleId: vehicle.id });
+    logger.info('VEHICLE:CREATE_SUCCESS', 'Vehicle fully created', {
+      vehicleId: vehicle.id,
+      msTotal: Date.now() - createStartedAt,
+    });
     return { success: true, vehicleId: vehicle.id };
   } catch (error) {
     logger.error('VEHICLE:CREATE_ERROR', error as Error);
     return { success: false, error: 'Failed to create vehicle' };
   }
 }
+
+/*
+  A deadline on the research call, because it had none.
+
+  Measured 28 Jul against the real VEHICLE_RESEARCH_PROMPT: a successful
+  gemini-2.5-flash call takes ~23s, twice, consistently. The retry loop makes
+  three attempts with 0/2/4s backoff, so a wholly failing research run is
+  ~75s of wall clock — and with no timeout on the individual call, an
+  unresponsive Gemini made that unbounded.
+
+  30s gives a healthy call ~30% headroom over its measured time while turning
+  "never returns" into "returns an error the UI can show". The ceiling matters
+  more than the exact number: a spinner with no deadline is a hang, not a wait.
+*/
+const RESEARCH_TIMEOUT_MS = 30_000;
 
 export async function generateVehicleDossier(vehicleId: string, vehicleData?: any) {
   // Cost control: server actions are publicly invokable POST endpoints
@@ -325,6 +363,7 @@ export async function generateVehicleDossier(vehicleId: string, vehicleData?: an
 
     const prompt = VEHICLE_RESEARCH_PROMPT(vehicle.year, vehicle.make, vehicle.model);
 
+    const researchStartedAt = Date.now();
     let attempt = 0;
     let parsed = null;
     let lastError = null;
@@ -338,11 +377,16 @@ export async function generateVehicleDossier(vehicleId: string, vehicleData?: an
 
         console.log(`[Research Attempt ${attempt + 1}/3] Generating research for ${vehicle.year} ${vehicle.make} ${vehicle.model}`);
 
-        const response = await genAI.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: prompt,
-          config: flashStructuredConfig,
-        });
+        const response = await withTimeout(
+          () =>
+            genAI.models.generateContent({
+              model: 'gemini-2.5-flash',
+              contents: prompt,
+              config: flashStructuredConfig,
+            }),
+          RESEARCH_TIMEOUT_MS,
+          'vehicle research'
+        );
         const text = response.text || '';
 
         console.log(`[Research Attempt ${attempt + 1}] Response length: ${text.length} chars`);
@@ -351,13 +395,30 @@ export async function generateVehicleDossier(vehicleId: string, vehicleData?: an
         console.log(`[Research Attempt ${attempt + 1}] JSON extracted successfully`);
 
         parsed = VehicleDataSchema.parse(jsonData);
-        console.log(`[Research Attempt ${attempt + 1}] Validation passed`);
+        console.log(
+          `[Research Attempt ${attempt + 1}] Validation passed after ${Date.now() - researchStartedAt}ms`
+        );
       } catch (error) {
         lastError = error;
         console.error(`[Research Attempt ${attempt + 1}] Failed:`, {
           error: error instanceof Error ? error.message : String(error),
           type: error instanceof SyntaxError ? 'JSON_PARSE' : error instanceof z.ZodError ? 'VALIDATION' : 'OTHER'
         });
+
+        /*
+          A timeout ends the loop rather than consuming the remaining attempts.
+
+          Three 30s deadlines plus backoff is 96s of someone watching a
+          spinner, and an upstream that did not answer in 30s is unlikely to
+          answer in the next 30. Retrying a parse or validation failure is
+          worth it — the model may format better on a second pass — but
+          retrying silence is just charging the user for the wait.
+        */
+        if (error instanceof TimeoutError) {
+          console.error('[Research] Timed out; not retrying — see RESEARCH_TIMEOUT_MS');
+          break;
+        }
+
         attempt++;
       }
     }

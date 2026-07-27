@@ -1,4 +1,20 @@
 import { supabase } from './supabase';
+import { withTimeout } from '@crewchief/core/retry';
+
+/*
+  Every outbound call here is bounded.
+
+  This module sits on the onboarding path — `createVehicle` awaits it between
+  the vehicle insert and its return — and its Google Custom Search call had no
+  timeout at all. A slow or unresponsive upstream therefore held the whole
+  first-run experience open with no error and no completion.
+
+  Note the search key is a separate credential from Gemini's, and as of
+  28 Jul the deployed one is expired ("API key expired. Please renew the API
+  key."). That fails fast rather than hanging, so it is not the cause of the
+  hang — but it does mean every vehicle currently gets the fallback image.
+*/
+const SEARCH_TIMEOUT_MS = 5000;
 
 const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1517026575992-5e15ad95f780?q=80&w=2340&auto=format&fit=crop';
 
@@ -63,7 +79,11 @@ async function fetchVehicleImage(year: number, make: string, model: string, colo
     try {
       const url = `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(searchQuery)}&searchType=image&imgSize=xlarge&imgType=photo&fileType=jpg&key=${apiKey}&cx=${searchEngineId}&num=10`;
 
-      const response = await fetch(url);
+      const response = await withTimeout(
+        (signal) => fetch(url, { signal }),
+        SEARCH_TIMEOUT_MS,
+        'vehicle image search'
+      );
       if (!response.ok) continue;
 
       const data = await response.json();
