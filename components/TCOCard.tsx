@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DollarSign, TrendingDown, Fuel, Wrench, ShieldCheck, ChevronRight, ToggleLeft, ToggleRight, Info, SlidersHorizontal } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { calculateTCO } from '@/lib/tco-calculator';
 
 interface TCOCardProps {
   vehicle: any;
@@ -119,17 +120,6 @@ function KPICard({ label, value, sub, accent }: { label: string; value: string; 
   );
 }
 
-function estimateResaleValue(vehicle: any, yearsFromNow = 0): number {
-  const currentYear = new Date().getFullYear();
-  const vehicleAge = currentYear - vehicle.year + yearsFromNow;
-  const purchasePrice = vehicle.purchase_price || 0;
-  if (!purchasePrice) return 0;
-  const depreciationRate = 0.15;
-  const minValueRatio = 0.08;
-  const ratio = Math.max(minValueRatio, Math.pow(1 - depreciationRate, vehicleAge));
-  return purchasePrice * ratio;
-}
-
 export default function TCOCard({ vehicle, vehicleId, onEditInputs }: TCOCardProps) {
   const [totalServiceSpend, setTotalServiceSpend] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -156,46 +146,27 @@ export default function TCOCard({ vehicle, vehicleId, onEditInputs }: TCOCardPro
   }, [loadServiceSpend]);
 
   const purchasePrice = vehicle.purchase_price || 0;
+  const extraYears = whatIfMode === 'keep2' ? 2 : 0;
+
+  // The math lives in lib/tco-calculator.ts so the numbers on this card are
+  // the numbers the tests assert — they were two separate implementations
+  // with two different depreciation models until this was extracted.
+  const {
+    totalFuelCost: activeFuelCost,
+    totalInsurance: activeInsurance,
+    totalServiceSpend: activeServiceSpend,
+    depreciation,
+    resaleValue,
+    netTCO,
+    costPerMile,
+    costPerMonth,
+    monthsOwned: activeMonths,
+    activeMileage,
+  } = calculateTCO(vehicle, totalServiceSpend, extraYears);
+
+  // Read straight off the vehicle for the "we can't price fuel" notice below.
   const avgMpg = vehicle.avg_mpg || 0;
   const fuelPrice = vehicle.fuel_price_per_gallon || 0;
-  const insuranceMonthly = vehicle.insurance_monthly || 0;
-  const currentMileage = vehicle.current_mileage || 0;
-  const monthlyMiles = vehicle.avg_miles_per_month || 500;
-
-  const monthsOwned = vehicle.created_at
-    ? Math.max(1, Math.round((Date.now() - new Date(vehicle.created_at).getTime()) / (1000 * 60 * 60 * 24 * 30)))
-    : 12;
-
-  const totalFuelCost = avgMpg > 0 && fuelPrice > 0
-    ? (currentMileage / avgMpg) * fuelPrice
-    : 0;
-
-  const totalInsurance = insuranceMonthly * monthsOwned;
-
-  const extraYears = whatIfMode === 'keep2' ? 2 : 0;
-  const futureMonths = monthsOwned + extraYears * 12;
-  const futureMileage = currentMileage + extraYears * 12 * monthlyMiles;
-  const futureFuelCost = avgMpg > 0 && fuelPrice > 0
-    ? (futureMileage / avgMpg) * fuelPrice
-    : totalFuelCost;
-  const futureInsurance = insuranceMonthly * futureMonths;
-  const futureServiceSpend = extraYears > 0
-    ? totalServiceSpend + (totalServiceSpend / Math.max(1, monthsOwned)) * extraYears * 12
-    : totalServiceSpend;
-
-  const activeFuelCost = whatIfMode === 'keep2' ? futureFuelCost : totalFuelCost;
-  const activeInsurance = whatIfMode === 'keep2' ? futureInsurance : totalInsurance;
-  const activeServiceSpend = whatIfMode === 'keep2' ? futureServiceSpend : totalServiceSpend;
-  const activeMileage = whatIfMode === 'keep2' ? futureMileage : currentMileage;
-  const activeMonths = whatIfMode === 'keep2' ? futureMonths : monthsOwned;
-
-  const resaleValue = estimateResaleValue(vehicle, extraYears);
-  const depreciation = purchasePrice > 0 ? purchasePrice - resaleValue : 0;
-
-  const totalCost = depreciation + activeServiceSpend + activeFuelCost + activeInsurance;
-  const netTCO = Math.max(0, totalCost);
-  const costPerMile = activeMileage > 0 && netTCO > 0 ? netTCO / activeMileage : 0;
-  const costPerMonth = activeMonths > 0 ? netTCO / activeMonths : 0;
 
   const hasEnoughData = purchasePrice > 0;
 
