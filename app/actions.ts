@@ -194,7 +194,10 @@ export async function createVehicle(vehicleData: {
   avg_miles_per_month: number;
   performance_mindedness: 'stock' | 'mild' | 'aggressive';
   driving_style: string;
-  user_id?: string;
+  // No user_id. Ownership comes from the session below and never from the
+  // caller — a client-supplied user_id on a server action reads as
+  // authoritative even when the body ignores it, which is one careless edit
+  // away from being trusted.
 }) {
   logger.info('VEHICLE:CREATE_START', 'Creating new vehicle', {
     make: vehicleData.make,
