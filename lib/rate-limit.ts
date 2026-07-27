@@ -1,5 +1,5 @@
 import { getServiceRoleClient } from './supabase';
-import { logger } from './logger';
+import { logger } from '@crewchief/core/logger';
 
 export type RateLimitTier = 'ai' | 'upload' | 'default';
 

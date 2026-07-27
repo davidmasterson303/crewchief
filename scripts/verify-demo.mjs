@@ -261,9 +261,67 @@ async function checkVehicleImages(supabaseUrl, key) {
   }
 }
 
+/*
+ * The API routes an anonymous visitor's browser actually calls.
+ *
+ * This check exists because /api/v1/load-vehicle returned
+ * 500 "Invalid API key" on both deployed projects and nothing noticed. The
+ * route reached for the service-role client even on a demo vehicle, the
+ * deployed service-role key is rejected, and the only thing that would have
+ * called the route — hooks/useVehicle.ts — has no consumers. A broken endpoint
+ * with no caller is invisible to every gate that looks at pages.
+ *
+ * Same reasoning as checkAiCredential above: a 200 on the page proves the page
+ * renders, not that the data path behind it works.
+ *
+ * Only demo-readable routes belong here. /api/v1/load-maintenance-data is
+ * deliberately absent — the `anon` role is refused SELECT on all four tables
+ * it reads, so it cannot serve an anonymous visitor by design, and asserting
+ * it would be asserting something the demo does not depend on.
+ */
+async function checkDemoApiRoutes() {
+  console.log('\nAPI routes the demo depends on');
+
+  const checks = [
+    {
+      label: '/api/v1/load-vehicle',
+      path: `/api/v1/load-vehicle?vehicleId=${DEMO_VEHICLE_ID}`,
+      // The demo Accord. Proves it returned the vehicle, not merely a 200.
+      mustContain: 'Accord',
+    },
+  ];
+
+  for (const check of checks) {
+    try {
+      const res = await fetch(`${base}${check.path}`);
+      const body = await res.text();
+
+      if (!res.ok) {
+        // Surface the real message — "Invalid API key" is the whole story.
+        let detail = body.slice(0, 120);
+        try {
+          detail = JSON.parse(body).error ?? detail;
+        } catch {}
+        fail(`${check.label} returned HTTP ${res.status} — ${detail}`);
+        continue;
+      }
+
+      if (!body.includes(check.mustContain)) {
+        fail(`${check.label} returned 200 but without ${check.mustContain}`);
+        continue;
+      }
+
+      pass(`${check.label} — served the demo vehicle anonymously`);
+    } catch (error) {
+      fail(`${check.label} — request failed: ${error.message}`);
+    }
+  }
+}
+
 console.log(`\nVerifying demo at ${base}`);
 await checkPages();
 await checkAiCredential();
+await checkDemoApiRoutes();
 await checkAnonData();
 
 console.log('\n' + '─'.repeat(60));

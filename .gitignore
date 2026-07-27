@@ -25,8 +25,14 @@ yarn-debug.log*
 yarn-error.log*
 
 # local env files
-.env
-.env*.local
+#
+# Catch-all with one exception, rather than naming variants. `.env` and
+# `.env*.local` were listed individually, which let `.env.backup-<timestamp>`
+# through — the file crewchief-fix-key.command writes when it swaps a key. A
+# `git add -A` then swept it into a commit and GitHub push protection caught
+# the Supabase secret key and a GCP key in it. Nothing reached the remote.
+.env*
+!.env.example
 
 # vercel
 .vercel

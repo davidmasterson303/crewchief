@@ -12,7 +12,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { createBrowserSupabaseClient } from '@/lib/supabase';
-import { queryClient } from '@/lib/query-client';
+import { queryClient } from '@crewchief/core/query-client';
+import { signOutAndClearCache } from '@/lib/sign-out';
 import { toast } from 'sonner';
 
 /**
@@ -23,10 +24,9 @@ import { toast } from 'sonner';
  * and Apple's wording points at account settings specifically. A settings
  * page nothing links to would not have satisfied it.
  *
- * Sign-out clears the TanStack Query cache as well as the Supabase session.
- * Without that, cached vehicle and dashboard data survives in memory and the
- * next account to sign in on the same browser tab briefly sees the previous
- * user's garage before refetching.
+ * Sign-out clears the TanStack Query cache as well as the Supabase session —
+ * see `lib/sign-out.ts` for why that is a privacy boundary and not tidiness.
+ * Both sign-out paths go through that one helper so neither can drift.
  */
 export function AccountMenu() {
   const router = useRouter();
@@ -36,16 +36,9 @@ export function AccountMenu() {
     if (signingOut) return;
     setSigningOut(true);
 
-    try {
-      await createBrowserSupabaseClient().auth.signOut();
-    } catch {
-      // Sign out locally regardless — a failed round trip should not strand
-      // someone in a session they have asked to leave.
-    }
-
     // Order matters: drop cached data before navigating, so nothing renders
     // another account's vehicles in the gap.
-    queryClient.clear();
+    await signOutAndClearCache(createBrowserSupabaseClient(), queryClient);
 
     toast.success('Signed out');
     router.push('/login');

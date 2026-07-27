@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Upload, Loader as Loader2, FileText, Camera, X } from 'lucide-react';
-import { invalidateDashboardCache } from '@/lib/query-invalidation';
+import { invalidateDashboardCache } from '@crewchief/core/query-invalidation';
 
 interface DocumentUploadProps {
   vehicleId: string;
@@ -53,7 +53,7 @@ export default function DocumentUpload({ vehicleId }: DocumentUploadProps) {
         formData.append('file', file);
         formData.append('vehicleId', vehicleId);
 
-        const response = await fetch('/api/upload-document', {
+        const response = await fetch('/api/v1/upload-document', {
           method: 'POST',
           body: formData,
         });

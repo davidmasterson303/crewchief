@@ -19,7 +19,7 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
-import { logger } from '@/lib/logger';
+import { logger } from '@crewchief/core/logger';
 
 interface Props {
   children: ReactNode;

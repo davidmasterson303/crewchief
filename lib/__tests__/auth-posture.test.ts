@@ -86,17 +86,17 @@ function exportedActions(source: string): Fn[] {
  *   'public'         — deliberately unauthenticated; justify in the comment
  */
 const ROUTE_POSTURE: Record<string, 'vehicle-scoped' | 'session' | 'public'> = {
-  'app/api/vehicles/route.ts': 'session',
-  'app/api/load-vehicle/route.ts': 'vehicle-scoped',
-  'app/api/load-maintenance-data/route.ts': 'vehicle-scoped',
-  'app/api/wishlist/route.ts': 'vehicle-scoped',
-  'app/api/wishlist/check/route.ts': 'vehicle-scoped',
-  'app/api/wishlist/complete/route.ts': 'vehicle-scoped',
-  'app/api/performance-stats/route.ts': 'vehicle-scoped',
-  'app/api/delete-maintenance-item/route.ts': 'vehicle-scoped',
+  'app/api/v1/vehicles/route.ts': 'session',
+  'app/api/v1/load-vehicle/route.ts': 'vehicle-scoped',
+  'app/api/v1/load-maintenance-data/route.ts': 'vehicle-scoped',
+  'app/api/v1/wishlist/route.ts': 'vehicle-scoped',
+  'app/api/v1/wishlist/check/route.ts': 'vehicle-scoped',
+  'app/api/v1/wishlist/complete/route.ts': 'vehicle-scoped',
+  'app/api/v1/performance-stats/route.ts': 'vehicle-scoped',
+  'app/api/v1/delete-maintenance-item/route.ts': 'vehicle-scoped',
   // Both delegate to server actions in app/actions.ts, which authorize there.
-  'app/api/upload-document/route.ts': 'vehicle-scoped',
-  'app/api/consultant/upload-document/route.ts': 'vehicle-scoped',
+  'app/api/v1/upload-document/route.ts': 'vehicle-scoped',
+  'app/api/v1/consultant/upload-document/route.ts': 'vehicle-scoped',
   /*
     Returns the commit SHA this deployment was built from — a public repo's
     public commit id, and nothing else. No database, no session, no service

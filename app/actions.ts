@@ -2,19 +2,19 @@
 
 import { supabase, getServiceRoleClient, createServerActionClient, getServerClient } from '@/lib/supabase';
 import { genAI, flashStructuredConfig, flashConfig } from '@/lib/gemini';
-import { VEHICLE_RESEARCH_PROMPT, POWERTRAIN_OPTIONS_PROMPT, CONSULTANT_SYSTEM_PROMPT, CONSULTANT_DOCUMENT_VALIDATION_PROMPT } from '@/lib/prompts';
+import { VEHICLE_RESEARCH_PROMPT, POWERTRAIN_OPTIONS_PROMPT, CONSULTANT_SYSTEM_PROMPT, CONSULTANT_DOCUMENT_VALIDATION_PROMPT } from '@crewchief/core/prompts';
 import { getVehicleImage } from '@/lib/vehicle-images';
-import { logger } from '@/lib/logger';
+import { logger } from '@crewchief/core/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { authorizeVehicleAccess, authorizeVehicleScopedRow, requireSession } from '@/lib/api-auth';
-import { isDemoVehicleId } from '@/lib/demo';
-import { vehicleStoragePath, vehicleIdFromStoragePath } from '@/lib/storage-paths';
-import { parseWishlistCommands, parsePerformanceCommands, parseStatusCommands, parseInvoiceFlag } from '@/lib/consultant-commands';
-import { validateData, vehicleIdSchema, serviceItemSchema, maintenanceLineItemSchema, quoteRequestSchema } from '@/lib/validation';
-import { withRetry } from '@/lib/retry';
-import type { Vehicle, ServiceItem, MaintenanceLineItem, KnowledgeBase, ApiResponse, ConsultantContext } from '@/lib/types';
+import { isDemoVehicleId } from '@crewchief/core/demo';
+import { vehicleStoragePath, vehicleIdFromStoragePath } from '@crewchief/core/storage-paths';
+import { parseWishlistCommands, parsePerformanceCommands, parseStatusCommands, parseInvoiceFlag } from '@crewchief/core/consultant-commands';
+import { validateData, vehicleIdSchema, serviceItemSchema, maintenanceLineItemSchema, quoteRequestSchema } from '@crewchief/core/validation';
+import { withRetry } from '@crewchief/core/retry';
+import type { Vehicle, ServiceItem, MaintenanceLineItem, KnowledgeBase, ApiResponse, ConsultantContext } from '@crewchief/core/types';
 import { z } from 'zod';
-import { FLASH_MODEL, PRO_MODEL, FLASH_VISION_MODEL } from '@/lib/ai/models';
+import { FLASH_MODEL, PRO_MODEL, FLASH_VISION_MODEL } from '@crewchief/core/ai/models';
 
 import {
   addItemToWishlist as _addItemToWishlist,
@@ -194,7 +194,10 @@ export async function createVehicle(vehicleData: {
   avg_miles_per_month: number;
   performance_mindedness: 'stock' | 'mild' | 'aggressive';
   driving_style: string;
-  user_id?: string;
+  // No user_id. Ownership comes from the session below and never from the
+  // caller — a client-supplied user_id on a server action reads as
+  // authoritative even when the body ignores it, which is one careless edit
+  // away from being trusted.
 }) {
   logger.info('VEHICLE:CREATE_START', 'Creating new vehicle', {
     make: vehicleData.make,

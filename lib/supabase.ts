@@ -86,6 +86,39 @@ export function createServerActionClient() {
   );
 }
 
+/**
+ * A client that acts as the holder of `accessToken`.
+ *
+ * Phase 2 task 2.1. The web app authenticates with cookies; a native client
+ * has no cookie jar and sends `Authorization: Bearer <jwt>` instead. Passing
+ * the token as a global header means PostgREST applies **the same RLS
+ * policies** to this client as to a cookie session — it is a different way to
+ * present the same identity, not a different level of trust.
+ *
+ * Not a privileged client. It is exactly as capable as the user it belongs to,
+ * which is the entire point: bearer support must not become a second, quieter
+ * route to data a cookie session could not reach.
+ */
+export function createBearerClient(accessToken: string): SupabaseClient {
+  const url = supabaseUrl;
+  const key = supabaseAnonKey;
+
+  if (!url || !key) {
+    throw new Error(
+      'Missing Supabase config. Set NEXT_PUBLIC_SUPABASE_URL and either ' +
+        'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY or NEXT_PUBLIC_SUPABASE_ANON_KEY.'
+    );
+  }
+
+  return createClient(url, key, {
+    global: { headers: { Authorization: `Bearer ${accessToken}` } },
+    // Stateless by construction: one request, one token, nothing persisted and
+    // nothing refreshed. A server-side client that cached a session would leak
+    // it into the next request on the same warm instance.
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
 export function getServerClient() {
   const url = supabaseUrl;
   const key = supabaseAnonKey;

@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { Droplets, Wind, RotateCcw, Zap, Thermometer, Settings, ShieldCheck, Clock, TriangleAlert as AlertTriangle, CircleCheck as CheckCircle, Layers, ChevronRight, ChevronDown, Link as LinkIcon } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { syncCategoryFromHistory } from '@/lib/maintenance-sync';
+import { syncCategoryFromHistory } from '@crewchief/core/maintenance-sync';
 import { LogServiceModal } from '@/components/LogServiceModal';
 
 interface UpcomingMaintenanceProps {

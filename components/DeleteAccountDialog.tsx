@@ -16,6 +16,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { deleteAccount } from '@/app/account-actions';
 import { createBrowserSupabaseClient } from '@/lib/supabase';
+import { queryClient } from '@crewchief/core/query-client';
+import { signOutAndClearCache } from '@/lib/sign-out';
 import { toast } from 'sonner';
 
 const CONFIRM_PHRASE = 'DELETE';
@@ -63,12 +65,12 @@ export function DeleteAccountDialog({
     }
 
     // The auth user is gone, so the cookie now references nothing. Clear it
-    // locally too, otherwise the browser keeps a session for a dead account.
-    try {
-      await createBrowserSupabaseClient().auth.signOut();
-    } catch {
-      // Already invalid server-side; nothing to recover here.
-    }
+    // locally too, otherwise the browser keeps a session for a dead account —
+    // and clear the query cache with it. This is the path where a cache leak
+    // is least defensible: the user's stated intent was that the data cease to
+    // exist, and rows deleted server-side while their cached copies sit in
+    // this tab is the opposite of that.
+    await signOutAndClearCache(createBrowserSupabaseClient(), queryClient);
 
     // Apple requires confirmation that deletion actually happened.
     toast.success('Your account and all its data have been deleted.');

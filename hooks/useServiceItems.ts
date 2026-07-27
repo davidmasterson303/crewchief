@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getClientSupabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { logger } from '@/lib/logger';
-import { queryClient as singletonQueryClient } from '@/lib/query-client';
+import { logger } from '@crewchief/core/logger';
+import { queryClient as singletonQueryClient } from '@crewchief/core/query-client';
 
 export function useServiceItems(vehicleId: string | null | undefined) {
   return useQuery({

@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { FileText, Receipt, Image, FileIcon, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
-import type { ConsultantDocument, InvoiceLineItem } from '@/lib/types';
+import type { ConsultantDocument, InvoiceLineItem } from '@crewchief/core/types';
 import { getClientSupabase } from '@/lib/supabase';
 
 interface DocumentLibraryProps {

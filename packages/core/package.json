@@ -1,0 +1,11 @@
+{
+  "name": "@crewchief/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Logic shared by the web app and the mobile client. No Next, no Supabase, no Node built-ins.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

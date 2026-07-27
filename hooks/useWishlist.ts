@@ -2,8 +2,8 @@ import { useState, useCallback, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { addIssueToWishlist, addMaintenanceItemToWishlist, addModificationToWishlist, removeFromWishlist } from '@/app/actions';
 import { toast } from 'sonner';
-import { invalidateDashboardCache } from '@/lib/query-invalidation';
-import { isDemoVehicleId } from '@/lib/demo';
+import { invalidateDashboardCache } from '@crewchief/core/query-invalidation';
+import { isDemoVehicleId } from '@crewchief/core/demo';
 
 type ItemType = 'issue' | 'maintenance' | 'modification';
 

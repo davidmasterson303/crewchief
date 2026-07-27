@@ -1,11 +1,26 @@
 /**
- * Test Suite 3: RLS Ownership Verification
+ * Ownership rules, as a model. **This suite does not test RLS.**
  *
- * Verifies that the application-layer ownership check logic (mirroring the
- * RLS user_owns_vehicle() function) correctly prevents cross-user data access.
+ * It was called "RLS Ownership Verification", which it is not and has never
+ * been. Everything below runs against `mockVehicleDb` and the
+ * `userOwnsVehicle` / `simulate*` helpers defined in this file — a hand-written
+ * restatement of the intended rules. No policy, no database, and no route
+ * handler is exercised. Renamed because the old title made this the second
+ * appearance of the pattern `middleware.ts` warns about in its own header
+ * comment: 11 green tests in `security.test.ts` asserting protection the
+ * exported middleware did not have.
  *
- * These tests simulate the ownership enforcement added to API routes such as
- * /api/load-vehicle and /api/load-maintenance-data.
+ * That is not idle: the `vehicles` table's own policies are
+ * `USING (true)` for SELECT, INSERT, UPDATE and DELETE as of migration
+ * `20260103030740`, and nothing replaces them. The simulation below has been
+ * green that entire time. See
+ * `supabase/migrations/20260727150000_scope_vehicles_rls_to_owner.sql`.
+ *
+ * The model is still worth keeping — it is a readable statement of what the
+ * rules are supposed to be, and `lib/__tests__/api-auth.test.ts` covers the
+ * layer that really enforces them for API routes. What it cannot tell you is
+ * whether the database agrees, and the browser client talks to the database
+ * directly (`hooks/useVehicles.ts`, `components/VehicleCard.tsx`).
  */
 
 const USER_A_ID = 'user-a-00000000-0000-0000-0000-000000000001';
@@ -80,7 +95,7 @@ function simulateGetAllVehicles(authenticatedUserId: string | null): {
   return { status: 200, vehicles: userVehicles };
 }
 
-describe('RLS Ownership: Cross-User Isolation', () => {
+describe('Ownership model (simulation — not RLS, not the real routes)', () => {
   describe('simulateLoadVehicle: ownership enforcement', () => {
     it('allows User A to load their own vehicle', () => {
       const result = simulateLoadVehicle('vehicle-a1', USER_A_ID);

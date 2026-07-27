@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Zap, Gauge, Rocket } from 'lucide-react';
 import { updatePerformanceGoal } from '@/app/actions';
 import { toast } from 'sonner';
-import { invalidateDashboardCache } from '@/lib/query-invalidation';
+import { invalidateDashboardCache } from '@crewchief/core/query-invalidation';
 
 interface PerformanceGoalSelectorProps {
   vehicleId: string;

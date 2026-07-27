@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader as Loader2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
-import { logger } from '@/lib/logger';
+import { logger } from '@crewchief/core/logger';
 
 interface WishlistItem {
   id: string;
@@ -58,7 +58,7 @@ export function MarkCompleteDialog({
     try {
       setLoading(true);
 
-      const response = await fetch('/api/wishlist/complete', {
+      const response = await fetch('/api/v1/wishlist/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
-import { isDemoVehicleId } from '@/lib/demo';
+import { resolveRoute } from '@crewchief/core/routes';
+import { corsHeadersFor, isVersionedApiPath } from '@crewchief/core/cors';
 
 /**
  * Route protection.
@@ -14,73 +15,21 @@ import { isDemoVehicleId } from '@/lib/demo';
  * Before this, `security.test.ts` tested a private copy of this logic while the
  * exported middleware was a no-op with an empty matcher — 11 green tests
  * asserting protection the app did not actually have.
- */
-
-export const PROTECTED_ROUTES = [
-  '/garage',
-  '/dashboard',
-  '/consultant',
-  '/documents',
-  '/vehicle-info',
-  '/onboard',
-  '/settings',
-] as const;
-
-/** Pages a signed-in user has no reason to see. */
-export const AUTH_ROUTES = ['/login', '/signup'] as const;
-
-/**
- * Vehicle-detail routes are `/<section>/<vehicleId>`. When that id is one of
- * the seeded demo vehicles the page is public — the whole point of the demo
- * is browsing it without an account.
  *
- * Missing this took the demo down: an anonymous visitor clicking a car on
- * /demo was redirected to /login. The demo is a live portfolio piece, so any
- * change to PROTECTED_ROUTES must keep this path open.
+ * That policy now lives in `@crewchief/core/routes` so `components/AuthProvider.tsx`
+ * can share it — a client component cannot import this module, which pulls in
+ * `next/server`. It is re-exported below rather than duplicated, because a
+ * private copy of this logic is the exact bug described above.
  */
-export function isPublicDemoPath(pathname: string): boolean {
-  const [, section, id] = pathname.split('/');
-  if (!section || !id) return false;
-  return isDemoVehicleId(id);
-}
 
-export function isProtectedRoute(pathname: string): boolean {
-  if (isPublicDemoPath(pathname)) return false;
-  return PROTECTED_ROUTES.some(
-    (route) => pathname === route || pathname.startsWith(route + '/')
-  );
-}
-
-export type RouteDecision =
-  | { type: 'redirect'; location: string }
-  | { type: 'next' };
-
-/**
- * Pure routing policy. Given a path and whether the caller is authenticated,
- * decide where they go. No Supabase, no network, no side effects.
- */
-export function resolveRoute({
-  pathname,
-  isAuthenticated,
-  requestUrl,
-}: {
-  pathname: string;
-  isAuthenticated: boolean;
-  requestUrl: string;
-}): RouteDecision {
-  if (isProtectedRoute(pathname) && !isAuthenticated) {
-    const loginUrl = new URL('/login', requestUrl);
-    // Preserve where they were headed so login can send them back.
-    loginUrl.searchParams.set('redirect', pathname);
-    return { type: 'redirect', location: loginUrl.toString() };
-  }
-
-  if (AUTH_ROUTES.includes(pathname as (typeof AUTH_ROUTES)[number]) && isAuthenticated) {
-    return { type: 'redirect', location: new URL('/garage', requestUrl).toString() };
-  }
-
-  return { type: 'next' };
-}
+export {
+  PROTECTED_ROUTES,
+  AUTH_ROUTES,
+  isPublicDemoPath,
+  isProtectedRoute,
+  resolveRoute,
+  type RouteDecision,
+} from '@crewchief/core/routes';
 
 function readSupabaseConfig(): { url: string; key: string } | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -92,8 +41,72 @@ function readSupabaseConfig(): { url: string; key: string } | null {
   return url && key ? { url, key } : null;
 }
 
+/**
+ * Cross-origin handling for `/api/v1/*`, task 2.3.
+ *
+ * Runs before any session work and returns unconditionally, so adding the API
+ * to the matcher does not put a `getUser()` network round trip in front of
+ * every API request — which is the reason the matcher below is scoped in the
+ * first place.
+ *
+ * Requests without an `Origin`, and origins that are not allowlisted, get no
+ * CORS headers at all. For the first that is correct because they are
+ * same-origin or not a browser; for the second, omitting
+ * `Access-Control-Allow-Origin` *is* the refusal — there is no deny header.
+ *
+ * This grants nothing. Every route stays protected by `lib/api-auth.ts`
+ * whatever origin it was called from.
+ */
+function handleApiCors(request: NextRequest): NextResponse {
+  const headers = corsHeadersFor(request.headers.get('origin'));
+
+  // Preflight is answered here and never reaches the route.
+  if (request.method === 'OPTIONS') {
+    // 204 with no CORS headers for an unlisted origin: the browser will refuse
+    // the real request, which is the intended outcome.
+    return new NextResponse(null, { status: 204, headers: headers ?? undefined });
+  }
+
+  const response = NextResponse.next({ request });
+  if (headers) {
+    for (const [key, value] of Object.entries(headers)) {
+      /*
+        KNOWN LIMITATION — `Vary: Origin` does not survive on this response.
+
+        Next attaches its own Vary list (RSC, Next-Router-State-Tree, …) after
+        middleware returns, and it replaces whatever is here. Measured on
+        Next 13.5.1: neither `set` nor `append` sticks. The preflight above
+        does carry `Vary: Origin`, because that response is constructed here
+        and never passes through the router.
+
+        Why it is acceptable rather than fixed: these responses embed a
+        specific Access-Control-Allow-Origin, so in principle a shared cache
+        that did not know they vary by Origin could serve one origin's
+        response to another. In practice the routes are `force-dynamic` and
+        the deployment returns `cache-control: no-cache` on them, so no shared
+        cache may reuse a response without revalidating.
+
+        `append` is kept rather than `set` so this starts working on its own if
+        Next stops overwriting. Do not read the header on a passthrough
+        response and conclude it is configured — it is not.
+      */
+      if (key === 'Vary') response.headers.append(key, value);
+      else response.headers.set(key, value);
+    }
+  }
+  return response;
+}
+
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+
+  // Before the session work, and before anything else: the API surface is not
+  // route-protected here (lib/api-auth.ts owns that) and must not pay for a
+  // session lookup it does not use.
+  if (isVersionedApiPath(pathname)) {
+    return handleApiCors(request);
+  }
+
   const supabaseConfig = readSupabaseConfig();
 
   // No config means no way to verify a session. Fail closed: treat the caller
@@ -151,6 +164,12 @@ export const config = {
   // Scoped deliberately. A catch-all matcher would fire a getUser() network
   // call on every asset and public page, including the anonymous demo.
   matcher: [
+    // CORS only — handleApiCors returns before any session lookup, so this
+    // adds no getUser() call. Deliberately /api/v1 and not /api: the
+    // unversioned /api/version and /api/health/ai are read by release tooling
+    // rather than browsers, and putting the deploy path through middleware
+    // would be cost with no benefit.
+    '/api/v1/:path*',
     '/garage/:path*',
     '/dashboard/:path*',
     '/consultant/:path*',

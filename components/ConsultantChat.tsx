@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Loader as Loader2, Send, Plus, Search, MessageSquare, Paperclip, X, FileText, ExternalLink, Heart, Check, Wrench, TriangleAlert, Sparkles, PanelLeft, Copy } from 'lucide-react';
-import { logger } from '@/lib/logger';
-import { isDemoMode, isDemoVehicleId } from '@/lib/demo';
-import { wishlistItemIdentifier } from '@/lib/wishlist-identifier';
+import { logger } from '@crewchief/core/logger';
+import { isDemoVehicleId } from '@crewchief/core/demo';
+import { isDemoMode } from '@/lib/demo-mode';
+import { wishlistItemIdentifier } from '@crewchief/core/wishlist-identifier';
 import {
   sendConsultantMessage,
   createConsultantSession,
@@ -17,7 +18,7 @@ import {
   getConsultantSessions,
 } from '@/app/actions';
 import { toast } from 'sonner';
-import { invalidateDashboardCache } from '@/lib/query-invalidation';
+import { invalidateDashboardCache } from '@crewchief/core/query-invalidation';
 
 interface ConsultantChatProps {
   vehicleId: string;
@@ -315,7 +316,7 @@ export default function ConsultantChat({
     if (addedWishlistItems.has(key)) return;
     setAddingWishlistItem(key);
     try {
-      const response = await fetch('/api/wishlist', {
+      const response = await fetch('/api/v1/wishlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -401,7 +402,7 @@ export default function ConsultantChat({
         formData.append('vehicleId', vehicleId);
         formData.append('sessionId', sessionId);
 
-        const response = await fetch('/api/consultant/upload-document', {
+        const response = await fetch('/api/v1/consultant/upload-document', {
           method: 'POST',
           body: formData,
         });

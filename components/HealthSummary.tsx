@@ -16,7 +16,7 @@ import {
 import { generateVehicleHealthSummary } from '@/app/actions';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
-import { invalidateDashboardCache } from '@/lib/query-invalidation';
+import { invalidateDashboardCache } from '@crewchief/core/query-invalidation';
 import RecallHistoryModal from './RecallHistoryModal';
 import { useCountUp } from '@/hooks/use-count-up';
 import { useHealthBand, getHealthBand } from '@/hooks/use-health-band';

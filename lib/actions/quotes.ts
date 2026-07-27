@@ -2,9 +2,9 @@
 
 import { getServiceRoleClient } from '@/lib/supabase';
 import { genAI } from '@/lib/gemini';
-import { logger } from '@/lib/logger';
-import { withRetry } from '@/lib/retry';
-import { FLASH_MODEL } from '@/lib/ai/models';
+import { logger } from '@crewchief/core/logger';
+import { withRetry } from '@crewchief/core/retry';
+import { FLASH_MODEL } from '@crewchief/core/ai/models';
 
 interface CostEstimateItem {
   description: string;

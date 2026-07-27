@@ -1,7 +1,7 @@
 'use client';
 
 import { AlertCircle } from 'lucide-react';
-import { calculateMileageUpdateStatus, formatMileagePromptMessage } from '@/lib/mileage-tracking';
+import { calculateMileageUpdateStatus, formatMileagePromptMessage } from '@crewchief/core/mileage-tracking';
 
 interface MileageUpdatePromptProps {
   vehicle: {

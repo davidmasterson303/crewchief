@@ -14,7 +14,9 @@ import {
   vehicleStoragePath,
   vehicleIdFromStoragePath,
   vehicleStoragePrefixes,
-} from '@/lib/storage-paths';
+} from '@crewchief/core/storage-paths';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const VEHICLE = 'd4e8b2a1-0000-4000-8000-000000000abc';
 
@@ -75,5 +77,40 @@ describe('deletion sweep still reaches legacy objects', () => {
     expect(prefixes).toContain(VEHICLE);
     expect(prefixes).toContain(`vehicle-photos/${VEHICLE}`);
     expect(prefixes).toContain(`consultant-docs/${VEHICLE}`);
+  });
+});
+
+describe('every upload writes a path the deletion sweep can find', () => {
+  /*
+    The invariant the whole deletion guarantee rests on.
+
+    `uploadInvoiceForCompletion` used to write `invoices/{file}` — no vehicle,
+    no user, nothing to attribute it to — so those objects could not be purged
+    with an account. Task 0.3 moved all four upload sites onto
+    `vehicleStoragePath`, and `deleteAccount` no longer carries a caveat about
+    it. That caveat's absence is only honest while this stays true.
+
+    A new `.upload()` that builds its own path is exactly how the hole
+    reopens, and it would be invisible: uploads would work, deletion would
+    report success, and the blobs would simply stay.
+  */
+  const SOURCE_FILES = ['app/actions.ts'];
+
+  it.each(SOURCE_FILES)('%s builds every upload path with vehicleStoragePath', (rel) => {
+    const source = readFileSync(join(__dirname, '..', '..', rel), 'utf8');
+
+    const uploadCalls = (source.match(/\.upload\(/g) ?? []).length;
+    const builtPaths = (source.match(/vehicleStoragePath\(/g) ?? []).length;
+
+    expect(uploadCalls).toBeGreaterThan(0);
+    expect(builtPaths).toBeGreaterThanOrEqual(uploadCalls);
+  });
+
+  it('no source file uploads to a hand-written top-level folder', () => {
+    // The specific shapes that broke it: a string literal prefix where a
+    // vehicle id belongs.
+    const source = readFileSync(join(__dirname, '..', '..', 'app/actions.ts'), 'utf8');
+
+    expect(source).not.toMatch(/\.upload\(\s*[`'"](?:invoices|vehicle-photos|consultant-docs)\//);
   });
 });

@@ -1,8 +1,8 @@
 'use server';
 
 import { getServiceRoleClient } from '@/lib/supabase';
-import { logger } from '@/lib/logger';
-import { wishlistItemIdentifier } from '@/lib/wishlist-identifier';
+import { logger } from '@crewchief/core/logger';
+import { wishlistItemIdentifier } from '@crewchief/core/wishlist-identifier';
 
 type WishlistItemType = 'issue' | 'maintenance' | 'modification';
 

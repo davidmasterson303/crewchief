@@ -16,7 +16,7 @@
  * the two must not drift.
  */
 
-import { wishlistItemIdentifier } from '@/lib/wishlist-identifier';
+import { wishlistItemIdentifier } from '@crewchief/core/wishlist-identifier';
 
 describe('the same item always gets the same identifier', () => {
   // The exact failure David reported: added from the dossier, then from the

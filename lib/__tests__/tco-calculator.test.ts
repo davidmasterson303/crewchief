@@ -1,92 +1,35 @@
 /**
- * Test Suite 2: TCO Calculator Math
+ * TCO math — against the shipped implementation.
  *
- * Verifies that the TCO calculation logic produces correct outputs given
- * a known mock vehicle dataset. Tests the core math extracted from TCOCard.
+ * @jest-environment node
+ *
+ * This suite had **no imports**. It defined its own `estimateResaleValue` and
+ * `calculateTCO` at the top of the file and tested those, while the real math
+ * shipped from inside `components/TCOCard.tsx`. Its own header said it covered
+ * "the core math extracted from TCOCard" — extracted meaning copied.
+ *
+ * The copies diverged. The aggregation stayed identical line for line, but the
+ * depreciation model became a different model entirely: a lookup table here
+ * (0.80 at one year, 0.20 floor) against exponential decay there (0.85^age,
+ * 0.08 floor). So every green assertion below was computed on a resale curve
+ * the product never used.
+ *
+ * Third instance of the pattern in this repo, after `security.test.ts` testing
+ * a private `runMiddlewareLogic()` against a no-op middleware, and
+ * `rls-ownership.test.ts` testing a `mockVehicleDb` simulation. The fix is the
+ * same each time: one implementation, imported.
+ *
+ * Most of the assertions here were also self-referential — `expect(depreciation)
+ * .toBe(40000 - result.resaleValue)` restates the implementation and passes
+ * against any curve at all. That is why the divergence was survivable for so
+ * long. The `the shipped depreciation curve` block at the end exists to fix
+ * that: it pins actual numbers, so a change to the model has to be deliberate.
  */
 
-interface VehicleInput {
-  purchase_price?: number;
-  avg_mpg?: number;
-  fuel_price_per_gallon?: number;
-  insurance_monthly?: number;
-  current_mileage?: number;
-  avg_miles_per_month?: number;
-  year?: number;
-  created_at?: string;
-}
-
-function estimateResaleValue(vehicle: VehicleInput, extraYears = 0): number {
-  const purchasePrice = vehicle.purchase_price || 0;
-  if (!purchasePrice) return 0;
-
-  const currentYear = new Date().getFullYear();
-  const vehicleYear = vehicle.year || currentYear;
-  const vehicleAge = currentYear - vehicleYear + extraYears;
-
-  const depreciationTable: Record<number, number> = {
-    0: 1.0, 1: 0.8, 2: 0.68, 3: 0.58, 4: 0.5,
-    5: 0.44, 6: 0.38, 7: 0.33, 8: 0.29, 9: 0.25,
-  };
-
-  const ratio = vehicleAge >= 10 ? 0.2 : (depreciationTable[vehicleAge] ?? 0.2);
-  return purchasePrice * ratio;
-}
-
-function calculateTCO(vehicle: VehicleInput, totalServiceSpend: number, extraYears = 0) {
-  const purchasePrice = vehicle.purchase_price || 0;
-  const avgMpg = vehicle.avg_mpg || 0;
-  const fuelPrice = vehicle.fuel_price_per_gallon || 0;
-  const insuranceMonthly = vehicle.insurance_monthly || 0;
-  const currentMileage = vehicle.current_mileage || 0;
-  const monthlyMiles = vehicle.avg_miles_per_month || 500;
-
-  const monthsOwned = vehicle.created_at
-    ? Math.max(1, Math.round((Date.now() - new Date(vehicle.created_at).getTime()) / (1000 * 60 * 60 * 24 * 30)))
-    : 12;
-
-  const futureMonths = monthsOwned + extraYears * 12;
-  const futureMileage = currentMileage + extraYears * 12 * monthlyMiles;
-
-  const activeMileage = extraYears > 0 ? futureMileage : currentMileage;
-  const activeMonths = extraYears > 0 ? futureMonths : monthsOwned;
-
-  const totalFuelCost = avgMpg > 0 && fuelPrice > 0 ? (currentMileage / avgMpg) * fuelPrice : 0;
-  const futureFuelCost = avgMpg > 0 && fuelPrice > 0 ? (futureMileage / avgMpg) * fuelPrice : totalFuelCost;
-  const activeFuelCost = extraYears > 0 ? futureFuelCost : totalFuelCost;
-
-  const totalInsurance = insuranceMonthly * monthsOwned;
-  const futureInsurance = insuranceMonthly * futureMonths;
-  const activeInsurance = extraYears > 0 ? futureInsurance : totalInsurance;
-
-  const futureServiceSpend = extraYears > 0
-    ? totalServiceSpend + (totalServiceSpend / Math.max(1, monthsOwned)) * extraYears * 12
-    : totalServiceSpend;
-  const activeServiceSpend = extraYears > 0 ? futureServiceSpend : totalServiceSpend;
-
-  const resaleValue = estimateResaleValue(vehicle, extraYears);
-  const depreciation = purchasePrice > 0 ? purchasePrice - resaleValue : 0;
-
-  const totalCost = depreciation + activeServiceSpend + activeFuelCost + activeInsurance;
-  const netTCO = Math.max(0, totalCost);
-  const costPerMile = activeMileage > 0 && netTCO > 0 ? netTCO / activeMileage : 0;
-  const costPerMonth = activeMonths > 0 ? netTCO / activeMonths : 0;
-
-  return {
-    totalFuelCost: activeFuelCost,
-    totalInsurance: activeInsurance,
-    depreciation,
-    resaleValue,
-    netTCO,
-    costPerMile,
-    costPerMonth,
-    monthsOwned: activeMonths,
-    activeMileage,
-  };
-}
+import { calculateTCO, estimateResaleValue, type TCOVehicle } from '@crewchief/core/tco-calculator';
 
 describe('TCO Calculator', () => {
-  const mockVehicle: VehicleInput = {
+  const mockVehicle: TCOVehicle = {
     purchase_price: 40000,
     avg_mpg: 25,
     fuel_price_per_gallon: 4.0,
@@ -202,6 +145,80 @@ describe('TCO Calculator', () => {
       const current = calculateTCO(mockVehicle, 1000, 0);
       const future = calculateTCO(mockVehicle, 1000, 2);
       expect(future.totalInsurance).toBeGreaterThan(current.totalInsurance);
+    });
+  });
+
+  /*
+    The assertions above are self-referential — they restate the implementation
+    and pass against any depreciation model, which is exactly why a wrong one
+    survived here for months. These pin real numbers.
+
+    Ages are built relative to the current year rather than hardcoding a model
+    year, so this does not quietly start testing a different age every January.
+  */
+  describe('the shipped depreciation curve', () => {
+    const currentYear = new Date().getFullYear();
+    const atAge = (age: number): TCOVehicle => ({
+      purchase_price: 40000,
+      year: currentYear - age,
+    });
+
+    it.each([
+      [0, 40000],
+      [1, 34000],
+      [3, 24565],
+      [8, 10899.62],
+    ])('at %i years old, resale is %d — 0.85^age', (age, expected) => {
+      expect(estimateResaleValue(atAge(age))).toBeCloseTo(expected, 1);
+    });
+
+    it('floors at 8% of purchase price, not 20%', () => {
+      // 0.85^20 is about 3.9%, so the floor is doing the work here.
+      expect(estimateResaleValue(atAge(20))).toBeCloseTo(40000 * 0.08, 5);
+    });
+
+    it('is NOT the lookup-table model this suite used to assert', () => {
+      // The old private copy returned 0.80 at one year and floored at 0.20.
+      // If someone reinstates that model, it is a product decision that
+      // changes every TCO figure in the app — it must not arrive as a
+      // silent refactor. See @crewchief/core/tco-calculator.
+      expect(estimateResaleValue(atAge(1))).not.toBeCloseTo(40000 * 0.8, 1);
+      expect(estimateResaleValue(atAge(20))).not.toBeCloseTo(40000 * 0.2, 1);
+    });
+
+    it('projects forward with extraYears', () => {
+      // A 3-year-old car kept 2 more years is priced as a 5-year-old car.
+      expect(estimateResaleValue(atAge(3), 2)).toBeCloseTo(
+        estimateResaleValue(atAge(5)),
+        5
+      );
+    });
+
+    it('treats a missing year as brand new rather than returning NaN', () => {
+      /*
+        The one behaviour the extraction deliberately changed.
+
+        TCOCard computed `currentYear - vehicle.year` with no fallback, so a
+        vehicle carrying a purchase price and no year produced NaN — and
+        propagated it through depreciation, netTCO, costPerMile and
+        costPerMonth, which would have rendered as "NaN" on the card.
+
+        Unreachable for a persisted row (`vehicles.year` is `int NOT NULL`),
+        which is why it was never seen. Fixed rather than faithfully copied,
+        because a NaN reaching the UI is not behaviour worth preserving.
+        Everything else was verified identical to the original across 2,166
+        input combinations at the time of the extraction.
+      */
+      const result = calculateTCO({ purchase_price: 40000 }, 0);
+
+      expect(result.resaleValue).toBe(40000);
+      expect(result.depreciation).toBe(0);
+      expect(Number.isNaN(result.netTCO)).toBe(false);
+      expect(Number.isNaN(result.costPerMonth)).toBe(false);
+    });
+
+    it('is 0 when the purchase price is unknown', () => {
+      expect(estimateResaleValue({ year: currentYear - 3 })).toBe(0);
     });
   });
 });
