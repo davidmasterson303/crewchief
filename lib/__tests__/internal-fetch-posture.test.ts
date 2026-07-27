@@ -44,6 +44,33 @@ function findSourceFiles(dir: string, acc: string[] = []): string[] {
 
 const SOURCE_DIRS = ['app', 'lib', 'components', 'hooks'];
 
+/**
+ * Modules permitted to read an `Authorization` header.
+ *
+ * Reading one to *authenticate the caller* is the legitimate case, and Phase 2
+ * task 2.1 needs exactly one place to do it. Forwarding one onward is the case
+ * this suite exists to prevent, and no entry here is licensed to do that.
+ *
+ * **This list may only ever shrink**, on the same terms as
+ * `PENDING_AUTHORIZATION` in `auth-posture.test.ts`. Adding a route handler
+ * here would mean a second implementation of caller identity, which is the
+ * thing `lib/api-auth.ts` exists to prevent.
+ */
+const AUTHORIZATION_READERS = ['lib/api-auth.ts'];
+
+/**
+ * Matches a header read in either spelling: `request.headers.get('x')` on a
+ * NextRequest, and `headers().get('x')` from `next/headers`.
+ *
+ * The second form was missed by the first version of this suite, and the miss
+ * was only caught because the allowlist meta-test below asserts that each
+ * allowlisted file actually trips the rule. A ratchet whose detector has a
+ * hole is worse than no ratchet — it reports safety it is not checking.
+ */
+function headerRead(name: string): RegExp {
+  return new RegExp(`(?:headers\\s*\\(\\s*\\)|headers)\\s*\\.\\s*get\\(\\s*['"]${name}['"]\\s*\\)`, 'i');
+}
+
 const sources = SOURCE_DIRS.flatMap((dir) => findSourceFiles(join(ROOT, dir))).map((path) => ({
   path,
   rel: path.slice(ROOT.length + 1),
@@ -67,8 +94,8 @@ describe('the internal-fetch posture', () => {
       (s) =>
         /nextUrl\s*\.\s*origin/.test(s.code) ||
         /new URL\(\s*request\.url\s*\)\s*\.\s*origin/.test(s.code) ||
-        /headers\s*\.\s*get\(\s*['"]host['"]\s*\)/i.test(s.code) ||
-        /headers\s*\.\s*get\(\s*['"]x-forwarded-host['"]\s*\)/i.test(s.code)
+        headerRead('host').test(s.code) ||
+        headerRead('x-forwarded-host').test(s.code)
     );
 
     expect(offenders.map((o) => o.rel)).toEqual([]);
@@ -77,14 +104,28 @@ describe('the internal-fetch posture', () => {
   it('never forwards the caller credentials to another request', () => {
     const offenders = sources.filter(
       (s) =>
-        /headers\s*\.\s*get\(\s*['"]cookie['"]\s*\)/i.test(s.code) ||
-        /headers\s*\.\s*get\(\s*['"]authorization['"]\s*\)/i.test(s.code)
+        headerRead('cookie').test(s.code) ||
+        (headerRead('authorization').test(s.code) && !AUTHORIZATION_READERS.includes(s.rel))
     );
 
-    // If bearer-token support (Phase 2 task 2.1) needs to READ an Authorization
-    // header, that belongs in lib/api-auth.ts and this list should name it
-    // explicitly rather than the assertion being relaxed.
     expect(offenders.map((o) => o.rel)).toEqual([]);
+  });
+
+  it('keeps the Authorization allowlist to modules that authenticate', () => {
+    // The allowlist is the pressure valve, so it needs its own ratchet: an
+    // entry that no longer reads the header must be deleted rather than left
+    // to quietly re-permit a file that has become something else.
+    //
+    // This assertion has already paid for itself. The first version of the
+    // detector above only matched `request.headers.get(...)`, so
+    // `headers().get(...)` from next/headers — which is exactly what
+    // lib/api-auth.ts uses — slipped straight through. The rule was reporting
+    // a safety it was not checking, and this is what surfaced it.
+    for (const rel of AUTHORIZATION_READERS) {
+      const entry = sources.find((s) => s.rel === rel);
+      expect(entry).toBeDefined();
+      expect(entry!.code).toMatch(headerRead('authorization'));
+    }
   });
 
   it('keeps the wishlist route calling the recompute in process', () => {

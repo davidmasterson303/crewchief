@@ -20,6 +20,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
+  createBearerClient,
   createServerActionClient,
   getServerClient,
   getServiceRoleClient,
@@ -69,6 +70,104 @@ function deny(error: string, status: number): VehicleAccessDenied {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Caller identity — cookie session or bearer token
+// ---------------------------------------------------------------------------
+
+/*
+ * Phase 2 task 2.1. The web app authenticates with cookies. A native client
+ * has no cookie jar, so it presents `Authorization: Bearer <jwt>` instead.
+ *
+ * Both arrive here and leave as the same thing: a verified user plus a client
+ * that RLS scopes to them. Everything downstream — the ownership check, the
+ * conditions under which a service-role client is handed back — is shared, and
+ * deliberately so. A bearer path with its own ownership logic would be a
+ * second implementation of the rule that decides who may reach privileged
+ * data, and this codebase's recurring bug is a second implementation drifting
+ * from the first.
+ *
+ * NOTE for the internal-fetch ratchet: this is the one module permitted to
+ * read an `Authorization` header. See lib/__tests__/internal-fetch-posture.test.ts.
+ */
+
+/**
+ * Pull the token out of an `Authorization` header value.
+ *
+ * Deliberately strict. `Bearer` is matched case-insensitively because RFC 6750
+ * says the scheme is, but anything malformed returns null rather than a
+ * best-effort guess — a token this function had to repair is a token we do not
+ * understand, and guessing at credentials is how parsers become vulnerabilities.
+ */
+export function parseBearerToken(headerValue: string | null | undefined): string | null {
+  if (!headerValue) return null;
+
+  const match = /^Bearer[ ]+(\S+)$/i.exec(headerValue.trim());
+  return match ? match[1] : null;
+}
+
+interface Caller {
+  userId: string;
+  /** RLS-scoped to the caller. Never privileged. */
+  client: SupabaseClient;
+}
+
+/**
+ * Resolve who is calling, from either credential type.
+ *
+ * **Precedence, and it is a security decision.** A bearer token wins when one
+ * is present, and a *malformed or rejected* bearer is a 401 — it never falls
+ * back to whatever cookie happens to be on the request. Falling back would
+ * mean a caller who explicitly presented one identity gets served as another,
+ * which makes "who was this request?" unanswerable from the outside and hides
+ * a broken client behind a stale browser session.
+ */
+async function resolveCaller(): Promise<Caller | null> {
+  const token = readBearerToken();
+
+  if (token) {
+    // getUser(jwt) validates the token against the auth server rather than
+    // decoding it locally. A signature check we performed ourselves would be
+    // a signature check we could get wrong.
+    const bearerClient = createBearerClient(token);
+    const {
+      data: { user },
+      error,
+    } = await bearerClient.auth.getUser(token);
+
+    if (error || !user) {
+      logger.warn('API_AUTH:BEARER_REJECTED', 'Bearer token did not verify');
+      return null;
+    }
+
+    return { userId: user.id, client: bearerClient };
+  }
+
+  const sessionClient = createServerActionClient();
+  const {
+    data: { user },
+    error,
+  } = await sessionClient.auth.getUser();
+
+  if (error || !user) return null;
+
+  return { userId: user.id, client: sessionClient };
+}
+
+/**
+ * Read the Authorization header out of the ambient request.
+ *
+ * Wrapped so a context without one — a server action invoked outside a request
+ * scope, or a unit test — degrades to "no bearer" instead of throwing.
+ */
+function readBearerToken(): string | null {
+  try {
+    const { headers } = require('next/headers');
+    return parseBearerToken(headers().get('authorization'));
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Resolve whether the current caller may act on `vehicleId`.
  *
@@ -96,22 +195,20 @@ export async function authorizeVehicleAccess(
     return { ok: true, isDemo: true, userId: null, client: getServerClient() };
   }
 
-  const sessionClient = createServerActionClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await sessionClient.auth.getUser();
+  // Cookie session or bearer token — see resolveCaller. Everything below is
+  // identical for both, which is the point.
+  const caller = await resolveCaller();
 
-  if (authError || !user) {
+  if (!caller) {
     return deny('Unauthorized', 401);
   }
 
-  // Ownership is checked through the *session* client so RLS applies here too.
-  const { data: owned, error: ownershipError } = await sessionClient
+  // Ownership is checked through the *caller's* client so RLS applies here too.
+  const { data: owned, error: ownershipError } = await caller.client
     .from('vehicles')
     .select('id')
     .eq('id', vehicleId)
-    .eq('user_id', user.id)
+    .eq('user_id', caller.userId)
     .maybeSingle();
 
   if (ownershipError) {
@@ -124,7 +221,7 @@ export async function authorizeVehicleAccess(
   if (!owned) {
     logger.warn('API_AUTH:OWNERSHIP_DENIED', 'Caller does not own vehicle', {
       vehicleId,
-      userId: user.id,
+      userId: caller.userId,
     });
     return deny(NOT_FOUND_MESSAGE, 404);
   }
@@ -132,7 +229,7 @@ export async function authorizeVehicleAccess(
   return {
     ok: true,
     isDemo: false,
-    userId: user.id,
+    userId: caller.userId,
     client: getServiceRoleClient(),
   };
 }
@@ -158,19 +255,18 @@ export type SessionResult = SessionGranted | VehicleAccessDenied;
  *
  * Prefer `authorizeVehicleAccess` whenever a vehicle is in scope; this is the
  * weaker guarantee and should be the exception.
+ *
+ * Accepts either credential type, on the same terms as
+ * `authorizeVehicleAccess` — see `resolveCaller`.
  */
 export async function requireSession(): Promise<SessionResult> {
-  const sessionClient = createServerActionClient();
-  const {
-    data: { user },
-    error,
-  } = await sessionClient.auth.getUser();
+  const caller = await resolveCaller();
 
-  if (error || !user) {
+  if (!caller) {
     return deny('Unauthorized', 401);
   }
 
-  return { ok: true, userId: user.id };
+  return { ok: true, userId: caller.userId };
 }
 
 export type VehicleScopedTable =
