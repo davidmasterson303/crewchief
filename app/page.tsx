@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Car, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { VehicleCard } from '@/components/VehicleCard';
-import { useVehicles, type GarageVehicle } from '@/hooks/useVehicles';
+import { useDemoVehicles, type GarageVehicle } from '@/hooks/useVehicles';
 
 // Self-hosted (was hot-linked from Unsplash — a third-party outage or
 // rate limit would grey out the landing visual).
@@ -29,7 +29,7 @@ function VehicleCardSkeleton() {
 }
 
 export default function GaragePage() {
-  const { data: vehicles = [], isLoading, error: queryError } = useVehicles();
+  const { data: vehicles = [], isLoading, error: queryError } = useDemoVehicles();
   const [makeFilter, setMakeFilter] = useState<string | null>(null);
 
   const uniqueMakes = useMemo(() => {

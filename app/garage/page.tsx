@@ -4,12 +4,20 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Car, Plus } from 'lucide-react';
 import { VehicleCard } from '@/components/VehicleCard';
-import { useVehicles } from '@/hooks/useVehicles';
+import { useMyVehicles } from '@/hooks/useVehicles';
+import { useAuth } from '@/components/AuthProvider';
 import { AccountMenu } from '@/components/AccountMenu';
 import { RevealOnScroll } from '@/components/RevealOnScroll';
 
 export default function GaragePage() {
-  const { data: vehicles = [], isLoading: loading, error: queryError } = useVehicles();
+  const { loading: authLoading } = useAuth();
+  const { data: vehicles = [], isLoading, error: queryError } = useMyVehicles();
+
+  // The vehicle query is disabled until the session resolves, and a disabled
+  // query is not "loading" as far as TanStack Query is concerned. Without
+  // folding the auth state in, a user with a full garage sees "Your Garage is
+  // Empty" for the moment before their session lands.
+  const loading = authLoading || isLoading;
 
   const error = queryError?.message || null;
 
