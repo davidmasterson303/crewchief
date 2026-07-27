@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
 import { checkRateLimit, getClientIdentifier, rateLimitResponse } from '@/lib/rate-limit';
 import { authorizeVehicleScopedRow } from '@/lib/api-auth';
+import { recomputePerformanceStats } from '@/lib/performance-stats';
 
 export const dynamic = 'force-dynamic';
 
@@ -111,25 +112,42 @@ export async function POST(request: NextRequest) {
     }
 
     if (wishlistItem.item_type === 'modification') {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 5000);
-      const baseUrl = request.nextUrl.origin;
-      fetch(`${baseUrl}/api/performance-stats`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // Forward the caller's session so this internal hop stays authorized
-          // once /api/performance-stats starts requiring one (task 0.5).
-          cookie: request.headers.get('cookie') ?? '',
-        },
-        body: JSON.stringify({ vehicleId: wishlistItem.vehicle_id }),
-        signal: controller.signal,
-      })
-        .then(() => clearTimeout(timeout))
-        .catch(err => {
-          clearTimeout(timeout);
+      /*
+        Completing a mod changes the vehicle's service history, so its
+        performance stats are now stale. Recomputed in process.
+
+        This used to POST to `${request.nextUrl.origin}/api/performance-stats`
+        with the caller's session cookie forwarded, so the inner route could
+        authorize the hop. `nextUrl.origin` comes from the request's host
+        headers, which made the destination of a request carrying a user's
+        session cookie depend on a header the caller influences and on whether
+        the platform in front of the app normalises it — a safety property
+        owned by someone else's proxy config, invisible to every test here,
+        and able to change without this code changing.
+
+        Calling directly removes the question. `access` above already proved
+        write access to this item's parent vehicle, which is strictly better
+        evidence than a re-derived cookie, and `intent: 'write'` means a demo
+        vehicle never reaches here.
+
+        Best-effort and deliberately not awaited: the stats are derived display
+        data, the dashboard recomputes on next view because the mod hash will
+        differ, and marking an item complete should not wait on Gemini.
+      */
+      const rateLimit = await checkRateLimit(access.userId ?? identifier, 'ai');
+      if (rateLimit.allowed) {
+        recomputePerformanceStats({
+          vehicleId: wishlistItem.vehicle_id,
+          client,
+          isDemo: false,
+        }).catch(err => {
           logger.error('WISHLIST_COMPLETE:PERF_RECALC', err as Error, { vehicleId: wishlistItem.vehicle_id });
         });
+      } else {
+        logger.warn('WISHLIST_COMPLETE:PERF_RECALC_RATE_LIMIT', 'Skipped stat recompute', {
+          vehicleId: wishlistItem.vehicle_id,
+        });
+      }
     }
 
     return NextResponse.json({
