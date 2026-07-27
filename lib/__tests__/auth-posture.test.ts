@@ -105,6 +105,17 @@ const ROUTE_POSTURE: Record<string, 'vehicle-scoped' | 'session' | 'public'> = {
     landed before the demo domain is moved onto it.
   */
   'app/api/version/route.ts': 'public',
+  /*
+    Reports whether this deployment's Gemini credential works. Public for the
+    same reason as /api/version: the thing asking is a deploy script checking
+    from outside, before the demo domain is moved onto a build.
+
+    It touches no database, no session and no service role, takes no user input,
+    and returns no part of the credential — only whether Google accepted it.
+    It lists models rather than generating anything, so it cannot be turned into
+    a way to spend tokens; see the route for why that distinction matters here.
+  */
+  'app/api/health/ai/route.ts': 'public',
 };
 
 /**
@@ -198,5 +209,59 @@ describe('server actions', () => {
   it('ratchets down — the backlog never grows', () => {
     // Lower this number as actions are fixed. It must never be raised.
     expect(PENDING_AUTHORIZATION.size).toBeLessThanOrEqual(0);
+  });
+});
+
+/*
+ * The demo path must stay reachable.
+ *
+ * `sendConsultantMessage` asked authorizeVehicleAccess for `intent: 'write'`
+ * unconditionally. Demo vehicles are denied any write, so **every consultant
+ * message on a demo vehicle returned an error** — the demo's headline feature,
+ * advertised on the portfolio as live, dead in production. It passed the type
+ * check, the whole suite, `verify-demo.mjs` and the promote gate, because none
+ * of them exercised the demo path.
+ *
+ * These are static assertions rather than a live round-trip on purpose: the
+ * network half is covered by /api/health/ai, and this half needs no network to
+ * be caught. The point is that the *shape* of the regression is now visible
+ * without deploying.
+ */
+describe('demo consultant path', () => {
+  const actionsSource = readFileSync(join(ROOT, 'app/actions.ts'), 'utf8');
+
+  function sendConsultantMessageBody(): string {
+    const start = actionsSource.indexOf('export async function sendConsultantMessage');
+    expect(start).toBeGreaterThan(-1);
+    // Far enough to cover the authorization block and the demo guard.
+    return actionsSource.slice(start, start + 12000);
+  }
+
+  it('does not ask for write access on a demo vehicle', () => {
+    const body = sendConsultantMessageBody();
+
+    // The intent must be conditional. An unconditional write is the regression.
+    expect(body).toMatch(/intent:\s*isDemoVehicle\s*\?\s*'read'\s*:\s*'write'/);
+    expect(body).not.toMatch(/authorizeVehicleAccess\([^)]*\{\s*intent:\s*'write'\s*\}/);
+  });
+
+  it('derives demo status server-side, never from the client payload', () => {
+    const body = sendConsultantMessageBody();
+
+    // params.isDemo is client-supplied. Using it for the intent would let a
+    // caller downgrade the check on a real vehicle; using it for the
+    // persistence guard would let one write to demo data with the service role.
+    expect(body).toMatch(/const isDemoVehicle = isDemoVehicleId\(params\.vehicleId\)/);
+    expect(body).toMatch(/if \(!isDemoVehicle\) \{/);
+    expect(body).not.toMatch(/if \(!isDemo\) \{/);
+  });
+
+  it('keeps demo vehicles read-only in the authorization helper', () => {
+    // The other half of the contract: relaxing the consultant's intent must not
+    // have relaxed what a demo vehicle is allowed to do.
+    const apiAuth = readFileSync(join(ROOT, 'lib/api-auth.ts'), 'utf8');
+    expect(apiAuth).toMatch(/isDemoVehicleId\(vehicleId\)/);
+    expect(apiAuth).toMatch(/intent === 'write'/);
+    expect(apiAuth).toMatch(/Demo vehicles are read-only/);
   });
 });
