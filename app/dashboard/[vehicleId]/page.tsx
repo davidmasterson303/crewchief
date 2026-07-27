@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { useQuery } from '@tanstack/react-query';
 import { DashboardSkeleton } from '@/components/Skeletons';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { VehicleResearchStatus } from '@/components/VehicleResearchStatus';
 
 export default function DashboardPage({ params }: { params: { vehicleId: string } }) {
   const router = useRouter();
@@ -93,6 +94,17 @@ export default function DashboardPage({ params }: { params: { vehicleId: string 
               addressedCampaigns={data.addressedCampaigns}
             />
           )}
+
+          {/*
+            Above the fold on purpose. A vehicle whose research has not landed
+            renders an empty dossier below, and the user needs to know that is
+            a pending state rather than the truth about their car.
+          */}
+          <VehicleResearchStatus
+            vehicleId={params.vehicleId}
+            status={data.knowledge?.research_status}
+            onComplete={refetch}
+          />
 
           <HealthSummary
             healthSummary={data.healthSummary}

@@ -258,13 +258,15 @@ export async function createVehicle(vehicleData: {
     });
 
     try {
-      logger.debug('VEHICLE:GENERATE_IMAGE', 'Generating vehicle image');
-      const imageStartedAt = Date.now();
-      await getVehicleImage(vehicle.id, vehicle);
-      logger.info('VEHICLE:IMAGE_DONE', 'Vehicle image stage complete', {
-        vehicleId: vehicle.id,
-        ms: Date.now() - imageStartedAt,
-      });
+      /*
+        Deliberately NOT awaited here any more.
+
+        This ran between the insert and the return, so a slow Google image
+        search delayed the user reaching their garage for a photo they had not
+        asked for. It is enrichment, and enrichment now happens in
+        `enrichVehicle` — see the note there.
+      */
+      logger.debug('VEHICLE:IMAGE_DEFERRED', 'Vehicle image deferred to enrichment');
     } catch (error) {
       logger.warn('VEHICLE:IMAGE_FAILED', 'Failed to generate vehicle image', {
         error: (error as Error).message,
@@ -337,6 +339,99 @@ export async function createVehicle(vehicleData: {
   more than the exact number: a spinner with no deadline is a hang, not a wait.
 */
 const RESEARCH_TIMEOUT_MS = 30_000;
+
+/**
+ * Everything a new vehicle needs that is not required to own it.
+ *
+ * ── Why this exists ─────────────────────────────────────────────────────────
+ *
+ * Onboarding used to do all of this *before* the user reached their garage:
+ * the vehicle insert, a Google image lookup, a ~23s Gemini research call, a
+ * second Gemini call for the health summary, and then a hardcoded two-second
+ * pause. Measured 28 Jul, that is 30-60s of spinner on the first thing anyone
+ * ever does in this product — and with no deadline on the model calls it was
+ * unbounded. An App Store reviewer creates an account, adds a vehicle, and
+ * judges; a multi-minute spinner reads as broken.
+ *
+ * The VIN decode already yields year, make, model, trim, engine and
+ * drivetrain in ~0.6s. That is everything "I own this car" needs. The research
+ * makes the dossier better; nothing about owning the car depends on it.
+ *
+ * ── Why it is a server action and not a background job ──────────────────────
+ *
+ * §11 records the wishlist recompute being fire-and-forget on a serverless
+ * platform, where work started after the response "may be frozen along with
+ * it". So this is deliberately **not** started and abandoned during
+ * onboarding. The dashboard calls it as a real request with a real lifecycle,
+ * once, when it sees `research_status = 'pending'`. The work is owned by a
+ * request that is actually waiting for it.
+ *
+ * That also gives failure somewhere to live: the row goes to `'failed'`, the
+ * dashboard shows it, and the user can press retry. A silent empty dossier is
+ * the §21 provenance problem in a new costume — a UI implying data it does
+ * not have.
+ */
+export async function enrichVehicle(vehicleId: string) {
+  const startedAt = Date.now();
+
+  const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+  if (!access.ok) {
+    return { success: false, error: access.error };
+  }
+
+  const { data: vehicle } = await access.client
+    .from('vehicles')
+    .select('*')
+    .eq('id', vehicleId)
+    .maybeSingle();
+
+  if (!vehicle) {
+    return { success: false, error: 'Vehicle not found' };
+  }
+
+  // Best-effort and bounded. A missing photo must never fail enrichment —
+  // and as of 28 Jul GOOGLE_SEARCH_API_KEY is expired, so this currently
+  // always falls back.
+  try {
+    await getVehicleImage(vehicleId, vehicle);
+  } catch (error) {
+    logger.warn('ENRICH:IMAGE_FAILED', 'Vehicle image lookup failed', {
+      vehicleId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  const dossier = await generateVehicleDossier(vehicleId);
+  if (!dossier.success) {
+    logger.error('ENRICH:RESEARCH_FAILED', new Error(dossier.error || 'unknown'), {
+      vehicleId,
+      msTotal: Date.now() - startedAt,
+    });
+    // generateVehicleDossier has already written research_status='failed',
+    // which is what the dashboard renders a retry against.
+    return { success: false, error: dossier.error };
+  }
+
+  const health = await generateVehicleHealthSummary(vehicleId);
+  if (!health.success) {
+    // The dossier is the valuable half and it landed. A missing health score
+    // is a worse dashboard, not a broken vehicle.
+    logger.warn('ENRICH:HEALTH_FAILED', 'Health summary failed', {
+      vehicleId,
+      error: health.error,
+    });
+  }
+
+  preloadAllPerformanceModifications(vehicleId).catch(() => {});
+
+  logger.info('ENRICH:COMPLETE', 'Vehicle enrichment complete', {
+    vehicleId,
+    msTotal: Date.now() - startedAt,
+    unsupported: !!dossier.unsupported,
+  });
+
+  return { success: true, unsupported: !!dossier.unsupported };
+}
 
 export async function generateVehicleDossier(vehicleId: string, vehicleData?: any) {
   // Cost control: server actions are publicly invokable POST endpoints
