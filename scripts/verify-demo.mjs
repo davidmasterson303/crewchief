@@ -96,6 +96,52 @@ async function checkPages() {
   }
 }
 
+/*
+ * Does the deployment's AI credential actually work?
+ *
+ * This check exists because the consultant — the demo's headline feature,
+ * advertised on the portfolio as live — was dead in production and passed every
+ * gate this project has, including this script and the promote gate that runs
+ * it. Page checks proved `/consultant/<id>` returned 200. It did. Sending a
+ * message returned an error every time.
+ *
+ * A blocking failure, not a warning: shipping a demo whose advertised feature
+ * errors is worse than not shipping. It is the same reasoning as the data
+ * checks below.
+ *
+ * /api/health/ai lists models rather than asking a question, so this costs no
+ * tokens and takes no input — see the route for why a prompt-based check would
+ * have been a public endpoint that spends money on request.
+ */
+async function checkAiCredential() {
+  console.log('\nThe AI credential this build will actually use');
+  const url = `${base}/api/health/ai`;
+  try {
+    const res = await fetch(url, { redirect: 'follow' });
+    let body = {};
+    try {
+      body = await res.json();
+    } catch {
+      /* fall through to the status-only message */
+    }
+
+    if (res.status === 404) {
+      // A build predating the route. Not a credential failure, and not
+      // something to fail a promote over.
+      warn('no /api/health/ai on this build — cannot verify the AI credential');
+      return;
+    }
+    if (res.ok && body.ok) {
+      pass(`Gemini credential accepted (${body.models ?? '?'} models visible)`);
+      return;
+    }
+    fail(`Gemini credential rejected — ${body.reason || `HTTP ${res.status}`}`);
+    console.log('        the consultant will error on every message until this is fixed');
+  } catch (error) {
+    fail(`could not reach ${url} — ${error.message}`);
+  }
+}
+
 async function checkAnonData() {
   console.log('\nData an anonymous browser reads directly');
 
@@ -149,6 +195,7 @@ async function checkAnonData() {
 
 console.log(`\nVerifying demo at ${base}`);
 await checkPages();
+await checkAiCredential();
 await checkAnonData();
 
 console.log('\n' + '─'.repeat(60));
