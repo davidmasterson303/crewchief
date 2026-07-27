@@ -143,6 +143,16 @@ export default function HealthSummary({ vehicleId, healthSummary, recalls = [], 
 
   const scoreInfo = getScoreLabel(healthSummary.health_score);
 
+  /*
+   * `compact` has no call sites — grep for `<HealthSummary` and the dashboard
+   * is the only one, without the prop. It is the sole remaining reason
+   * ScoreRing and scoreInfo exist in this file.
+   *
+   * Left in place rather than deleted, but worth knowing that it still renders
+   * a ScoreRing: if anyone puts a compact HealthSummary on the dashboard, D5's
+   * duplicate score comes back silently. Delete this branch or drop its ring
+   * before reaching for it.
+   */
   if (compact) {
     return (
       <Card className={`border ${
@@ -188,16 +198,25 @@ export default function HealthSummary({ vehicleId, healthSummary, recalls = [], 
 
   return (
     <Card className="bg-slate-900/60 border-white/10">
+      {/*
+        D5 — this card used to print the score a second time.
+        `DiagnosticHero` sits directly above it on the dashboard and renders the
+        same number, so a reader met "74 / Fair" twice within one screen and had
+        to work out that they were the same fact rather than two measurements.
+
+        The hero keeps the score. This card answers the question the hero
+        raises — *why* that number — so its ScoreRing and its band label are
+        gone, not restyled. The narrative stays as the lead-in, because it is
+        the one thing here that reads as an answer rather than a reading.
+      */}
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="flex items-start gap-5">
-            <ScoreRing score={healthSummary.health_score} />
             <div>
               <CardTitle className="text-white flex items-center gap-2 mb-1">
                 <Activity className="h-5 w-5 text-info" />
-                Vehicle Health
+                What&apos;s driving the score
               </CardTitle>
-              <p className={`text-base font-semibold ${scoreInfo.color}`}>{scoreInfo.label}</p>
               {healthSummary.summary && (
                 <p className="text-sm text-white/55 mt-1.5 max-w-xl leading-relaxed">{healthSummary.summary}</p>
               )}
@@ -217,6 +236,53 @@ export default function HealthSummary({ vehicleId, healthSummary, recalls = [], 
       </CardHeader>
 
       <CardContent className="space-y-5">
+        {/*
+          The contributing factors, absorbed from what used to be a separate
+          "Red Flags" card lower down. They are the reason the score is not
+          higher, so they belong at the top of the answer rather than below two
+          screens of context tiles.
+
+          ── The point delta the ticket asks for is deliberately absent ──────
+
+          D5 specifies "one row per contributing factor with its point delta".
+          There is no delta to show. `vehicle_health_summary` holds a single
+          `health_score` int plus prose — `summary`, `maintenance_status`,
+          `issues_overview`, `recall_status` — and two string arrays,
+          `red_flags` and `recommendations`. Nothing anywhere attributes points
+          to a factor.
+
+          Printing "-8" beside a red flag would be inventing a number about
+          someone's car and presenting it as computed, which is the same defect
+          as the consultant's old provenance badges: a confident claim the
+          system never made. Deltas need a scoring breakdown emitted by
+          whatever produces the score. That is real work, server-side, and it
+          is not this ticket.
+
+          So each factor gets a severity icon and its text, and the rows carry
+          no magnitude they cannot justify.
+        */}
+        {healthSummary.red_flags && healthSummary.red_flags.length > 0 && (
+          <div className="space-y-2">
+            {healthSummary.red_flags.map((flag: string) => (
+              <div
+                key={flag}
+                className="flex items-start gap-2.5 p-3 rounded-xl border"
+                style={{
+                  background: 'var(--critical-red-wash)',
+                  borderColor: 'var(--critical-red-border)',
+                }}
+              >
+                <AlertTriangle
+                  className="h-4 w-4 shrink-0 mt-0.5"
+                  style={{ color: 'var(--critical-red)' }}
+                  aria-hidden="true"
+                />
+                <p className="text-sm text-white/80 leading-snug">{flag}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className="grid md:grid-cols-3 gap-3">
           <div className={`p-4 rounded-xl border ${maintenanceEmpty ? 'bg-green-500/8 border-green-400/20' : 'bg-orange-500/8 border-orange-400/20'}`}>
             <div className="flex items-center gap-2.5 mb-2">
@@ -272,22 +338,9 @@ export default function HealthSummary({ vehicleId, healthSummary, recalls = [], 
           />
         </div>
 
-        {healthSummary.red_flags && healthSummary.red_flags.length > 0 && (
-          <div className="bg-red-500/8 border border-red-400/20 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <AlertTriangle className="h-5 w-5 text-red-400" />
-              <h4 className="font-semibold text-white text-sm">Red Flags</h4>
-            </div>
-            <div className="space-y-2">
-              {healthSummary.red_flags.map((flag: string) => (
-                <div key={flag} className="flex items-start gap-2.5 p-2.5 bg-red-500/6 rounded-lg border border-red-400/10">
-                  <div className="w-1.5 h-1.5 rounded-full bg-red-400 mt-1.5 shrink-0" />
-                  <p className="text-sm text-white/75 leading-snug">{flag}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* The "Red Flags" card that stood here is gone — its rows are now the
+            contributing factors at the top of this card. Two places listing the
+            same flags was the same duplication problem as the score itself. */}
 
         {healthSummary.recommendations && healthSummary.recommendations.length > 0 && (
           <div className="bg-info-wash border border-info-border rounded-xl p-4">

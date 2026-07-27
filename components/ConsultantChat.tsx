@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Loader as Loader2, Send, Plus, Search, MessageSquare, Paperclip, X, FileText, ExternalLink, Heart, Check, Wrench, TriangleAlert, Sparkles, PanelLeft } from 'lucide-react';
+import { Loader as Loader2, Send, Plus, Search, MessageSquare, Paperclip, X, FileText, ExternalLink, Heart, Check, Wrench, TriangleAlert, Sparkles, PanelLeft, Copy } from 'lucide-react';
 import { logger } from '@/lib/logger';
 import { isDemoMode, isDemoVehicleId } from '@/lib/demo';
 import { wishlistItemIdentifier } from '@/lib/wishlist-identifier';
@@ -89,19 +88,91 @@ function renderMarkdownLine(line: string, key: number) {
   return parts.length > 0 ? parts : line;
 }
 
-function getSourceBadges(content: string, knowledge: any): { label: string; icon: React.ReactNode }[] {
-  const badges: { label: string; icon: React.ReactNode }[] = [];
-  const lower = content.toLowerCase();
-  if (lower.includes('service') || lower.includes('oil') || lower.includes('maintenance') || lower.includes('filter')) {
-    badges.push({ label: 'Service records', icon: <Wrench className="h-2.5 w-2.5" /> });
-  }
-  if (lower.includes('issue') || lower.includes('recall') || lower.includes('defect') || lower.includes('warning')) {
-    badges.push({ label: 'Issue history', icon: <TriangleAlert className="h-2.5 w-2.5" /> });
-  }
-  if (lower.includes('mod') || lower.includes('performance') || lower.includes('horsepower') || lower.includes('torque')) {
-    badges.push({ label: 'Mod profile', icon: <Sparkles className="h-2.5 w-2.5" /> });
-  }
-  return badges.slice(0, 2);
+/*
+ * What the model was actually given.
+ *
+ * ── The bug this replaces ───────────────────────────────────────────────────
+ *
+ * This function used to lowercase the assistant's own reply and keyword-match
+ * it: `content.includes('oil')` produced a "Service records" chip,
+ * `includes('recall')` produced "Issue history". The chips asserted what the
+ * system had read, and nothing about them was connected to what it read. A
+ * reply that merely said the word "recall" claimed issue history had been
+ * consulted whether or not a single row existed.
+ *
+ * Two details made it worse than a rough heuristic. It was handed `knowledge`
+ * as its second argument and never referenced it — the real grounding data was
+ * already at the call site and was discarded in favour of guessing from the
+ * output. And `includes('mod')` matches "model", "modern", "moderate" and
+ * "modify", so a reply mentioning "the 2019 model" earned a "Mod profile"
+ * badge. That fires on ordinary copy, not edge cases.
+ *
+ * ── What it claims now, and what it deliberately does not ───────────────────
+ *
+ * These are the context collections that were non-empty at the moment the
+ * question was sent — the same values handed to `sendConsultantMessage` a few
+ * lines later. So the claim is "this was supplied to the model", which is
+ * checkable, rather than "the model used this", which no client can know. That
+ * is why the row is prefixed "Based on" and not "Sources".
+ *
+ * Computed at send time and stored on the message, because context is a
+ * property of the turn, not of the transcript. Messages replayed from a saved
+ * session carry no `sources` and therefore show no chips: the honest rendering
+ * of "we no longer know" is to claim nothing, not to recompute from today's
+ * garage and backdate it onto an old answer.
+ */
+type ContextKind = 'knowledge' | 'service' | 'issues' | 'mods' | 'wishlist' | 'recalls';
+
+const CONTEXT_LABELS: Record<ContextKind, string> = {
+  knowledge: 'Knowledge base',
+  service: 'Service records',
+  issues: 'Issue history',
+  mods: 'Mod profile',
+  wishlist: 'Wishlist',
+  recalls: 'Recall data',
+};
+
+function contextIcon(kind: ContextKind) {
+  if (kind === 'issues' || kind === 'recalls') return <TriangleAlert className="h-2.5 w-2.5" />;
+  if (kind === 'mods') return <Sparkles className="h-2.5 w-2.5" />;
+  if (kind === 'wishlist') return <Heart className="h-2.5 w-2.5" />;
+  return <Wrench className="h-2.5 w-2.5" />;
+}
+
+function nonEmpty(v: any): boolean {
+  if (!v) return false;
+  if (Array.isArray(v)) return v.length > 0;
+  if (typeof v === 'object') return Object.keys(v).length > 0;
+  return true;
+}
+
+function suppliedContext(ctx: {
+  knowledge?: any;
+  completedItems?: any[];
+  maintenanceLineItems?: any[];
+  issueTracking?: any[];
+  modTracking?: any[];
+  modWishlistItems?: any[];
+  nhtsaData?: any;
+}): ContextKind[] {
+  const kinds: ContextKind[] = [];
+  if (nonEmpty(ctx.knowledge)) kinds.push('knowledge');
+  if (nonEmpty(ctx.completedItems) || nonEmpty(ctx.maintenanceLineItems)) kinds.push('service');
+  if (nonEmpty(ctx.issueTracking)) kinds.push('issues');
+  /*
+   * `modTracking` and `modWishlistItems` are two different things and were
+   * briefly collapsed into one "Mod profile" chip. They must not be:
+   * `modWishlistItems` is loaded from the `wishlist_items` table (see
+   * app/consultant/[vehicleId]/page.tsx), and on the demo Accord that table
+   * holds an oil-dilution check, a brake fluid flush and a CVT fluid flush —
+   * maintenance, not modifications. The chip claimed a mod profile the car does
+   * not have, which is the same overclaim this whole function exists to remove.
+   * The upstream prop name is what misleads; the label here tells the truth.
+   */
+  if (nonEmpty(ctx.modTracking)) kinds.push('mods');
+  if (nonEmpty(ctx.modWishlistItems)) kinds.push('wishlist');
+  if (nonEmpty(ctx.nhtsaData?.recalls)) kinds.push('recalls');
+  return kinds;
 }
 
 export default function ConsultantChat({
@@ -127,6 +198,7 @@ export default function ConsultantChat({
   const [messages, setMessages] = useState<any[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [copiedTurn, setCopiedTurn] = useState<number | null>(null);
   const [thinkingStage, setThinkingStage] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -141,6 +213,50 @@ export default function ConsultantChat({
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const thinkingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  /*
+   * The field was `rows={3}`: three lines of empty box for a one-line question,
+   * and still three for a long one. It now starts at one line and grows to six
+   * before scrolling.
+   *
+   * Height is reset to 'auto' before measuring because scrollHeight never
+   * shrinks below the element's current height — without the reset the field
+   * grows and never comes back down after a delete.
+   */
+  useLayoutEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const cs = getComputedStyle(el);
+    const line = parseFloat(cs.lineHeight) || 20;
+    const pad = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    const max = line * 6 + pad;
+
+    el.style.height = 'auto';
+
+    /*
+     * The empty height is computed, not measured.
+     *
+     * `scrollHeight` on an empty field measures the *placeholder*, and this
+     * placeholder wraps to two lines at the composer's width — so an empty box
+     * was 54px and shrank to 34px on the first keystroke. Measuring gave a
+     * field that visibly jumped the moment you started typing.
+     *
+     * `max` includes the padding for the same reason: without it, six lines of
+     * text did not fit in the six-line cap.
+     */
+    const target = input ? Math.min(el.scrollHeight, max) : line + pad;
+    el.style.height = `${target}px`;
+    el.style.overflowY = input && el.scrollHeight > max ? 'auto' : 'hidden';
+  }, [input]);
+
+  /* Shown in the composer, so the grounding claim sits where the question is
+   * typed. "Open" is everything not completed and not merely wished for —
+   * `status` also carries 'wishlist', which is an intention, not an obligation. */
+  const displayMileage: number = vehicle.current_mileage ?? 0;
+  const openItemCount = (allServiceItems || []).filter(
+    (i: any) => i.status !== 'completed' && i.status !== 'wishlist'
+  ).length;
   const isInitialLoadRef = useRef(true);
 
   useEffect(() => {
@@ -400,6 +516,18 @@ export default function ConsultantChat({
         content: result.response,
         timestamp: new Date().toISOString(),
         wishlistActions: result.wishlistActions,
+        /* Recorded from the same values sent above, at the moment they were
+         * sent. See suppliedContext — this is what was supplied, not what was
+         * used, and it is deliberately absent on replayed history. */
+        sources: suppliedContext({
+          knowledge,
+          completedItems,
+          maintenanceLineItems,
+          issueTracking,
+          modTracking,
+          modWishlistItems,
+          nhtsaData,
+        }),
       };
       setMessages([...optimisticMessages, assistantMsg]);
       setCurrentFollowUps(getFollowUps(result.response || ''));
@@ -434,6 +562,30 @@ export default function ConsultantChat({
           timestamp: new Date().toISOString(),
         },
       ]);
+    }
+  };
+
+  /*
+   * Copy ships; Retry does not, deliberately.
+   *
+   * A correct retry has to drop the answer being retried and re-send the
+   * preceding question. `handleSend` builds both its optimistic list and its
+   * `messageHistory` from the `messages` state captured in its closure, so
+   * calling setMessages() and then handleSend() in the same tick sends the
+   * stale history — the failed answer goes back to the model as context for
+   * its own retry. Fixing it properly means threading a history override
+   * through the send path, which is the one thing the v7 ticket says not to
+   * touch. A retry that silently re-asks without removing the bad answer is
+   * worse than no retry, so this is one button, not two.
+   */
+  const handleCopyTurn = async (content: string, index: number) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedTurn(index);
+      setTimeout(() => setCopiedTurn((cur) => (cur === index ? null : cur)), 1600);
+    } catch (error) {
+      logger.error('CONSULTANT:COPY', error as Error);
+      toast.error('Could not copy to clipboard');
     }
   };
 
@@ -578,19 +730,40 @@ export default function ConsultantChat({
               {messages.map((msg: any, index: number) => (
                 <div
                   key={index}
-                  className={`flex gap-3 animate-fade-in ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
+                  className={`turn animate-fade-in flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
                 >
-                  <Avatar className="h-8 w-8 mt-1 flex-shrink-0">
-                    <AvatarFallback className={msg.role === 'user' ? 'bg-cyan-600 text-white text-xs' : 'bg-white/10 text-white/70 text-xs'}>
-                      {msg.role === 'user' ? 'U' : 'CC'}
-                    </AvatarFallback>
-                  </Avatar>
+                  {/*
+                    The assistant's identity is a label row, not an avatar.
+                    There are exactly two speakers and alignment already says
+                    which is which, so an 8x8 'CC' circle on every turn was
+                    paying for information the layout already carried.
+                  */}
+                  {msg.role === 'assistant' && (
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <Sparkles className="h-[13px] w-[13px] flex-shrink-0" style={{ color: 'var(--info)' }} />
+                      <span className="text-[11px] font-semibold uppercase tracking-widest text-white/45">CrewChief</span>
+                      <span className="text-[10px] text-white/25">
+                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  )}
                   <div
-                    className={`flex-1 max-w-[80%] ${
+                    className={
                       msg.role === 'user'
-                        ? 'bg-cyan-600/90 text-white rounded-2xl rounded-tr-sm'
-                        : 'bg-info-wash border border-info-border text-white rounded-2xl rounded-tl-sm'
-                    } p-4 overflow-hidden`}
+                        ? 'max-w-[80%] bg-cyan-600/90 text-white rounded-2xl rounded-tr-sm p-4 overflow-hidden'
+                        /*
+                          Unboxed: no background, border, radius or padding. A
+                          CrewChief answer is a diagnosis, not a chat line, and
+                          after this a container on this screen means
+                          "structured payload" rather than "someone spoke".
+
+                          `.measure` (68ch) is load-bearing, not polish. The
+                          bubble's max-w-[80%] was capping the line length by
+                          accident; unboxed prose has no edges to stop it and
+                          would run to ~120 characters on a wide panel.
+                        */
+                        : 'measure text-white overflow-hidden'
+                    }
                   >
                     {msg.documents && msg.documents.length > 0 && (
                       <div className="mb-3 space-y-2">
@@ -618,19 +791,6 @@ export default function ConsultantChat({
                         <p key={i} className="text-sm leading-relaxed break-words">{renderMarkdownLine(line, i)}</p>
                       ))}
                     </div>
-                    {msg.role === 'assistant' && (() => {
-                      const badges = getSourceBadges(msg.content, knowledge);
-                      return badges.length > 0 ? (
-                        <div className="flex flex-wrap gap-1.5 mt-2.5">
-                          {badges.map((badge, bi) => (
-                            <span key={bi} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/6 border border-white/10 text-[10px] text-white/45 font-medium">
-                              {badge.icon}
-                              {badge.label}
-                            </span>
-                          ))}
-                        </div>
-                      ) : null;
-                    })()}
                     {msg.wishlistActions && msg.wishlistActions.length > 0 && (
                       <div className="mt-3 space-y-2 border-t border-white/10 pt-3">
                         <p className="text-xs font-semibold text-white/50 uppercase tracking-widest">Suggested for wishlist</p>
@@ -664,27 +824,75 @@ export default function ConsultantChat({
                         })}
                       </div>
                     )}
-                    <div className="text-[10px] opacity-40 mt-2">
+                  </div>
+
+                  {/*
+                    Provenance at the foot of the turn, prefixed "Based on"
+                    because it reports what was supplied to the model — not
+                    what the model used, which is not knowable from here.
+                    Absent entirely on messages replayed from a saved session.
+                  */}
+                  {msg.role === 'assistant' && msg.sources?.length > 0 && (
+                    <div className="measure flex flex-wrap items-center gap-1.5 mt-2.5">
+                      <span className="text-[10px] text-white/30 font-medium">Based on</span>
+                      {msg.sources.map((kind: ContextKind) => (
+                        <span
+                          key={kind}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/6 border border-white/10 text-[10px] text-white/45 font-medium"
+                        >
+                          {contextIcon(kind)}
+                          {CONTEXT_LABELS[kind]}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/*
+                    Quiet utilities. Opacity, not display:none, so they stay in
+                    the tab order — and pinned visible on touch, where there is
+                    no hover to reveal them. Same rule as the garage card's
+                    edit pencil; see .turn-actions in globals.css.
+                  */}
+                  {msg.role === 'assistant' && msg.content && (
+                    <div className="turn-actions flex items-center gap-1 mt-1.5">
+                      <button
+                        onClick={() => handleCopyTurn(msg.content, index)}
+                        className="tap-target-44 flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-white/35 hover:text-white/70 transition-colors"
+                        aria-label="Copy this answer"
+                      >
+                        {copiedTurn === index ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                        {copiedTurn === index ? 'Copied' : 'Copy'}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* The user bubble keeps its timestamp, below and right. */}
+                  {msg.role === 'user' && (
+                    <div className="text-[10px] text-white/30 mt-1">
                       {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </div>
-                  </div>
+                  )}
                 </div>
               ))}
 
+              {/* The same label row as a real turn, with the indicator inline.
+                  It was a third avatar+bubble, which made "thinking" look like
+                  a message that had arrived. */}
               {loading && (
-                <div className="flex gap-3 animate-fade-in">
-                  <Avatar className="h-8 w-8 mt-1 flex-shrink-0">
-                    <AvatarFallback className="bg-white/10 text-white/70 text-xs">CC</AvatarFallback>
-                  </Avatar>
-                  <div className="bg-white/8 border border-white/8 rounded-2xl rounded-tl-sm p-4 flex items-center gap-3">
-                    <Loader2 className="h-4 w-4 animate-spin text-info flex-shrink-0" />
+                <div className="animate-fade-in flex flex-col items-start">
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <Sparkles className="h-[13px] w-[13px] flex-shrink-0" style={{ color: 'var(--info)' }} />
+                    <span className="text-[11px] font-semibold uppercase tracking-widest text-white/45">CrewChief</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-info flex-shrink-0" />
                     <span className="text-sm text-white/50">{THINKING_STAGES[thinkingStage]}</span>
                   </div>
                 </div>
               )}
 
               {showFollowUps && !loading && currentFollowUps.length > 0 && (
-                <div className="flex flex-col gap-2 pl-11 animate-slide-up">
+                <div className="flex flex-col gap-2 animate-slide-up">
                   <p className="text-xs text-white/35 font-medium">Ask a follow-up</p>
                   <div className="flex flex-wrap gap-2">
                     {currentFollowUps.map((suggestion, i) => (
@@ -706,7 +914,7 @@ export default function ConsultantChat({
                 );
                 if (highPriorityWishlist.length === 0) return null;
                 return (
-                  <div className="pl-11 animate-slide-up">
+                  <div className="animate-slide-up">
                     <div className="flex items-center gap-3 p-3 rounded-xl bg-amber-500/8 border border-amber-400/20">
                       <TriangleAlert className="h-4 w-4 text-amber-400 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
@@ -757,44 +965,64 @@ export default function ConsultantChat({
               ))}
             </div>
           )}
-          {/* Canonical composer order is [attach, input, send] — attach sits
-              beside the field, not stacked between field and send. */}
-          <div className="flex gap-2 items-end">
-            <Button
-              variant="outline"
-              size="lg"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={loading || uploadingFiles || selectedFiles.length >= 3}
-              aria-label="Attach a file"
-              title="Attach documents, invoices, or diagnostic reports"
-              className="tap-target-44 border-white/10 text-white/50 hover:text-cyan-400 hover:bg-cyan-400/8 hover:border-cyan-400/30 transition-all"
-            >
-              <Paperclip className="h-[17px] w-[17px]" />
-            </Button>
-            <div className="flex flex-col flex-1 gap-2">
-              <Textarea
-                placeholder="Ask me anything about your vehicle..."
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyPress}
-                rows={3}
-                className="resize-none bg-white/6 border-white/10 text-white placeholder:text-white/30 rounded-xl focus:border-cyan-400/40 transition-colors text-sm"
-                disabled={loading || uploadingFiles}
-              />
+          {/*
+            One panel, not three surfaces.
+            Attach, field and send were three separately bordered controls in a
+            flex row, so the composer read as a toolbar rather than a place to
+            write. The panel now owns the border and the focus ring; the
+            textarea is borderless inside it. Canonical order is still
+            [attach, input, send] — attach beside the field, send last.
+          */}
+          <div className="composer-panel rounded-xl">
+            <Textarea
+              ref={textareaRef}
+              placeholder="Ask me anything about your vehicle..."
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyPress}
+              rows={1}
+              className="resize-none border-0 bg-transparent text-white placeholder:text-white/30 text-sm px-3 pt-2.5 pb-1 min-h-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none"
+              disabled={loading || uploadingFiles}
+            />
+            <div className="flex items-center gap-2 px-2 pb-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={loading || uploadingFiles || selectedFiles.length >= 3}
+                aria-label="Attach a file"
+                title="Attach documents, invoices, or diagnostic reports"
+                className="tap-target-44 h-8 w-8 p-0 text-white/50 hover:text-cyan-400 hover:bg-cyan-400/8"
+              >
+                <Paperclip className="h-[17px] w-[17px]" />
+              </Button>
+
+              {/*
+                The product's promise is that the answer is grounded in this
+                specific car. Say so where the question is being typed.
+                Truncates, never wraps — a second line here pushes the controls
+                around as mileage changes.
+              */}
+              <span className="flex-1 min-w-0 truncate text-[11px] text-white/30">
+                {vehicle.year} {vehicle.make} {vehicle.model}
+                {` · ${displayMileage.toLocaleString()} mi`}
+                {openItemCount > 0 && ` · ${openItemCount} open item${openItemCount === 1 ? '' : 's'}`}
+              </span>
+
+              <Button
+                onClick={() => handleSend()}
+                disabled={loading || uploadingFiles || (!input.trim() && selectedFiles.length === 0)}
+                size="sm"
+                aria-label="Send"
+                className="tap-target-44 h-8 bg-cyan-600 hover:bg-cyan-500 text-white border-0 transition-all disabled:opacity-40"
+              >
+                {uploadingFiles ? (
+                  <Loader2 className="h-[15px] w-[15px] animate-spin" />
+                ) : (
+                  <Send className="h-[15px] w-[15px]" />
+                )}
+              </Button>
             </div>
-            <Button
-              onClick={() => handleSend()}
-              disabled={loading || uploadingFiles || (!input.trim() && selectedFiles.length === 0)}
-              size="lg"
-              aria-label="Send"
-              className="tap-target-44 bg-cyan-600 hover:bg-cyan-500 text-white border-0 transition-all disabled:opacity-40"
-            >
-              {uploadingFiles ? (
-                <Loader2 className="h-[15px] w-[15px] animate-spin" />
-              ) : (
-                <Send className="h-[15px] w-[15px]" />
-              )}
-            </Button>
           </div>
           <input
             ref={fileInputRef}
