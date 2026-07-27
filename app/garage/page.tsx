@@ -38,7 +38,13 @@ export default function GaragePage() {
               <span className="text-xl font-semibold text-white tracking-tight">CrewChief</span>
             </Link>
             <div className="flex items-center gap-3">
-              <Link href="/onboard">
+              {/*
+                `from=garage` marks this as a deliberate visit. /onboard now
+                redirects a user who already has vehicles, and without this
+                marker that guard would make adding a second car impossible —
+                see lib/onboarding.ts.
+              */}
+              <Link href="/onboard?from=garage">
                 <Button className="bg-black border-2 border-cyan-400 hover:bg-cyan-400/10 text-cyan-400 font-semibold">
                   <Plus className="mr-2 h-4 w-4" />
                   Add Vehicle
@@ -79,7 +85,7 @@ export default function GaragePage() {
               Add your first vehicle and unlock AI-powered maintenance insights, cost optimization, and repair bundling strategies.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link href="/onboard">
+              <Link href="/onboard?from=garage">
                 <Button size="lg" className="bg-cyan-500 hover:bg-cyan-400 text-black h-14 px-10 rounded-full text-base font-semibold transition-all hover:scale-105">
                   Add Your First Vehicle
                 </Button>

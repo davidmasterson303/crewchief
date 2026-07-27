@@ -68,6 +68,39 @@ export interface ProfileUpdate {
   notification_preferences?: Record<string, unknown>;
 }
 
+/**
+ * How many vehicles the signed-in user owns.
+ *
+ * `head: true` with an exact count — the rows themselves are never needed,
+ * only whether there are any. Used by the `/onboard` guard, which runs on
+ * every visit to that route and should not pull a garage's worth of columns
+ * to answer a yes/no question.
+ *
+ * Returns 0 for a caller with no session. That is the safe direction: an
+ * unauthenticated visitor never reaches `/onboard` anyway (the middleware
+ * redirects first), and if one somehow did, showing onboarding is better than
+ * bouncing them somewhere on the strength of a count we could not read.
+ */
+export async function countUserVehicles(): Promise<number> {
+  const session = await requireSession();
+  if (!session.ok) return 0;
+
+  const client = getServiceRoleClient();
+  const { count, error } = await client
+    .from('vehicles')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', session.userId);
+
+  if (error) {
+    logger.error('ONBOARD:VEHICLE_COUNT', new Error(error.message), {
+      userId: session.userId,
+    });
+    return 0;
+  }
+
+  return count ?? 0;
+}
+
 export async function getProfile() {
   const session = await requireSession();
   if (!session.ok) {

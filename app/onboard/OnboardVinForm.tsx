@@ -10,7 +10,15 @@ import { Loader as Loader2, Car, ArrowLeft } from 'lucide-react';
 import { decodeVIN } from '../actions';
 import OnboardingWizard from '@/components/OnboardingWizard';
 
-export default function OnboardPage() {
+/**
+ * The VIN form, and then the wizard.
+ *
+ * Split out of `page.tsx` when task 1.6 added the returning-user guard. The
+ * guard has to run before anything renders — a client-side check would paint
+ * the onboarding form and then yank it away — so `page.tsx` is now a server
+ * component and this is what it renders once the visitor is cleared.
+ */
+export default function OnboardVinForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const fromDemo = searchParams.get('from') === 'demo';
