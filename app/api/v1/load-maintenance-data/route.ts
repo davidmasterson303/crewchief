@@ -1,12 +1,33 @@
-import { getServiceRoleClient, createServerActionClient } from '@/lib/supabase';
-import { isDemoVehicleId } from '@/lib/demo';
 import { logger } from '@/lib/logger';
-import { vehicleIdSchema } from '@/lib/validation';
 import { type NextRequest } from 'next/server';
 import type { ApiResponse } from '@/lib/types';
 import { checkRateLimit, getClientIdentifier, rateLimitResponse } from '@/lib/rate-limit';
+import { authorizeVehicleAccess } from '@/lib/api-auth';
 
 export const dynamic = 'force-dynamic';
+
+/**
+ * Documents, invoice lines, completed service items and maintenance lines.
+ *
+ * Authorization goes through `authorizeVehicleAccess`, which replaces a
+ * hand-rolled copy of the ownership check identical to the one that was in
+ * `load-vehicle` — two more implementations of the rule `lib/api-auth.ts` owns.
+ *
+ * **A demo vehicle will fail here, and that is the honest answer rather than a
+ * bug.** Measured against the live project on 27 Jul: the `anon` role is
+ * granted SELECT on `vehicles` and `vehicle_knowledge_base`, and is refused —
+ * "permission denied for table" — on all four tables this route reads. So an
+ * anonymous caller genuinely cannot see this data.
+ *
+ * The tempting fix is to use the service-role client for demo vehicles the way
+ * this route used to. Do not. `authorizeVehicleAccess` returns the anon client
+ * for demo reads deliberately, so that RLS scopes them; reaching past it for
+ * shared public data is how a demo-shaped hole gets opened in a boundary that
+ * currently holds. If the demo should expose maintenance history, that is a
+ * deliberate grant on those four tables, not a client swap here.
+ *
+ * Nothing displays this today — see the note on the hooks below.
+ */
 
 export async function GET(request: NextRequest): Promise<Response> {
   logger.info('API:LOAD_MAINTENANCE', 'Loading maintenance data');
@@ -26,34 +47,12 @@ export async function GET(request: NextRequest): Promise<Response> {
       return Response.json({ success: false, error: 'Missing vehicleId' } as ApiResponse, { status: 400 });
     }
 
-    const validationResult = vehicleIdSchema.safeParse(vehicleId);
-    if (!validationResult.success) {
-      logger.warn('API:LOAD_MAINTENANCE', 'Invalid vehicleId format');
-      return Response.json({ success: false, error: 'Invalid vehicleId format' } as ApiResponse, { status: 400 });
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'read' });
+    if (!access.ok) {
+      return access.response;
     }
 
-    const isDemo = isDemoVehicleId(vehicleId);
-
-    if (!isDemo) {
-      const authClient = createServerActionClient();
-      const { data: { user }, error: authError } = await authClient.auth.getUser();
-      if (authError || !user) {
-        return Response.json({ success: false, error: 'Unauthorized' } as ApiResponse, { status: 401 });
-      }
-
-      const { data: ownership } = await authClient
-        .from('vehicles')
-        .select('id')
-        .eq('id', vehicleId)
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (!ownership) {
-        return Response.json({ success: false, error: 'Vehicle not found' } as ApiResponse, { status: 404 });
-      }
-    }
-
-    const supabase = getServiceRoleClient();
+    const supabase = access.client;
 
     logger.debug('API:LOAD_MAINTENANCE', 'Fetching all maintenance data in parallel');
     const [docsResult, lineItemsResult, serviceItemsResult, maintenanceItemsResult] = await Promise.all([

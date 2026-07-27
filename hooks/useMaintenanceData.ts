@@ -7,6 +7,15 @@ export interface MaintenanceData {
   maintenanceLineItems: any[];
 }
 
+/**
+ * Maintenance history through the API. **Currently unreferenced** — see the
+ * note on `useVehicle` for why these are kept rather than deleted.
+ *
+ * Specific to this one: the four tables behind it are not readable by the
+ * `anon` role, so it cannot serve a demo vehicle at all. It is a signed-in
+ * endpoint, and until the deployed service-role key is fixed it cannot serve
+ * anyone. Do not wire a page onto it before then.
+ */
 export function useMaintenanceData(vehicleId: string | null | undefined) {
   return useQuery({
     queryKey: ['maintenance', vehicleId],

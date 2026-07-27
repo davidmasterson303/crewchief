@@ -1,12 +1,26 @@
-import { getServiceRoleClient, createServerActionClient } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
-import { vehicleIdSchema } from '@/lib/validation';
 import { type NextRequest } from 'next/server';
 import type { ApiResponse } from '@/lib/types';
 import { checkRateLimit, getClientIdentifier, rateLimitResponse } from '@/lib/rate-limit';
-import { isDemoVehicleId } from '@/lib/demo';
+import { authorizeVehicleAccess } from '@/lib/api-auth';
 
 export const dynamic = 'force-dynamic';
+
+/**
+ * Vehicle and knowledge-base read.
+ *
+ * Authorization goes through `authorizeVehicleAccess` like everything else.
+ * It used to hand-roll its own: session lookup, then a `vehicles` ownership
+ * query, then `getServiceRoleClient()` — a second implementation of the rule
+ * `lib/api-auth.ts` exists to own, and the bug this codebase keeps repeating.
+ *
+ * It also reached for the service role **unconditionally, including for demo
+ * vehicles**, which is why this route returned 500 "Invalid API key" on both
+ * deployments while sibling routes served the demo fine: the deployed
+ * service-role key is rejected, and this route needed it even for public data.
+ * `authorizeVehicleAccess` hands back the anon client for a demo read, so that
+ * path no longer depends on the elevated credential at all.
+ */
 
 export async function GET(request: NextRequest): Promise<Response> {
   logger.info('API:LOAD_VEHICLE', 'Loading vehicle');
@@ -26,34 +40,14 @@ export async function GET(request: NextRequest): Promise<Response> {
       return Response.json({ success: false, error: 'Missing vehicleId' } as ApiResponse, { status: 400 });
     }
 
-    const validationResult = vehicleIdSchema.safeParse(vehicleId);
-    if (!validationResult.success) {
-      logger.warn('API:LOAD_VEHICLE', 'Invalid vehicleId format');
-      return Response.json({ success: false, error: 'Invalid vehicleId format' } as ApiResponse, { status: 400 });
+    // Validates the id, resolves demo vs owned, and returns the right client:
+    // anon for a demo read, service-role only once ownership is proven.
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'read' });
+    if (!access.ok) {
+      return access.response;
     }
 
-    const isDemo = isDemoVehicleId(vehicleId);
-
-    if (!isDemo) {
-      const authClient = createServerActionClient();
-      const { data: { user }, error: authError } = await authClient.auth.getUser();
-      if (authError || !user) {
-        return Response.json({ success: false, error: 'Unauthorized' } as ApiResponse, { status: 401 });
-      }
-
-      const { data: ownership } = await authClient
-        .from('vehicles')
-        .select('id')
-        .eq('id', vehicleId)
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (!ownership) {
-        return Response.json({ success: false, error: 'Vehicle not found' } as ApiResponse, { status: 404 });
-      }
-    }
-
-    const supabase = getServiceRoleClient();
+    const supabase = access.client;
 
     const [vehicleResult, knowledgeResult] = await Promise.all([
       supabase.from('vehicles').select('*').eq('id', vehicleId).maybeSingle(),
