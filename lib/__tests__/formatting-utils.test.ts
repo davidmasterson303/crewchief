@@ -7,7 +7,7 @@ import {
   truncateString,
   capitalizeWords,
   slugify
-} from '../formatting-utils';
+} from '@crewchief/core/formatting-utils';
 
 describe('Formatting Utils', () => {
   describe('formatCurrency', () => {

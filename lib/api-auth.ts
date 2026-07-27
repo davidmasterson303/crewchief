@@ -25,9 +25,9 @@ import {
   getServerClient,
   getServiceRoleClient,
 } from '@/lib/supabase';
-import { isDemoVehicleId } from '@/lib/demo';
-import { vehicleIdSchema } from '@/lib/validation';
-import { logger } from '@/lib/logger';
+import { isDemoVehicleId } from '@crewchief/core/demo';
+import { vehicleIdSchema } from '@crewchief/core/validation';
+import { logger } from '@crewchief/core/logger';
 
 export type AccessIntent = 'read' | 'write';
 

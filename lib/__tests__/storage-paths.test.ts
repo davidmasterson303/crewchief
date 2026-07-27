@@ -14,7 +14,7 @@ import {
   vehicleStoragePath,
   vehicleIdFromStoragePath,
   vehicleStoragePrefixes,
-} from '@/lib/storage-paths';
+} from '@crewchief/core/storage-paths';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 

@@ -1,7 +1,7 @@
 'use server';
 
 import { getServiceRoleClient } from '@/lib/supabase';
-import { logger } from '@/lib/logger';
+import { logger } from '@crewchief/core/logger';
 
 export async function fetchVehicleById(vehicleId: string) {
   try {

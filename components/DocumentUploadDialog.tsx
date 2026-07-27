@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Upload, FileText, Camera, X, TriangleAlert as AlertTriangle, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import InvoiceProcessingLoader from './InvoiceProcessingLoader';
-import { invalidateDashboardCache } from '@/lib/query-invalidation';
+import { invalidateDashboardCache } from '@crewchief/core/query-invalidation';
 import { generateVehicleHealthSummary } from '@/app/actions';
 
 interface DocumentUploadDialogProps {

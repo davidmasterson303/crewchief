@@ -4,14 +4,14 @@ import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Car, ChevronLeft, Clock, MessageSquare, Wrench, CreditCard as Edit2, Check, X, Info, ChevronRight, Tag } from 'lucide-react';
-import { isDemoVehicleId } from '@/lib/demo';
+import { isDemoVehicleId } from '@crewchief/core/demo';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { updateVehicleAvgMileage, updateVehicleMileage, updateVehicleStatus } from '@/app/actions';
-import { USAGE_PROFILES, usageProfileChip } from '@/lib/usage-profile';
-import { invalidateDashboardCache } from '@/lib/query-invalidation';
+import { USAGE_PROFILES, usageProfileChip } from '@crewchief/core/usage-profile';
+import { invalidateDashboardCache } from '@crewchief/core/query-invalidation';
 import { AccountMenu } from '@/components/AccountMenu';
 
 interface DashboardLayoutProps {

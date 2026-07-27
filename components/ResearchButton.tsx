@@ -6,7 +6,7 @@ import { RefreshCw, Loader as Loader2 } from 'lucide-react';
 import { generateVehicleDossier } from '@/app/actions';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
-import { logger } from '@/lib/logger';
+import { logger } from '@crewchief/core/logger';
 
 interface ResearchButtonProps {
   vehicleId: string;

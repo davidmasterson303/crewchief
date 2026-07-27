@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Upload, Loader as Loader2, FileText, Camera, X } from 'lucide-react';
-import { invalidateDashboardCache } from '@/lib/query-invalidation';
+import { invalidateDashboardCache } from '@crewchief/core/query-invalidation';
 
 interface DocumentUploadProps {
   vehicleId: string;

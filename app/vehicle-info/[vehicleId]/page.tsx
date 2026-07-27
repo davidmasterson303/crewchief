@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Gauge, Zap, Timer, Droplets, Lightbulb, Cog, Activity, Loader as Loader2, RefreshCw } from 'lucide-react';
 import ResearchButton from '@/components/ResearchButton';
 import { getClientSupabase } from '@/lib/supabase';
-import { logger } from '@/lib/logger';
+import { logger } from '@crewchief/core/logger';
 import TCOCard from '@/components/TCOCard';
 import TCOInputsModal from '@/components/TCOInputsModal';
 import { useQuery, useQueryClient } from '@tanstack/react-query';

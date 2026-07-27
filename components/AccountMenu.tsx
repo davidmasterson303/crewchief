@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { createBrowserSupabaseClient } from '@/lib/supabase';
-import { queryClient } from '@/lib/query-client';
+import { queryClient } from '@crewchief/core/query-client';
 import { signOutAndClearCache } from '@/lib/sign-out';
 import { toast } from 'sonner';
 

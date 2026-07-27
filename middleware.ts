@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
-import { resolveRoute } from '@/lib/routes';
-import { corsHeadersFor, isVersionedApiPath } from '@/lib/cors';
+import { resolveRoute } from '@crewchief/core/routes';
+import { corsHeadersFor, isVersionedApiPath } from '@crewchief/core/cors';
 
 /**
  * Route protection.
@@ -16,7 +16,7 @@ import { corsHeadersFor, isVersionedApiPath } from '@/lib/cors';
  * exported middleware was a no-op with an empty matcher — 11 green tests
  * asserting protection the app did not actually have.
  *
- * That policy now lives in `lib/routes.ts` so `components/AuthProvider.tsx`
+ * That policy now lives in `@crewchief/core/routes` so `components/AuthProvider.tsx`
  * can share it — a client component cannot import this module, which pulls in
  * `next/server`. It is re-exported below rather than duplicated, because a
  * private copy of this logic is the exact bug described above.
@@ -29,7 +29,7 @@ export {
   isProtectedRoute,
   resolveRoute,
   type RouteDecision,
-} from '@/lib/routes';
+} from '@crewchief/core/routes';
 
 function readSupabaseConfig(): { url: string; key: string } | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

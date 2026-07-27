@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { logger } from '@/lib/logger';
+import { logger } from '@crewchief/core/logger';
 import { checkRateLimit, getClientIdentifier, rateLimitResponse } from '@/lib/rate-limit';
 import { authorizeVehicleScopedRow } from '@/lib/api-auth';
 import { recomputePerformanceStats } from '@/lib/performance-stats';

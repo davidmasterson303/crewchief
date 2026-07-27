@@ -5,7 +5,7 @@
  * and database operations. Provides type-safe validation with clear error messages.
  *
  * Usage:
- *   import { validateData, vehicleSchema } from '@/lib/validation';
+ *   import { validateData, vehicleSchema } from './validation';
  *
  *   const result = validateData(vehicleSchema, userInput);
  *   if (!result.success) {
@@ -16,8 +16,8 @@
  */
 
 import { z } from 'zod';
-import type { ApiResponse } from '@/lib/types';
-import { logger } from '@/lib/logger';
+import type { ApiResponse } from './types';
+import { logger } from './logger';
 
 // ============================================================================
 // CONSTANTS

@@ -1,5 +1,5 @@
 /**
- * Which of `lib/` a mobile client could import.
+ * What a mobile client could import, and what it must not.
  *
  * @jest-environment node
  *
@@ -9,10 +9,13 @@
  * a test rather than kept as a review habit, "because it is exactly the kind
  * of thing that decays silently".
  *
- * So the assertion lands before the move rather than after it. Once the set
- * below is pinned, the move becomes mechanical: anything in `PORTABLE` can go,
- * anything in `NOT_PORTABLE` stays, and a module that changes category has to
- * change this file to do it.
+ * The assertion landed before the move rather than after it, which is why the
+ * move itself was mechanical. **It is now doing the opposite job**: `PORTABLE`
+ * is empty because everything that qualified has gone, so the load-bearing
+ * assertions are the two that guard the result — every module now inside
+ * `packages/core/src` is still portable, and every module left in `lib/` is
+ * still genuinely blocked. The first is where a later edit would reintroduce a
+ * Supabase import into the shared package unnoticed.
  *
  * **The check is transitive**, which is the whole point. `account-data.ts`
  * imports nothing disqualifying by eye — it reaches `@supabase/supabase-js`
@@ -102,35 +105,9 @@ function blocker(file: string, seen = new Set<string>()): string | null {
  * **This list may only grow**, and only by making a module genuinely portable.
  * Adding a name here without fixing the module fails the assertions below.
  */
-const PORTABLE = [
-  'lib/ai/models.ts',
-  'lib/auth-session.ts',
-  'lib/cache-debug.ts',
-  'lib/constants.ts',
-  'lib/consultant-commands.ts',
-  'lib/cors.ts',
-  'lib/demo-contract.ts',
-  'lib/demo.ts',
-  'lib/error-messages.ts',
-  'lib/event-bus.ts',
-  'lib/formatting-utils.ts',
-  'lib/logger.ts',
-  'lib/maintenance-sync.ts',
-  'lib/mileage-tracking.ts',
-  'lib/onboarding.ts',
-  'lib/prompts.ts',
-  'lib/query-client.ts',
-  'lib/query-invalidation.ts',
-  'lib/quote-naming.ts',
-  'lib/retry.ts',
-  'lib/routes.ts',
-  'lib/storage-paths.ts',
-  'lib/types.ts',
-  'lib/usage-profile.ts',
-  'lib/utils.ts',
-  'lib/validation.ts',
-  'lib/vehicle-utils.ts',
-  'lib/wishlist-identifier.ts',
+const PORTABLE: string[] = [
+  // Empty: every module that qualified has moved into packages/core/src.
+  // A new portable module in lib/ belongs here until it moves.
 ];
 
 /**
@@ -165,8 +142,12 @@ describe('the portable half of lib/', () => {
     expect(all.filter((f) => !classified.has(f))).toEqual([]);
   });
 
-  it.each(PORTABLE)('%s has no non-portable dependency, transitively', (rel) => {
-    expect(blocker(join(ROOT, rel))).toBeNull();
+  it('every module still in lib/ that claims to be portable really is', () => {
+    // A loop rather than it.each: the list is legitimately empty now that the
+    // move is done, and it.each throws on an empty table. It fills again only
+    // when someone adds a portable module to lib/ instead of to the package.
+    const wrong = PORTABLE.filter((rel) => blocker(join(ROOT, rel)) !== null);
+    expect(wrong).toEqual([]);
   });
 
   it('has moved at least one module into the package', () => {

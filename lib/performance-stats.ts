@@ -26,7 +26,7 @@
  */
 
 import { genAI, flashStructuredConfig } from '@/lib/gemini';
-import { logger } from '@/lib/logger';
+import { logger } from '@crewchief/core/logger';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export interface PerformanceStats {

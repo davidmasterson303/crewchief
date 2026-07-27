@@ -13,12 +13,12 @@
  * the garage and make a second car unaddable — a polish task turning into a
  * functional regression on the app's main flow. Hence `?from=garage`.
  *
- * The predicate itself is argued in `lib/onboarding.ts`: vehicle count, not
+ * The predicate itself is argued in `packages/core/src/onboarding.ts`: vehicle count, not
  * the profiles row, because the profile is trigger-created on signup and is
  * therefore true of a brand-new user.
  */
 
-import { resolveOnboardingEntry } from '@/lib/onboarding';
+import { resolveOnboardingEntry } from '@crewchief/core/onboarding';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -103,7 +103,7 @@ describe('the predicate is vehicles, not profiles', () => {
   });
 
   it('never consults a profile in the decision', () => {
-    const source = readFileSync(join(ROOT, 'lib/onboarding.ts'), 'utf8');
+    const source = readFileSync(join(ROOT, 'packages/core/src/onboarding.ts'), 'utf8');
     const body = source.slice(source.indexOf('export function resolveOnboardingEntry'));
     expect(body).not.toMatch(/profile/i);
   });

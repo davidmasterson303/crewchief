@@ -8,11 +8,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Loader as Loader2, CircleCheck as CheckCircle2, CircleAlert as AlertCircle, X, Upload, Image as ImageIcon } from 'lucide-react';
-import { logger } from '@/lib/logger';
+import { logger } from '@crewchief/core/logger';
 import { createVehicle, generateVehicleDossier, generateVehicleHealthSummary, preloadAllPerformanceModifications, updateVehiclePowertrain, fetchPowertrainOptions, uploadVehiclePhoto } from '@/app/actions';
-import { detectUncertainPowertrainFields } from '@/lib/vehicle-utils';
+import { detectUncertainPowertrainFields } from '@crewchief/core/vehicle-utils';
 import PowertrainSelector from '@/components/PowertrainSelector';
-import type { PowertrainUncertainty } from '@/lib/types';
+import type { PowertrainUncertainty } from '@crewchief/core/types';
 
 interface OnboardingWizardProps {
   vehicleData: {

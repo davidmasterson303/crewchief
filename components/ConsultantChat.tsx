@@ -6,10 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Loader as Loader2, Send, Plus, Search, MessageSquare, Paperclip, X, FileText, ExternalLink, Heart, Check, Wrench, TriangleAlert, Sparkles, PanelLeft, Copy } from 'lucide-react';
-import { logger } from '@/lib/logger';
-import { isDemoVehicleId } from '@/lib/demo';
+import { logger } from '@crewchief/core/logger';
+import { isDemoVehicleId } from '@crewchief/core/demo';
 import { isDemoMode } from '@/lib/demo-mode';
-import { wishlistItemIdentifier } from '@/lib/wishlist-identifier';
+import { wishlistItemIdentifier } from '@crewchief/core/wishlist-identifier';
 import {
   sendConsultantMessage,
   createConsultantSession,
@@ -18,7 +18,7 @@ import {
   getConsultantSessions,
 } from '@/app/actions';
 import { toast } from 'sonner';
-import { invalidateDashboardCache } from '@/lib/query-invalidation';
+import { invalidateDashboardCache } from '@crewchief/core/query-invalidation';
 
 interface ConsultantChatProps {
   vehicleId: string;

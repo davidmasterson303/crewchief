@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { uploadConsultantDocument } from '@/app/actions';
-import { logger } from '@/lib/logger';
-import { MAX_FILE_SIZE, ALLOWED_DOCUMENT_TYPES } from '@/lib/validation';
-import type { ApiResponse } from '@/lib/types';
+import { logger } from '@crewchief/core/logger';
+import { MAX_FILE_SIZE, ALLOWED_DOCUMENT_TYPES } from '@crewchief/core/validation';
+import type { ApiResponse } from '@crewchief/core/types';
 import { checkRateLimit, getClientIdentifier, rateLimitResponse } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';

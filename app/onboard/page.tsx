@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 import { countUserVehicles } from '@/lib/account-data';
-import { resolveOnboardingEntry } from '@/lib/onboarding';
+import { resolveOnboardingEntry } from '@crewchief/core/onboarding';
 import OnboardVinForm from './OnboardVinForm';
 
 /**

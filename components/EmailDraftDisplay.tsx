@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Copy, Check } from 'lucide-react';
-import { logger } from '@/lib/logger';
+import { logger } from '@crewchief/core/logger';
 
 interface EmailDraftDisplayProps {
   emailDraft: string;

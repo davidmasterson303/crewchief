@@ -1,7 +1,7 @@
 import { getServiceRoleClient } from '@/lib/supabase';
 import { requireSession } from '@/lib/api-auth';
-import { vehicleStoragePrefixes } from '@/lib/storage-paths';
-import { logger } from '@/lib/logger';
+import { vehicleStoragePrefixes } from '@crewchief/core/storage-paths';
+import { logger } from '@crewchief/core/logger';
 
 const DOCUMENTS_BUCKET = 'vehicle-documents';
 

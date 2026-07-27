@@ -12,7 +12,7 @@
  * the existing security suites use and there is still only one definition.
  */
 
-import { isDemoVehicleId } from '@/lib/demo';
+import { isDemoVehicleId } from './demo';
 
 export const PROTECTED_ROUTES = [
   '/garage',

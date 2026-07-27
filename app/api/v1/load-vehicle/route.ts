@@ -1,6 +1,6 @@
-import { logger } from '@/lib/logger';
+import { logger } from '@crewchief/core/logger';
 import { type NextRequest } from 'next/server';
-import type { ApiResponse } from '@/lib/types';
+import type { ApiResponse } from '@crewchief/core/types';
 import { checkRateLimit, getClientIdentifier, rateLimitResponse } from '@/lib/rate-limit';
 import { authorizeVehicleAccess } from '@/lib/api-auth';
 

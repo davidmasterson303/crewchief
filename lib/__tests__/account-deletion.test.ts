@@ -74,7 +74,7 @@ jest.mock('@/lib/api-auth', () => ({
   requireSession: jest.fn(async () => sessionResult),
 }));
 
-jest.mock('@/lib/logger', () => ({
+jest.mock('@crewchief/core/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));
 

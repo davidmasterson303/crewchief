@@ -6,7 +6,7 @@
  * and production monitoring.
  *
  * Usage:
- *   import { logger } from '@/lib/logger';
+ *   import { logger } from './logger';
  *
  *   logger.info('USER:LOGIN', 'User logged in successfully', { userId: '123' });
  *   logger.error('API:FETCH', new Error('Failed to fetch'), { endpoint: '/api/v1/vehicles' });

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usageProfileChip } from '@/lib/usage-profile';
+import { usageProfileChip } from '@crewchief/core/usage-profile';
 import { useHealthBand } from '@/hooks/use-health-band';
 import { Button } from '@/components/ui/button';
 import {
@@ -46,13 +46,13 @@ import {
   TriangleAlert,
 } from 'lucide-react';
 import { updateVehicleMileage } from '@/app/actions';
-import { logger } from '@/lib/logger';
-import { isDemoVehicleId, DEMO_IMAGES } from '@/lib/demo';
+import { logger } from '@crewchief/core/logger';
+import { isDemoVehicleId, DEMO_IMAGES } from '@crewchief/core/demo';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { invalidateDashboardCache } from '@/lib/query-invalidation';
-import { queryClient } from '@/lib/query-client';
+import { invalidateDashboardCache } from '@crewchief/core/query-invalidation';
+import { queryClient } from '@crewchief/core/query-client';
 import { supabase } from '@/lib/supabase';
 import { MileageUpdatePrompt } from './MileageUpdatePrompt';
 import { VehiclePhotoUploadDialog } from './VehiclePhotoUploadDialog';

@@ -42,7 +42,17 @@ function findSourceFiles(dir: string, acc: string[] = []): string[] {
   return acc;
 }
 
-const SOURCE_DIRS = ['app', 'lib', 'components', 'hooks'];
+/*
+  Includes the shared package. Phase 2.4 moved 29 modules into
+  `packages/core/src`, and this list did not follow them — so for one commit
+  the rule silently covered 29 fewer files while still reporting green.
+
+  It was caught only because the plan insists on proving a ratchet can still
+  fail after a move rather than trusting that it passes. Nothing here fails if
+  a directory is missing from this list; it just quietly checks less. If a new
+  top-level source directory appears, add it.
+*/
+const SOURCE_DIRS = ['app', 'lib', 'components', 'hooks', 'packages/core/src'];
 
 /**
  * Modules permitted to read an `Authorization` header.

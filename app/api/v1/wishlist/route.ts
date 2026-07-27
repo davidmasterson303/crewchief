@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceRoleClient, getServerClient, createServerActionClient } from '@/lib/supabase';
-import { logger } from '@/lib/logger';
+import { logger } from '@crewchief/core/logger';
 import { checkRateLimit, getClientIdentifier, rateLimitResponse } from '@/lib/rate-limit';
-import { isDemoVehicleId } from '@/lib/demo';
+import { isDemoVehicleId } from '@crewchief/core/demo';
 import { authorizeVehicleAccess, authorizeVehicleScopedRow } from '@/lib/api-auth';
 
 export const dynamic = 'force-dynamic';

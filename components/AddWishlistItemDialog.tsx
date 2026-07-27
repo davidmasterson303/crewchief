@@ -21,8 +21,8 @@ import {
 } from '@/components/ui/select';
 import { Loader as Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { logger } from '@/lib/logger';
-import { wishlistItemIdentifier } from '@/lib/wishlist-identifier';
+import { logger } from '@crewchief/core/logger';
+import { wishlistItemIdentifier } from '@crewchief/core/wishlist-identifier';
 
 interface AddWishlistItemDialogProps {
   open: boolean;

@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { logger } from '@/lib/logger';
+import { logger } from '@crewchief/core/logger';
 import MaintenanceItemDetailsDialog from './MaintenanceItemDetailsDialog';
 import DocumentUploadDialog from './DocumentUploadDialog';
 import type {
@@ -25,7 +25,7 @@ import type {
   MaintenanceItemToDelete,
   DeleteMaintenanceItemResult,
   MaintenanceItemDetails
-} from '@/lib/types';
+} from '@crewchief/core/types';
 
 interface MaintenanceHistoryProps {
   vehicleId: string;

@@ -25,7 +25,7 @@ import {
 import { useWishlistData } from '@/hooks/useWishlistData';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
-import { invalidateDashboardCache } from '@/lib/query-invalidation';
+import { invalidateDashboardCache } from '@crewchief/core/query-invalidation';
 import IssueFixDialog from './IssueFixDialog';
 import MaintenanceHistoryDialog from './MaintenanceHistoryDialog';
 import IssuesTab from './insights/IssuesTab';

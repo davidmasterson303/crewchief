@@ -18,7 +18,7 @@
  *     happens when middleware reaches further than intended.
  */
 
-import { allowedOrigins, corsHeadersFor, isVersionedApiPath } from '@/lib/cors';
+import { allowedOrigins, corsHeadersFor, isVersionedApiPath } from '@crewchief/core/cors';
 
 const ORIGINS = ['https://crewchief-demo.davidmasterson.co', 'http://localhost:8081'];
 

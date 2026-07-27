@@ -5,7 +5,7 @@
  * transient failures in API calls, database operations, and other async tasks.
  *
  * Usage:
- *   import { withRetry, RetryOptions } from '@/lib/retry';
+ *   import { withRetry, RetryOptions } from './retry';
  *
  *   const result = await withRetry(
  *     () => fetch('/api/data'),
@@ -13,7 +13,7 @@
  *   );
  */
 
-import { logger } from '@/lib/logger';
+import { logger } from './logger';
 
 // ============================================================================
 // TYPES

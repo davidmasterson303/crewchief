@@ -22,7 +22,7 @@
  * session — and that is the caller's job to track. Everything here is pure.
  */
 
-import { isProtectedRoute } from '@/lib/routes';
+import { isProtectedRoute } from './routes';
 
 /** The subset of Supabase auth events this policy reasons about. */
 export type AuthChangeEvent =

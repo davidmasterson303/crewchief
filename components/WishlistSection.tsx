@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Trash2, CircleCheck as CheckCircle, Wrench, TriangleAlert as AlertTriangle, Sparkles, Loader as Loader2, FileText, History, Eye, ListChecks } from 'lucide-react';
 import { toast } from 'sonner';
 import { getQuoteRequestHistory } from '@/app/actions';
-import { logger } from '@/lib/logger';
+import { logger } from '@crewchief/core/logger';
 import { MarkCompleteDialog } from './MarkCompleteDialog';
 import { AddWishlistItemDialog } from './AddWishlistItemDialog';
 import { QuoteRequestDialogV2 } from './QuoteRequestDialogV2';

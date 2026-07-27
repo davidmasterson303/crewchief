@@ -1,4 +1,4 @@
-import { extractJSON, VehicleDataSchema } from '../vehicle-utils';
+import { extractJSON, VehicleDataSchema } from '@crewchief/core/vehicle-utils';
 
 describe('Vehicle Utils', () => {
   describe('extractJSON', () => {

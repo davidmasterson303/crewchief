@@ -4,8 +4,8 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import type { User, Session } from '@supabase/supabase-js';
 import { createBrowserSupabaseClient, hasSupabaseConfig } from '@/lib/supabase';
-import { queryClient } from '@/lib/query-client';
-import { resolveAuthEvent } from '@/lib/auth-session';
+import { queryClient } from '@crewchief/core/query-client';
+import { resolveAuthEvent } from '@crewchief/core/auth-session';
 
 /**
  * The app's one auth-state listener.

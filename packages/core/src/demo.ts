@@ -2,9 +2,9 @@
  * Demo identity — portable.
  *
  * The cookie *name* lives here because it is just a string; the functions that
- * read and write it are in `lib/demo-mode.ts`, which is browser-only. Keeping
- * them apart is what lets this module, `lib/routes.ts` and
- * `lib/auth-session.ts` into the shared package.
+ * read and write it are in `lib/demo-mode.ts` (which stays in the app), and is browser-only. Keeping
+ * them apart is what lets this module, `routes.ts` and
+ * `auth-session.ts` into the shared package.
  */
 export const DEMO_COOKIE = 'crewchief_demo';
 export const DEMO_VEHICLE_IDS = [

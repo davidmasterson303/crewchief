@@ -1,6 +1,6 @@
 import { createServerActionClient } from '@/lib/supabase';
-import { logger } from '@/lib/logger';
-import type { ApiResponse } from '@/lib/types';
+import { logger } from '@crewchief/core/logger';
+import type { ApiResponse } from '@crewchief/core/types';
 
 export async function GET(): Promise<Response> {
   logger.info('API:GET_VEHICLES', 'Fetching vehicles for authenticated user');

@@ -1,4 +1,4 @@
-import { queryClient } from '@/lib/query-client';
+import { queryClient } from './query-client';
 
 /**
  * Invalidates all dashboard-related query caches for a given vehicle.
