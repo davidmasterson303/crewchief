@@ -1,5 +1,6 @@
 import { getServiceRoleClient } from '@/lib/supabase';
 import { requireSession } from '@/lib/api-auth';
+import { vehicleStoragePrefixes } from '@/lib/storage-paths';
 import { logger } from '@/lib/logger';
 
 const DOCUMENTS_BUCKET = 'vehicle-documents';
@@ -245,19 +246,11 @@ export async function exportAccountData() {
 /**
  * Prefixes under which a vehicle's files can live.
  *
- * There is no single convention — four upload paths each invented their own:
- *
- *   uploadInvoice               {vehicleId}/{file}
- *   uploadVehiclePhoto          vehicle-photos/{vehicleId}/{file}
- *   uploadConsultantDocument    consultant-docs/{vehicleId}/{sessionId}/{file}
- *   uploadInvoiceForCompletion  invoices/{file}          <- no vehicle at all
- *
- * The first three are recoverable from a vehicle id. The fourth is not, and
- * is reported separately — see `unattributable` below.
+ * The prefixes come from `lib/storage-paths.ts`, which is the module that
+ * writes them. This file used to carry its own identical copy — two
+ * definitions of where a user's data lives, which is the arrangement that
+ * makes a deletion sweep quietly stop matching the uploader.
  */
-function vehicleStoragePrefixes(vehicleId: string): string[] {
-  return [vehicleId, `vehicle-photos/${vehicleId}`, `consultant-docs/${vehicleId}`];
-}
 
 /**
  * List every object under a prefix, descending into subfolders.
@@ -408,23 +401,25 @@ export async function deleteAccount() {
     });
 
     /*
-      Known limitation, logged loudly rather than hidden.
+      The gap this used to warn about is closed.
 
-      `uploadInvoiceForCompletion` writes to `invoices/{file}` with no vehicle
-      or user in the path, so those objects cannot be attributed to an account
-      and therefore cannot be purged with it. That is a real gap in a deletion
-      guarantee we make in the privacy policy.
+      `uploadInvoiceForCompletion` wrote to `invoices/{file}` with no vehicle
+      or user in the path, so those objects could not be attributed to an
+      account and could not be purged with it — a real hole in the deletion
+      guarantee the privacy policy makes. Task 0.3 moved all four upload sites
+      onto `vehicleStoragePath`, so every object written now begins with a
+      vehicle id and is reachable by the sweep above.
 
-      The fix belongs upstream — that upload should be vehicle-scoped like the
-      other three — and is tracked with task 0.3, which is reworking storage
-      paths anyway. Until then, this records that deletion was incomplete by
-      design rather than pretending otherwise.
+      Confirmed 27 Jul against the live bucket: `vehicle-documents` holds zero
+      objects, so no legacy unattributable blobs survive from before the
+      unification either. The warning that stood here was describing a state
+      that no longer existed, which is worse than no warning — it would have
+      kept the privacy policy unpublished on stale evidence.
+
+      What would reopen it: any new `.upload()` call that does not build its
+      path with `vehicleStoragePath`. `lib/__tests__/storage-paths.test.ts`
+      covers the builder; the sweep depends on every writer using it.
     */
-    logger.warn(
-      'ACCOUNT_DELETE:UNATTRIBUTABLE_STORAGE',
-      'Objects under invoices/ cannot be attributed to a user and were not purged',
-      { userId }
-    );
 
     return {
       success: true,
