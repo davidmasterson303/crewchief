@@ -102,11 +102,13 @@ function blocker(file: string, seen = new Set<string>()): string | null {
  */
 const PORTABLE = [
   'lib/ai/models.ts',
+  'lib/auth-session.ts',
   'lib/cache-debug.ts',
   'lib/constants.ts',
   'lib/consultant-commands.ts',
   'lib/cors.ts',
   'lib/demo-contract.ts',
+  'lib/demo.ts',
   'lib/error-messages.ts',
   'lib/event-bus.ts',
   'lib/formatting-utils.ts',
@@ -119,6 +121,7 @@ const PORTABLE = [
   'lib/query-invalidation.ts',
   'lib/quote-naming.ts',
   'lib/retry.ts',
+  'lib/routes.ts',
   'lib/storage-paths.ts',
   'lib/tco-calculator.ts',
   'lib/types.ts',
@@ -146,12 +149,8 @@ const NOT_PORTABLE: Record<string, string> = {
   'lib/actions/vehicles.ts': 'reaches Supabase through lib/supabase',
   'lib/actions/wishlist.ts': 'reaches Supabase through lib/supabase',
   // Splits, not moves — the effort the plan warned about.
-  'lib/demo.ts': 'demo ids are portable; the cookie helpers use document.cookie',
   'lib/deletion-recovery.ts': 'queue logic is portable; persistence uses localStorage',
-  'lib/routes.ts': 'pure policy, but reaches document.cookie through lib/demo',
-  // Same chain one hop further out. Both become portable the moment demo.ts
-  // is split — which makes that split the highest-leverage one in the task.
-  'lib/auth-session.ts': 'pure policy, but reaches lib/demo through lib/routes',
+  'lib/demo-mode.ts': 'document.cookie — split out of demo.ts so demo.ts could move',
 };
 
 describe('the portable half of lib/', () => {

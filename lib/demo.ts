@@ -1,3 +1,11 @@
+/**
+ * Demo identity — portable.
+ *
+ * The cookie *name* lives here because it is just a string; the functions that
+ * read and write it are in `lib/demo-mode.ts`, which is browser-only. Keeping
+ * them apart is what lets this module, `lib/routes.ts` and
+ * `lib/auth-session.ts` into the shared package.
+ */
 export const DEMO_COOKIE = 'crewchief_demo';
 export const DEMO_VEHICLE_IDS = [
   'a1000000-0000-0000-0000-000000000001',
@@ -7,23 +15,6 @@ export const DEMO_VEHICLE_IDS = [
 
 export function isDemoVehicleId(vehicleId: string): boolean {
   return DEMO_VEHICLE_IDS.includes(vehicleId as any);
-}
-
-export function setDemoMode(): void {
-  if (typeof document !== 'undefined') {
-    document.cookie = `${DEMO_COOKIE}=1; path=/; max-age=86400; SameSite=Lax`;
-  }
-}
-
-export function clearDemoMode(): void {
-  if (typeof document !== 'undefined') {
-    document.cookie = `${DEMO_COOKIE}=; path=/; max-age=0`;
-  }
-}
-
-export function isDemoMode(): boolean {
-  if (typeof document === 'undefined') return false;
-  return document.cookie.split(';').some((c) => c.trim().startsWith(`${DEMO_COOKIE}=1`));
 }
 
 /*

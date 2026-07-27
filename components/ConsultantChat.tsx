@@ -7,7 +7,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Loader as Loader2, Send, Plus, Search, MessageSquare, Paperclip, X, FileText, ExternalLink, Heart, Check, Wrench, TriangleAlert, Sparkles, PanelLeft, Copy } from 'lucide-react';
 import { logger } from '@/lib/logger';
-import { isDemoMode, isDemoVehicleId } from '@/lib/demo';
+import { isDemoVehicleId } from '@/lib/demo';
+import { isDemoMode } from '@/lib/demo-mode';
 import { wishlistItemIdentifier } from '@/lib/wishlist-identifier';
 import {
   sendConsultantMessage,
