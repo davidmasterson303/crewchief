@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usageProfileChip } from '@crewchief/core/usage-profile';
 import { useHealthBand } from '@/hooks/use-health-band';
+import { useVehicleImage } from '@/hooks/useSignedUrl';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -228,13 +229,21 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary, alerts }: V
    * applied everywhere. Deleting it before then would send the demo cards back
    * to the Pexels CDN this map was introduced to get them off — the database
    * still holds those URLs. Delete both together, not this one first.
+   *
+   * The owner-photo half is resolved by `useVehicleImage`: the column holds a
+   * storage path against a private bucket, so it has to be signed before it
+   * can go in an `<img>`. That returns undefined while the exchange is in
+   * flight, which is why the demo override is checked first — it needs no
+   * signing and must not wait on one.
    */
+  const resolvedImageUrl = useVehicleImage(vehicle);
+
   const getVehicleImageUrl = (): string | undefined => {
     if (imageError) return undefined;
     if (isDemoVehicleId(vehicle.id) && DEMO_IMAGES[vehicle.id]) {
       return DEMO_IMAGES[vehicle.id];
     }
-    return vehicle.custom_image_url || vehicle.image_url || undefined;
+    return resolvedImageUrl;
   };
 
   const handleImageError = () => {

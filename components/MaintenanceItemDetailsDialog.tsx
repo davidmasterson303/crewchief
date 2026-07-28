@@ -1,10 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, DollarSign, FileText, MapPin, Wrench, Hash, Package } from 'lucide-react';
-import { getSignedInvoiceUrl } from '@/app/actions';
+import { useSignedUrl } from '@/hooks/useSignedUrl';
 
 interface MaintenanceItemDetailsDialogProps {
   open: boolean;
@@ -35,22 +34,14 @@ export default function MaintenanceItemDetailsDialog({
   invoiceUrl,
 }: MaintenanceItemDetailsDialogProps) {
   const totalCost = item.total_cost || (item.cost_labor || 0) + (item.cost_parts || 0);
-  const [signedUrl, setSignedUrl] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!invoiceUrl || !open) {
-      setSignedUrl(null);
-      return;
-    }
-    (async () => {
-      const result = await getSignedInvoiceUrl(invoiceUrl);
-      if (result.success && result.url) {
-        setSignedUrl(result.url);
-      } else {
-        setSignedUrl(invoiceUrl);
-      }
-    })();
-  }, [invoiceUrl, open]);
+  /*
+    On failure this used to fall back to `invoiceUrl` itself — the stored
+    `placeholder://…` path, rendered as an href. That link could not work: it
+    is not a URL, and the bucket behind it is private. The shared hook returns
+    undefined instead, and the row below simply does not render.
+  */
+  const signedUrl = useSignedUrl(invoiceUrl);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

@@ -7,6 +7,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getClientSupabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { useVehicleImage } from '@/hooks/useSignedUrl';
 
 const MOCK_MAINTENANCE_DATA = [
   {
@@ -55,6 +56,7 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
   });
 
   const vehicle = cachedVehicle ?? fetchedVehicle;
+  const vehicleImage = useVehicleImage(vehicle);
 
   const handleDownloadFakePDF = () => {
     toast.success('Invoice PDF downloaded successfully.', {
@@ -78,7 +80,7 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
     <DashboardLayout
       vehicle={vehicle}
       currentPage="maintenance"
-      vehicleImage={vehicle.custom_image_url || vehicle.image_url}
+      vehicleImage={vehicleImage}
     >
       <div className="space-y-6">
         <div className="flex justify-between items-center mb-8">

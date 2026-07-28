@@ -122,6 +122,7 @@ const NOT_PORTABLE: Record<string, string> = {
   'lib/rate-limit.ts': 'reaches Supabase through lib/supabase',
   'lib/sign-out.ts': 'Supabase types',
   'lib/vehicle-images.ts': 'reaches Supabase through lib/supabase',
+  'lib/storage-objects.ts': 'reaches Supabase through lib/supabase',
   'lib/gemini.ts': 'client at module scope — a build-time server key (§19)',
   'lib/actions/quotes.ts': 'reaches Supabase through lib/supabase',
   'lib/actions/vehicles.ts': 'reaches Supabase through lib/supabase',

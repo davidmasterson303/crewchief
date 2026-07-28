@@ -7,6 +7,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { getClientSupabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useVehicleImage } from '@/hooks/useSignedUrl';
 
 export default function ConsultantPage({ params }: { params: { vehicleId: string } }) {
   const router = useRouter();
@@ -64,6 +65,9 @@ export default function ConsultantPage({ params }: { params: { vehicleId: string
   });
 
   const shellVehicle = data?.vehicle ?? vehicleData;
+  // One resolution for every branch below — the shell and the loaded vehicle
+  // are the same car, and a hook cannot be called per branch.
+  const vehicleImage = useVehicleImage(shellVehicle);
 
   if (isLoading && !shellVehicle) {
     return (
@@ -78,7 +82,7 @@ export default function ConsultantPage({ params }: { params: { vehicleId: string
 
   if (isLoading && shellVehicle) {
     return (
-      <DashboardLayout vehicle={shellVehicle} currentPage="consultant" vehicleImage={shellVehicle.custom_image_url || shellVehicle.image_url}>
+      <DashboardLayout vehicle={shellVehicle} currentPage="consultant" vehicleImage={vehicleImage}>
         <div className="flex items-center justify-center py-32">
           <div className="flex flex-col items-center gap-3">
             <div className="w-10 h-10 border-2 border-info-border border-t-info rounded-full animate-spin" />
@@ -97,7 +101,7 @@ export default function ConsultantPage({ params }: { params: { vehicleId: string
     }
     if (shellVehicle) {
       return (
-        <DashboardLayout vehicle={shellVehicle} currentPage="consultant" vehicleImage={shellVehicle.custom_image_url || shellVehicle.image_url}>
+        <DashboardLayout vehicle={shellVehicle} currentPage="consultant" vehicleImage={vehicleImage}>
           <div className="bg-red-500/10 border border-red-400/25 rounded-2xl p-6">
             <h2 className="text-red-300 font-semibold mb-2">Error Loading Consultant</h2>
             <p className="text-red-200/60 mb-5 text-sm">{error.message}</p>
@@ -132,7 +136,7 @@ export default function ConsultantPage({ params }: { params: { vehicleId: string
 
   return (
     <ErrorBoundary context="CONSULTANT_PAGE">
-      <DashboardLayout vehicle={vehicle} knowledge={knowledge} currentPage="consultant" vehicleImage={vehicle.custom_image_url || vehicle.image_url}>
+      <DashboardLayout vehicle={vehicle} knowledge={knowledge} currentPage="consultant" vehicleImage={vehicleImage}>
         <ConsultantChat
           vehicleId={params.vehicleId}
           vehicle={vehicle}

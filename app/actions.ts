@@ -6,9 +6,15 @@ import { VEHICLE_RESEARCH_PROMPT, POWERTRAIN_OPTIONS_PROMPT, CONSULTANT_SYSTEM_P
 import { getVehicleImage } from '@/lib/vehicle-images';
 import { logger } from '@crewchief/core/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { downloadStoredFile } from '@/lib/storage-objects';
 import { authorizeVehicleAccess, authorizeVehicleScopedRow, requireSession } from '@/lib/api-auth';
 import { isDemoVehicleId } from '@crewchief/core/demo';
-import { vehicleStoragePath, vehicleIdFromStoragePath } from '@crewchief/core/storage-paths';
+import {
+  vehicleStoragePath,
+  vehicleIdFromStoragePath,
+  storedUrl,
+  storagePathFromStoredUrl,
+} from '@crewchief/core/storage-paths';
 import { withTimeout, TimeoutError } from '@crewchief/core/retry';
 import { parseWishlistCommands, parsePerformanceCommands, parseStatusCommands, parseInvoiceFlag } from '@crewchief/core/consultant-commands';
 import { validateData, vehicleIdSchema, serviceItemSchema, maintenanceLineItemSchema, quoteRequestSchema } from '@crewchief/core/validation';
@@ -1042,20 +1048,20 @@ export async function sendConsultantMessage(params: {
       const parts: any[] = [{ text: fullPrompt }];
 
       for (const doc of attachedDocuments) {
-        try {
-          const fetchResponse = await fetch(doc.file_url);
-          if (fetchResponse.ok) {
-            const buffer = await fetchResponse.arrayBuffer();
-            const base64Data = Buffer.from(buffer).toString('base64');
-            const mimeType = doc.file_type || 'image/jpeg';
-            parts.push({
-              inlineData: {
-                mimeType,
-                data: base64Data,
-              },
-            });
-          }
-        } catch {
+        // Read out of storage, not over HTTP — the bucket is private, so
+        // fetching one of its objects by URL cannot work.
+        const buffer = await downloadStoredFile(doc.file_url);
+
+        if (buffer) {
+          parts.push({
+            inlineData: {
+              mimeType: doc.file_type || 'image/jpeg',
+              data: buffer.toString('base64'),
+            },
+          });
+        } else {
+          // The model is told an attachment exists but could not be read,
+          // rather than being left to answer as though none was sent.
           parts.push({ text: `[Attached: ${doc.file_name}]` });
         }
       }
@@ -1560,10 +1566,9 @@ export async function processConsultantInvoiceToMaintenance(vehicleId: string, f
 
     const client = getServiceRoleClient();
 
-    const fetchResponse = await fetch(fileUrl);
-    if (!fetchResponse.ok) return { success: false, error: 'Failed to fetch document', itemsProcessed: 0, issueUpdates: 0, modUpdates: 0 };
-    const buffer = await fetchResponse.arrayBuffer();
-    const base64Data = Buffer.from(buffer).toString('base64');
+    const buffer = await downloadStoredFile(fileUrl);
+    if (!buffer) return { success: false, error: 'Failed to fetch document', itemsProcessed: 0, issueUpdates: 0, modUpdates: 0 };
+    const base64Data = buffer.toString('base64');
 
     const { data: docRecord } = await client
       .from('vehicle_documents')
@@ -2344,19 +2349,37 @@ export async function addMaintenanceHistory(
   }
 }
 
-export async function getSignedInvoiceUrl(fileUrl: string) {
+/**
+ * How long a minted URL lives.
+ *
+ * One hour, and the client caches a resolved URL for well under that (see
+ * `hooks/useSignedUrl.ts`). Longer would weaken the point of signing: the URL
+ * carries its own authority, so anyone who obtains one holds it for the whole
+ * window regardless of what happens to the vehicle in the meantime.
+ */
+const SIGNED_URL_TTL_SECONDS = 3600;
+
+/**
+ * Exchange a stored URL for a signed one.
+ *
+ * Every read of a `vehicle-documents` object goes through here: invoices,
+ * owner photos, consultant attachments. It was `getSignedInvoiceUrl` when
+ * invoices were the only caller.
+ */
+export async function getSignedStorageUrl(fileUrl: string) {
   try {
-    if (!fileUrl || !fileUrl.startsWith('placeholder://')) {
-      // Nothing to sign — this is already a stored URL. Still require a
-      // session so the action is not an open redirect-ish oracle.
+    const filePath = storagePathFromStoredUrl(fileUrl);
+
+    if (!filePath) {
+      // Not one of ours — a demo `/vehicles/…` asset, or an already-real URL.
+      // Still require a session so the action is not an open redirect-ish
+      // oracle.
       const session = await requireSession();
       if (!session.ok) {
         return { success: false, error: session.error };
       }
       return { success: true, url: fileUrl };
     }
-
-    const filePath = fileUrl.replace('placeholder://', '');
 
     /*
       Every object now lives under `{vehicleId}/{kind}/…`, so ownership is
@@ -2386,7 +2409,7 @@ export async function getSignedInvoiceUrl(fileUrl: string) {
     const { data, error } = await client
       .storage
       .from('vehicle-documents')
-      .createSignedUrl(filePath, 3600);
+      .createSignedUrl(filePath, SIGNED_URL_TTL_SECONDS);
 
     if (error || !data) {
       logger.warn('SIGNED_URL:CREATION_FAILED', 'Failed to create signed URL', { filePath, error });
@@ -3161,14 +3184,12 @@ export async function uploadInvoice(formData: FormData) {
       throw new Error(`Failed to upload file: ${uploadError.message}`);
     }
 
-    const { data: { publicUrl } } = client.storage
-      .from('vehicle-documents')
-      .getPublicUrl(fileName);
-
     const documentRecord = {
       vehicle_id: vehicleId,
       document_type: 'invoice' as const,
-      file_url: publicUrl,
+      // The path, not a URL — the bucket is private, so a public URL is dead
+      // on arrival and a signed one expires. See `storedUrl`.
+      file_url: storedUrl(fileName),
       extracted_data: {},
     };
 
@@ -3306,14 +3327,18 @@ export async function uploadVehiclePhoto(formData: FormData) {
       return { success: false, error: 'Failed to upload photo' };
     }
 
-    const { data: { publicUrl } } = client.storage
-      .from('vehicle-documents')
-      .getPublicUrl(fileName);
-
+    /*
+      Both columns hold the same path, in the two shapes their readers expect:
+      `custom_image_storage_path` is what the delete-and-replace above reads,
+      and `custom_image_url` is what every rendering surface reads. Writing a
+      public URL to the second is the bug this fixes — it was unresolvable from
+      the moment the bucket went private, which is why owner photos rendered as
+      broken heroes while the file sat intact in storage.
+    */
     const { error: updateError } = await client
       .from('vehicles')
       .update({
-        custom_image_url: publicUrl,
+        custom_image_url: storedUrl(fileName),
         custom_image_storage_path: fileName,
         custom_image_uploaded_at: new Date().toISOString(),
         focal_point_x: focalX,
@@ -3326,7 +3351,18 @@ export async function uploadVehiclePhoto(formData: FormData) {
       return { success: false, error: 'Failed to update vehicle' };
     }
 
-    return { success: true, photoUrl: publicUrl, focalX, focalY };
+    /*
+      `photoUrl` is signed rather than stored: it is handed straight to a
+      caller that may put it in an `<img>`, and returning the internal
+      `placeholder://` form there is how an unresolvable URL gets rendered.
+      Signing is best-effort — the upload has already succeeded, and no caller
+      currently needs the URL back.
+    */
+    const { data: signed } = await client.storage
+      .from('vehicle-documents')
+      .createSignedUrl(fileName, SIGNED_URL_TTL_SECONDS);
+
+    return { success: true, photoUrl: signed?.signedUrl ?? null, focalX, focalY };
   } catch (error: any) {
     console.error('Upload vehicle photo error:', error);
     return { success: false, error: error.message || 'Failed to upload photo' };
@@ -3502,16 +3538,15 @@ export async function uploadConsultantDocument(formData: FormData) {
       return { success: false, error: `Failed to upload file: ${uploadError.message}` };
     }
 
-    const { data: { publicUrl } } = client.storage
-      .from('vehicle-documents')
-      .getPublicUrl(fileName);
-
     const { data: document, error: dbError } = await client
       .from('consultant_documents')
       .insert({
         session_id: sessionId,
         vehicle_id: vehicleId,
-        file_url: publicUrl,
+        // The path, not a URL. `ConsultantChat` signs it to link to it, and
+        // `downloadStoredFile` reads the bytes for Gemini straight from
+        // storage without a URL at all.
+        file_url: storedUrl(fileName),
         file_name: file.name,
         file_type: file.type,
         file_size: file.size,
@@ -3928,11 +3963,10 @@ export async function uploadInvoiceForCompletion(
       return { success: false, error: 'Failed to upload invoice' };
     }
 
-    // The storage path, not a URL. The bucket becomes private in this task,
-    // so a URL is minted on demand via getSignedInvoiceUrl instead of being
-    // persisted — a stored public URL would outlive the permission that
-    // justified it.
-    return { success: true, data: { url: `placeholder://${fileName}` } };
+    // The storage path, not a URL. The bucket is private, so a URL is minted
+    // on demand via getSignedStorageUrl instead of being persisted — a stored
+    // public URL would outlive the permission that justified it.
+    return { success: true, data: { url: storedUrl(fileName) } };
   } catch (error: any) {
     console.error('[Invoice Upload] Exception:', error);
     return { success: false, error: error.message || 'Failed to upload invoice' };

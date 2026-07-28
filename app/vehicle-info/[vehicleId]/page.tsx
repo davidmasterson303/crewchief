@@ -12,6 +12,7 @@ import { logger } from '@crewchief/core/logger';
 import TCOCard from '@/components/TCOCard';
 import TCOInputsModal from '@/components/TCOInputsModal';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useVehicleImage } from '@/hooks/useSignedUrl';
 
 const ENABLE_TCO = false;
 
@@ -105,10 +106,14 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
     }
   }, [data?.vehicle?.id, perfChecked]);
 
+  // Above the loading and error branches: the cached vehicle and the fetched
+  // one are the same car, and a hook cannot be called inside a branch.
+  const vehicleImage = useVehicleImage(data?.vehicle ?? cachedVehicle);
+
   if (isLoading) {
     if (cachedVehicle) {
       return (
-        <DashboardLayout vehicle={cachedVehicle} currentPage="vehicle-info" vehicleImage={cachedVehicle.custom_image_url || cachedVehicle.image_url}>
+        <DashboardLayout vehicle={cachedVehicle} currentPage="vehicle-info" vehicleImage={vehicleImage}>
           <div className="flex items-center justify-center py-32">
             <div className="flex flex-col items-center gap-3">
               <div className="w-10 h-10 border-2 border-info-border border-t-info rounded-full animate-spin" />
@@ -167,7 +172,7 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
   const hasPowertrainData = knowledge?.engine_type || knowledge?.transmission_type || knowledge?.drivetrain;
 
   return (
-    <DashboardLayout vehicle={vehicle} knowledge={knowledge} currentPage="vehicle-info" vehicleImage={vehicle.custom_image_url || vehicle.image_url}>
+    <DashboardLayout vehicle={vehicle} knowledge={knowledge} currentPage="vehicle-info" vehicleImage={vehicleImage}>
       <div className="space-y-5">
         <div className="flex justify-end">
           <ResearchButton
