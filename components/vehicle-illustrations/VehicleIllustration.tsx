@@ -4,43 +4,80 @@ import type { VehicleBodyStyle } from '@crewchief/core/vehicle-body-style';
 import { BODY_STYLE_LABEL } from '@crewchief/core/vehicle-body-style';
 
 /**
- * The shared frame every vehicle illustration draws inside.
+ * The shared frame and the proportion grid every vehicle illustration draws
+ * against.
  *
- * ── The rules these obey, restated where they are enforced ──────────────────
+ * ── Why a grid ─────────────────────────────────────────────────────────────
  *
- * - **Warm graphite only.** Fills and strokes come from design tokens, never
- *   hex, so a theme change propagates. No cyan: cyan is reserved for actions,
- *   and the "Add a photo" affordance on the card *is* the action — it lives in
- *   the card component, not in here.
- * - **No health-ramp colours.** That ramp means a health score and nothing else.
- * - **Nothing identifiable.** Shapes are deliberately generic. If a car person
- *   could name a specific production model from one of these, it is wrong and
- *   gets redrawn. Generic is the requirement, not a compromise.
+ * Pass 1 gave all twelve shapes the same stance, and at 48px sedan / coupe /
+ * sports / small SUV / wagon / generic were interchangeable. Body type is
+ * carried by **height and stance**, not by detail — detail is the first thing
+ * to disappear when the art is 48px wide. So the grid is defined here, once,
+ * and every silhouette is seated on it. Per-file magic numbers are what let the
+ * set drift in the first place.
  *
- * ── Why one frame ──────────────────────────────────────────────────────────
+ * Three roof heights and two ground clearances give six stance combinations,
+ * which is enough to separate the whole set structurally before a single line
+ * of detail is drawn.
  *
- * A shared `viewBox`, ground line, wheel geometry and stroke weight are what
- * let twelve different shapes swap cleanly in the same card slot without the
- * card jumping. They are constants here rather than repeated per shape,
- * because a set that drifts is worse than a set that is plain.
+ * ── Colour rules, enforced where they are used ─────────────────────────────
  *
- * ── Legibility at 48px ─────────────────────────────────────────────────────
- *
- * These ship in the Expo garage view too. Everything is a solid shape with one
- * stroke weight and no gradients, and wheels are drawn *over* the body rather
- * than cut out of it — arch cutouts turn to mud at small sizes.
+ * - **No literal colour values anywhere in this directory.** Every fill and
+ *   stroke resolves through a design token, so a theme change propagates and a
+ *   warm tint cannot be invented locally. `illustration-tokens.test.ts` fails
+ *   the build if a hex, rgb(), oklch() or a raw hsl() appears here.
+ * - **Cyan is reserved for actions.** The "Add a photo" affordance on the card
+ *   *is* the action; it lives in the card component, not in here.
+ * - **The health ramp means a health score** and nothing else.
+ * - **Nothing identifiable.** If a car person could name a production model
+ *   from one of these, it is wrong and gets redrawn.
  */
 
 export const VIEW_BOX = '0 0 200 96';
+
 /** Where every vehicle stands. Shared so the set never appears to float. */
 export const GROUND_Y = 84;
-const WHEEL_R = 11;
-const WHEEL_INNER_R = 4.4;
-const STROKE = 2.4;
+
+/**
+ * Roof height — the y of the highest point of the body. Smaller y is taller.
+ *
+ * Three values, not a continuum. A continuum is how pass 1 ended up with six
+ * shapes within a few pixels of each other; discrete steps force a visible
+ * difference, or force a shape into a different group.
+ */
+export const ROOF = {
+  LOW: 44,
+  STANDARD: 34,
+  TALL: 22,
+} as const;
+
+/**
+ * Ground clearance — the y of the bottom of the body.
+ *
+ * `RAISED` sits 6px higher, which with the larger wheel leaves visible air
+ * under the body. That air is the single clearest "this is a truck or an SUV"
+ * signal available in a silhouette.
+ */
+export const SILL = {
+  CAR: 72,
+  RAISED: 66,
+} as const;
+
+/** Wheels stay uniform within a stance group; RAISED gets one step larger. */
+export const WHEEL_R = {
+  CAR: 11,
+  RAISED: 13,
+} as const;
 
 /** Wheel centres, shared by every four-wheeled style so they read as a set. */
 export const FRONT_AXLE_X = 50;
 export const REAR_AXLE_X = 152;
+
+const WHEEL_INNER_RATIO = 0.4;
+const STROKE = 2.4;
+
+export type RoofHeight = keyof typeof ROOF;
+export type Stance = keyof typeof SILL;
 
 export interface VehicleIllustrationProps {
   /**
@@ -56,24 +93,39 @@ export interface VehicleIllustrationProps {
 
 interface FrameProps extends VehicleIllustrationProps {
   style: VehicleBodyStyle;
-  /** Closed outline of the body, in viewBox coordinates, facing left. */
+  /**
+   * Which clearance group this shape belongs to. Drives wheel radius, and is
+   * asserted against the body path by the grid conformance test — the bottom of
+   * the path must equal `SILL[stance]`.
+   */
+  stance: Stance;
+  /** Closed outline of the body, in viewBox coordinates, **facing left**. */
   bodyPath: string;
-  /** Glass, seams and other detail drawn over the body. */
+  /** Glass, seams and secondary masses drawn over the body. */
   children?: React.ReactNode;
-  /** Motorcycles set their own wheels; everything else uses the shared pair. */
-  wheels?: Array<{ x: number; r?: number }>;
+  /**
+   * Motorcycles set their own wheels and opt out of the stance grid; nothing
+   * else may.
+   */
+  wheels?: Array<{ x: number; r: number }>;
 }
 
 export function IllustrationFrame({
   style,
+  stance,
   bodyPath,
   children,
-  wheels = [{ x: FRONT_AXLE_X }, { x: REAR_AXLE_X }],
+  wheels,
   tint,
   size = 200,
   className,
 }: FrameProps) {
   const titleId = `veh-illus-${style}`;
+  const r = WHEEL_R[stance];
+  const axles = wheels ?? [
+    { x: FRONT_AXLE_X, r },
+    { x: REAR_AXLE_X, r },
+  ];
 
   return (
     <svg
@@ -117,20 +169,21 @@ export function IllustrationFrame({
 
       {children}
 
-      {wheels.map(({ x, r = WHEEL_R }) => (
+      {/* Wheels last, drawn *over* the body — arch cutouts turn to mud at 48px. */}
+      {axles.map(({ x, r: wheelR }) => (
         <g key={x}>
           <circle
             cx={x}
-            cy={GROUND_Y - r}
-            r={r}
+            cy={GROUND_Y - wheelR}
+            r={wheelR}
             fill="hsl(var(--background))"
             stroke="hsl(var(--muted-foreground))"
             strokeWidth={STROKE}
           />
           <circle
             cx={x}
-            cy={GROUND_Y - r}
-            r={r === WHEEL_R ? WHEEL_INNER_R : r * 0.4}
+            cy={GROUND_Y - wheelR}
+            r={wheelR * WHEEL_INNER_RATIO}
             fill="hsl(var(--muted-foreground))"
             opacity={0.5}
           />
@@ -143,16 +196,38 @@ export function IllustrationFrame({
 /**
  * Glass.
  *
- * `--background` rather than `--card`: card sits only one step below the body
- * fill and the greenhouse disappeared entirely at review size. The darkest
- * surface token is what makes glass read as recessed rather than painted, and
- * the greenhouse is most of what distinguishes a van from a wagon.
+ * **Lighter than the body, not darker.** Pass 1 filled the greenhouse with
+ * `--background` — 6% lightness against a 14% body, an eight-point delta that
+ * vanished at card size and took the van-versus-wagon distinction with it.
+ * Glass now reads *up* the ramp instead: `--muted-foreground` at low opacity
+ * lands around 26% over the body, far enough from both the body (14%) and the
+ * card behind it (11%) to survive 48px. It is the same token as the stroke, so
+ * the set still resolves to two greys plus the ground.
  */
 export function Glass({ d }: { d: string }) {
-  return <path d={d} fill="hsl(var(--background))" stroke="none" opacity={0.85} />;
+  return <path d={d} fill="hsl(var(--muted-foreground))" stroke="none" opacity={0.32} />;
 }
 
-/** A door seam or bed line. Deliberately faint — structure, not decoration. */
+/**
+ * A second filled mass in body colour — a motorcycle seat, a tonneau.
+ *
+ * Same fill and stroke as the body so it reads as one object rather than an
+ * applied decal.
+ */
+export function Panel({ d }: { d: string }) {
+  return (
+    <path
+      d={d}
+      fill="hsl(var(--secondary))"
+      stroke="hsl(var(--muted-foreground))"
+      strokeWidth={STROKE}
+      strokeLinejoin="round"
+      strokeLinecap="round"
+    />
+  );
+}
+
+/** A door seam, bed line or frame member. Deliberately faint — structure, not decoration. */
 export function Seam({ d }: { d: string }) {
   return (
     <path
