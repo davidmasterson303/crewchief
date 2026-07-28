@@ -1,5 +1,22 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  /*
+    `next build` and `next dev` share `.next` by default, and a build run while
+    a dev server holds it leaves the app serving 404s for chunks that exist.
+    This project has traced four separate "the app is dead" investigations to
+    exactly that, and answered it with a standing rule not to do it.
+
+    A rule is a poor guard for a mistake this easy to make -- especially with
+    nine orphaned `next dev` processes on the machine as of 28 Jul, only one of
+    which is listening. So the build can now be pointed somewhere else:
+
+        NEXT_DIST_DIR=.next-verify npm run build
+
+    Unset everywhere it matters, so CI and Netlify keep building into `.next`
+    exactly as before. This only makes a safe local verification possible; it
+    does not change any deployed behaviour.
+  */
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   eslint: {
     ignoreDuringBuilds: true,
   },

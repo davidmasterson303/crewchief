@@ -10,6 +10,9 @@
 
 # next.js
 /.next/
+# Any NEXT_DIST_DIR used to verify a build without clobbering a running
+# dev server's .next — see the distDir note in next.config.js.
+/.next-*/
 /out/
 
 # production
