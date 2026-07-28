@@ -62,14 +62,25 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
     return () => document.removeEventListener('click', close);
   }, [isStatusOpen]);
 
-  const focalX = vehicle.focal_point_x ?? 50;
-  const focalY = vehicle.focal_point_y ?? 50;
+  /*
+    CC-142 §5 — the photographic page background is gone.
 
-  const backgroundStyle = vehicleImage ? {
-    backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.82)), url('${vehicleImage}')`,
-    backgroundSize: 'cover',
-    backgroundPosition: `${focalX}% ${focalY}%`,
-  } : undefined;
+    This was the hero's own photograph a second time, stretched over the whole
+    page (measured at 1436 x 2809) under an 82% black wash. Two costs, and the
+    second is the one that mattered:
+
+      - It is the single largest cause of the uniform brown-grey the app was
+        accused of. Every screen was tinted by whatever car was on it.
+      - It fetched a full-size photograph to render it at 18% opacity behind
+        opaque cards. On the dashboard that was 470 KB of `dark-roomb.jpeg`
+        downloaded and never meaningfully painted.
+
+    A flat surface lets the hero's contained photograph be the only photograph
+    on the screen, which is the whole point of §3.
+
+    `focal_point_x/y` are no longer read here either — that anchored this
+    background's `cover` crop, and there is no crop left to anchor.
+  */
 
 
   const handleSaveStatus = async (status: string) => {
@@ -147,7 +158,7 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
   };
 
   return (
-    <div className="min-h-screen bg-black" style={backgroundStyle}>
+    <div className="min-h-screen bg-black">
       <nav className={`sticky top-0 z-40 backdrop-blur-xl transition-all duration-200 ${scrolled ? 'bg-black/98 border-b border-white/10 shadow-lg shadow-black/50' : 'bg-black/90 border-b border-white/8'}`}>
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           <div className={`flex items-center justify-between transition-all duration-200 ${scrolled ? 'py-3' : 'py-4'}`}>

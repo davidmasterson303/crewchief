@@ -23,15 +23,16 @@ export default function GaragePage() {
 
   return (
     <div className="relative w-full min-h-screen">
-      <div
-        className="absolute inset-0 z-0"
-        style={{
-          backgroundImage: `linear-gradient(135deg, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0.3) 50%, rgba(0, 0, 0, 0.45) 100%), url('/dark-roomb.jpeg')`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundAttachment: 'fixed'
-        }}
-      />
+      {/*
+        CC-142 §5 — flat, not photographic. The garage is now a grid of
+        identity plates, each carrying its own make-derived field; a
+        photographic backdrop behind them put a second, unrelated image
+        underneath every one of those and tinted the lot. It also fetched
+        470 KB of `dark-roomb.jpeg` to sit at low opacity behind opaque cards.
+
+        Image backgrounds stay on landing and auth, which are not in scope.
+      */}
+      <div className="absolute inset-0 z-0 bg-black" />
       {/* Signature vignette — see app/demo/page.tsx. */}
       <div
         className="fixed inset-0 z-0 vignette-frame pointer-events-none"

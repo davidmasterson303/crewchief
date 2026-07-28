@@ -3,94 +3,69 @@
 import { useEffect, useRef, useState } from 'react';
 import { useCountUp } from '@/hooks/use-count-up';
 import { useHealthBand } from '@/hooks/use-health-band';
+import { VehicleIdentity } from '@/components/VehicleIdentity';
 
 interface DiagnosticHeroProps {
-  imageUrl?: string | null;
+  /** A renderable photo URL, already signed by the caller. Null is expected. */
+  photo?: string | null;
   vehicleName: string;
+  year?: number | string | null;
+  make?: string | null;
+  model?: string | null;
+  trim?: string | null;
   healthScore?: number;
-  focalX?: number | null;
-  /** 0–100. Vertical crop anchor for the desktop cover crop. */
-  focalY?: number | null;
+  /** One line on why the score is what it is. Optional. */
+  reason?: string | null;
+  /** Band height. 400px is the design default. */
+  height?: number;
 }
 
 /**
- * The page-width vehicle hero.
+ * The vehicle dashboard hero — CC-142 §3.
  *
- * ── The bug this shape exists to fix ────────────────────────────────────────
+ * ── What this replaces, and why it was worth replacing ──────────────────────
  *
- * This was a ~4:1 letterbox filled with `cover` and anchored at centre. Owner
- * photos are 3:4 portrait phone snapshots with the car in the bottom half, so
- * cover enlarged them ~3x and kept a horizontal band through the vertical
- * centre — reliably sky, ceiling, or garage lights. The car was not in the
- * hero at all. Nothing was malfunctioning: the geometry was unsurvivable, and
- * `center` is the wrong default for the photographs this product receives.
+ * The previous hero composited the photograph through six layers: a 42% warm
+ * brown `.ph-tint`, `saturate(.62)`, a vignette, a double scrim from both
+ * edges, and a duplicate 0×0 `<img>` — over a page background that was *the
+ * same photograph again* at 18%. Measured passthrough at the bottom of the
+ * hero was ~1.7%. Only about 75px of a 338px element was unobstructed, and
+ * roughly a tenth of each 700 KB photograph did any visual work.
  *
- * `.photo-hero` fixes it in two directions. Desktop crops low (`--focal-y`,
- * defaulting to 80%) and grades the photo; at ≤640px the image switches to
- * `contain` over a blurred copy of itself, so the whole car stays visible and
- * nothing is cropped.
+ * The photographs were never the problem. The compositing was.
  *
- * It deliberately does not use `.photo-plate`. Cards keep the plate; a
- * page-width hero is a different problem, and sharing one class is how the two
- * drift into each other.
+ * ── Nothing is printed over the photograph any more ─────────────────────────
  *
- * ── --focal-y, and the column that already existed ──────────────────────────
+ * The score and the vehicle's name used to sit *on* the image, which is what
+ * made the scrims necessary in the first place — text over an unpredictable
+ * photograph needs something to sit on. Moving the content beneath the band
+ * removes the requirement rather than tuning it, and the band gets to be a
+ * photograph instead of a textured backdrop.
  *
- * The v6 ticket asked for a new stored `hero_focal_y`. It is not needed:
- * `vehicles.focal_point_y` has existed since March, is already piped through
- * to this component, and already has an owner-facing editor in
- * VehiclePhotoUploadDialog. A second column would be a second source of truth
- * for one concept.
+ * ── The crop anchor is gone with the crop ───────────────────────────────────
  *
- * The only real gap was the default, and CSS closes it. `--focal-y` is emitted
- * *only* when a value is stored, so `object-position: 50% var(--focal-y, 80%)`
- * gives the hero its low anchor while VehicleCard keeps its own behaviour off
- * the same stored number.
- *
- * ── What was dropped, deliberately ──────────────────────────────────────────
- *
- * The image no longer parallaxes. It relied on `scale(1.12)` to have room to
- * translate without exposing the edges, and any scale defeats the mobile
- * `contain` behaviour whose entire purpose is that nothing is cropped. The
- * content block still fades on scroll.
+ * `focalX` / `focalY` are no longer props. `VehicleIdentity` contains the
+ * photo over a blurred copy of itself rather than cropping it, so there is no
+ * crop to anchor. The columns still exist and are still edited in
+ * VehiclePhotoUploadDialog; nothing on this screen reads them.
  */
 export default function DiagnosticHero({
-  imageUrl,
+  photo,
   vehicleName,
+  year,
+  make,
+  model,
+  trim,
   healthScore,
-  focalY,
+  reason,
+  height = 400,
 }: DiagnosticHeroProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scanDone, setScanDone] = useState(false);
-  const [scrollY, setScrollY] = useState(0);
   const [mounted, setMounted] = useState(false);
 
-  /*
-    ── A URL is not a photograph ───────────────────────────────────────────────
-
-    Having a string in `imageUrl` is not evidence that anything will render, and
-    this hero has already shipped the failure once: every owner photo uploaded
-    after the bucket went private held a `/object/public/…` URL that returned
-    400, and this component rendered two broken `<img>` elements over the empty
-    state rather than falling back to it.
-
-    That specific cause is fixed upstream — the column holds a path now and
-    `useVehicleImage` signs it. But the object can still be missing for reasons
-    no caller can check in advance: it was deleted out from under the row, or
-    the signed URL was minted against something no longer there. So the load
-    failure itself is the signal, and the only one that is actually reliable.
-
-    The *failed URL* is remembered rather than a boolean, so a fresh signed URL
-    for the same object clears the state on its own. Signed URLs are re-minted
-    roughly every 30 minutes, which makes a genuinely absent object cost one
-    failed request per refresh — and makes a transient failure self-heal without
-    a remount.
-  */
-  const [failedUrl, setFailedUrl] = useState<string | null>(null);
-  const photo = imageUrl && imageUrl !== failedUrl ? imageUrl : undefined;
-
-  // Shared primitives: the same band table and the same rAF loop as
-  // HealthSummary's ScoreRing, so the two can never disagree about one score.
+  // Shared primitives: the same band table as HealthSummary's ScoreRing, so
+  // the two can never disagree about one score.
   const band = useHealthBand(healthScore ?? 0);
   const displayScore = useCountUp(healthScore ?? 0, 1400, scanDone && !!healthScore);
 
@@ -100,113 +75,130 @@ export default function DiagnosticHero({
     return () => clearTimeout(timer);
   }, []);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      const rect = containerRef.current?.getBoundingClientRect();
-      if (rect) setScrollY(Math.max(0, -rect.top));
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  const fadeOpacity = Math.max(0, 1 - scrollY / 320);
-
-  /*
-    Emit the variable only when a value is actually stored. Passing '50%'
-    whenever the column is null would quietly reinstate the centred crop this
-    change exists to remove — the CSS fallback of 80% has to be allowed to win.
-  */
-  const focalStyle =
-    focalY != null ? ({ ['--focal-y']: `${focalY}%` } as React.CSSProperties) : undefined;
+  const score = healthScore ?? 0;
+  const shown = scanDone ? Math.round(displayScore) : 0;
 
   return (
-    <div
-      ref={containerRef}
-      className={`photo-hero rounded-2xl border border-white/10${photo ? '' : ' ph-empty'}`}
-      style={focalStyle}
-    >
-      {/* Both take the same src. The fill is display:none above 640px, so
-          desktop pays nothing for it. Either one failing condemns the src, so
-          both report — the fill is the one that is hidden on desktop, and a
-          hero that stayed broken on desktop because only the hidden image was
-          wired up would be a worse bug than the one this fixes. */}
-      {photo && (
-        <img
-          className="ph-fill"
-          src={photo}
-          alt=""
-          aria-hidden="true"
-          onError={() => setFailedUrl(photo)}
+    <section ref={containerRef} className="rounded-2xl overflow-hidden border border-white/8">
+      <div className="relative">
+        <VehicleIdentity
+          variant="band"
+          photo={photo ?? null}
+          year={year}
+          make={make}
+          model={model}
+          trim={trim}
+          height={height}
         />
-      )}
-      {photo && (
-        <img
-          className="ph-img"
-          src={photo}
-          alt={vehicleName}
-          onError={() => setFailedUrl(photo)}
-        />
-      )}
-      <div className="ph-tint" />
-      <div className="ph-bed" />
 
-      {mounted && !scanDone && photo && (
-        <div
-          className="scan-line left-0 right-0 h-[2px] pointer-events-none"
-          /*
-            position and z-index are set inline on purpose. `.photo-hero > *`
-            sets `position: relative`, and a Tailwind `absolute` class is the
-            same specificity — which is exactly how `.above-stretch` knocked the
-            card's options menu out of its corner earlier. Inline always wins.
-          */
-          style={{
-            position: 'absolute',
-            zIndex: 4,
-            background:
-              'linear-gradient(90deg, transparent 0%, rgba(34,211,238,0) 5%, rgba(34,211,238,1) 50%, rgba(34,211,238,0) 95%, transparent 100%)',
-            boxShadow: '0 0 18px 4px rgba(34,211,238,0.55), 0 0 40px 8px rgba(34,211,238,0.18)',
-            animation: 'scanLine 0.85s cubic-bezier(0.4,0,0.6,1) forwards',
-          }}
-        />
-      )}
+        {/*
+          The scan sweep. Transient — it runs once, for 850ms, and leaves
+          nothing behind. That is what keeps it compatible with "no tint,
+          vignette or scrim over any in-app photograph": those are persistent
+          layers that cost the photo permanently, this is motion.
+        */}
+        {mounted && !scanDone && (
+          <div
+            className="scan-line absolute left-0 right-0 h-[2px] pointer-events-none"
+            style={{
+              position: 'absolute',
+              zIndex: 4,
+              background:
+                'linear-gradient(90deg, transparent 0%, rgba(34,211,238,0) 5%, rgba(34,211,238,1) 50%, rgba(34,211,238,0) 95%, transparent 100%)',
+              boxShadow: '0 0 18px 4px rgba(34,211,238,0.55), 0 0 40px 8px rgba(34,211,238,0.18)',
+              animation: 'scanLine 0.85s cubic-bezier(0.4,0,0.6,1) forwards',
+            }}
+          />
+        )}
+      </div>
 
-      <div className="ph-content" style={{ opacity: fadeOpacity }}>
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-white/40 mb-1">
-            {!photo ? 'Add a photo' : scanDone ? 'Diagnostics Complete' : 'Scanning...'}
-          </p>
-          {/* A hero is the one place both serif roles are allowed at once — the
-              name and the hero numeral read as a single moment. */}
-          <h2 className="display-serif text-3xl sm:text-4xl text-white tracking-tight leading-none">
-            {vehicleName}
-          </h2>
-        </div>
+      {/*
+        Beneath the band: the score, and the reason for it. The vehicle's name
+        lives here now rather than on the photograph.
+      */}
+      <div className="bg-[#0f1318]/90 px-6 sm:px-8 py-6">
+        <p className="label-uppercase mb-1">
+          {!photo ? 'No photo yet' : scanDone ? 'Diagnostics complete' : 'Scanning…'}
+        </p>
+        <h2 className="display-serif text-3xl sm:text-4xl text-white tracking-tight leading-none mb-6">
+          {vehicleName}
+        </h2>
 
-        {/* The score renders once, here, and never on raw photography. */}
         {healthScore !== undefined && (
-          <div className="ph-glass">
-            <p className="text-xs text-white/40 uppercase tracking-wider mb-1">Health Score</p>
-            <div className="flex items-baseline gap-1">
+          <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-8">
+            <div className="flex items-baseline gap-2">
               {/* Numeral stays Inter: tabular figures matter more than flourish
                   on a value that animates digit by digit. */}
               <span
-                className="num text-4xl font-bold leading-none"
+                className="num text-6xl font-bold leading-none"
                 style={{
                   color: band.color,
-                  filter: scanDone ? `drop-shadow(0 0 8px rgba(${band.rgb},0.45))` : 'none',
+                  textShadow: scanDone ? `0 0 44px rgba(${band.rgb},0.22)` : 'none',
                 }}
               >
-                {scanDone ? Math.round(displayScore) : '—'}
+                {scanDone ? shown : '—'}
               </span>
-              <span className="text-base text-white/35">/100</span>
+              <span className="text-lg text-white/35">/100</span>
+              {/* Derived from the score, never passed in — a hand-written label
+                  is how 61 came to be called "Good". */}
+              <span
+                className="text-sm font-semibold ml-1"
+                style={{ color: band.color }}
+              >
+                {scanDone ? band.label : ''}
+              </span>
             </div>
-            {/* Derived from the score, never passed in — a hand-written label
-                is how 61 came to be called "Good". */}
-            <p className="text-xs font-semibold mt-0.5" style={{ color: band.color }}>
-              {scanDone ? band.label : ' '}
-            </p>
+
+            {/*
+              A band scale, not a progress bar. The ticks are the point: a bare
+              fill says "more is better" and nothing else, while 40 / 60 / 80
+              are where the label actually changes. A score of 62 sitting just
+              past a tick reads very differently from 62 on an unmarked track.
+            */}
+            <div className="flex-1 min-w-[180px] pb-1">
+              <div className="relative h-[3px] rounded-full bg-white/10">
+                <div
+                  className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-300"
+                  style={{
+                    width: `${Math.max(0, Math.min(100, scanDone ? shown : 0))}%`,
+                    background: band.color,
+                  }}
+                />
+                {[40, 60, 80].map((tick) => (
+                  <span
+                    key={tick}
+                    aria-hidden="true"
+                    className="absolute top-[-3px] w-px h-[9px] bg-white/25"
+                    style={{ left: `${tick}%` }}
+                  />
+                ))}
+                {scanDone && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute top-[-3px] w-[2px] h-[9px] rounded-full transition-[left] duration-300"
+                    style={{
+                      left: `${Math.max(0, Math.min(100, shown))}%`,
+                      background: band.color,
+                    }}
+                  />
+                )}
+              </div>
+              <div className="relative mt-1.5 h-3">
+                {[40, 60, 80].map((tick) => (
+                  <span
+                    key={tick}
+                    className="num absolute text-[10px] text-white/30 -translate-x-1/2"
+                    style={{ left: `${tick}%` }}
+                  >
+                    {tick}
+                  </span>
+                ))}
+              </div>
+            </div>
           </div>
         )}
+
+        {reason && <p className="text-sm text-white/50 mt-4">{reason}</p>}
       </div>
 
       <style jsx>{`
@@ -230,6 +222,6 @@ export default function DiagnosticHero({
           top: 0;
         }
       `}</style>
-    </div>
+    </section>
   );
 }

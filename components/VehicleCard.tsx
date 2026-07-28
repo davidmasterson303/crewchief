@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usageProfileChip } from '@crewchief/core/usage-profile';
 import { useHealthBand } from '@/hooks/use-health-band';
 import { useVehicleImage } from '@/hooks/useSignedUrl';
+import { VehicleIdentity } from '@/components/VehicleIdentity';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -42,7 +43,6 @@ import {
   Gauge,
   Clock,
   Tag,
-  Crosshair,
   ShieldAlert,
   TriangleAlert,
 } from 'lucide-react';
@@ -151,12 +151,10 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary, alerts }: V
   const [isUpdatingMileage, setIsUpdatingMileage] = useState(false);
   const [showPhotoDialog, setShowPhotoDialog] = useState(false);
   const [displayVehicle, setDisplayVehicle] = useState(vehicle);
-  const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
     setDisplayVehicle(vehicle);
     setMileageInput(vehicle.current_mileage.toString());
-    setImageError(false);
   }, [vehicle]);
 
   const handleDelete = async (e: React.MouseEvent) => {
@@ -239,16 +237,10 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary, alerts }: V
   const resolvedImageUrl = useVehicleImage(vehicle);
 
   const getVehicleImageUrl = (): string | undefined => {
-    if (imageError) return undefined;
     if (isDemoVehicleId(vehicle.id) && DEMO_IMAGES[vehicle.id]) {
       return DEMO_IMAGES[vehicle.id];
     }
     return resolvedImageUrl;
-  };
-
-  const handleImageError = () => {
-    logger.error('VEHICLE_CARD:IMAGE_LOAD', new Error('Image failed to load'));
-    setImageError(true);
   };
 
   if (isDeleted) return null;
@@ -298,59 +290,49 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary, alerts }: V
   return (
     <div className="group card-lift relative border rounded-2xl overflow-hidden bg-[#0f1318]/90 backdrop-blur-sm h-full flex flex-col shadow-lg shadow-black/50 edge-light hover:border-cyan-400/30">
       {/*
-        96px, down from a 3:2 plate that was ~158px tall.
-        Identity only — enough to tell three cars apart at a glance, not a
-        feature. And it renders only when there is a photograph: no empty
-        plate, no placeholder icon, no stock car. See getVehicleImageUrl.
+        The 3:2 identity plate, and it renders unconditionally — CC-142 §2.
+
+        ── This supersedes a v7 decision, deliberately ───────────────────────
+        v7 shrank this to a 96px strip that appeared *only* when a photograph
+        existed, on the reasoning that "a card that is complete without a photo
+        is better than a card that is never allowed to lack one." That reasoning
+        was sound, and its premise was that the no-photo state looked broken —
+        an empty plate, a placeholder icon, or a stock car.
+
+        CC-142 removes the premise. The no-photo state is now a deterministic
+        make-derived field with the vehicle named on it, which is a finished
+        design rather than an absence, so it earns the space v7 correctly denied
+        it. Restoring the plate without `VehicleIdentity` would reinstate the
+        bug v7 was avoiding — the two changes only make sense together.
+
+        The focal-point crop is gone with the `cover` fit that needed it: the
+        plate contains the photo rather than cropping it, so there is no crop to
+        anchor. `focal_point_x/y` still exist and are still edited in
+        VehiclePhotoUploadDialog; nothing reads them here any more.
       */}
-      {photoUrl && (
-        <div className="photo-plate h-24 bg-slate-900/60 group/image">
-          {(() => {
-            const focalX = vehicle.focal_point_x ?? 50;
-            const focalY = vehicle.focal_point_y ?? 50;
-            const showAdjustNudge = vehicle.custom_image_url && vehicle.focal_point_x == null;
-            return (
-              <>
-                <img
-                  src={photoUrl}
-                  alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-                  className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
-                  style={{ objectPosition: `${focalX}% ${focalY}%` }}
-                  onError={handleImageError}
-                  loading="lazy"
-                />
+      <div className="relative group/image">
+        <VehicleIdentity
+          variant="card"
+          photo={photoUrl ?? null}
+          year={vehicle.year}
+          make={vehicle.make}
+          model={vehicle.model}
+          trim={vehicle.trim}
+        />
 
-                {/* Compact at 96px. The full-width bar this replaced covered
-                    most of a strip this short. */}
-                {showAdjustNudge && (
-                  <div className="above-stretch absolute bottom-2 left-2 opacity-0 group-hover/image:opacity-100 transition-opacity duration-200">
-                    <button
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowPhotoDialog(true); }}
-                      className="tap-target-44 flex items-center gap-1.5 px-2 py-1 bg-black/70 hover:bg-black/85 border border-amber-400/35 rounded-md text-amber-300/90 text-[11px] font-medium transition-all backdrop-blur-sm"
-                    >
-                      <Crosshair className="h-3 w-3 flex-shrink-0" />
-                      Adjust focus
-                    </button>
-                  </div>
-                )}
-
-                <div className="above-stretch absolute inset-0 bg-black/50 opacity-0 group-hover/image:opacity-100 transition-opacity duration-200 flex items-center justify-center">
-                  <button
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowPhotoDialog(true); }}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full text-white text-xs font-medium transition-all backdrop-blur-sm"
-                    aria-label="Change vehicle photo"
-                  >
-                    <Camera className="h-3.5 w-3.5" />
-                    Change Photo
-                  </button>
-                </div>
-              </>
-            );
-          })()}
-
-          <div className="absolute top-2 left-2">{nicknameChip}</div>
+        <div className="above-stretch absolute inset-0 bg-black/50 opacity-0 group-hover/image:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowPhotoDialog(true); }}
+            className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full text-white text-xs font-medium transition-all backdrop-blur-sm"
+            aria-label={photoUrl ? 'Change vehicle photo' : 'Add a photo of this car'}
+          >
+            <Camera className="h-3.5 w-3.5" />
+            {photoUrl ? 'Change Photo' : 'Add Photo'}
+          </button>
         </div>
-      )}
+
+        <div className="absolute top-2 left-2">{nicknameChip}</div>
+      </div>
 
       {/*
         Conditions, in their own slot. Full-bleed so it reads as a property of

@@ -82,15 +82,22 @@ export default function DashboardPage({ params }: { params: { vehicleId: string 
     <ErrorBoundary>
       <DashboardLayout vehicle={data.vehicle} currentPage="dashboard" vehicleImage={vehicleImage} healthSummary={data.healthSummary}>
         <div className="space-y-8">
-          {vehicleImage && (
-            <DiagnosticHero
-              imageUrl={vehicleImage}
-              vehicleName={`${data.vehicle.year} ${data.vehicle.make} ${data.vehicle.model}`}
-              healthScore={data.healthSummary?.health_score}
-              focalX={data.vehicle.focal_point_x}
-              focalY={data.vehicle.focal_point_y}
-            />
-          )}
+          {/*
+            Unconditional now. The hero used to render only when a photo
+            resolved, which meant a vehicle without one had no hero at all and
+            the page opened on a recall banner. The no-photo state is CC-142's
+            primary design, so there is always something to show.
+          */}
+          <DiagnosticHero
+            photo={vehicleImage}
+            vehicleName={`${data.vehicle.year} ${data.vehicle.make} ${data.vehicle.model}`}
+            year={data.vehicle.year}
+            make={data.vehicle.make}
+            model={data.vehicle.model}
+            trim={data.vehicle.trim}
+            healthScore={data.healthSummary?.health_score}
+            reason={data.healthSummary?.summary}
+          />
 
           {data.nhtsa?.recalls && data.nhtsa.recalls.length > 0 && (
             <RecallAlerts

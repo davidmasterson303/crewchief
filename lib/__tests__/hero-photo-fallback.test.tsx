@@ -1,93 +1,126 @@
 /**
- * The hero falls back to its empty state when a photo fails to load.
+ * The dashboard hero never renders a broken photograph, and never renders
+ * nothing.
  *
  * @jest-environment jsdom
  *
- * This is a regression test for a bug that shipped and stayed shipped for two
- * days. `vehicle-documents` went private, three upload sites kept persisting
- * `.getPublicUrl()` results, and every owner photo written after that held a
- * URL returning 400 "Bucket not found". The hero received a perfectly truthy
- * string, so it took the has-a-photo branch: two broken `<img>` elements, the
- * scan-line animation, and a label reading "Diagnostics Complete" over an image
- * that was never going to arrive.
+ * This started as a regression test for a bug that shipped and stayed shipped:
+ * `vehicle-documents` went private, three upload sites kept persisting
+ * `.getPublicUrl()` results, and the hero took a truthy string as proof a
+ * photograph would appear — rendering broken `<img>` elements under the label
+ * "Diagnostics Complete".
  *
- * The stored-path convention fixes that cause. It does not fix the *class* —
- * an object can still be deleted out from under its row, and a signed URL is
- * minted without checking that the object behind it exists. A URL is not a
- * photograph, so the load failure is the only reliable signal, and this file
- * asserts the whole empty state comes back when it fires rather than only the
- * `<img>` disappearing.
+ * CC-142 moved the mechanism into `VehicleIdentity`, which has its own tests
+ * for the exchange itself. What stays here is the guarantee that belongs at
+ * *this* level, because it is a property of the screen rather than of the
+ * component: the dashboard hero is always present, and it degrades to the
+ * identity plate rather than to an absence or a broken image.
+ *
+ * The "always present" half is new and is worth stating plainly. The hero used
+ * to be rendered behind `{vehicleImage && ...}`, so a vehicle with no photo
+ * had no hero at all and its dashboard opened on a recall banner.
  */
 
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import DiagnosticHero from '@/components/DiagnosticHero';
 
-const VEHICLE_NAME = '2015 BMW M235i';
-
-/** The `<img>` carrying the visible photo, as opposed to the mobile fill. */
-function visibleImage(container: HTMLElement): HTMLImageElement {
-  const img = container.querySelector('img.ph-img');
-  if (!img) throw new Error('expected a rendered photo');
-  return img as HTMLImageElement;
+/**
+ * The score and its band label are held back until the 900ms scan reveal
+ * finishes, so a test that asserts them on the first frame is asserting the
+ * loading state. This runs the reveal out.
+ */
+function completeScan() {
+  act(() => {
+    jest.advanceTimersByTime(1000);
+  });
 }
 
-describe('DiagnosticHero, when a photo fails to load', () => {
-  it('renders the photo while it is loading fine', () => {
+const M235i = {
+  vehicleName: '2015 BMW M235i',
+  year: 2015,
+  make: 'BMW',
+  model: 'M235i',
+  trim: 'Base',
+};
+
+function plate(container: HTMLElement): HTMLElement {
+  const el = container.querySelector('[data-variant="band"]');
+  if (!el) throw new Error('expected the hero band');
+  return el as HTMLElement;
+}
+
+describe('the hero always renders', () => {
+  it('shows the identity plate when there is no photo', () => {
+    const { container } = render(<DiagnosticHero {...M235i} />);
+
+    expect(plate(container).dataset.hasPhoto).toBe('false');
+    expect(container.querySelectorAll('img').length).toBe(0);
+    // The vehicle is named beneath the band, not on it.
+    expect(screen.getByText('2015 BMW M235i')).toBeInTheDocument();
+    expect(screen.getByText('No photo yet')).toBeInTheDocument();
+  });
+
+  it('shows the photo when there is one', () => {
     const { container } = render(
-      <DiagnosticHero imageUrl="https://example.test/car.jpg" vehicleName={VEHICLE_NAME} />
+      <DiagnosticHero {...M235i} photo="https://example.test/car.jpg" />
     );
-
-    expect(container.querySelectorAll('img').length).toBe(2);
-    expect(container.querySelector('.photo-hero')).not.toHaveClass('ph-empty');
-    expect(screen.queryByText('Add a photo')).not.toBeInTheDocument();
+    expect(plate(container).dataset.hasPhoto).toBe('true');
   });
+});
 
-  it('drops every trace of the photo when the image errors', () => {
+describe('when the photo fails to load', () => {
+  it('falls back to the plate rather than a broken image', () => {
     const { container } = render(
-      <DiagnosticHero imageUrl="https://example.test/gone.jpg" vehicleName={VEHICLE_NAME} />
+      <DiagnosticHero {...M235i} photo="https://example.test/gone.jpg" />
     );
 
-    fireEvent.error(visibleImage(container));
+    const probe = container.querySelector('img');
+    expect(probe).toBeTruthy();
+    fireEvent.error(probe!);
 
-    // No broken image survives — this is the part CC-142 §1 forbids outright.
+    expect(plate(container).dataset.hasPhoto).toBe('false');
     expect(container.querySelectorAll('img').length).toBe(0);
+    // And the hero is still a hero — the vehicle is still named.
+    expect(screen.getByText('2015 BMW M235i')).toBeInTheDocument();
+  });
+});
 
-    // And the container actually takes the empty treatment, rather than
-    // rendering a photo-shaped hole with no class to style it.
-    expect(container.querySelector('.photo-hero')).toHaveClass('ph-empty');
+describe('the score', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
 
-    // The label has to follow too. "Diagnostics Complete" over an empty frame
-    // is the same lie as a broken <img>, just quieter.
-    expect(screen.getByText('Add a photo')).toBeInTheDocument();
+  it('is not printed over the photograph', () => {
+    const { container } = render(
+      <DiagnosticHero {...M235i} photo="https://example.test/car.jpg" healthScore={74} />
+    );
+
+    // The band is the photo and nothing else. The score lives in the block
+    // beneath it, which is what removed the need for the scrims entirely.
+    expect(plate(container).textContent).toBe('');
   });
 
-  it('gives a fresh URL for the same vehicle another chance', () => {
-    const { container, rerender } = render(
-      <DiagnosticHero imageUrl="https://example.test/signed?token=first" vehicleName={VEHICLE_NAME} />
-    );
+  it('renders the band label derived from the score, never free text', () => {
+    render(<DiagnosticHero {...M235i} healthScore={74} />);
 
-    fireEvent.error(visibleImage(container));
-    expect(container.querySelectorAll('img').length).toBe(0);
+    // Held back during the reveal — asserting here would test the placeholder.
+    expect(screen.queryByText('Fair')).not.toBeInTheDocument();
 
-    /*
-      Signed URLs are re-minted roughly every 30 minutes. If the failure were
-      remembered as a boolean, a transient error would blank the hero until the
-      component unmounted — so what is remembered is the URL that failed, and a
-      new one clears it without an effect or a key.
-    */
-    rerender(
-      <DiagnosticHero imageUrl="https://example.test/signed?token=second" vehicleName={VEHICLE_NAME} />
-    );
+    completeScan();
 
-    expect(container.querySelectorAll('img').length).toBe(2);
-    expect(screen.queryByText('Add a photo')).not.toBeInTheDocument();
+    // 74 is "Fair" (>= 60). A hand-written label is how 61 came to be "Good".
+    expect(screen.getByText('Fair')).toBeInTheDocument();
   });
 
-  it('shows the empty state when there is no photo at all', () => {
-    const { container } = render(<DiagnosticHero vehicleName={VEHICLE_NAME} />);
+  it('says "Diagnostics complete" only once the scan is done, and only with a photo', () => {
+    render(<DiagnosticHero {...M235i} photo="https://example.test/car.jpg" healthScore={74} />);
 
-    expect(container.querySelectorAll('img').length).toBe(0);
-    expect(container.querySelector('.photo-hero')).toHaveClass('ph-empty');
-    expect(screen.getByText('Add a photo')).toBeInTheDocument();
+    expect(screen.getByText('Scanning…')).toBeInTheDocument();
+    completeScan();
+    expect(screen.getByText('Diagnostics complete')).toBeInTheDocument();
+  });
+
+  it('is absent entirely when there is no score, rather than showing zero', () => {
+    render(<DiagnosticHero {...M235i} />);
+    expect(screen.queryByText('/100')).not.toBeInTheDocument();
   });
 });
