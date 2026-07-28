@@ -65,6 +65,30 @@ export default function DiagnosticHero({
   const [scrollY, setScrollY] = useState(0);
   const [mounted, setMounted] = useState(false);
 
+  /*
+    ── A URL is not a photograph ───────────────────────────────────────────────
+
+    Having a string in `imageUrl` is not evidence that anything will render, and
+    this hero has already shipped the failure once: every owner photo uploaded
+    after the bucket went private held a `/object/public/…` URL that returned
+    400, and this component rendered two broken `<img>` elements over the empty
+    state rather than falling back to it.
+
+    That specific cause is fixed upstream — the column holds a path now and
+    `useVehicleImage` signs it. But the object can still be missing for reasons
+    no caller can check in advance: it was deleted out from under the row, or
+    the signed URL was minted against something no longer there. So the load
+    failure itself is the signal, and the only one that is actually reliable.
+
+    The *failed URL* is remembered rather than a boolean, so a fresh signed URL
+    for the same object clears the state on its own. Signed URLs are re-minted
+    roughly every 30 minutes, which makes a genuinely absent object cost one
+    failed request per refresh — and makes a transient failure self-heal without
+    a remount.
+  */
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const photo = imageUrl && imageUrl !== failedUrl ? imageUrl : undefined;
+
   // Shared primitives: the same band table and the same rAF loop as
   // HealthSummary's ScoreRing, so the two can never disagree about one score.
   const band = useHealthBand(healthScore ?? 0);
@@ -98,17 +122,35 @@ export default function DiagnosticHero({
   return (
     <div
       ref={containerRef}
-      className={`photo-hero rounded-2xl border border-white/10${imageUrl ? '' : ' ph-empty'}`}
+      className={`photo-hero rounded-2xl border border-white/10${photo ? '' : ' ph-empty'}`}
       style={focalStyle}
     >
       {/* Both take the same src. The fill is display:none above 640px, so
-          desktop pays nothing for it. */}
-      {imageUrl && <img className="ph-fill" src={imageUrl} alt="" aria-hidden="true" />}
-      {imageUrl && <img className="ph-img" src={imageUrl} alt={vehicleName} />}
+          desktop pays nothing for it. Either one failing condemns the src, so
+          both report — the fill is the one that is hidden on desktop, and a
+          hero that stayed broken on desktop because only the hidden image was
+          wired up would be a worse bug than the one this fixes. */}
+      {photo && (
+        <img
+          className="ph-fill"
+          src={photo}
+          alt=""
+          aria-hidden="true"
+          onError={() => setFailedUrl(photo)}
+        />
+      )}
+      {photo && (
+        <img
+          className="ph-img"
+          src={photo}
+          alt={vehicleName}
+          onError={() => setFailedUrl(photo)}
+        />
+      )}
       <div className="ph-tint" />
       <div className="ph-bed" />
 
-      {mounted && !scanDone && imageUrl && (
+      {mounted && !scanDone && photo && (
         <div
           className="scan-line left-0 right-0 h-[2px] pointer-events-none"
           /*
@@ -131,7 +173,7 @@ export default function DiagnosticHero({
       <div className="ph-content" style={{ opacity: fadeOpacity }}>
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-white/40 mb-1">
-            {!imageUrl ? 'Add a photo' : scanDone ? 'Diagnostics Complete' : 'Scanning...'}
+            {!photo ? 'Add a photo' : scanDone ? 'Diagnostics Complete' : 'Scanning...'}
           </p>
           {/* A hero is the one place both serif roles are allowed at once — the
               name and the hero numeral read as a single moment. */}
