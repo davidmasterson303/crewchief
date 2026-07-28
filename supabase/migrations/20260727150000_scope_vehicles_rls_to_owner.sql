@@ -1,206 +1,184 @@
 /*
-  # Scope the vehicles table's own RLS policies to the owner
+  # Make the migration history reproduce the live vehicles policies
 
-  ## NOT YET APPLIED — and the finding below has been PARTLY CORRECTED. Read this first.
+  ## What this is now, and what it used to be
 
-  ## CORRECTION, 29 Jul — measured against the live database
+  This file used to *change* production. It no longer does. It exists to make a
+  database rebuilt from `supabase/migrations` come up with the policies
+  production already has.
 
-  When this was written, no non-demo vehicle existed, so the anon-leak test was
-  impossible and the conclusion rested on the migration history alone. A real
-  private vehicle now exists, and the test was run:
+  **Applying this to production is intended to be a no-op**, and it is written
+  so that it provably is: it drops only policy names production does not have,
+  and creates only policy names production does have — each guarded by an
+  existence check. Against live, every statement below skips.
 
-    anon SELECT, listing all vehicles      -> 3 demo rows, nothing else
-    anon SELECT by the private vehicle id  -> 0 rows
-    anon SELECT by a demo vehicle id       -> 1 row
-    anon on its child tables (knowledge
-      base, health summary, nhtsa, wishlist)
-      for the private vehicle              -> 0 rows each
-    same child tables for a demo vehicle   -> readable
+  ## Why the rewrite was necessary — the first version would have failed silently
 
-  **The live database scopes anon correctly.** The `USING (true)` policy in the
-  migration history is NOT what is running.
+  The original dropped four wide-open policies by the names found in the
+  migration history, and created four narrow ones:
 
-  So what was right and what was wrong:
+      "Allow select on vehicles"          20260103030740, USING (true)
+      "Allow insert on vehicles"          20260103030740, WITH CHECK (true)
+      "Allow update on vehicles"          20260103030740, USING (true)
+      "Allow delete on vehicles"          20260103030740, USING (true)
+      "Allow all operations on vehicles"  20260101215332, FOR ALL USING (true)
 
-    RIGHT — the migration history really does leave `vehicles` with
-            `USING (true)` for SELECT/INSERT/UPDATE/DELETE, never dropped.
-    WRONG — the inference that the live database is therefore open. It is not,
-            at least for anon.
+  A read-only sweep of production on 28 Jul 2026 found **none of those names
+  exist live.** Live has four differently-named, correctly-scoped policies —
+  someone fixed them by hand, through the Bolt or Supabase dashboard, and never
+  wrote the change back.
 
-  ## What this actually means, which is a different problem
+  Had the original run:
 
-  **The migrations do not reproduce the live database.** Someone fixed these
-  policies outside the migration history — most likely through the Bolt or
-  Supabase dashboard. That means a database rebuilt from `supabase/migrations`
-  — a fresh environment, a local stack, a disaster recovery — comes up
-  **wide open**, while production is fine.
+    1. All five DROPs would have silently no-op'd — they name nothing that
+       exists.
+    2. The four new policies would have been *added alongside* the four live
+       ones. Eight policies, not four.
+    3. **Permissive policies OR together.** The new `AND NOT is_demo` guard
+       would have been nullified by the broader live policy beside it.
 
-  It also answers the question in the Wed 29 Jul prompt: the §2 task 0.2 audit
-  was probably not wrong, and nothing regressed. The audit read the live
-  database; this file read the history; they disagree because the history is
-  incomplete.
+  Access would not have widened, so nothing would have looked wrong. The one
+  protection the migration existed to add simply would not have worked, while
+  this file read as though it did — a known gap converted into an invisible
+  one, which is worse than the gap.
 
-  ## Therefore: do NOT apply this blind
+  ## What production actually has (verified 28 Jul 2026, read-only)
 
-  Permissive policies OR together. This migration's DROPs target policies *by
-  name* — names taken from the history, which may not be what live actually
-  has. Applying it could add a narrow policy alongside an unknown existing one
-  and change nothing, while reading as though the hole was closed.
+    "Users can view own and demo vehicles"        SELECT  (user_id = auth.uid()) OR (is_demo = true)
+    "Authenticated users can insert own vehicles" INSERT  role authenticated
+    "Users can update own vehicles"               UPDATE  (user_id = auth.uid())
+    "Users can delete own vehicles"               DELETE  (user_id = auth.uid())
 
-  **Get the live policy list first**, from the Supabase SQL editor:
+  There is no `USING (true)` on `vehicles`, nor on any of the seven other tables
+  swept. The `authenticated` role is scoped everywhere. This answers the
+  question that had been open since 27 Jul — whether a signed-in user could
+  reach another account's vehicle — at the policy-definition level. **A
+  two-account behavioural test is still the only way to confirm it holds at
+  runtime rather than on paper.**
 
-      select polname, polcmd, pg_get_expr(polqual, polrelid) as using_expr
-      from pg_policy p join pg_class c on c.oid = p.polrelid
-      where relname = 'vehicles';
+  On UPDATE, live defines `USING` without `WITH CHECK`. That is not a gap:
+  Postgres reuses the `USING` expression as the `WITH CHECK` expression when the
+  latter is omitted, so a user cannot reassign `user_id` to another account. The
+  form below matches live rather than "improving" on it.
 
-  Then either reconcile this migration to match what is really there, or
-  supersede it deliberately. The goal is that the history and the database
-  agree — not that this particular file runs.
+  ## What this deliberately does NOT do
 
-  ## Still genuinely unknown
+  **It does not add the `AND NOT is_demo` write guard.** Live protects demo rows
+  through ownership — `user_id = auth.uid()` never matches for a demo row — not
+  through an explicit flag check. Adding the guard is defence in depth and
+  probably worth having, but it is a *change to production behaviour*, and
+  folding it into a reconciliation is precisely how the first version of this
+  file went wrong. It belongs in its own migration, applied deliberately, once
+  this one has made the two agree.
 
-  Whether the **authenticated** role is scoped. Anon is proven; a signed-in
-  user reading another user's vehicle has not been tested, because it needs a
-  second account. That is the remaining test and it is cheap now that signup
-  works.
+  **It does not touch the six child tables.** They are scoped by
+  `user_owns_vehicle(vehicle_id)` in the history *and* live, so those already
+  agree.
 
-  ## The finding
+  Two known divergences are recorded here and not addressed:
 
-  Every child table (`service_items`, `vehicle_documents`, `consultant_conversations`,
-  …) is scoped with `user_owns_vehicle(vehicle_id)`. The `vehicles` table itself is
-  not. Its policies have been unrestricted since `20260103030740`:
+    - `wishlist_items` carries six policies live where four suffice: a `FOR ALL`
+      catch-all beside three narrower ones doing the same ownership check, plus
+      a separate anon demo read. Not a hole — everything resolves to the same
+      boundary — but redundant coverage, and another fingerprint of
+      hand-patching.
+    - The body of `user_owns_vehicle()` has not been read. Six tables delegate
+      their entire boundary to it, so whether it is SECURITY DEFINER, and
+      whether its `search_path` is pinned, both matter. **Outstanding.**
 
-      CREATE POLICY "Allow select on vehicles" ON vehicles FOR SELECT USING (true);
-      CREATE POLICY "Allow insert on vehicles" ON vehicles FOR INSERT WITH CHECK (true);
-      CREATE POLICY "Allow update on vehicles" ON vehicles FOR UPDATE USING (true) WITH CHECK (true);
-      CREATE POLICY "Allow delete on vehicles" ON vehicles FOR DELETE USING (true);
+  ## Verifying after this runs
 
-  No later migration drops or replaces them. `20260314234029_enforce_vehicle_ownership_and_rls`
-  is the one that sounds like it would, and it does add the NOT NULL and the foreign
-  key to `auth.users` — but its own security notes say the ownership checks live on
-  *child* tables, and it leaves the four policies above untouched.
+    -- expect exactly the four names above, and nothing else
+    select polname, polcmd, pg_get_expr(polqual, polrelid)
+    from pg_policy p join pg_class c on c.oid = p.polrelid
+    where relname = 'vehicles';
 
-  ## Why it matters
-
-  RLS is the only enforcement for anything the browser client queries directly, and
-  the app does query `vehicles` directly:
-
-    - `hooks/useVehicles.ts`, `app/demo/page.tsx`, and the dashboard, consultant,
-      documents and vehicle-info pages all SELECT from `vehicles` with the session
-      client.
-    - `components/VehicleCard.tsx:170` runs
-      `supabase.from('vehicles').delete().eq('id', vehicle.id)` — a DELETE issued
-      straight from the browser, with no server-side authorization in front of it.
-
-  `lib/api-auth.ts` protects the API routes and server actions, but it is not in the
-  path for any of the above. With `USING (true)`, a signed-in user can read, modify
-  and delete **any** vehicle row, including the three demo vehicles that the
-  recruiter-facing public demo renders.
-
-  ## What has and has not been verified (27 Jul)
-
-  VERIFIED against the live database:
-    - The `anon` role cannot INSERT, UPDATE or DELETE — it fails with "permission
-      denied for table vehicles", which is the *table GRANT* from
-      `20260726140000_lock_anon_writes_and_restore_dossier`, not a row policy.
-    - `anon` can SELECT, and sees the three demo rows.
-
-  NOT VERIFIED — needs a signed-in session, which the session that wrote this could
-  not obtain:
-    - Whether the `authenticated` role can read/modify/delete other users' rows.
-      The migration history says yes. The `authenticated` GRANT must exist, or
-      VehicleCard's client-side delete could not work at all.
-
-  Migrations are not proof of live state — this project's Supabase is Bolt-managed
-  and may have drifted. **Run the check at the bottom before and after applying.**
-
-  ## The policy
-
-  Owner-or-demo for reads; owner-and-not-demo for writes. Demo rows become readable
-  by everyone and writable by nobody, which is what `lib/api-auth.ts` already
-  enforces at the application layer (`intent: 'write'` on a demo vehicle is a 403).
-  Service-role callers bypass RLS entirely, so migrations and the seeding scripts
-  are unaffected.
+    -- and the behaviour that pays for it
+    -- 1. anonymous /demo still lists three vehicles
+    -- 2. node scripts/verify-demo.mjs <url> passes
+    -- 3. a signed-in user sees, adds, edits and deletes only their own
 */
 
 -- ============================================================
--- Replace the unrestricted policies
+-- 1. Remove the wide-open policies the history creates.
+--    No-ops against production; the whole point on a rebuild.
 -- ============================================================
 
+DROP POLICY IF EXISTS "Allow all operations on vehicles" ON public.vehicles;
 DROP POLICY IF EXISTS "Allow select on vehicles" ON public.vehicles;
 DROP POLICY IF EXISTS "Allow insert on vehicles" ON public.vehicles;
 DROP POLICY IF EXISTS "Allow update on vehicles" ON public.vehicles;
 DROP POLICY IF EXISTS "Allow delete on vehicles" ON public.vehicles;
 
--- Also drop the original catch-all in case an environment predates 20260103030740.
-DROP POLICY IF EXISTS "Allow all operations on vehicles" ON public.vehicles;
+-- ============================================================
+-- 2. Create production's policies, but only where absent.
+--
+--    Postgres has no CREATE POLICY IF NOT EXISTS, and an unguarded CREATE
+--    would abort the whole migration against live. Guarding each one is what
+--    makes this file safe to run anywhere, more than once.
+-- ============================================================
 
-/*
-  SELECT — demo rows are public by design; everything else is owner-only.
+DO $$
+BEGIN
+  /*
+    SELECT is intentionally not restricted `TO authenticated`. `auth.uid()` is
+    NULL for an anonymous visitor, so `user_id = auth.uid()` is NULL and the row
+    is admitted only by `is_demo` — which is what keeps the public demo working
+    without a session. Adding a role restriction here takes the demo down; §3
+    item 6 records that happening once already.
+  */
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policy p JOIN pg_class c ON c.oid = p.polrelid
+    WHERE c.relname = 'vehicles' AND p.polname = 'Users can view own and demo vehicles'
+  ) THEN
+    CREATE POLICY "Users can view own and demo vehicles"
+      ON public.vehicles FOR SELECT
+      USING ((user_id = auth.uid()) OR (is_demo = true));
+  END IF;
 
-  `auth.uid()` is NULL for anon, so `user_id = auth.uid()` is NULL and the row is
-  admitted only when `is_demo`. That is what keeps the anonymous demo working, and
-  it is the clause to be most careful with: §3 item 6 records the demo going down
-  when route protection stopped accounting for anonymous visitors.
-*/
-CREATE POLICY "vehicles_select_own_or_demo"
-  ON public.vehicles FOR SELECT
-  USING (is_demo OR user_id = auth.uid());
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policy p JOIN pg_class c ON c.oid = p.polrelid
+    WHERE c.relname = 'vehicles' AND p.polname = 'Authenticated users can insert own vehicles'
+  ) THEN
+    CREATE POLICY "Authenticated users can insert own vehicles"
+      ON public.vehicles FOR INSERT
+      TO authenticated
+      WITH CHECK (user_id = auth.uid());
+  END IF;
 
-/*
-  INSERT — you may only create vehicles you own, and may not mint demo rows.
-  Without the is_demo guard, any user could create a row that every visitor to the
-  public demo would then see.
-*/
-CREATE POLICY "vehicles_insert_own"
-  ON public.vehicles FOR INSERT
-  TO authenticated
-  WITH CHECK (user_id = auth.uid() AND NOT is_demo);
+  /*
+    `WITH CHECK` is omitted to match live exactly. Postgres then reuses the
+    `USING` expression for the new row, so reassigning `user_id` to another
+    account is already refused. Spelling it out would make this a different
+    policy definition from the one production runs — the thing this file exists
+    to stop.
+  */
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policy p JOIN pg_class c ON c.oid = p.polrelid
+    WHERE c.relname = 'vehicles' AND p.polname = 'Users can update own vehicles'
+  ) THEN
+    CREATE POLICY "Users can update own vehicles"
+      ON public.vehicles FOR UPDATE
+      TO authenticated
+      USING (user_id = auth.uid());
+  END IF;
 
-/*
-  UPDATE — owner only, and never a demo row.
+  /*
+    The one that matters most: components/VehicleCard.tsx issues
+    `supabase.from('vehicles').delete()` straight from the browser, with no
+    server-side authorization in front of it. This policy is the only thing
+    between a signed-in user and another account's vehicles.
+  */
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policy p JOIN pg_class c ON c.oid = p.polrelid
+    WHERE c.relname = 'vehicles' AND p.polname = 'Users can delete own vehicles'
+  ) THEN
+    CREATE POLICY "Users can delete own vehicles"
+      ON public.vehicles FOR DELETE
+      TO authenticated
+      USING (user_id = auth.uid());
+  END IF;
+END $$;
 
-  `WITH CHECK` as well as `USING`: without it a user could update their own row and
-  set `user_id` to someone else, or flip `is_demo` true and publish it into the demo.
-*/
-CREATE POLICY "vehicles_update_own"
-  ON public.vehicles FOR UPDATE
-  TO authenticated
-  USING (user_id = auth.uid() AND NOT is_demo)
-  WITH CHECK (user_id = auth.uid() AND NOT is_demo);
-
-/*
-  DELETE — owner only, and never a demo row. This is the one that matters most:
-  components/VehicleCard.tsx deletes from the browser, so this policy is the only
-  thing standing between a signed-in user and the public demo's vehicles.
-*/
-CREATE POLICY "vehicles_delete_own"
-  ON public.vehicles FOR DELETE
-  TO authenticated
-  USING (user_id = auth.uid() AND NOT is_demo);
-
-/*
-  ── BEFORE APPLYING ────────────────────────────────────────────────────────────
-
-  Confirm the finding is real on the live database rather than only in the
-  migration history. Signed in as a real user, from the browser console:
-
-      await supabase.from('vehicles').select('id,make,is_demo')
-
-  If that returns the three demo vehicles plus any other account's vehicles, the
-  policies are unrestricted and this migration is needed. If it returns only your
-  own vehicles plus the demo rows, the live state has already diverged from the
-  migrations and this should be reconciled rather than applied blind.
-
-  ── AFTER APPLYING — all four must hold ────────────────────────────────────────
-
-  1. Anonymous /demo still lists three vehicles, and a demo dashboard still renders.
-     This is the one that takes the demo down if the SELECT clause is wrong.
-  2. `node scripts/verify-demo.mjs <url>` passes.
-  3. A signed-in user sees their own vehicles and can add, edit and delete them.
-  4. A signed-in user CANNOT delete a demo vehicle from the browser console:
-         await supabase.from('vehicles').delete().eq('id','a1000000-0000-0000-0000-000000000001')
-     must affect zero rows.
-
-  Apply to the CI project first, not to the project the live demo reads from.
-*/
+-- RLS itself, in case a rebuilt environment somehow reaches here without it.
+ALTER TABLE public.vehicles ENABLE ROW LEVEL SECURITY;
