@@ -6,7 +6,8 @@
     "packages/*"
   ],
   "_dependencyNotes": {
-    "bufferutil, utf-8-validate": "Optional native deps of `ws`, reached via @google/genai -> lib/gemini.ts. Nothing here imports them and a pruning pass will read them as dead weight. DO NOT REMOVE: without them webpack emits 'Module not found' and every request through the Gemini path HANGS INDEFINITELY rather than erroring. Cost an evening on 28 Jul. Guarded by lib/__tests__/ws-optional-deps.test.ts."
+    "bufferutil, utf-8-validate": "Optional native deps of `ws`, reached via @google/genai -> lib/gemini.ts. Nothing here imports them and a pruning pass will read them as dead weight. DO NOT REMOVE: without them webpack emits 'Module not found' and every request through the Gemini path HANGS INDEFINITELY rather than erroring. Cost an evening on 28 Jul. Guarded by lib/__tests__/ws-optional-deps.test.ts.",
+    "DO NOT run `npm run build` while `npm run dev` is running": "They share .next. A build replaces the chunks the dev server is serving, so every /_next/static request 404s: the page renders as unstyled HTML and React never hydrates, which presents as dead buttons rather than an error. This is the PackFileCacheStrategy / 503-chunk symptom recorded against /forgot-password. Fix: stop dev, rm -rf .next, restart. Deployments are unaffected \u2014 Netlify never runs dev."
   },
   "scripts": {
     "dev": "next dev",
