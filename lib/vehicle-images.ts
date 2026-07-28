@@ -16,9 +16,26 @@ import { withTimeout } from '@crewchief/core/retry';
 */
 const SEARCH_TIMEOUT_MS = 5000;
 
-const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1517026575992-5e15ad95f780?q=80&w=2340&auto=format&fit=crop';
+/*
+  There is no fallback image, deliberately.
 
-export async function getVehicleImage(vehicleId: string, vehicle: any): Promise<string> {
+  This used to be an images.unsplash.com URL. **That URL now 404s** — verified
+  28 Jul — so the "graceful fallback" was rendering a broken <img> with alt
+  text on the vehicle hero, above the fold, on a portfolio piece. Nobody would
+  ever report that as a bug, which is what made it worth finding.
+
+  Two reasons not to substitute another URL. §20 already moved the demo
+  photography to local files precisely to stop the recruiter-facing demo
+  depending on a third party at runtime, and the same argument applies here.
+  And `DiagnosticHero` already renders a deliberate empty state — "Add a
+  photo" — when it has no image. The dead URL was bypassing a perfectly good
+  design.
+
+  So: no image is `null`, and the UI says so honestly.
+*/
+const NO_IMAGE = null;
+
+export async function getVehicleImage(vehicleId: string, vehicle: any): Promise<string | null> {
   // 1. Check Cache
   const { data: vehicleData } = await supabase
     .from('vehicles')
@@ -26,10 +43,10 @@ export async function getVehicleImage(vehicleId: string, vehicle: any): Promise<
     .eq('id', vehicleId)
     .maybeSingle();
 
-  // Return immediately if we already have a valid non-fallback image URL.
-  // This protects manually set image_url values (e.g. demo vehicles) from being overwritten
-  // by the Google image search even when processed_image_at is null.
-  if (vehicleData?.image_url && vehicleData.image_url !== FALLBACK_IMAGE) {
+  // Return immediately if we already have an image. This protects manually set
+  // image_url values (e.g. demo vehicles) from being overwritten by the Google
+  // image search even when processed_image_at is null.
+  if (vehicleData?.image_url) {
     if (!vehicleData.processed_image_at) {
       return vehicleData.image_url;
     }
@@ -56,17 +73,17 @@ export async function getVehicleImage(vehicleId: string, vehicle: any): Promise<
     return imageUrl;
   } catch (error) {
     console.error('Failed to fetch vehicle image:', error);
-    return FALLBACK_IMAGE;
+    return NO_IMAGE;
   }
 }
 
-async function fetchVehicleImage(year: number, make: string, model: string, color?: string): Promise<string> {
+async function fetchVehicleImage(year: number, make: string, model: string, color?: string): Promise<string | null> {
   const apiKey = process.env.GOOGLE_SEARCH_API_KEY;
   const searchEngineId = process.env.GOOGLE_SEARCH_ENGINE_ID;
 
   if (!apiKey || !searchEngineId) {
     console.error('[CrewChief] GOOGLE_SEARCH_API_KEY or GOOGLE_SEARCH_ENGINE_ID is not set. Set them in your .env file (see .env.example). Vehicle image search will use the fallback image.');
-    return FALLBACK_IMAGE;
+    return NO_IMAGE;
   }
 
   const colorPart = color ? ` "${color}"` : '';
@@ -137,13 +154,14 @@ async function fetchVehicleImage(year: number, make: string, model: string, colo
     }
   }
 
-  console.warn('[VehicleImages] No valid images found, using fallback');
-  return FALLBACK_IMAGE;
+  console.warn('[VehicleImages] No valid image found — leaving the vehicle without one');
+  return NO_IMAGE;
 }
 
 async function validateImageUrl(url: string): Promise<boolean> {
   try {
-    if (!url || url === FALLBACK_IMAGE) {
+    // Nothing to validate. Not an error — the caller renders an empty state.
+    if (!url) {
       return true;
     }
 

@@ -41,6 +41,7 @@ const STATIC_ANALYSIS_SUITES = [
   'internal-fetch-posture.test.ts',
   'vehicles-rls-posture.test.ts',
   'portability.test.ts',
+  'ws-optional-deps.test.ts',
   'tests-test-real-code.test.ts',
 ];
 
