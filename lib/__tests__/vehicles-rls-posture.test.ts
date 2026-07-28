@@ -16,10 +16,19 @@
  * straight from the browser client. `lib/api-auth.ts` is not in that path.
  *
  * This is a static read of the migration corpus, so it proves what the
- * migrations declare and not what the live database does — the project's
- * Supabase is Bolt-managed and can drift. It is still the right ratchet: the
- * next permissive policy someone writes will fail here, and the reason it was
- * missed the first time is that nothing was looking.
+ * migrations declare and not what the live database does.
+ *
+ * **That gap turned out to be the actual finding.** Measured 29 Jul against
+ * the live project: anon cannot read a private vehicle, by list or by direct
+ * id, nor any of its child tables — so the `USING (true)` policy in the
+ * history is not what is running. Someone fixed it outside the migrations,
+ * almost certainly through a dashboard.
+ *
+ * Which means the real defect is not an open database, it is that **the
+ * migrations do not reproduce the live one**. A fresh environment built from
+ * `supabase/migrations` comes up wide open while production is fine, and
+ * nothing would say so. This suite is what makes that visible: it asserts what
+ * a rebuild would get, which is exactly the thing no one was checking.
  */
 
 import { readdirSync, readFileSync } from 'node:fs';

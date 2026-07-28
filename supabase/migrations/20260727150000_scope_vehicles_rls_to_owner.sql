@@ -1,7 +1,68 @@
 /*
   # Scope the vehicles table's own RLS policies to the owner
 
-  ## NOT YET APPLIED — read the verification steps at the bottom first.
+  ## NOT YET APPLIED — and the finding below has been PARTLY CORRECTED. Read this first.
+
+  ## CORRECTION, 29 Jul — measured against the live database
+
+  When this was written, no non-demo vehicle existed, so the anon-leak test was
+  impossible and the conclusion rested on the migration history alone. A real
+  private vehicle now exists, and the test was run:
+
+    anon SELECT, listing all vehicles      -> 3 demo rows, nothing else
+    anon SELECT by the private vehicle id  -> 0 rows
+    anon SELECT by a demo vehicle id       -> 1 row
+    anon on its child tables (knowledge
+      base, health summary, nhtsa, wishlist)
+      for the private vehicle              -> 0 rows each
+    same child tables for a demo vehicle   -> readable
+
+  **The live database scopes anon correctly.** The `USING (true)` policy in the
+  migration history is NOT what is running.
+
+  So what was right and what was wrong:
+
+    RIGHT — the migration history really does leave `vehicles` with
+            `USING (true)` for SELECT/INSERT/UPDATE/DELETE, never dropped.
+    WRONG — the inference that the live database is therefore open. It is not,
+            at least for anon.
+
+  ## What this actually means, which is a different problem
+
+  **The migrations do not reproduce the live database.** Someone fixed these
+  policies outside the migration history — most likely through the Bolt or
+  Supabase dashboard. That means a database rebuilt from `supabase/migrations`
+  — a fresh environment, a local stack, a disaster recovery — comes up
+  **wide open**, while production is fine.
+
+  It also answers the question in the Wed 29 Jul prompt: the §2 task 0.2 audit
+  was probably not wrong, and nothing regressed. The audit read the live
+  database; this file read the history; they disagree because the history is
+  incomplete.
+
+  ## Therefore: do NOT apply this blind
+
+  Permissive policies OR together. This migration's DROPs target policies *by
+  name* — names taken from the history, which may not be what live actually
+  has. Applying it could add a narrow policy alongside an unknown existing one
+  and change nothing, while reading as though the hole was closed.
+
+  **Get the live policy list first**, from the Supabase SQL editor:
+
+      select polname, polcmd, pg_get_expr(polqual, polrelid) as using_expr
+      from pg_policy p join pg_class c on c.oid = p.polrelid
+      where relname = 'vehicles';
+
+  Then either reconcile this migration to match what is really there, or
+  supersede it deliberately. The goal is that the history and the database
+  agree — not that this particular file runs.
+
+  ## Still genuinely unknown
+
+  Whether the **authenticated** role is scoped. Anon is proven; a signed-in
+  user reading another user's vehicle has not been tested, because it needs a
+  second account. That is the remaining test and it is cheap now that signup
+  works.
 
   ## The finding
 
