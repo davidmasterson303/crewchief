@@ -45,6 +45,10 @@ const STATIC_ANALYSIS_SUITES = [
   'illustration-tokens.test.ts',
   'env-parity.test.ts',
   'tests-test-real-code.test.ts',
+  // Reads @google/genai's own dist entries to prove the protobufjs CRITICAL is
+  // never loaded. Importing the tokenizer to test it would load the very module
+  // the suite exists to show is unreachable.
+  'protobufjs-unreachable.test.ts',
 ];
 
 /**
