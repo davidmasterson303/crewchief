@@ -43,6 +43,7 @@ const STATIC_ANALYSIS_SUITES = [
   'portability.test.ts',
   'ws-optional-deps.test.ts',
   'illustration-tokens.test.ts',
+  'env-parity.test.ts',
   'tests-test-real-code.test.ts',
 ];
 
