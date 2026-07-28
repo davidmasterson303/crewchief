@@ -33,11 +33,29 @@ export function isDemoVehicleId(vehicleId: string): boolean {
  * the database; once it has been applied everywhere, this map and the override
  * in VehicleCard should both be deleted so the database is the only answer.
  *
- * Keep the paths identical to the migration's. If they drift, the card and the
- * hero show different cars.
+ * Keep these pointing at the same *photograph* as the migration's. If they
+ * drift, the card and the hero show different cars.
+ *
+ * ── They now point at a card-sized derivative, and that is not drift ────────
+ *
+ * `card-800.jpg` is `hero-3x2.jpg` resized to 800px and re-encoded — the same
+ * frame, the same crop, a different file size. The rule above is about which
+ * car is shown, and it still holds.
+ *
+ * The reason is CC-142's payload criterion. A garage grid of three cards was
+ * fetching three page-width heroes: 2,252 KB to fill three ~400px boxes. The
+ * derivatives bring that to 225 KB. The dashboard keeps `hero-3x2.jpg`, which
+ * is the right source for a 400px full-width band.
+ *
+ * `lib/__tests__/demo-image-budget.test.ts` holds the line at 250 KB.
+ *
+ * **Whoever deletes this map must not simply fall back to `image_url`** — the
+ * database column holds the hero, so doing that silently restores the 2.2 MB
+ * grid. Deleting it properly means the card asking for a card-sized source,
+ * whether through a second column, a naming convention or `srcset`.
  */
 export const DEMO_IMAGES: Record<string, string> = {
-  'a1000000-0000-0000-0000-000000000001': '/vehicles/accord/hero-3x2.jpg',
-  'a2000000-0000-0000-0000-000000000002': '/vehicles/wrx/hero-3x2.jpg',
-  'a3000000-0000-0000-0000-000000000003': '/vehicles/m3/hero-3x2.jpg',
+  'a1000000-0000-0000-0000-000000000001': '/vehicles/accord/card-800.jpg',
+  'a2000000-0000-0000-0000-000000000002': '/vehicles/wrx/card-800.jpg',
+  'a3000000-0000-0000-0000-000000000003': '/vehicles/m3/card-800.jpg',
 };
