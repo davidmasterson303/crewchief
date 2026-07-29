@@ -4,24 +4,37 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Car, ArrowRight } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import dynamic from 'next/dynamic';
 import { VehicleCard } from '@/components/VehicleCard';
 import { RevealOnScroll } from '@/components/RevealOnScroll';
+import GarageDoor from '@/components/GarageDoor';
+import LandingHero from '@/components/LandingHero';
 import { supabase } from '@/lib/supabase';
 
-const LandingHero = dynamic(() => import('@/components/LandingHero'), { ssr: false });
+/*
+ * LandingHero is imported directly rather than through `next/dynamic` with
+ * `ssr: false`, which is what it used to be. That arrangement raced a 600ms
+ * timer against the arrival of its own chunk: if the chunk lost, the curtain
+ * mounted already-open and the intro silently never played. The door is
+ * server-rendered now, so there is no chunk to wait for and no race to lose.
+ */
 
 const INTERIOR_URL = '/dark-roomb.jpeg';
 
 export default function DemoPage() {
-  const [isGarageOpen, setIsGarageOpen] = useState(false);
+  return (
+    <GarageDoor panel={(enter) => <LandingHero onEnter={enter} />}>
+      <DemoContents />
+    </GarageDoor>
+  );
+}
+
+/* The page below the door, which mounts once and knows nothing about it. */
+function DemoContents() {
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadDemoVehicles();
-    const timer = setTimeout(() => setIsGarageOpen(true), 600);
-    return () => clearTimeout(timer);
   }, []);
 
   const loadDemoVehicles = async () => {
@@ -115,8 +128,6 @@ export default function DemoPage() {
           )}
         </div>
       </main>
-
-      <LandingHero isOpen={isGarageOpen} onEnter={() => setIsGarageOpen(true)} />
     </div>
   );
 }

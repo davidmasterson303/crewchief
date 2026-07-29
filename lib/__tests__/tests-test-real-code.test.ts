@@ -59,6 +59,11 @@ const STATIC_ANALYSIS_SUITES = [
   // rejected by Postgres and had its error discarded, so the only place the
   // disagreement is visible is the source of both sides.
   'mod-details-goal-key.test.ts',
+  // Reads globals.css and the two curtain components to prove the garage-door
+  // intro is still drawn rather than photographed. The thing it guards against
+  // — swapping the CSS slats for a 1.4 MB JPEG — renders correctly, so no
+  // runtime assertion can see it. Only the source can.
+  'garage-door-cost.test.ts',
 ];
 
 /**

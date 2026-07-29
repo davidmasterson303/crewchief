@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Car, Plus } from 'lucide-react';
 import { VehicleCard } from '@/components/VehicleCard';
+import GarageDoor from '@/components/GarageDoor';
+import LandingHero from '@/components/LandingHero';
 import { useDemoVehicles, type GarageVehicle } from '@/hooks/useVehicles';
 
 // Self-hosted (was hot-linked from Unsplash — a third-party outage or
@@ -28,6 +30,20 @@ function VehicleCardSkeleton() {
 }
 
 export default function GaragePage() {
+  return (
+    <GarageDoor panel={(enter) => <LandingHero onEnter={enter} />}>
+      <GarageContents />
+    </GarageDoor>
+  );
+}
+
+/*
+ * Split out so the page below the door is an ordinary component that mounts
+ * once and knows nothing about the intro. The predecessor threaded an `isOpen`
+ * boolean through the page and passed it back down to the curtain, which is
+ * how the two got out of step; there is nothing to thread here.
+ */
+function GarageContents() {
   const { data: vehicles = [], isLoading, error: queryError } = useDemoVehicles();
 
   return (
