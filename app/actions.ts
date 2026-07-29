@@ -1804,6 +1804,41 @@ export async function getVehicleHealthSummary(vehicleId: string) {
   }
 }
 
+/*
+  The union of both vocabularies, because the app genuinely has both.
+
+  `performance_mindedness` (enum)      : stock | mild | aggressive
+  `performance_goal` (text + CHECK)    : mild  | moderate | aggressive
+
+  'stock' and 'moderate' each exist in exactly one of them, so any lookup keyed
+  on one vocabulary and fed from the other has a hole in it. Covering the union
+  is what closes the hole — and typing it as a Record means adding a value to
+  either column fails the build here instead of rendering `undefined` into a
+  prompt sent to Gemini.
+*/
+type GoalKey = 'stock' | 'mild' | 'moderate' | 'aggressive';
+
+const GOAL_CONTEXT: Record<GoalKey, string> = {
+  stock:
+    'to keep the car factory-correct. Prioritise originality, warranty and resale above all else. Be explicit about what a modification costs them in those terms, and say plainly when the honest answer is to leave it alone.',
+  mild: 'subtle improvements that maintain OEM+ reliability. Prioritize longevity and minimal risk. Recommend conservative, proven upgrades that add refinement without compromising the factory engineering.',
+  moderate:
+    'balanced performance and reliability. Suggest upgrades that enhance the driving experience while maintaining reasonable reliability. Focus on well-tested modifications with strong community support.',
+  aggressive:
+    "maximum performance with track-focused priorities. Recommend serious performance upgrades for someone who values power and handling over comfort and longevity. Suggest modifications that push the vehicle's capabilities.",
+};
+
+/**
+ * Coerce whatever a caller has to a key this module can look up.
+ *
+ * 'moderate' is the fallback rather than 'stock' because it is what the
+ * database default has silently meant for every vehicle to date — an unknown
+ * value should land where the old behaviour landed, not somewhere new.
+ */
+function normaliseGoal(value: unknown): GoalKey {
+  return typeof value === 'string' && value in GOAL_CONTEXT ? (value as GoalKey) : 'moderate';
+}
+
 export async function generateModificationDetails(vehicleId: string, modName: string, vehicle: any, performanceMindset: string) {
   // Cost control: server actions are publicly invokable POST endpoints
   // and demo mode has no auth, so every Gemini-backed path is rate limited.
@@ -1820,20 +1855,40 @@ export async function generateModificationDetails(vehicleId: string, modName: st
     }
 
     const client = getServiceRoleClient();
-    const performanceGoal = vehicle.performance_goal || 'moderate';
 
-    const goalContext = {
-      mild: 'subtle improvements that maintain OEM+ reliability. Prioritize longevity and minimal risk. Recommend conservative, proven upgrades that add refinement without compromising the factory engineering.',
-      moderate: 'balanced performance and reliability. Suggest upgrades that enhance the driving experience while maintaining reasonable reliability. Focus on well-tested modifications with strong community support.',
-      aggressive: 'maximum performance with track-focused priorities. Recommend serious performance upgrades for someone who values power and handling over comfort and longevity. Suggest modifications that push the vehicle\'s capabilities.'
-    };
+    /*
+      ── Two columns model this, and only one of them is real ──────────────────
+
+      `performance_mindedness` is an enum the owner actually picks in
+      onboarding. It gates the UI: VehicleInsights hides the mods tab entirely
+      when it is 'stock'.
+
+      `performance_goal` is a text column added later with a CHECK of
+      ('mild','moderate','aggressive') and a NOT NULL default of 'moderate'.
+      **No screen in the app ever writes it.** It is 'moderate' for every
+      vehicle that has ever existed.
+
+      This function took the owner's real choice as `performanceMindset` and
+      then ignored the parameter, reading `performance_goal` instead — so an
+      owner who said 'aggressive' in onboarding got modification analysis
+      written for a 'moderate' owner, every time, and an owner who said 'stock'
+      got mod analysis at all. That is the reported disagreement between the two
+      fields: they never disagreed so much as one of them was never consulted.
+
+      Preferring the parameter fixes it. `performance_goal` stays as the
+      fallback so a caller that has not been updated still behaves as before
+      rather than losing context entirely.
+    */
+    const performanceGoal: GoalKey = normaliseGoal(
+      performanceMindset || vehicle.performance_mindedness || vehicle.performance_goal
+    );
 
     const prompt = `You are an expert automotive consultant analyzing a modification for a specific vehicle owner.
 
 VEHICLE:
 - ${vehicle.year} ${vehicle.make} ${vehicle.model}
 - Owner's Performance Goal: ${performanceGoal.toUpperCase()}
-- Performance Goal Context: The owner wants ${goalContext[performanceGoal as keyof typeof goalContext]}
+- Performance Goal Context: The owner wants ${GOAL_CONTEXT[performanceGoal]}
 - Ownership Objective: ${vehicle.ownership_objective || 'Not specified'}
 
 MODIFICATION: ${modName}

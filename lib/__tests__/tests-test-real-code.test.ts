@@ -49,6 +49,9 @@ const STATIC_ANALYSIS_SUITES = [
   // never loaded. Importing the tokenizer to test it would load the very module
   // the suite exists to show is unreachable.
   'protobufjs-unreachable.test.ts',
+  // Reads app/actions.ts to prove a parameter is actually referenced. An unused
+  // parameter raises no type error, so only a source scan catches it returning.
+  'performance-goal.test.ts',
 ];
 
 /**
