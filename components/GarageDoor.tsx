@@ -7,6 +7,7 @@ import {
   INTRO_LIFT_TIMEOUT_MS,
   INTRO_PLAYED_KEY,
   INTRO_PLAYED_VALUE,
+  type IntroDecision,
 } from '@crewchief/core/intro-gate';
 
 /**
@@ -73,37 +74,63 @@ export default function GarageDoor({ panel, children }: GarageDoorProps) {
   */
   const [phase, setPhase] = useState<Phase>('closed');
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  /*
+    Decided once per mounted instance, and this ref is what makes that true.
+
+    React Strict Mode — on by default for the App Router, so every development
+    load — mounts, runs effects, tears them down and mounts again. Without this,
+    the first pass wrote the "already played" flag and the second pass read it
+    back, concluded the intro had run, and removed the curtain. The door could
+    therefore never appear in development, while every unit test of the policy
+    stayed green, because the policy was never what was wrong.
+
+    An effect that writes the state it reads is not idempotent. Strict Mode
+    exists to surface exactly that, and it did.
+  */
+  const decision = useRef<IntroDecision | null>(null);
 
   const lift = useCallback(() => {
     setPhase((current) => (current === 'closed' ? 'lifting' : current));
   }, []);
 
   useEffect(() => {
-    /*
-      The same policy the pre-paint script applied, from the same three inputs,
-      in the same load — so the two agree by construction. They cannot share an
-      import: that script has to run before the bundle exists, which is the
-      whole reason it is a string. `@crewchief/core/intro-gate` is where the
-      rule is written down, and the script mirrors it.
-    */
-    const decision = decideIntro({
-      alreadyPlayed: (() => {
-        try {
-          return sessionStorage.getItem(INTRO_PLAYED_KEY) === INTRO_PLAYED_VALUE;
-        } catch (_) {
-          return false;
-        }
-      })(),
-      reducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
-      documentHidden: document.hidden,
-    });
+    if (decision.current === null) {
+      /*
+        Prefer the answer the pre-paint script already reached. It ran once,
+        before the first paint, from the same three inputs, and it is what the
+        CSS is keying off — so taking it here means the stylesheet and the
+        component cannot disagree about whether this load has an intro.
 
-    if (decision === 'skip') {
+        The fallback recomputes it, for the case where that script did not run:
+        a test renderer, or a context where the inline script was blocked. The
+        two cannot share an import, because the script has to run before the
+        bundle exists, which is the whole reason it is a string.
+      */
+      const prePainted = document.documentElement.getAttribute('data-intro');
+
+      decision.current =
+        prePainted === 'play' || prePainted === 'skip'
+          ? prePainted
+          : decideIntro({
+              alreadyPlayed: (() => {
+                try {
+                  return sessionStorage.getItem(INTRO_PLAYED_KEY) === INTRO_PLAYED_VALUE;
+                } catch (_) {
+                  return false;
+                }
+              })(),
+              reducedMotion:
+                window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
+              documentHidden: document.hidden,
+            });
+
+      if (decision.current === 'play') markPlayed();
+    }
+
+    if (decision.current === 'skip') {
       setPhase('gone');
       return;
     }
-
-    markPlayed();
 
     const scheduled = timers.current;
     scheduled.push(setTimeout(lift, INTRO_HOLD_MS));
