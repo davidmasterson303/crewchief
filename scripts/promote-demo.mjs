@@ -216,12 +216,34 @@ try {
   try { sh('git checkout main'); } catch {}
 }
 
+/*
+  The commit to expect is the *merge* commit, not the one being promoted.
+
+  This instruction used to say `${head}`, and it is wrong in a way that has
+  already cost real time. Netlify builds `demo-live`, so /api/version reports
+  demo-live's HEAD — the --no-ff merge this script just made — and never the
+  main commit named in its message. Following the old instruction, you check for
+  a commit that will never appear and conclude the deploy failed.
+
+  Worse, it seeds the status doc with the wrong baseline. On 28 Jul that doc
+  recorded `demo-live = d0dcaff`, which is not a code commit at all but an
+  *earlier promotion merge*. A later check against that stale value produced a
+  false alarm that the demo had moved unexpectedly, and cost a round trip to
+  disprove.
+*/
+const mergeCommit = sh('git rev-parse demo-live').slice(0, 8);
+
 console.log(`
 Netlify is building the demo now. When it finishes:
 
   node scripts/verify-demo.mjs
 
-and confirm ${DEMO}/api/version reports ${head.slice(0, 8)}.
+and confirm ${DEMO}/api/version reports ${mergeCommit} — the merge commit on
+${RELEASE_BRANCH}, which is what Netlify built. It will NOT report
+${head.slice(0, 8)}: that is the commit being promoted, and it is recorded in
+the merge message, not in the build.
+
+Record ${mergeCommit} as ${RELEASE_BRANCH}'s new baseline.
 
 To undo: revert the merge commit on ${RELEASE_BRANCH} and push. The demo
 returns to its previous build without touching main.
