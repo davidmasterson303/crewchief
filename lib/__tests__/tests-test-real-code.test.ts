@@ -41,7 +41,14 @@ const STATIC_ANALYSIS_SUITES = [
   'internal-fetch-posture.test.ts',
   'vehicles-rls-posture.test.ts',
   'portability.test.ts',
+  'ws-optional-deps.test.ts',
+  'illustration-tokens.test.ts',
+  'env-parity.test.ts',
   'tests-test-real-code.test.ts',
+  // Reads @google/genai's own dist entries to prove the protobufjs CRITICAL is
+  // never loaded. Importing the tokenizer to test it would load the very module
+  // the suite exists to show is unreachable.
+  'protobufjs-unreachable.test.ts',
 ];
 
 /**
@@ -64,8 +71,18 @@ const DECLARED_SIMULATIONS = ['rls-ownership.test.ts'];
 const IMPORTS_APP_CODE =
   /(?:from\s+|require\()\s*['"](?:@crewchief\/|@\/|\.\.?\/)(?!.*__tests__)/;
 
+/*
+  `.tsx` as well as `.ts`.
+
+  Globbing only `.test.ts` was a silent hole in exactly the guard whose job is
+  to catch tests that do not test anything: every component suite escaped it,
+  and the way to evade the check was to name a file `.tsx`. Found when the
+  illustration grid suite — a `.tsx` — was not picked up at all. Both existing
+  `.tsx` suites already imported real modules, so closing it cost nothing;
+  leaving it open would have cost the next one.
+*/
 function suites(): string[] {
-  return readdirSync(TESTS_DIR).filter((f) => f.endsWith('.test.ts'));
+  return readdirSync(TESTS_DIR).filter((f) => /\.test\.tsx?$/.test(f));
 }
 
 describe('every suite exercises shipped code', () => {

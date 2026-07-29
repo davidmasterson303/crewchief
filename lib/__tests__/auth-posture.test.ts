@@ -84,8 +84,11 @@ function exportedActions(source: string): Fn[] {
  *   'vehicle-scoped' — must go through lib/api-auth
  *   'session'        — must call auth.getUser() directly
  *   'public'         — deliberately unauthenticated; justify in the comment
+ *   'secret-gated'   — no user session, but a shared secret from the
+ *                      environment. For routes that cost money to call and are
+ *                      invoked by tooling rather than by people
  */
-const ROUTE_POSTURE: Record<string, 'vehicle-scoped' | 'session' | 'public'> = {
+const ROUTE_POSTURE: Record<string, 'vehicle-scoped' | 'session' | 'public' | 'secret-gated'> = {
   'app/api/v1/vehicles/route.ts': 'session',
   'app/api/v1/load-vehicle/route.ts': 'vehicle-scoped',
   'app/api/v1/load-maintenance-data/route.ts': 'vehicle-scoped',
@@ -116,6 +119,23 @@ const ROUTE_POSTURE: Record<string, 'vehicle-scoped' | 'session' | 'public'> = {
     a way to spend tokens; see the route for why that distinction matters here.
   */
   'app/api/health/ai/route.ts': 'public',
+  /*
+    Asks the live consultant a real question and reads the answer, so unlike
+    /api/health/ai it spends Gemini tokens on every call.
+
+    That is exactly why it is not 'public'. A public endpoint that spends
+    tokens on request is the unbounded-cost bug §3 records in
+    `performance-stats`, where demo vehicles fell through to a model call on
+    every anonymous page view. Per CREWCHIEF_ROUNDTRIP_GATE_DESIGN.md decision
+    1, the endpoint is closed rather than the prompt made cheap — cost stops
+    being a design problem once the caller must authenticate.
+
+    'secret-gated' is a new category rather than the nearest existing label.
+    Calling it 'public' would have been false, and 'session' would have been
+    both false and useless, since the caller is promote-demo.mjs and a canary,
+    neither of which has a user session.
+  */
+  'app/api/health/consultant/route.ts': 'secret-gated',
 };
 
 /**
@@ -162,6 +182,30 @@ describe('API routes', () => {
   it('every route declares an auth posture', () => {
     const undeclared = routes.filter((r) => !(r in ROUTE_POSTURE));
     expect(undeclared).toEqual([]);
+  });
+
+  it.each(
+    Object.entries(ROUTE_POSTURE)
+      .filter(([, posture]) => posture === 'secret-gated')
+      .map(([route]) => route)
+  )('%s actually gates on a secret', (route) => {
+    /*
+      A posture label that nothing checks is decoration, and this codebase has
+      shipped that three times — security.test.ts against a no-op middleware,
+      rls-ownership.test.ts against a mock, tco-calculator.test.ts against a
+      private copy. So 'secret-gated' has to earn the name.
+
+      Asserted: the route reads a secret from the environment, compares what
+      the caller presented, and fails closed when the secret is unset. That
+      last one matters most — an unset secret meaning "open" on a route that
+      spends Gemini tokens would be worse than having no gate.
+    */
+    const source = readFileSync(join(ROOT, route), 'utf8');
+
+    expect(source).toMatch(/process\.env\.[A-Z_]*SECRET/);
+    expect(source).toMatch(/headers\.get\(/);
+    // Fails closed: there is a branch on the secret being absent.
+    expect(source).toMatch(/if\s*\(!\s*secret\s*\)/);
   });
 
   it('has no stale registry entries for deleted routes', () => {

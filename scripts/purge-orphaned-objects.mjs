@@ -19,9 +19,10 @@
  *
  * ── What counts as an orphan ────────────────────────────────────────────────
  *
- * An object no row in `vehicle_documents` points at. There are currently 54,
- * against 5 surviving rows — all of which hold `demo-placeholder.local` URLs
- * that never resolved to a real object.
+ * An object no database row points at — see `REFERENCES` below for the full
+ * set of columns that count as a reference. When this was first run there were
+ * 54, against 5 surviving rows, all of which held `demo-placeholder.local`
+ * URLs that never resolved to a real object.
  *
  * Cause: when Gemini parsing failed, `uploadInvoice` deleted the database row
  * and never removed the uploaded file. A rejected parse is a *normal* outcome
@@ -101,18 +102,47 @@ async function listRecursive(prefix = '', depth = 0) {
   return out;
 }
 
-/** Paths referenced by vehicle_documents — never delete these. */
-async function referencedPaths() {
-  const res = await fetch(`${URL_}/rest/v1/vehicle_documents?select=file_url`, { headers });
-  if (!res.ok) throw new Error(`could not read vehicle_documents: ${res.status}`);
+/**
+ * Every path any row points at — never delete these.
+ *
+ * This asked `vehicle_documents` alone, which was true enough while invoices
+ * were the only thing in the bucket whose URL resolved. It stopped being true
+ * the moment owner photos and consultant attachments worked: both live here,
+ * neither is recorded in that table, and both would have been listed as
+ * orphans and deleted on the next `--apply`.
+ *
+ * `vehicles` is read through *two* columns because they are two different
+ * claims on an object. `custom_image_storage_path` is what deletion uses;
+ * `custom_image_url` is what rendering uses. A row where they disagree — one
+ * migrated, one not — must protect whatever either of them names.
+ */
+const REFERENCES = [
+  ['vehicle_documents', 'file_url'],
+  ['consultant_documents', 'file_url'],
+  ['maintenance_line_items', 'invoice_url'],
+  ['vehicles', 'custom_image_url'],
+  ['vehicles', 'custom_image_storage_path'],
+];
 
-  const rows = await res.json();
-  return new Set(
-    rows
-      .map((r) => String(r.file_url || ''))
-      .map((u) => u.replace('placeholder://', ''))
-      .filter(Boolean)
-  );
+async function referencedPaths() {
+  const paths = new Set();
+
+  for (const [table, column] of REFERENCES) {
+    const res = await fetch(`${URL_}/rest/v1/${table}?select=${column}`, { headers });
+    if (!res.ok) throw new Error(`could not read ${table}.${column}: ${res.status}`);
+
+    for (const row of await res.json()) {
+      // Both shapes appear: `placeholder://{path}` in the URL columns, and a
+      // bare path in custom_image_storage_path.
+      const value = String(row[column] || '').replace('placeholder://', '');
+      // A surviving `https://…` URL names no path this script can match. It is
+      // a row this cleanup cannot reason about, so it protects nothing — which
+      // is why the migration converts them before this is ever run again.
+      if (value && !value.startsWith('http')) paths.add(value);
+    }
+  }
+
+  return paths;
 }
 
 console.log(`\n${APPLY ? 'PURGING' : 'DRY RUN — nothing will be deleted'}`);

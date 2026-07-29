@@ -59,14 +59,10 @@ export default function OnboardVinForm() {
 
   return (
     <div className="relative min-h-screen flex items-center justify-center p-6 overflow-hidden">
-      <div
-        className="fixed inset-0 z-0"
-        style={{
-          backgroundImage: `linear-gradient(rgba(0,0,0,0.72), rgba(0,0,0,0.88)), url('/dark-roomb.jpeg')`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        }}
-      />
+      {/* CC-142 §5 — flat on authenticated routes. Under a 0.72–0.88 black
+          wash this photograph was already almost entirely invisible; what it
+          reliably did was download. */}
+      <div className="fixed inset-0 z-0 bg-black" />
 
       <div className="relative z-10 w-full max-w-lg">
         <div className="mb-8">

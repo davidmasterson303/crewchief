@@ -95,6 +95,32 @@ export const DEMO_SMOKE_EXPECTATIONS = {
   },
 } as const;
 
+/**
+ * Facts the consultant must be able to state about a demo vehicle.
+ *
+ * The round-trip gate asks the live consultant a real question and checks the
+ * answer contains at least one of these. They are anchored **here, next to the
+ * ids they describe**, rather than hardcoded in the gate — §23 is a worked
+ * example of demo seed data being corrected, and a gate that fails because the
+ * seed was *fixed* is a gate people learn to distrust.
+ *
+ * Sourced from `supabase/migrations/20260314142241_seed_demo_vehicles.sql`:
+ * the WRX is seeded at 41200 miles with a "Stage 1 tune" ownership objective,
+ * and its knowledge base carries the Stage 1 / rod bearing material. Per §22's
+ * related finding the demo model receives the knowledge base and recall data,
+ * which is exactly where these live — so they are answerable, not hopeful.
+ *
+ * If the seed changes, change these with it. That is the point of them being
+ * adjacent.
+ */
+export const CONSULTANT_ROUND_TRIP = {
+  /** The WRX — chosen because its seed data is the most distinctive. */
+  vehicleId: DEMO_VEHICLE_IDS[1],
+  question: 'What mileage is this car at, and what engine modifications does it have?',
+  /** At least one must appear in the answer for the round trip to count. */
+  expectedTokens: ['41,200', '41200', 'Stage 1', 'Stage 1 tune'],
+} as const;
+
 export function isDemoVehicleId(id: string): boolean {
   return (DEMO_VEHICLE_IDS as readonly string[]).includes(id);
 }

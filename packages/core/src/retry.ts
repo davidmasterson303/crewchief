@@ -428,3 +428,60 @@ export async function retrySequence<T>(
   logger.info(context, `All ${operations.length} operations completed`);
   return results;
 }
+
+/**
+ * Thrown when an operation exceeds its deadline.
+ *
+ * A distinct class so callers can tell "the thing failed" from "the thing
+ * never answered" — those want different handling, and the round-trip health
+ * classifier depends on the difference (`degraded`, not `broken`).
+ */
+export class TimeoutError extends Error {
+  constructor(
+    public readonly label: string,
+    public readonly ms: number
+  ) {
+    super(`${label} exceeded its ${ms}ms deadline`);
+    this.name = 'TimeoutError';
+  }
+}
+
+/**
+ * Put a deadline on a promise.
+ *
+ * Written for the onboarding hang: the Gemini research call and the vehicle
+ * image lookup both had **no timeout at all**, so a slow or unresponsive
+ * upstream left the user on a spinner with no error, no completion, and no way
+ * forward. A wait you cannot bound is a hang, not a wait.
+ *
+ * This bounds the *waiting*, not the work — a `fetch` given an AbortSignal is
+ * genuinely cancelled, but a promise from an SDK that ignores signals keeps
+ * running in the background. That is still the right trade here: the caller
+ * gets a decision on time, and the orphaned work is bounded by the process.
+ * Where cancellation matters, pass the signal through.
+ *
+ * @param label Used in the error and in logs. Name the stage, not the library.
+ */
+export async function withTimeout<T>(
+  operation: (signal: AbortSignal) => Promise<T>,
+  ms: number,
+  label: string
+): Promise<T> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new TimeoutError(label, ms));
+    }, ms);
+  });
+
+  try {
+    return await Promise.race([operation(controller.signal), deadline]);
+  } finally {
+    // Always clear, or a resolved-early operation leaves the process holding a
+    // timer for the full duration — which in a serverless function is billable.
+    if (timer) clearTimeout(timer);
+  }
+}

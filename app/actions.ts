@@ -6,9 +6,16 @@ import { VEHICLE_RESEARCH_PROMPT, POWERTRAIN_OPTIONS_PROMPT, CONSULTANT_SYSTEM_P
 import { getVehicleImage } from '@/lib/vehicle-images';
 import { logger } from '@crewchief/core/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { downloadStoredFile } from '@/lib/storage-objects';
 import { authorizeVehicleAccess, authorizeVehicleScopedRow, requireSession } from '@/lib/api-auth';
 import { isDemoVehicleId } from '@crewchief/core/demo';
-import { vehicleStoragePath, vehicleIdFromStoragePath } from '@crewchief/core/storage-paths';
+import {
+  vehicleStoragePath,
+  vehicleIdFromStoragePath,
+  storedUrl,
+  storagePathFromStoredUrl,
+} from '@crewchief/core/storage-paths';
+import { withTimeout, TimeoutError } from '@crewchief/core/retry';
 import { parseWishlistCommands, parsePerformanceCommands, parseStatusCommands, parseInvoiceFlag } from '@crewchief/core/consultant-commands';
 import { validateData, vehicleIdSchema, serviceItemSchema, maintenanceLineItemSchema, quoteRequestSchema } from '@crewchief/core/validation';
 import { withRetry } from '@crewchief/core/retry';
@@ -199,6 +206,17 @@ export async function createVehicle(vehicleData: {
   // authoritative even when the body ignores it, which is one careless edit
   // away from being trusted.
 }) {
+  /*
+    Stage timing, because the first thing anyone asked about the onboarding
+    hang was "which part is slow" and nobody could answer it.
+
+    Measured 28 Jul, warm server, real prompt: NHTSA decode ~0.6s, each
+    Supabase call ~0.2s, the Gemini research call ~23s. The AI layer is the
+    whole story and everything else is noise — but that was an inference until
+    it was measured, and this makes the next run answer for itself.
+  */
+  const createStartedAt = Date.now();
+
   logger.info('VEHICLE:CREATE_START', 'Creating new vehicle', {
     make: vehicleData.make,
     model: vehicleData.model,
@@ -240,11 +258,21 @@ export async function createVehicle(vehicleData: {
       return { success: false, error: 'Failed to save vehicle' };
     }
 
-    logger.info('VEHICLE:CREATED', 'Vehicle record created', { vehicleId: vehicle.id });
+    logger.info('VEHICLE:CREATED', 'Vehicle record created', {
+      vehicleId: vehicle.id,
+      msSinceStart: Date.now() - createStartedAt,
+    });
 
     try {
-      logger.debug('VEHICLE:GENERATE_IMAGE', 'Generating vehicle image');
-      await getVehicleImage(vehicle.id, vehicle);
+      /*
+        Deliberately NOT awaited here any more.
+
+        This ran between the insert and the return, so a slow Google image
+        search delayed the user reaching their garage for a photo they had not
+        asked for. It is enrichment, and enrichment now happens in
+        `enrichVehicle` — see the note there.
+      */
+      logger.debug('VEHICLE:IMAGE_DEFERRED', 'Vehicle image deferred to enrichment');
     } catch (error) {
       logger.warn('VEHICLE:IMAGE_FAILED', 'Failed to generate vehicle image', {
         error: (error as Error).message,
@@ -292,12 +320,123 @@ export async function createVehicle(vehicleData: {
       });
     }
 
-    logger.info('VEHICLE:CREATE_SUCCESS', 'Vehicle fully created', { vehicleId: vehicle.id });
+    logger.info('VEHICLE:CREATE_SUCCESS', 'Vehicle fully created', {
+      vehicleId: vehicle.id,
+      msTotal: Date.now() - createStartedAt,
+    });
     return { success: true, vehicleId: vehicle.id };
   } catch (error) {
     logger.error('VEHICLE:CREATE_ERROR', error as Error);
     return { success: false, error: 'Failed to create vehicle' };
   }
+}
+
+/*
+  A deadline on the research call, because it had none.
+
+  Measured 28 Jul against the real VEHICLE_RESEARCH_PROMPT: a successful
+  gemini-2.5-flash call takes ~23s, twice, consistently. The retry loop makes
+  three attempts with 0/2/4s backoff, so a wholly failing research run is
+  ~75s of wall clock — and with no timeout on the individual call, an
+  unresponsive Gemini made that unbounded.
+
+  30s gives a healthy call ~30% headroom over its measured time while turning
+  "never returns" into "returns an error the UI can show". The ceiling matters
+  more than the exact number: a spinner with no deadline is a hang, not a wait.
+*/
+const RESEARCH_TIMEOUT_MS = 30_000;
+
+/**
+ * Everything a new vehicle needs that is not required to own it.
+ *
+ * ── Why this exists ─────────────────────────────────────────────────────────
+ *
+ * Onboarding used to do all of this *before* the user reached their garage:
+ * the vehicle insert, a Google image lookup, a ~23s Gemini research call, a
+ * second Gemini call for the health summary, and then a hardcoded two-second
+ * pause. Measured 28 Jul, that is 30-60s of spinner on the first thing anyone
+ * ever does in this product — and with no deadline on the model calls it was
+ * unbounded. An App Store reviewer creates an account, adds a vehicle, and
+ * judges; a multi-minute spinner reads as broken.
+ *
+ * The VIN decode already yields year, make, model, trim, engine and
+ * drivetrain in ~0.6s. That is everything "I own this car" needs. The research
+ * makes the dossier better; nothing about owning the car depends on it.
+ *
+ * ── Why it is a server action and not a background job ──────────────────────
+ *
+ * §11 records the wishlist recompute being fire-and-forget on a serverless
+ * platform, where work started after the response "may be frozen along with
+ * it". So this is deliberately **not** started and abandoned during
+ * onboarding. The dashboard calls it as a real request with a real lifecycle,
+ * once, when it sees `research_status = 'pending'`. The work is owned by a
+ * request that is actually waiting for it.
+ *
+ * That also gives failure somewhere to live: the row goes to `'failed'`, the
+ * dashboard shows it, and the user can press retry. A silent empty dossier is
+ * the §21 provenance problem in a new costume — a UI implying data it does
+ * not have.
+ */
+export async function enrichVehicle(vehicleId: string) {
+  const startedAt = Date.now();
+
+  const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+  if (!access.ok) {
+    return { success: false, error: access.error };
+  }
+
+  const { data: vehicle } = await access.client
+    .from('vehicles')
+    .select('*')
+    .eq('id', vehicleId)
+    .maybeSingle();
+
+  if (!vehicle) {
+    return { success: false, error: 'Vehicle not found' };
+  }
+
+  // Best-effort and bounded. A missing photo must never fail enrichment —
+  // and as of 28 Jul GOOGLE_SEARCH_API_KEY is expired, so this currently
+  // always falls back.
+  try {
+    await getVehicleImage(vehicleId, vehicle);
+  } catch (error) {
+    logger.warn('ENRICH:IMAGE_FAILED', 'Vehicle image lookup failed', {
+      vehicleId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  const dossier = await generateVehicleDossier(vehicleId);
+  if (!dossier.success) {
+    logger.error('ENRICH:RESEARCH_FAILED', new Error(dossier.error || 'unknown'), {
+      vehicleId,
+      msTotal: Date.now() - startedAt,
+    });
+    // generateVehicleDossier has already written research_status='failed',
+    // which is what the dashboard renders a retry against.
+    return { success: false, error: dossier.error };
+  }
+
+  const health = await generateVehicleHealthSummary(vehicleId);
+  if (!health.success) {
+    // The dossier is the valuable half and it landed. A missing health score
+    // is a worse dashboard, not a broken vehicle.
+    logger.warn('ENRICH:HEALTH_FAILED', 'Health summary failed', {
+      vehicleId,
+      error: health.error,
+    });
+  }
+
+  preloadAllPerformanceModifications(vehicleId).catch(() => {});
+
+  logger.info('ENRICH:COMPLETE', 'Vehicle enrichment complete', {
+    vehicleId,
+    msTotal: Date.now() - startedAt,
+    unsupported: !!dossier.unsupported,
+  });
+
+  return { success: true, unsupported: !!dossier.unsupported };
 }
 
 export async function generateVehicleDossier(vehicleId: string, vehicleData?: any) {
@@ -325,6 +464,7 @@ export async function generateVehicleDossier(vehicleId: string, vehicleData?: an
 
     const prompt = VEHICLE_RESEARCH_PROMPT(vehicle.year, vehicle.make, vehicle.model);
 
+    const researchStartedAt = Date.now();
     let attempt = 0;
     let parsed = null;
     let lastError = null;
@@ -338,11 +478,16 @@ export async function generateVehicleDossier(vehicleId: string, vehicleData?: an
 
         console.log(`[Research Attempt ${attempt + 1}/3] Generating research for ${vehicle.year} ${vehicle.make} ${vehicle.model}`);
 
-        const response = await genAI.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: prompt,
-          config: flashStructuredConfig,
-        });
+        const response = await withTimeout(
+          () =>
+            genAI.models.generateContent({
+              model: 'gemini-2.5-flash',
+              contents: prompt,
+              config: flashStructuredConfig,
+            }),
+          RESEARCH_TIMEOUT_MS,
+          'vehicle research'
+        );
         const text = response.text || '';
 
         console.log(`[Research Attempt ${attempt + 1}] Response length: ${text.length} chars`);
@@ -351,13 +496,30 @@ export async function generateVehicleDossier(vehicleId: string, vehicleData?: an
         console.log(`[Research Attempt ${attempt + 1}] JSON extracted successfully`);
 
         parsed = VehicleDataSchema.parse(jsonData);
-        console.log(`[Research Attempt ${attempt + 1}] Validation passed`);
+        console.log(
+          `[Research Attempt ${attempt + 1}] Validation passed after ${Date.now() - researchStartedAt}ms`
+        );
       } catch (error) {
         lastError = error;
         console.error(`[Research Attempt ${attempt + 1}] Failed:`, {
           error: error instanceof Error ? error.message : String(error),
           type: error instanceof SyntaxError ? 'JSON_PARSE' : error instanceof z.ZodError ? 'VALIDATION' : 'OTHER'
         });
+
+        /*
+          A timeout ends the loop rather than consuming the remaining attempts.
+
+          Three 30s deadlines plus backoff is 96s of someone watching a
+          spinner, and an upstream that did not answer in 30s is unlikely to
+          answer in the next 30. Retrying a parse or validation failure is
+          worth it — the model may format better on a second pass — but
+          retrying silence is just charging the user for the wait.
+        */
+        if (error instanceof TimeoutError) {
+          console.error('[Research] Timed out; not retrying — see RESEARCH_TIMEOUT_MS');
+          break;
+        }
+
         attempt++;
       }
     }
@@ -886,20 +1048,20 @@ export async function sendConsultantMessage(params: {
       const parts: any[] = [{ text: fullPrompt }];
 
       for (const doc of attachedDocuments) {
-        try {
-          const fetchResponse = await fetch(doc.file_url);
-          if (fetchResponse.ok) {
-            const buffer = await fetchResponse.arrayBuffer();
-            const base64Data = Buffer.from(buffer).toString('base64');
-            const mimeType = doc.file_type || 'image/jpeg';
-            parts.push({
-              inlineData: {
-                mimeType,
-                data: base64Data,
-              },
-            });
-          }
-        } catch {
+        // Read out of storage, not over HTTP — the bucket is private, so
+        // fetching one of its objects by URL cannot work.
+        const buffer = await downloadStoredFile(doc.file_url);
+
+        if (buffer) {
+          parts.push({
+            inlineData: {
+              mimeType: doc.file_type || 'image/jpeg',
+              data: buffer.toString('base64'),
+            },
+          });
+        } else {
+          // The model is told an attachment exists but could not be read,
+          // rather than being left to answer as though none was sent.
           parts.push({ text: `[Attached: ${doc.file_name}]` });
         }
       }
@@ -1404,10 +1566,9 @@ export async function processConsultantInvoiceToMaintenance(vehicleId: string, f
 
     const client = getServiceRoleClient();
 
-    const fetchResponse = await fetch(fileUrl);
-    if (!fetchResponse.ok) return { success: false, error: 'Failed to fetch document', itemsProcessed: 0, issueUpdates: 0, modUpdates: 0 };
-    const buffer = await fetchResponse.arrayBuffer();
-    const base64Data = Buffer.from(buffer).toString('base64');
+    const buffer = await downloadStoredFile(fileUrl);
+    if (!buffer) return { success: false, error: 'Failed to fetch document', itemsProcessed: 0, issueUpdates: 0, modUpdates: 0 };
+    const base64Data = buffer.toString('base64');
 
     const { data: docRecord } = await client
       .from('vehicle_documents')
@@ -2188,19 +2349,37 @@ export async function addMaintenanceHistory(
   }
 }
 
-export async function getSignedInvoiceUrl(fileUrl: string) {
+/**
+ * How long a minted URL lives.
+ *
+ * One hour, and the client caches a resolved URL for well under that (see
+ * `hooks/useSignedUrl.ts`). Longer would weaken the point of signing: the URL
+ * carries its own authority, so anyone who obtains one holds it for the whole
+ * window regardless of what happens to the vehicle in the meantime.
+ */
+const SIGNED_URL_TTL_SECONDS = 3600;
+
+/**
+ * Exchange a stored URL for a signed one.
+ *
+ * Every read of a `vehicle-documents` object goes through here: invoices,
+ * owner photos, consultant attachments. It was `getSignedInvoiceUrl` when
+ * invoices were the only caller.
+ */
+export async function getSignedStorageUrl(fileUrl: string) {
   try {
-    if (!fileUrl || !fileUrl.startsWith('placeholder://')) {
-      // Nothing to sign — this is already a stored URL. Still require a
-      // session so the action is not an open redirect-ish oracle.
+    const filePath = storagePathFromStoredUrl(fileUrl);
+
+    if (!filePath) {
+      // Not one of ours — a demo `/vehicles/…` asset, or an already-real URL.
+      // Still require a session so the action is not an open redirect-ish
+      // oracle.
       const session = await requireSession();
       if (!session.ok) {
         return { success: false, error: session.error };
       }
       return { success: true, url: fileUrl };
     }
-
-    const filePath = fileUrl.replace('placeholder://', '');
 
     /*
       Every object now lives under `{vehicleId}/{kind}/…`, so ownership is
@@ -2230,7 +2409,7 @@ export async function getSignedInvoiceUrl(fileUrl: string) {
     const { data, error } = await client
       .storage
       .from('vehicle-documents')
-      .createSignedUrl(filePath, 3600);
+      .createSignedUrl(filePath, SIGNED_URL_TTL_SECONDS);
 
     if (error || !data) {
       logger.warn('SIGNED_URL:CREATION_FAILED', 'Failed to create signed URL', { filePath, error });
@@ -3005,14 +3184,12 @@ export async function uploadInvoice(formData: FormData) {
       throw new Error(`Failed to upload file: ${uploadError.message}`);
     }
 
-    const { data: { publicUrl } } = client.storage
-      .from('vehicle-documents')
-      .getPublicUrl(fileName);
-
     const documentRecord = {
       vehicle_id: vehicleId,
       document_type: 'invoice' as const,
-      file_url: publicUrl,
+      // The path, not a URL — the bucket is private, so a public URL is dead
+      // on arrival and a signed one expires. See `storedUrl`.
+      file_url: storedUrl(fileName),
       extracted_data: {},
     };
 
@@ -3150,14 +3327,18 @@ export async function uploadVehiclePhoto(formData: FormData) {
       return { success: false, error: 'Failed to upload photo' };
     }
 
-    const { data: { publicUrl } } = client.storage
-      .from('vehicle-documents')
-      .getPublicUrl(fileName);
-
+    /*
+      Both columns hold the same path, in the two shapes their readers expect:
+      `custom_image_storage_path` is what the delete-and-replace above reads,
+      and `custom_image_url` is what every rendering surface reads. Writing a
+      public URL to the second is the bug this fixes — it was unresolvable from
+      the moment the bucket went private, which is why owner photos rendered as
+      broken heroes while the file sat intact in storage.
+    */
     const { error: updateError } = await client
       .from('vehicles')
       .update({
-        custom_image_url: publicUrl,
+        custom_image_url: storedUrl(fileName),
         custom_image_storage_path: fileName,
         custom_image_uploaded_at: new Date().toISOString(),
         focal_point_x: focalX,
@@ -3170,7 +3351,18 @@ export async function uploadVehiclePhoto(formData: FormData) {
       return { success: false, error: 'Failed to update vehicle' };
     }
 
-    return { success: true, photoUrl: publicUrl, focalX, focalY };
+    /*
+      `photoUrl` is signed rather than stored: it is handed straight to a
+      caller that may put it in an `<img>`, and returning the internal
+      `placeholder://` form there is how an unresolvable URL gets rendered.
+      Signing is best-effort — the upload has already succeeded, and no caller
+      currently needs the URL back.
+    */
+    const { data: signed } = await client.storage
+      .from('vehicle-documents')
+      .createSignedUrl(fileName, SIGNED_URL_TTL_SECONDS);
+
+    return { success: true, photoUrl: signed?.signedUrl ?? null, focalX, focalY };
   } catch (error: any) {
     console.error('Upload vehicle photo error:', error);
     return { success: false, error: error.message || 'Failed to upload photo' };
@@ -3346,16 +3538,15 @@ export async function uploadConsultantDocument(formData: FormData) {
       return { success: false, error: `Failed to upload file: ${uploadError.message}` };
     }
 
-    const { data: { publicUrl } } = client.storage
-      .from('vehicle-documents')
-      .getPublicUrl(fileName);
-
     const { data: document, error: dbError } = await client
       .from('consultant_documents')
       .insert({
         session_id: sessionId,
         vehicle_id: vehicleId,
-        file_url: publicUrl,
+        // The path, not a URL. `ConsultantChat` signs it to link to it, and
+        // `downloadStoredFile` reads the bytes for Gemini straight from
+        // storage without a URL at all.
+        file_url: storedUrl(fileName),
         file_name: file.name,
         file_type: file.type,
         file_size: file.size,
@@ -3772,11 +3963,10 @@ export async function uploadInvoiceForCompletion(
       return { success: false, error: 'Failed to upload invoice' };
     }
 
-    // The storage path, not a URL. The bucket becomes private in this task,
-    // so a URL is minted on demand via getSignedInvoiceUrl instead of being
-    // persisted — a stored public URL would outlive the permission that
-    // justified it.
-    return { success: true, data: { url: `placeholder://${fileName}` } };
+    // The storage path, not a URL. The bucket is private, so a URL is minted
+    // on demand via getSignedStorageUrl instead of being persisted — a stored
+    // public URL would outlive the permission that justified it.
+    return { success: true, data: { url: storedUrl(fileName) } };
   } catch (error: any) {
     console.error('[Invoice Upload] Exception:', error);
     return { success: false, error: error.message || 'Failed to upload invoice' };

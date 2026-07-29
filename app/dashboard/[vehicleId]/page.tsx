@@ -12,6 +12,8 @@ import { Button } from '@/components/ui/button';
 import { useQuery } from '@tanstack/react-query';
 import { DashboardSkeleton } from '@/components/Skeletons';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { VehicleResearchStatus } from '@/components/VehicleResearchStatus';
+import { useVehicleImage } from '@/hooks/useSignedUrl';
 
 export default function DashboardPage({ params }: { params: { vehicleId: string } }) {
   const router = useRouter();
@@ -47,6 +49,10 @@ export default function DashboardPage({ params }: { params: { vehicleId: string 
     enabled: !!params.vehicleId
   });
 
+  // Before the loading and error branches: this is a hook, and it has to run
+  // on every render regardless of which one this render takes.
+  const vehicleImage = useVehicleImage(data?.vehicle);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-black p-6">
@@ -74,17 +80,24 @@ export default function DashboardPage({ params }: { params: { vehicleId: string 
 
   return (
     <ErrorBoundary>
-      <DashboardLayout vehicle={data.vehicle} currentPage="dashboard" vehicleImage={data.vehicle.custom_image_url || data.vehicle.image_url} healthSummary={data.healthSummary}>
+      <DashboardLayout vehicle={data.vehicle} currentPage="dashboard" vehicleImage={vehicleImage} healthSummary={data.healthSummary}>
         <div className="space-y-8">
-          {(data.vehicle.custom_image_url || data.vehicle.image_url) && (
-            <DiagnosticHero
-              imageUrl={data.vehicle.custom_image_url || data.vehicle.image_url}
-              vehicleName={`${data.vehicle.year} ${data.vehicle.make} ${data.vehicle.model}`}
-              healthScore={data.healthSummary?.health_score}
-              focalX={data.vehicle.focal_point_x}
-              focalY={data.vehicle.focal_point_y}
-            />
-          )}
+          {/*
+            Unconditional now. The hero used to render only when a photo
+            resolved, which meant a vehicle without one had no hero at all and
+            the page opened on a recall banner. The no-photo state is CC-142's
+            primary design, so there is always something to show.
+          */}
+          <DiagnosticHero
+            photo={vehicleImage}
+            vehicleName={`${data.vehicle.year} ${data.vehicle.make} ${data.vehicle.model}`}
+            year={data.vehicle.year}
+            make={data.vehicle.make}
+            model={data.vehicle.model}
+            trim={data.vehicle.trim}
+            healthScore={data.healthSummary?.health_score}
+            reason={data.healthSummary?.summary}
+          />
 
           {data.nhtsa?.recalls && data.nhtsa.recalls.length > 0 && (
             <RecallAlerts
@@ -93,6 +106,17 @@ export default function DashboardPage({ params }: { params: { vehicleId: string 
               addressedCampaigns={data.addressedCampaigns}
             />
           )}
+
+          {/*
+            Above the fold on purpose. A vehicle whose research has not landed
+            renders an empty dossier below, and the user needs to know that is
+            a pending state rather than the truth about their car.
+          */}
+          <VehicleResearchStatus
+            vehicleId={params.vehicleId}
+            status={data.knowledge?.research_status}
+            onComplete={refetch}
+          />
 
           <HealthSummary
             healthSummary={data.healthSummary}

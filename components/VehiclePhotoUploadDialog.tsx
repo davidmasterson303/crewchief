@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Upload, X, Loader as Loader2, Move } from 'lucide-react';
 import { toast } from 'sonner';
 import { uploadVehiclePhoto, removeVehiclePhoto } from '@/app/actions';
+import { downscaleImage } from '@/lib/image-downscale';
 import { useRouter } from 'next/navigation';
 
 interface VehiclePhotoUploadDialogProps {
@@ -67,8 +68,16 @@ export function VehiclePhotoUploadDialog({
       toast.error('Please select a valid image file (JPEG, PNG, or WEBP)');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image size must be less than 5MB');
+    /*
+      A sanity ceiling, not a size limit. This used to be 5 MB, which rejects an
+      ordinary photo from a recent phone — the user was told their picture was
+      too big and given nothing to do about it. Uploads are now downscaled to
+      1600px before they leave the browser (see handleUpload), so the only thing
+      still worth refusing is a file large enough to be a mistake or a decode
+      bomb.
+    */
+    if (file.size > 40 * 1024 * 1024) {
+      toast.error('That image is unusually large — please choose a photo under 40MB');
       return;
     }
     setSelectedFile(file);
@@ -155,8 +164,19 @@ export function VehiclePhotoUploadDialog({
   const handleUpload = async () => {
     if (!selectedFile) return;
     setIsUploading(true);
+
+    /*
+      Downscale here rather than at selection, for two reasons: a user who
+      picks a photo and then cancels should not have paid for an encode, and
+      the focal-point preview above stays on the full-resolution image.
+
+      This never throws and never rejects — on any failure it hands back the
+      original file, so the worst case is the upload we would have done anyway.
+    */
+    const fileToUpload = await downscaleImage(selectedFile);
+
     const formData = new FormData();
-    formData.append('file', selectedFile);
+    formData.append('file', fileToUpload);
     formData.append('vehicleId', vehicleId);
     formData.append('focalX', String(focalX));
     formData.append('focalY', String(focalY));

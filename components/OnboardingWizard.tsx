@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Loader as Loader2, CircleCheck as CheckCircle2, CircleAlert as AlertCircle, X, Upload, Image as ImageIcon } from 'lucide-react';
 import { logger } from '@crewchief/core/logger';
-import { createVehicle, generateVehicleDossier, generateVehicleHealthSummary, preloadAllPerformanceModifications, updateVehiclePowertrain, fetchPowertrainOptions, uploadVehiclePhoto } from '@/app/actions';
+import { createVehicle, updateVehiclePowertrain, fetchPowertrainOptions, uploadVehiclePhoto } from '@/app/actions';
 import { detectUncertainPowertrainFields } from '@crewchief/core/vehicle-utils';
 import PowertrainSelector from '@/components/PowertrainSelector';
 import type { PowertrainUncertainty } from '@crewchief/core/types';
@@ -68,8 +68,6 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [researchComplete, setResearchComplete] = useState(false);
-  const [unsupported, setUnsupported] = useState(false);
   const [showClarificationStep, setShowClarificationStep] = useState(false);
   const [uncertaintyData, setUncertaintyData] = useState<PowertrainUncertainty | null>(null);
   const [vehicleId, setVehicleId] = useState<string | null>(null);
@@ -287,46 +285,37 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
       }
     }
 
-    const dossierResult = await generateVehicleDossier(result.vehicleId!);
+    /*
+      The user is done. Everything below this point used to run first.
 
-    if (dossierResult.success && dossierResult.data) {
-      const uncertainty = detectUncertainPowertrainFields(
-        dossierResult.data.powertrain?.engine_type,
-        dossierResult.data.powertrain?.transmission_type,
-        dossierResult.data.powertrain?.drivetrain
-      );
+      Measured 28 Jul: the research call alone is ~23s, the health summary is a
+      second model call, and there was a hardcoded 2s pause on top — all before
+      the user reached their garage. None of it is needed to own a car. The
+      dashboard now calls `enrichVehicle` when it sees research_status
+      'pending', so the work is owned by a request that is actually waiting for
+      it rather than abandoned on a serverless platform (§11).
 
-      if (uncertainty.hasUncertainty) {
-        setUncertaintyData(uncertainty);
-        setShowClarificationStep(true);
-        setLoading(false);
-        setStep(clarificationStep);
-        return;
-      }
+      The powertrain clarification stays, but it now runs against the VIN
+      decode rather than the research. That is both faster and more truthful:
+      NHTSA gave us engine, displacement and drivetrain in ~0.6s, and asking
+      the user to confirm what the decode already knows never needed a model
+      call in between.
+    */
+    const uncertainty = detectUncertainPowertrainFields(
+      formData.engine_type,
+      formData.transmission_type,
+      formData.drivetrain
+    );
 
-      const healthResult = await generateVehicleHealthSummary(result.vehicleId!);
-
-      if (!healthResult.success) {
-        logger.error('ONBOARDING:HEALTH_SUMMARY', new Error(healthResult.error || 'Health summary failed'));
-      }
-
-      preloadAllPerformanceModifications(result.vehicleId!).catch(() => {});
-
-      setResearchComplete(true);
-      if (dossierResult.unsupported) {
-        setUnsupported(true);
-      }
-      setTimeout(() => {
-        router.push(`/dashboard/${result.vehicleId}`);
-      }, 2000);
-    } else {
-      logger.error('ONBOARDING:RESEARCH', new Error(dossierResult.error || 'Research generation failed'));
-      preloadAllPerformanceModifications(result.vehicleId!).catch(() => {});
-      setResearchComplete(true);
-      setTimeout(() => {
-        router.push(`/dashboard/${result.vehicleId}`);
-      }, 2000);
+    if (uncertainty.hasUncertainty) {
+      setUncertaintyData(uncertainty);
+      setShowClarificationStep(true);
+      setLoading(false);
+      setStep(clarificationStep);
+      return;
     }
+
+    router.push(`/dashboard/${result.vehicleId}`);
   };
 
   const handleClarificationSubmit = async () => {
@@ -366,52 +355,10 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
       return;
     }
 
-    const healthResult = await generateVehicleHealthSummary(vehicleId);
-
-    if (!healthResult.success) {
-      logger.error('ONBOARDING:HEALTH_SUMMARY_RETRY', new Error(healthResult.error || 'Health summary failed'));
-    }
-
-    preloadAllPerformanceModifications(vehicleId).catch(() => {});
-
-    setResearchComplete(true);
-    setTimeout(() => {
-      router.push(`/dashboard/${vehicleId}`);
-    }, 2000);
+    // Same reasoning as the main path: the vehicle exists and the user has
+    // told us what we needed. Enrichment belongs to the dashboard.
+    router.push(`/dashboard/${vehicleId}`);
   };
-
-  if (researchComplete) {
-    return (
-      <div className="min-h-screen bg-[#080808] flex items-center justify-center p-4">
-        <div className="w-full max-w-lg text-center glass-panel rounded-2xl p-12">
-          {unsupported ? (
-            <>
-              <div className="w-16 h-16 rounded-2xl bg-yellow-500/15 border border-yellow-400/25 flex items-center justify-center mx-auto mb-5">
-                <AlertCircle className="h-8 w-8 text-yellow-400" />
-              </div>
-              <h2 className="text-2xl font-bold text-white mb-3">Limited Data Available</h2>
-              <p className="text-white/55 mb-6 leading-relaxed">
-                We couldn&apos;t find enough data for your vehicle, but you can still track maintenance manually.
-              </p>
-            </>
-          ) : (
-            <>
-              <div className="w-16 h-16 rounded-2xl bg-green-500/15 border border-green-400/25 flex items-center justify-center mx-auto mb-5">
-                <CheckCircle2 className="h-8 w-8 text-green-400" />
-              </div>
-              <h2 className="text-2xl font-bold text-white mb-3">All Set!</h2>
-              <p className="text-white/55 mb-6 leading-relaxed">
-                Your vehicle has been added and researched. Redirecting to your dashboard...
-              </p>
-            </>
-          )}
-          <div className="flex justify-center">
-            <div className="w-6 h-6 border-2 border-info-border border-t-info rounded-full animate-spin" />
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   const getStepTitle = () => {
     if (step === 1) return 'Confirm Vehicle Details';

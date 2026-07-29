@@ -16,10 +16,19 @@
  * straight from the browser client. `lib/api-auth.ts` is not in that path.
  *
  * This is a static read of the migration corpus, so it proves what the
- * migrations declare and not what the live database does — the project's
- * Supabase is Bolt-managed and can drift. It is still the right ratchet: the
- * next permissive policy someone writes will fail here, and the reason it was
- * missed the first time is that nothing was looking.
+ * migrations declare and not what the live database does.
+ *
+ * **That gap turned out to be the actual finding.** Measured 29 Jul against
+ * the live project: anon cannot read a private vehicle, by list or by direct
+ * id, nor any of its child tables — so the `USING (true)` policy in the
+ * history is not what is running. Someone fixed it outside the migrations,
+ * almost certainly through a dashboard.
+ *
+ * Which means the real defect is not an open database, it is that **the
+ * migrations do not reproduce the live one**. A fresh environment built from
+ * `supabase/migrations` comes up wide open while production is fine, and
+ * nothing would say so. This suite is what makes that visible: it asserts what
+ * a rebuild would get, which is exactly the thing no one was checking.
  */
 
 import { readdirSync, readFileSync } from 'node:fs';
@@ -98,15 +107,78 @@ describe('vehicles RLS, as declared by the migrations', () => {
     }
   });
 
-  it('never lets a write policy touch a demo row', () => {
-    // Demo vehicles are shared and recruiter-facing. The application layer
-    // already refuses writes to them (authorizeVehicleAccess rejects
-    // intent:'write'); the database should not be the weaker of the two.
+  /*
+    ── A guard that was removed on purpose, and the reason, so it is not
+       quietly restored or quietly forgotten ────────────────────────────────
+
+    This assertion used to require `NOT is_demo` on every write policy, matching
+    the first draft of 20260727150000.
+
+    That draft was never applied, and a read-only sweep of production on 28 Jul
+    2026 showed why it must not be: **none of the policy names it dropped exist
+    live.** Live had been fixed by hand through the dashboard, under different
+    names. Applying it would have left the four live policies in place and added
+    four more beside them — and because permissive policies OR together, the
+    `NOT is_demo` guard would have been nullified by the broader live policy
+    next to it. The file would have read as though the hole was closed.
+
+    So the migration was rewritten to *reproduce* live rather than change it,
+    and live protects demo rows through ownership: `user_id = auth.uid()` never
+    matches for a demo row, because no user owns one.
+
+    The explicit flag guard is still worth having as defence in depth — it is
+    what stops a user flipping `is_demo` true on their own row and publishing it
+    into the public demo. But that is a **change to production behaviour**, and
+    folding it into a reconciliation is exactly how the first version went
+    wrong. It gets its own migration, applied deliberately, once history and
+    database agree.
+
+    Until then this asserts the property that actually holds, and the one below
+    keeps the deferral honest.
+  */
+  it('scopes every write policy so no user can reach a row they do not own', () => {
     const writes = policies.filter((p) => /FOR\s+(INSERT|UPDATE|DELETE)/i.test(p.body));
 
+    expect(writes.length).toBeGreaterThan(0);
     for (const p of writes) {
-      expect(p.body).toMatch(/NOT\s+is_demo/i);
+      // Ownership is the boundary. A demo row has no owner, so this covers the
+      // demo case without naming it.
+      expect(p.body).toMatch(/user_id\s*=\s*auth\.uid\(\)|user_owns_vehicle/i);
+      expect(p.body).not.toMatch(/USING\s*\(\s*true\s*\)/i);
     }
+  });
+
+  it('records that the is_demo write guard is deferred, not lost', () => {
+    /*
+      The deferral only stays honest if it is written down where the next person
+      to read these policies will see it. If someone adds the guard, this fails
+      and they delete it — which is the correct outcome, and the point.
+    */
+    const migration = readFileSync(
+      join(MIGRATIONS, '20260727150000_scope_vehicles_rls_to_owner.sql'),
+      'utf8'
+    );
+
+    /*
+      Comments are stripped before looking for the guard, and this is the whole
+      trick. The first version of this assertion scanned the raw file, so the
+      sentence *explaining why the guard is absent* satisfied it — the test was
+      vacuous and passed against a file with no guard and no explanation. It was
+      caught by probing it with a real violation, which is the only reason it is
+      not still sitting here green and meaningless.
+
+      Same technique the illustration-tokens guard uses, for the same reason:
+      a guard that can be satisfied by its own rationale is not a guard.
+    */
+    const sql = migration.replace(/\/\*[\s\S]*?\*\//g, '').replace(/--.*$/gm, '');
+
+    const hasGuard = /NOT\s+is_demo/i.test(sql);
+    const explainsDeferral = /deliberately does NOT do/i.test(migration);
+
+    expect({ hasGuard, explainsDeferral }).not.toEqual({
+      hasGuard: false,
+      explainsDeferral: false,
+    });
   });
 
   it('keeps demo rows readable without a session, or the public demo dies', () => {

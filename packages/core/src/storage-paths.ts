@@ -82,6 +82,49 @@ export function vehicleIdFromStoragePath(path: string): string | null {
   return isUuid ? first : null;
 }
 
+/**
+ * ── What goes in the database ───────────────────────────────────────────────
+ *
+ * Not a URL. The bucket is private (migration 20260726180000), so the two URL
+ * shapes available are both unstorable:
+ *
+ *   - `/object/public/vehicle-documents/…` never resolves against a private
+ *     bucket. It returns `400 {"statusCode":"404","error":"Bucket not found"}`
+ *     — dead the moment it is written.
+ *   - A signed URL resolves, and then expires. Persisting one moves the
+ *     breakage an hour into the future rather than fixing it.
+ *
+ * So the *path* is persisted, and a signed URL is minted per read. The stored
+ * value is prefixed so a column holding a path is distinguishable from one
+ * holding a real URL, both by code and by eye:
+ *
+ *   placeholder://{vehicleId}/{kind}/{file}
+ *
+ * The scheme is spelled `placeholder://` because existing rows and
+ * `scripts/purge-orphaned-objects.mjs` already use that literal. It reads like
+ * a stand-in, which is unfortunate — but renaming it means migrating both, and
+ * the name is the least interesting thing about the convention.
+ */
+export const STORED_URL_SCHEME = 'placeholder://';
+
+/** Wrap a storage path for persistence. Never store a URL. */
+export function storedUrl(path: string): string {
+  return `${STORED_URL_SCHEME}${path}`;
+}
+
+/**
+ * The storage path inside a stored URL, or null if this is something else —
+ * a real URL, a demo `/vehicles/…` asset, or an empty column.
+ *
+ * Callers use null to mean "not ours to sign, pass it through untouched".
+ */
+export function storagePathFromStoredUrl(url: string | null | undefined): string | null {
+  if (!url || !url.startsWith(STORED_URL_SCHEME)) return null;
+
+  const path = url.slice(STORED_URL_SCHEME.length);
+  return path.length > 0 ? path : null;
+}
+
 /** Every prefix under which a vehicle's objects can live, newest convention first. */
 export function vehicleStoragePrefixes(vehicleId: string): string[] {
   return [

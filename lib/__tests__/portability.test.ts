@@ -122,6 +122,7 @@ const NOT_PORTABLE: Record<string, string> = {
   'lib/rate-limit.ts': 'reaches Supabase through lib/supabase',
   'lib/sign-out.ts': 'Supabase types',
   'lib/vehicle-images.ts': 'reaches Supabase through lib/supabase',
+  'lib/storage-objects.ts': 'reaches Supabase through lib/supabase',
   'lib/gemini.ts': 'client at module scope — a build-time server key (§19)',
   'lib/actions/quotes.ts': 'reaches Supabase through lib/supabase',
   'lib/actions/vehicles.ts': 'reaches Supabase through lib/supabase',
@@ -129,6 +130,18 @@ const NOT_PORTABLE: Record<string, string> = {
   // Splits, not moves — the effort the plan warned about.
   'lib/deletion-recovery.ts': 'queue logic is portable; persistence uses localStorage',
   'lib/demo-mode.ts': 'document.cookie — split out of demo.ts so demo.ts could move',
+  /*
+    Canvas encoding is genuinely web-only, and the split is deliberate rather
+    than reluctant: the arithmetic — scale factors, the quality ladder, whether
+    a re-encode is even worth keeping — lives in
+    `@crewchief/core/image-resize` where it is portable and tested, and only
+    the `document.createElement('canvas')` glue stays here.
+
+    A React Native client will need its own encoder anyway (expo-image-manipulator
+    or similar), and when it does, it reuses every decision and reimplements only
+    the draw call.
+  */
+  'lib/image-downscale.ts': 'canvas, document and Image — the maths is in core/image-resize',
 };
 
 describe('the portable half of lib/', () => {

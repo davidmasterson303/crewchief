@@ -14,6 +14,8 @@ import {
   vehicleStoragePath,
   vehicleIdFromStoragePath,
   vehicleStoragePrefixes,
+  storedUrl,
+  storagePathFromStoredUrl,
 } from '@crewchief/core/storage-paths';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -112,5 +114,50 @@ describe('every upload writes a path the deletion sweep can find', () => {
     const source = readFileSync(join(__dirname, '..', '..', 'app/actions.ts'), 'utf8');
 
     expect(source).not.toMatch(/\.upload\(\s*[`'"](?:invoices|vehicle-photos|consultant-docs)\//);
+  });
+});
+
+describe('what gets persisted is a path, never a URL', () => {
+  it('round-trips a storage path', () => {
+    const path = vehicleStoragePath(VEHICLE, 'photos', 'car.jpg');
+    expect(storagePathFromStoredUrl(storedUrl(path))).toBe(path);
+  });
+
+  it.each([
+    ['a demo asset', '/vehicles/bmw-m235i/hero-3x2.jpg'],
+    ['an external URL', 'https://images.example.com/car.jpg'],
+    ['an empty scheme', 'placeholder://'],
+    ['nothing at all', null],
+    ['nothing at all, the other way', undefined],
+  ])('leaves %s alone', (_label, value) => {
+    // null means "not ours to sign" — the caller passes the value through
+    // untouched rather than trying to mint a URL for it.
+    expect(storagePathFromStoredUrl(value as string | null | undefined)).toBeNull();
+  });
+
+  /*
+    The ratchet for the bug this convention exists to prevent.
+
+    `vehicle-documents` went private in migration 20260726180000, which makes
+    `/object/public/…` return 404 for every object in it. Three upload sites
+    kept calling `.getPublicUrl()` and persisting the result, so every photo,
+    invoice and consultant attachment uploaded after that migration stored a
+    URL that was dead on arrival — including the hero image on a real vehicle,
+    whose photograph was intact in storage the whole time.
+
+    Nothing failed loudly. The upload succeeded, the row was written, the
+    object existed. Only the `<img>` was broken, which reads as a rendering
+    bug and sends you looking at the component.
+  */
+  it('no code mints a public URL against the private bucket', () => {
+    const sources = ['app/actions.ts', 'lib/storage-objects.ts'];
+
+    for (const rel of sources) {
+      const source = readFileSync(join(__dirname, '..', '..', rel), 'utf8');
+      expect({ rel, matches: source.match(/\.getPublicUrl\(/g) }).toEqual({
+        rel,
+        matches: null,
+      });
+    }
   });
 });

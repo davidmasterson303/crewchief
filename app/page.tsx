@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Car, Plus } from 'lucide-react';
-import { useMemo, useState } from 'react';
 import { VehicleCard } from '@/components/VehicleCard';
 import { useDemoVehicles, type GarageVehicle } from '@/hooks/useVehicles';
 
@@ -30,17 +29,6 @@ function VehicleCardSkeleton() {
 
 export default function GaragePage() {
   const { data: vehicles = [], isLoading, error: queryError } = useDemoVehicles();
-  const [makeFilter, setMakeFilter] = useState<string | null>(null);
-
-  const uniqueMakes = useMemo(() => {
-    const makes = Array.from(new Set(vehicles.map((v: GarageVehicle) => v.make))).sort();
-    return (makes as string[]).length > 1 ? (makes as string[]) : [];
-  }, [vehicles]);
-
-  const filteredVehicles = useMemo(() => {
-    if (!makeFilter) return vehicles;
-    return vehicles.filter((v: GarageVehicle) => v.make === makeFilter);
-  }, [vehicles, makeFilter]);
 
   return (
     <div className="relative w-full min-h-screen">
@@ -91,39 +79,6 @@ export default function GaragePage() {
             </div>
           </div>
 
-          {uniqueMakes.length > 0 && !isLoading && (
-            <div className="flex items-center gap-2 mb-6 flex-wrap">
-              <button
-                onClick={() => setMakeFilter(null)}
-                className={`px-3.5 py-1.5 rounded-full text-sm font-medium transition-all border ${
-                  makeFilter === null
-                    ? 'bg-cyan-600 text-white border-cyan-600'
-                    : 'bg-white/5 text-white/60 border-white/10 hover:bg-white/10 hover:text-white'
-                }`}
-              >
-                All
-              </button>
-              {uniqueMakes.map((make) => (
-                <button
-                  key={make}
-                  onClick={() => setMakeFilter(makeFilter === make ? null : make)}
-                  className={`px-3.5 py-1.5 rounded-full text-sm font-medium transition-all border ${
-                    makeFilter === make
-                      ? 'bg-cyan-600 text-white border-cyan-600'
-                      : 'bg-white/5 text-white/60 border-white/10 hover:bg-white/10 hover:text-white'
-                  }`}
-                >
-                  {make}
-                </button>
-              ))}
-              {makeFilter && (
-                <span className="text-xs text-white/40 ml-1">
-                  {filteredVehicles.length} of {vehicles.length}
-                </span>
-              )}
-            </div>
-          )}
-
           {queryError && (
             <div className="mb-8 p-4 border border-red-500/30 rounded-xl bg-red-500/8 flex items-center justify-between gap-4">
               <p className="text-red-400 text-sm">Failed to load vehicles. Please try refreshing.</p>
@@ -141,8 +96,8 @@ export default function GaragePage() {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {isLoading ? (
               [1, 2, 3].map((i) => <VehicleCardSkeleton key={i} />)
-            ) : filteredVehicles.length > 0 ? (
-              filteredVehicles.map((vehicle: GarageVehicle, index: number) => (
+            ) : vehicles.length > 0 ? (
+              vehicles.map((vehicle: GarageVehicle, index: number) => (
                 <div
                   key={vehicle.id}
                   className="animate-slide-up"
@@ -155,7 +110,7 @@ export default function GaragePage() {
                   />
                 </div>
               ))
-            ) : !makeFilter ? (
+            ) : (
               <div className="col-span-full text-center py-20">
                 <Car className="h-10 w-10 text-white/25 mx-auto mb-5" />
                 <h2 className="text-xl font-semibold text-white mb-2">Your garage is empty</h2>
@@ -171,14 +126,7 @@ export default function GaragePage() {
                   </Button>
                 </Link>
               </div>
-            ) : makeFilter ? (
-              <div className="col-span-full text-center py-12">
-                <p className="text-white/50 text-base">No {makeFilter} vehicles in the garage.</p>
-                <button onClick={() => setMakeFilter(null)} className="text-cyan-400 text-sm mt-2 hover:text-cyan-300 transition-colors">
-                  Show all vehicles
-                </button>
-              </div>
-            ) : null}
+            )}
           </div>
         </main>
       </div>

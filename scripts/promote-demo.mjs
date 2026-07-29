@@ -32,12 +32,42 @@
  */
 
 import { execSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 
 const APPLY = process.argv.includes('--apply');
+
+/*
+  Waives a `degraded` consultant round trip — Gemini rate-limited or down —
+  and NOTHING else. A `broken` verdict is ours and is not overridable at all.
+
+  Deliberately command-line only, with no env-var or config-file equivalent,
+  so it cannot become the default by accident. The reason it waives is printed
+  in full and written into the merge commit body, because promotions are
+  --no-ff and `git log demo-live` should record every time the gate was
+  bypassed and why. A door that logs is what stops people making their own.
+*/
+const ALLOW_DEGRADED_AI = process.argv.includes('--allow-degraded-ai');
+
+/** Set by the consultant check so the merge commit can record a waiver. */
+let degradedWaiver = null;
 
 const CANDIDATE = process.env.CREWCHIEF_CI_URL
   || 'https://effulgent-blancmange-6adfdf.netlify.app';
 const DEMO = 'https://crewchief-demo.davidmasterson.co';
+
+/** Read from the environment, never argv — a secret in argv is in the process table. */
+const CONSULTANT_SECRET =
+  process.env.CONSULTANT_HEALTH_SECRET ||
+  (() => {
+    try {
+      const line = readFileSync(new URL('../.env', import.meta.url), 'utf8')
+        .split('\n')
+        .find((l) => l.startsWith('CONSULTANT_HEALTH_SECRET='));
+      return line ? line.slice('CONSULTANT_HEALTH_SECRET='.length).trim() : '';
+    } catch {
+      return '';
+    }
+  })();
 const RELEASE_BRANCH = 'demo-live';
 
 const sh = (cmd) => execSync(cmd, { encoding: 'utf8' }).trim();
@@ -107,7 +137,52 @@ try {
   bad('verify-demo failed — run it directly; this is the release blocker');
 }
 
-/* 5 ── promote ------------------------------------------------------------- */
+/* 5 ── the consultant actually answers ------------------------------------- */
+console.log('\nConsultant round trip (against the candidate)');
+if (!CONSULTANT_SECRET) {
+  /*
+    Not a warning. §25 is the record of a gate that degraded a missing check
+    into a shrug and then watched the consultant die in production with every
+    other check green. If the secret is not configured, this gate cannot run,
+    and a promotion that cannot run its gates is not a verified promotion.
+  */
+  bad('CONSULTANT_HEALTH_SECRET is not set — cannot verify the consultant answers');
+} else {
+  try {
+    const res = await fetch(`${CANDIDATE}/api/health/consultant`, {
+      headers: { 'x-consultant-health-secret': CONSULTANT_SECRET },
+    });
+    const health = await res.json();
+
+    if (health.status === 'good') {
+      ok(`consultant answered with vehicle facts (${health.ms}ms)`);
+    } else if (health.reason === 'NOT_CONFIGURED') {
+      /*
+        The candidate deployment has no secret, so the route fails closed.
+        Still blocks — an unverified consultant is exactly what §25 shipped —
+        but it is a missing env var, not a dead consultant, and saying
+        "broken" would send someone hunting the wrong thing.
+      */
+      bad('the candidate has no CONSULTANT_HEALTH_SECRET — cannot verify the consultant');
+      console.log(`    Set it in Netlify for ${CANDIDATE.replace('https://', '')} and re-run.`);
+    } else if (health.status === 'degraded' && ALLOW_DEGRADED_AI) {
+      degradedWaiver = `${health.reason}: ${health.detail}`;
+      console.log(`  \x1b[33m!\x1b[0m WAIVED --allow-degraded-ai — ${degradedWaiver}`);
+      console.log('    This will be written into the merge commit.');
+    } else if (health.status === 'degraded') {
+      bad(`consultant degraded (${health.reason}: ${health.detail})`);
+      console.log('    Gemini, not us. Re-run with --allow-degraded-ai to promote anyway.');
+    } else {
+      // broken — ours, and not overridable.
+      bad(`consultant is broken (${health.reason}: ${health.detail})`);
+      console.log('    This is our fault, not an upstream outage. There is no override.');
+    }
+  } catch (e) {
+    bad(`consultant health check unreachable (${e.message})`);
+  }
+}
+
+/* 6 ── promote ------------------------------------------------------------- */
 console.log('\n' + '─'.repeat(60));
 
 if (failed > 0) {
@@ -124,7 +199,13 @@ try {
   // --no-ff keeps each promotion a single, revertible point in history. If a
   // promotion turns out badly, reverting one merge commit restores the demo.
   sh(`git checkout ${RELEASE_BRANCH}`);
-  sh(`git merge --no-ff main -m "Promote ${head.slice(0, 8)} to the public demo"`);
+  const message = degradedWaiver
+    ? `Promote ${head.slice(0, 8)} to the public demo\n\n` +
+      `AI GATE WAIVED with --allow-degraded-ai.\n${degradedWaiver}\n\n` +
+      `The consultant was not verified on this build. The 6-hourly canary\n` +
+      `re-checks the live demo; if this was not transient it will surface there.`
+    : `Promote ${head.slice(0, 8)} to the public demo`;
+  sh(`git merge --no-ff main -m ${JSON.stringify(message)}`);
   sh(`git push origin ${RELEASE_BRANCH}`);
   ok(`${RELEASE_BRANCH} pushed`);
 } catch (e) {

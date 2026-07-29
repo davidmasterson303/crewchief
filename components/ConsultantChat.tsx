@@ -19,6 +19,7 @@ import {
 } from '@/app/actions';
 import { toast } from 'sonner';
 import { invalidateDashboardCache } from '@crewchief/core/query-invalidation';
+import { useSignedUrl } from '@/hooks/useSignedUrl';
 
 interface ConsultantChatProps {
   vehicleId: string;
@@ -36,6 +37,39 @@ interface ConsultantChatProps {
   nhtsaData?: any;
   healthSummary?: any;
   modWishlistItems?: any[];
+}
+
+/**
+ * One attachment chip in the transcript.
+ *
+ * A component rather than an inline `<a>` because `file_url` holds a storage
+ * path against a private bucket and has to be signed before it can be opened —
+ * and a hook cannot be called from inside the `.map` that renders these.
+ *
+ * While the URL is resolving the chip renders as plain text: still visible,
+ * still named, just not yet clickable. A link that 404s the moment it is
+ * pressed is worse than one that arrives a moment late.
+ */
+function AttachmentLink({ doc, className }: { doc: any; className: string }) {
+  const href = useSignedUrl(doc.file_url);
+
+  const body = (
+    <>
+      <FileText className="h-4 w-4 flex-shrink-0" />
+      <span className="text-sm flex-1 truncate">{doc.file_name}</span>
+      {href && <ExternalLink className="h-3 w-3 flex-shrink-0 opacity-60" />}
+    </>
+  );
+
+  if (!href) {
+    return <div className={`${className} opacity-60 cursor-default`}>{body}</div>;
+  }
+
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" className={className}>
+      {body}
+    </a>
+  );
 }
 
 const THINKING_STAGES = [
@@ -769,21 +803,15 @@ export default function ConsultantChat({
                     {msg.documents && msg.documents.length > 0 && (
                       <div className="mb-3 space-y-2">
                         {msg.documents.map((doc: any, docIdx: number) => (
-                          <a
+                          <AttachmentLink
                             key={docIdx}
-                            href={doc.file_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                            doc={doc}
                             className={`flex items-center gap-2 p-2 rounded-lg ${
                               msg.role === 'user'
                                 ? 'bg-cyan-700/60 hover:bg-cyan-700'
                                 : 'bg-white/8 hover:bg-white/12'
                             } transition-colors`}
-                          >
-                            <FileText className="h-4 w-4 flex-shrink-0" />
-                            <span className="text-sm flex-1 truncate">{doc.file_name}</span>
-                            <ExternalLink className="h-3 w-3 flex-shrink-0 opacity-60" />
-                          </a>
+                          />
                         ))}
                       </div>
                     )}

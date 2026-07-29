@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 3000
+    },
+    {
+      "name": "crewchief-prod-verify",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "start:verify", "--", "-p", "3100"],
+      "port": 3100
     }
   ]
 }
