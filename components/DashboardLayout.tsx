@@ -208,8 +208,30 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
             {!isDemo && <AccountMenu />}
           </div>
 
-          {scrolled && (
-            <div className="flex border-t border-white/8 overflow-x-auto edge-fade-x">
+          {/*
+            ── One tab strip, and it lives here ────────────────────────────────
+
+            There used to be two: this one, and a full-size copy in the page
+            body. This one appeared at `window.scrollY > 60` while the body copy
+            sat ~300px down and stayed on screen much longer — so everything
+            between those two points showed the navigation **twice**, which is
+            the first thing you hit when you scroll.
+
+            The obvious repair is to time the handover: show this one exactly
+            when the body one leaves the viewport. That was tried and rejected.
+            It needs a runtime measurement, the measurement is wrong on first
+            paint (the hero image has no intrinsic height yet, so the body strip
+            measures as already-scrolled-past and *both* render at rest), and
+            correcting that needs re-measurement on frame, on load, and on
+            resize. That is a lot of moving parts standing between a user and a
+            row of links.
+
+            Deleting the duplicate removes the whole class of bug instead of
+            timing around it. Navigation belongs in persistent chrome: it is now
+            always here, always visible, and cannot be on screen twice because
+            it only exists once.
+          */}
+          <div className="flex border-t border-white/8 overflow-x-auto edge-fade-x">
               {tabs.map(({ key, label, icon: Icon, href }) => {
                 const isActive = currentPage === key;
                 return (
@@ -225,9 +247,8 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                     {isActive && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400 rounded-t-full" />}
                   </Link>
                 );
-              })}
-            </div>
-          )}
+            })}
+          </div>
         </div>
       </nav>
 
@@ -362,24 +383,8 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
         </div>
 
 
-        <div className="flex mb-8 border-b border-white/10 overflow-x-auto edge-fade-x">
-          {tabs.map(({ key, label, icon: Icon, href }) => {
-            const isActive = currentPage === key;
-            return (
-              <Link
-                key={key}
-                href={href(vehicle.id)}
-                className={`relative flex items-center gap-2 px-5 py-3.5 text-sm font-medium whitespace-nowrap transition-colors duration-150 ${
-                  isActive ? 'text-cyan-400 bg-cyan-400/5' : 'text-white/50 hover:text-white/80 hover:bg-white/5'
-                }`}
-              >
-                <Icon className={`h-4 w-4 ${isActive ? 'text-cyan-400' : 'text-white/40'}`} />
-                {label}
-                {isActive && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400 rounded-t-full" />}
-              </Link>
-            );
-          })}
-        </div>
+        {/* The body copy of the tab strip lived here. It is gone — see the
+            note on the strip in the sticky header above. */}
 
         <div className="glass-panel rounded-2xl p-6">
           {children}
