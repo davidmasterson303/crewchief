@@ -837,9 +837,28 @@ html[data-intro='play'] .garage-door {
   );
 }
 
+/*
+ * A door on a chain drive, not a panel on an ease-out.
+ *
+ * The first version travelled a full viewport height in 1.5s on a symmetric
+ * ease-in-out, and read as a slide rather than as a door — "garage doors don't
+ * open that fast", which is exactly right. Three things were wrong with it, and
+ * only one of them was the duration.
+ *
+ * The settle at 4% is the motor taking the load: a real opener pulls the door
+ * down a few millimetres against its own weight before the chain starts lifting
+ * it. It is 3px over about a tenth of a second — under a conscious threshold,
+ * but the difference between machinery and animation.
+ *
+ * The middle is close to linear because a chain drive is close to linear. Easing
+ * belongs at the ends, where the motor is starting and stopping, and nowhere in
+ * between; the old symmetric curve spent the whole travel accelerating or
+ * decelerating, which is what made it feel weightless.
+ */
 @keyframes garageDoorLift {
-  from { transform: translateY(0); }
-  to   { transform: translateY(-100%); }
+  0%   { transform: translateY(0); }
+  4%   { transform: translateY(3px); }
+  100% { transform: translateY(-100%); }
 }
 
 /*
@@ -848,14 +867,14 @@ html[data-intro='play'] .garage-door {
  * exact moment the user is looking at the reveal.
  */
 .garage-door.is-lifting {
-  animation: garageDoorLift 1500ms cubic-bezier(0.45, 0.05, 0.55, 0.95) forwards;
+  animation: garageDoorLift 2600ms cubic-bezier(0.3, 0.2, 0.7, 0.82) forwards;
   will-change: transform;
 }
 
-/* The content on the door fades before the door itself starts moving. */
+/* The panel clears as the door takes up, over a beat rather than a blink. */
 .garage-door.is-lifting .garage-door-content {
   opacity: 0;
-  transition: opacity 400ms ease-out;
+  transition: opacity 600ms ease-out;
 }
 
 /*

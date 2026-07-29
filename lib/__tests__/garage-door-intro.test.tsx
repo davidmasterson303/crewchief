@@ -22,13 +22,19 @@
  */
 
 import { StrictMode } from 'react';
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import GarageDoor from '@/components/GarageDoor';
 import { INTRO_PLAYED_KEY, INTRO_PLAYED_VALUE } from '@crewchief/core/intro-gate';
 
 function renderDoor(strict: boolean) {
   const tree = (
-    <GarageDoor panel={() => <span>on the door</span>}>
+    <GarageDoor
+      panel={(enter) => (
+        <button type="button" onClick={enter}>
+          Enter Garage
+        </button>
+      )}
+    >
       <main>the page</main>
     </GarageDoor>
   );
@@ -67,12 +73,62 @@ describe('a first load in a visible tab', () => {
 
   it('renders the panel on the door', () => {
     renderDoor(true);
-    expect(screen.getByText('on the door')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Enter Garage' })).toBeInTheDocument();
   });
 
   it('records that the intro has played, so a reload does not repeat it', () => {
     renderDoor(true);
     expect(sessionStorage.getItem(INTRO_PLAYED_KEY)).toBe(INTRO_PLAYED_VALUE);
+  });
+});
+
+describe('the door waits to be opened', () => {
+  /*
+    It used to open on a timer, which made the button on it ornamental — you
+    watched a thing happen instead of doing it. A garage door opens because
+    someone pressed the opener.
+
+    Fake timers here rather than a real wait, so "nothing happens" is asserted
+    against a clock that has genuinely moved rather than one that has not had
+    time to.
+  */
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  it('does not open on its own, however long it is left', () => {
+    const { container } = renderDoor(true);
+
+    act(() => {
+      jest.advanceTimersByTime(60_000);
+    });
+
+    expect(curtain(container)).not.toBeNull();
+    expect(curtain(container)!.className).not.toContain('is-lifting');
+  });
+
+  it('opens when the opener on the panel is pressed', () => {
+    const { container } = renderDoor(true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enter Garage' }));
+
+    expect(curtain(container)!.className).toContain('is-lifting');
+  });
+
+  it('tears the curtain down if the animation never reports finishing', () => {
+    /*
+      `animationend` is the normal signal and cannot be the only one — a hidden
+      tab or an interrupted animation never fires it, and the predecessor was
+      found frozen mid-lift, parked over the page. jsdom runs no animations at
+      all, so this is exactly that case.
+    */
+    const { container } = renderDoor(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Enter Garage' }));
+
+    act(() => {
+      jest.advanceTimersByTime(60_000);
+    });
+
+    expect(curtain(container)).toBeNull();
   });
 });
 

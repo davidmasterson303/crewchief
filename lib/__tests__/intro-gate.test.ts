@@ -27,8 +27,6 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   decideIntro,
-  INTRO_DWELL_MS,
-  INTRO_HOLD_MS,
   INTRO_LIFT_MS,
   INTRO_LIFT_TIMEOUT_MS,
   INTRO_PANEL_SETTLED_MS,
@@ -126,29 +124,83 @@ describe('the intro timings', () => {
     expect(Number(lift![1])).toBe(INTRO_LIFT_MS);
   });
 
-  it('lets the panel finish arriving before the door starts leaving', () => {
+  it('travels slowly enough to read as a door, and not so slowly as to trap anyone', () => {
     /*
-      The relationship that was wrong, and the reason the intro was reported as
-      faint and buggy: the hold was 900ms while the panel's entrance ran to
-      1220ms, so the door began lifting — fading the panel out — while three of
-      its four elements were still fading in. Opposing opacity animations
-      composite, so they simply never got bright.
-
-      A whole second of dwell rather than a hair's breadth, because the failure
-      mode of getting this wrong is not a jitter; it is content that can never
-      be read.
+      1500ms across a full viewport height read as a slide, not a door. A real
+      opener takes ten to fifteen seconds, which is unusable here, so the number
+      is a judgement — but a bounded one, and the upper bound matters as much as
+      the lower: the visitor pressed a button expecting to get in.
     */
-    expect(INTRO_HOLD_MS).toBeGreaterThan(INTRO_PANEL_SETTLED_MS);
-    expect(INTRO_DWELL_MS).toBeGreaterThanOrEqual(1000);
+    expect(INTRO_LIFT_MS).toBeGreaterThanOrEqual(2000);
+    expect(INTRO_LIFT_MS).toBeLessThanOrEqual(3500);
   });
 
-  it('is matched by every entrance in the panel it waits for', () => {
+  it('moves close to linear through the middle of its travel', () => {
     /*
-      The other half. INTRO_PANEL_SETTLED_MS is a claim about a file it cannot
-      see, so it is checked against that file: every framer-motion transition in
-      LandingHero must land inside the budget. Adding one more staggered element
-      with a late delay is the natural way to reintroduce the bug, and it fails
-      here rather than looking merely dim in a browser.
+      A chain drive does not accelerate through its whole travel. Easing belongs
+      at the ends, where the motor starts and stops, and nowhere in between —
+      easing across the entire distance is what made a heavy object look
+      weightless.
+
+      This assertion is deliberately arithmetic rather than a look at the
+      control points, because the control-point version of it was written first
+      and was worthless: it passed against the very ease-in-out curve it existed
+      to reject, and against a replacement that turned out to be five times less
+      linear than what it replaced. Numbers on a bezier are not readable by
+      inspection. So the curve is evaluated.
+    */
+    const css = readFileSync(join(__dirname, '..', '..', 'app', 'globals.css'), 'utf8');
+    const curve = css.match(
+      /\.garage-door\.is-lifting\s*\{[^}]*?cubic-bezier\(([\d.]+),\s*([\d.]+),\s*([\d.]+),\s*([\d.]+)\)/
+    );
+
+    expect(curve).not.toBeNull();
+    const [x1, y1, x2, y2] = curve!.slice(1, 5).map(Number);
+
+    /** Progress at time `t`, solving x(u) = t by bisection then taking y(u). */
+    const progressAt = (t: number) => {
+      const axis = (a: number, b: number, u: number) =>
+        3 * (1 - u) * (1 - u) * u * a + 3 * (1 - u) * u * u * b + u * u * u;
+      let lo = 0;
+      let hi = 1;
+      for (let i = 0; i < 60; i += 1) {
+        const mid = (lo + hi) / 2;
+        if (axis(x1, x2, mid) < t) lo = mid;
+        else hi = mid;
+      }
+      return axis(y1, y2, (lo + hi) / 2);
+    };
+
+    // Speed across each slice of the middle 70% of the travel.
+    const speeds: number[] = [];
+    for (let t = 0.15; t < 0.85; t += 0.05) {
+      speeds.push(progressAt(t + 0.05) - progressAt(t));
+    }
+
+    const evenness = Math.max(...speeds) / Math.min(...speeds);
+
+    // 1.0 is dead linear. The rejected ease-in-out measures 2.40 here, and the
+    // curve that replaced it measured 12.04 — worse, while looking plausible.
+    expect(evenness).toBeLessThan(1.6);
+
+    /*
+      ...and it must still ease at the ends, or it is simply linear — a door
+      that reaches full speed instantly and stops dead has no motor in it.
+
+      The margin is the assertion. Written first as `< 0.08` against a linear
+      curve's exact 0.08, it let `cubic-bezier(0, 0, 1, 1)` straight through on
+      bisection rounding. A bound that a rejected value meets exactly is not a
+      bound.
+    */
+    expect(progressAt(0.08)).toBeLessThan(0.07);
+  });
+
+  it('keeps every entrance in the panel inside the settle budget', () => {
+    /*
+      INTRO_PANEL_SETTLED_MS is a claim about a file it cannot see, so it is
+      checked against that file: every framer-motion transition in LandingHero
+      must land inside the budget. The panel carries the button that opens the
+      door, and a control still fading in is a control you cannot press.
     */
     const hero = readFileSync(join(__dirname, '..', '..', 'components', 'LandingHero.tsx'), 'utf8');
 
@@ -174,16 +226,4 @@ describe('the intro timings', () => {
     expect(INTRO_LIFT_TIMEOUT_MS).toBeGreaterThan(INTRO_LIFT_MS);
   });
 
-  it('keeps the whole intro under three and a half seconds', () => {
-    /*
-      The annoyance budget, raised from 2500ms once the dwell was real.
-
-      It was not raised to accommodate a slow animation — the lift is unchanged.
-      It was raised because the old ceiling was being met by *skipping the part
-      that matters*: a door nobody can read the words on is not a shorter intro,
-      it is a broken one. This runs once per session and can be dismissed with
-      the button on it.
-    */
-    expect(INTRO_HOLD_MS + INTRO_LIFT_MS).toBeLessThanOrEqual(3500);
-  });
 });

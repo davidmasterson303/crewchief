@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState, type AnimationEvent, type ReactNode } from 'react';
 import {
   decideIntro,
-  INTRO_HOLD_MS,
   INTRO_LIFT_TIMEOUT_MS,
   INTRO_PLAYED_KEY,
   INTRO_PLAYED_VALUE,
@@ -73,7 +72,6 @@ export default function GarageDoor({ panel, children }: GarageDoorProps) {
     being in the server's HTML.
   */
   const [phase, setPhase] = useState<Phase>('closed');
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   /*
     Decided once per mounted instance, and this ref is what makes that true.
 
@@ -127,27 +125,35 @@ export default function GarageDoor({ panel, children }: GarageDoorProps) {
       if (decision.current === 'play') markPlayed();
     }
 
-    if (decision.current === 'skip') {
-      setPhase('gone');
-      return;
-    }
-
-    const scheduled = timers.current;
-    scheduled.push(setTimeout(lift, INTRO_HOLD_MS));
+    if (decision.current === 'skip') setPhase('gone');
 
     /*
-      The safety net for the failure this component's predecessor actually
-      exhibited: a curtain frozen mid-lift, parked over the page. `animationend`
-      does not arrive if the animation never runs or is interrupted, so the
-      teardown cannot be its only trigger. See INTRO_LIFT_TIMEOUT_MS.
-    */
-    scheduled.push(setTimeout(() => setPhase('gone'), INTRO_HOLD_MS + INTRO_LIFT_TIMEOUT_MS));
+      And then it waits.
 
-    return () => {
-      scheduled.forEach(clearTimeout);
-      scheduled.length = 0;
-    };
-  }, [lift]);
+      There is deliberately no timer here. The door opened by itself on a hold
+      of a few hundred milliseconds, which made the button on it ornamental —
+      you watched a thing happen rather than doing it. A garage door opens
+      because someone pressed the opener, and the panel already carries the
+      opener. Nothing about the intro should proceed without the visitor.
+    */
+  }, []);
+
+  /*
+    The safety net, armed only once the door is actually moving.
+
+    `animationend` is the right signal and cannot be the only one: it never
+    arrives if the animation is interrupted, or if the tab is hidden partway
+    through. The predecessor was found frozen 5% into its lift, parked over the
+    page indefinitely, because a stalled animation had nothing else to end it.
+
+    Armed on entering `lifting` rather than at mount, now that the door may sit
+    closed for as long as the visitor likes.
+  */
+  useEffect(() => {
+    if (phase !== 'lifting') return;
+    const timer = setTimeout(() => setPhase('gone'), INTRO_LIFT_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [phase]);
 
   const handleAnimationEnd = (event: AnimationEvent<HTMLDivElement>) => {
     // Only the door's own lift ends the intro. Without this guard any

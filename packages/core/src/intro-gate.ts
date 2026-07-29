@@ -67,41 +67,38 @@ export function decideIntro({
 }
 
 /**
- * How long the door sits closed before it lifts, in milliseconds.
- *
- * **Must exceed {@link INTRO_PANEL_SETTLED_MS}, and visibly.** At 900ms it did
- * not, and the intro was reported as "faint, quick and buggy" — correctly. The
- * panel's own entrance ran to 1220ms, so the lift began while three of its four
- * elements were still fading *in*. Two opposing opacity animations composited:
- * the headline held full brightness for 50ms, and the paragraph, the buttons
- * and the test-drive link never reached it at all. Nothing was mistimed by a
- * little; the curtain was leaving before the content had arrived.
- *
- * The gap between the two is the dwell — the beat where the door is simply a
- * door with legible words on it, which is the entire point of having one.
- *
- * The original value was 600ms, measured from the *page's* mount while the
- * curtain arrived in a separately-loaded chunk, so on a slow load it fired
- * before the curtain existed and the intro silently never rendered. That race
- * is gone. This number is kept here, beside the thing it must clear, rather
- * than inlined in a component where the relationship is invisible.
- */
-export const INTRO_HOLD_MS = 1800;
-
-/**
  * When the panel on the door has finished arriving.
  *
- * The last of `LandingHero`'s staggered entrances, delay plus duration. Kept
- * here so {@link INTRO_HOLD_MS} can be checked against it by a test instead of
- * by whoever next edits one of the two.
+ * The last of `LandingHero`'s staggered entrances, delay plus duration.
+ *
+ * It matters because the panel carries the button that opens the door, and a
+ * control that is still fading in is a control you cannot press. It briefly did
+ * not hold: the entrance ran to 1220ms against a hold of 900ms, so the lift
+ * began while three of the four elements were still arriving. Two opposing
+ * opacity animations composited and the panel simply never got bright.
+ *
+ * Kept here rather than inlined in the component so a test can check the
+ * component against it, instead of whoever next edits one of the two.
  */
 export const INTRO_PANEL_SETTLED_MS = 700;
 
-/** How long the panel is fully legible before the door starts to move. */
-export const INTRO_DWELL_MS = INTRO_HOLD_MS - INTRO_PANEL_SETTLED_MS;
-
-/** Duration of the lift itself. Must match `--intro-lift-ms` in globals.css. */
-export const INTRO_LIFT_MS = 1500;
+/**
+ * Duration of the lift. Must match the animation in globals.css, which a test
+ * checks by reading the stylesheet.
+ *
+ * 2600ms, up from 1500ms, because "garage doors don't open that fast" and they
+ * do not. A domestic opener takes ten to fifteen seconds for a full door, which
+ * is unusable here — but the honest constraint is not speed, it is that the
+ * travel has to read as machinery hauling weight rather than a panel sliding.
+ * The keyframes carry the rest of that: a settle as the motor takes the load,
+ * and a near-linear middle, because a chain drive does not accelerate through
+ * its whole travel.
+ *
+ * It is affordable now in a way it was not before. The door no longer opens on
+ * a timer, so this is time the visitor asked for by pressing the opener, not
+ * time spent waiting on a page that will not get out of the way.
+ */
+export const INTRO_LIFT_MS = 2600;
 
 /**
  * When to give up waiting for `animationend` and tear the curtain down anyway.

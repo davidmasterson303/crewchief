@@ -21,12 +21,13 @@ import FeaturesDrawer from './FeaturesDrawer';
  * with it.
  *
  * **The staggered entrances below must all finish inside
- * `INTRO_PANEL_SETTLED_MS`**, because the door starts lifting at
- * `INTRO_HOLD_MS` and fades this whole panel out as it goes. They previously
- * ran to 1220ms against a 900ms hold, so three of the four elements were still
- * fading in while the wrapper faded out — they composited to something
- * permanently dim, and the headline was at full strength for 50ms. A test
- * holds the relationship now; the numbers here are half of it.
+ * `INTRO_PANEL_SETTLED_MS`.** This panel carries the button that opens the
+ * door, and a control still fading in is a control nobody can press. They
+ * previously ran to 1220ms against a door that started lifting at 900ms, so
+ * three of the four elements were still arriving while the wrapper faded out —
+ * they composited to something permanently dim, and the headline was at full
+ * strength for 50ms. A test holds the relationship now; the numbers here are
+ * half of it.
  */
 
 interface LandingHeroProps {
