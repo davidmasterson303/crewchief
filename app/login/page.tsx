@@ -148,7 +148,7 @@ export default function LoginPage() {
           </div>
 
           <div className="mt-4 text-center">
-            <Link href="/demo" className="text-white/30 hover:text-white/50 text-xs transition-colors">
+            <Link href="/" className="text-white/30 hover:text-white/50 text-xs transition-colors">
               Or try the demo without an account
             </Link>
           </div>

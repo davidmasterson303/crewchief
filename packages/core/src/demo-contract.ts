@@ -32,7 +32,13 @@ export const DEMO_VEHICLE_IDS = [
   'a3000000-0000-0000-0000-000000000003',
 ] as const;
 
-/** Pages an anonymous visitor must be able to reach. */
+/**
+ * Pages an anonymous visitor must be able to reach.
+ *
+ * `/demo` stays on this list even though it is now a redirect to `/` — the
+ * portfolio and README both link to it, so "reachable" is still a requirement.
+ * What changed is where the content lives: see DEMO_SMOKE_EXPECTATIONS.
+ */
 export const PUBLIC_DEMO_ROUTES = [
   '/',
   '/demo',
@@ -83,8 +89,18 @@ export const ANON_READ_TABLES = {
  * Used by the live verifier — cheap, stable strings, not brittle selectors.
  */
 export const DEMO_SMOKE_EXPECTATIONS = {
+  /*
+    Asserted against `/`, not `/demo`.
+
+    `/demo` redirects here now, and the live verifier fetches with
+    `redirect: 'follow'` — so pointing this at `/demo` would still pass, by
+    following a redirect to the page that actually holds the cars. That is a
+    check that goes green for a reason it does not state, which is the failure
+    this whole file exists to prevent. The redirect gets its own assertion in
+    scripts/verify-demo.mjs instead.
+  */
   demoPage: {
-    path: '/demo',
+    path: '/',
     mustContain: ['Honda', 'Subaru', 'BMW'],
     minLength: 2000,
   },

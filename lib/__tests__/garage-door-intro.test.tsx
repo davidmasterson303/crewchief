@@ -82,6 +82,44 @@ describe('a first load in a visible tab', () => {
   });
 });
 
+describe('navigating within the same document', () => {
+  /*
+    The bug behind "the demo link doesn't work".
+
+    The pre-paint script in app/layout.tsx sets `data-intro` once per *document
+    load*. `next/link` navigates on the client and never re-runs it, so the
+    attribute still reads "play" long after the intro has been and gone. When
+    the component preferred that attribute over session storage, every
+    client-side navigation to a door-bearing route mounted a fresh curtain —
+    pressing "Take a Test Drive" put you in front of a second closed garage
+    door, which is indistinguishable from a dead link.
+
+    Simulated exactly: play the intro, unmount as a navigation would, then mount
+    again with the attribute left as the script wrote it.
+  */
+  it('does not show the curtain again after the intro has played', () => {
+    document.documentElement.setAttribute('data-intro', 'play');
+
+    const first = renderDoor(true);
+    expect(curtain(first.container)).not.toBeNull();
+    first.unmount();
+
+    // The attribute is deliberately left alone — that is the whole point.
+    expect(document.documentElement.getAttribute('data-intro')).toBe('play');
+
+    const second = renderDoor(true);
+    expect(curtain(second.container)).toBeNull();
+  });
+
+  it('still renders the page it navigated to', () => {
+    document.documentElement.setAttribute('data-intro', 'play');
+    renderDoor(true).unmount();
+
+    const { container } = renderDoor(true);
+    expect(container.querySelectorAll('main')).toHaveLength(1);
+  });
+});
+
 describe('the door waits to be opened', () => {
   /*
     It used to open on a timer, which made the button on it ornamental — you

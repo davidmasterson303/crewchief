@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, ChevronDown, Gauge } from 'lucide-react';
+import { ArrowRight, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import FeaturesDrawer from './FeaturesDrawer';
 
@@ -110,22 +110,35 @@ export default function LandingHero({ onEnter }: LandingHeroProps) {
           </button>
         </motion.div>
 
+        {/*
+          The third affordance used to be "Take a Test Drive" pointing at /demo.
+          That page was a duplicate of the one behind this door, so the button
+          offered a trip to where you already were — and pressing "Enter Garage"
+          *is* the test drive. What was missing instead was any way at all to
+          reach an account: no public page linked to /login or /signup, so a
+          returning visitor had to type the URL.
+        */}
         <motion.div
-          className="mt-8"
+          className="mt-8 flex items-center gap-4 text-sm"
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.32, duration: 0.38, ease: 'easeOut' }}
         >
-          <Link href="/demo">
-            <button className="demo-btn group relative flex items-center gap-2.5 px-6 py-3 rounded-full border border-cyan-400/25 bg-transparent hover:bg-cyan-500/10 transition-all duration-250 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50">
-              <span className="absolute inset-0 rounded-full pointer-events-none demo-glow" aria-hidden="true" />
-              <Gauge className="relative z-10 h-4 w-4 text-cyan-400 transition-transform duration-300 group-hover:scale-110" />
-              <span className="relative z-10 text-sm font-medium text-cyan-300 group-hover:text-cyan-200 tracking-wide">
-                Take a Test Drive
-              </span>
-              <ArrowRight className="relative z-10 h-3.5 w-3.5 text-cyan-400/70 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:text-cyan-400" />
-              <span className="relative z-10 text-xs text-white/30 ml-0.5">— no signup needed</span>
-            </button>
+          <Link
+            href="/login"
+            className="font-medium text-white/55 hover:text-white/85 transition-colors rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
+          >
+            Sign in
+          </Link>
+          <span className="text-white/15" aria-hidden="true">
+            &middot;
+          </span>
+          <Link
+            href="/signup"
+            className="group inline-flex items-center gap-1.5 font-medium text-cyan-300 hover:text-cyan-200 transition-colors rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
+          >
+            Create an account
+            <ArrowRight className="h-3.5 w-3.5 text-cyan-400/70 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:text-cyan-400" />
           </Link>
         </motion.div>
       </div>
@@ -145,15 +158,6 @@ export default function LandingHero({ onEnter }: LandingHeroProps) {
         @keyframes shimmer {
           0%   { background-position: 200% center; }
           100% { background-position: -200% center; }
-        }
-
-        .demo-glow {
-          box-shadow: 0 0 0 0 rgba(34, 211, 238, 0);
-          transition: box-shadow 0.3s ease;
-        }
-
-        .demo-btn:hover .demo-glow {
-          box-shadow: 0 0 18px 2px rgba(34, 211, 238, 0.18);
         }
 
         .enter-garage-btn:hover {

@@ -17,6 +17,25 @@ const nextConfig = {
     does not change any deployed behaviour.
   */
   distDir: process.env.NEXT_DIST_DIR || '.next',
+
+  /*
+    /demo and / had drifted into the same page: both rendered the same three
+    is_demo cars behind the same garage door, and the door carried a "Take a
+    Test Drive" button pointing at a near-copy of the page it sat on.
+
+    / is the demo now, and /demo redirects to it. The redirect is not optional
+    housekeeping — README.md advertises https://crewchief-demo.davidmasterson.co
+    and davidmasterson.co/ai-work.html links to the demo, so the path has to keep
+    resolving. `packages/core/src/demo-contract.ts` still lists /demo among the
+    routes an anonymous visitor must be able to reach, and scripts/verify-demo.mjs
+    asserts it lands on / rather than on /login.
+
+    Deliberately temporary: a 308 is cached hard by browsers and would make this
+    awkward to reverse if /demo should ever become a distinct page again.
+  */
+  async redirects() {
+    return [{ source: '/demo', destination: '/', permanent: false }];
+  },
   eslint: {
     ignoreDuringBuilds: true,
   },

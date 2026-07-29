@@ -1,6 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type AnimationEvent, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type AnimationEvent,
+  type ReactNode,
+} from 'react';
 import {
   decideIntro,
   INTRO_LIFT_TIMEOUT_MS,
@@ -50,6 +58,21 @@ interface GarageDoorProps {
 
 type Phase = 'closed' | 'lifting' | 'gone';
 
+/**
+ * A layout effect on the client, an ordinary one on the server.
+ *
+ * The decision has to land *before* the browser paints. A passive `useEffect`
+ * runs after paint, so a load that skips the intro would show one frame of
+ * door and then remove it — invisible on a first load, where the intro is
+ * playing anyway, and a clear flicker on every client-side navigation back to
+ * a door-bearing route, where it is not.
+ *
+ * `useLayoutEffect` warns when it runs during server rendering, hence the
+ * switch rather than using it directly.
+ */
+const useIntroDecisionEffect =
+  typeof window !== 'undefined' ? useLayoutEffect : useEffect;
+
 function markPlayed() {
   // Written when the intro *starts*, not when it finishes. A reload halfway
   // through is a person who has seen it and would rather not sit through it
@@ -91,36 +114,36 @@ export default function GarageDoor({ panel, children }: GarageDoorProps) {
     setPhase((current) => (current === 'closed' ? 'lifting' : current));
   }, []);
 
-  useEffect(() => {
+  useIntroDecisionEffect(() => {
     if (decision.current === null) {
       /*
-        Prefer the answer the pre-paint script already reached. It ran once,
-        before the first paint, from the same three inputs, and it is what the
-        CSS is keying off — so taking it here means the stylesheet and the
-        component cannot disagree about whether this load has an intro.
+        Session storage is the source of truth, not the `data-intro` attribute
+        the pre-paint script wrote.
 
-        The fallback recomputes it, for the case where that script did not run:
-        a test renderer, or a context where the inline script was blocked. The
-        two cannot share an import, because the script has to run before the
-        bundle exists, which is the whole reason it is a string.
+        Preferring that attribute is what broke the demo link. The script runs
+        once per *document load*; `next/link` navigates on the client and never
+        re-runs it, so the attribute still says "play" long after the intro has
+        finished. Every client-side navigation back to a door-bearing route
+        therefore raised a second curtain — pressing a link and being met by
+        another closed garage door, which reads as a dead link.
+
+        The two cannot disagree within a load anyway: the script computes its
+        answer before `markPlayed()` has run, so it reads the same unplayed flag
+        this does. The attribute's job is narrower than it was given — it exists
+        so CSS can hide the server-rendered curtain before the first paint, and
+        that is all it does now.
       */
-      const prePainted = document.documentElement.getAttribute('data-intro');
-
-      decision.current =
-        prePainted === 'play' || prePainted === 'skip'
-          ? prePainted
-          : decideIntro({
-              alreadyPlayed: (() => {
-                try {
-                  return sessionStorage.getItem(INTRO_PLAYED_KEY) === INTRO_PLAYED_VALUE;
-                } catch (_) {
-                  return false;
-                }
-              })(),
-              reducedMotion:
-                window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
-              documentHidden: document.hidden,
-            });
+      decision.current = decideIntro({
+        alreadyPlayed: (() => {
+          try {
+            return sessionStorage.getItem(INTRO_PLAYED_KEY) === INTRO_PLAYED_VALUE;
+          } catch (_) {
+            return false;
+          }
+        })(),
+        reducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
+        documentHidden: document.hidden,
+      });
 
       if (decision.current === 'play') markPlayed();
     }

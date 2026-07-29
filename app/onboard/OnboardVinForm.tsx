@@ -22,7 +22,8 @@ export default function OnboardVinForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const fromDemo = searchParams.get('from') === 'demo';
-  const garageHref = fromDemo ? '/demo' : '/garage';
+  // The demo garage is `/` now; `/demo` only redirects there.
+  const garageHref = fromDemo ? '/' : '/garage';
 
   const [vin, setVin] = useState('');
   const [loading, setLoading] = useState(false);

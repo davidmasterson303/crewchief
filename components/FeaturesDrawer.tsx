@@ -6,8 +6,11 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
+  ArrowRight,
   Brain,
   Wrench,
   ShieldAlert,
@@ -149,6 +152,27 @@ export default function FeaturesDrawer({ open, onOpenChange }: FeaturesDrawerPro
               <span className="text-info font-medium">Built for the long haul.</span>{' '}
               CrewChief grows with your car. Every service record, every conversation, every decision you log makes future recommendations sharper and more personalized.
             </p>
+          </div>
+
+          {/*
+            The drawer had no link in it at all — you read the whole feature
+            list and the only way out was to close it. Somebody convinced by
+            this content had nowhere to go.
+          */}
+          <div className="mt-4 flex flex-col items-center gap-3 pb-2">
+            <Link href="/signup" onClick={() => onOpenChange(false)} className="w-full">
+              <Button className="w-full h-11 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-xl transition-all">
+                Create an account
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              className="text-xs text-white/40 hover:text-white/70 transition-colors"
+            >
+              Keep looking around the demo
+            </button>
           </div>
         </div>
       </SheetContent>

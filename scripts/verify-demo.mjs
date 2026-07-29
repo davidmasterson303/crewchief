@@ -42,10 +42,22 @@ const DEFAULT_BASE = 'https://crewchief-demo.davidmasterson.co';
 const base = (process.argv[2] || DEFAULT_BASE).replace(/\/$/, '');
 
 const PAGE_CHECKS = [
-  { path: '/demo', mustContain: ['Honda', 'Subaru', 'BMW'], label: 'demo garage' },
+  // `/`, not `/demo` — the demo garage lives at the root now. Checking /demo
+  // here would still pass, because the fetch below follows redirects, and would
+  // be asserting nothing about where the cars are.
+  { path: '/', mustContain: ['Honda', 'Subaru', 'BMW'], label: 'demo garage' },
   { path: `/dashboard/${DEMO_VEHICLE_ID}`, mustContain: ['Accord'], label: 'vehicle dashboard' },
   { path: `/consultant/${DEMO_VEHICLE_ID}`, mustContain: [], label: 'consultant' },
 ];
+
+/*
+ * Paths that must keep resolving somewhere useful, wherever that now is.
+ *
+ * README.md advertises the demo URL and davidmasterson.co/ai-work.html links to
+ * it, so /demo cannot 404 just because the page behind it was merged into /. It
+ * also must not land on /login, which is the failure this script was written for.
+ */
+const REDIRECT_CHECKS = [{ from: '/demo', to: '/', label: 'legacy /demo link' }];
 
 let failures = 0;
 let warnings = 0;
@@ -89,6 +101,27 @@ async function checkPages() {
         warn(`${check.label} loaded but initial HTML lacks: ${missing.join(', ')}`);
       } else {
         pass(`${check.label} — HTTP 200 at ${finalPath}`);
+      }
+    } catch (error) {
+      fail(`${check.label} — request failed: ${error.message}`);
+    }
+  }
+}
+
+async function checkRedirects() {
+  console.log('\nLinks published elsewhere that must still resolve');
+  for (const check of REDIRECT_CHECKS) {
+    const url = `${base}${check.from}`;
+    try {
+      const res = await fetch(url, { redirect: 'follow' });
+      const finalPath = new URL(res.url).pathname;
+
+      if (!res.ok) {
+        fail(`${check.label} returned HTTP ${res.status} — a published URL is dead`);
+      } else if (finalPath !== check.to) {
+        fail(`${check.label} landed on ${finalPath}, expected ${check.to}`);
+      } else {
+        pass(`${check.label} → ${finalPath}`);
       }
     } catch (error) {
       fail(`${check.label} — request failed: ${error.message}`);
@@ -320,6 +353,7 @@ async function checkDemoApiRoutes() {
 
 console.log(`\nVerifying demo at ${base}`);
 await checkPages();
+await checkRedirects();
 await checkAiCredential();
 await checkDemoApiRoutes();
 await checkAnonData();

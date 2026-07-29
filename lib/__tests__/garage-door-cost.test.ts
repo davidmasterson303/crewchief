@@ -78,7 +78,8 @@ describe('the garage door costs no image payload', () => {
 });
 
 describe('the curtain cannot be lazily loaded', () => {
-  it.each(['app/page.tsx', 'app/demo/page.tsx'])('%s imports the door eagerly', (rel) => {
+  // Just `/` now — app/demo/page.tsx was merged into it, and /demo redirects.
+  it.each(['app/page.tsx'])('%s imports the door eagerly', (rel) => {
     /*
       The door must be in the server's HTML, or it cannot cover the first
       paint. `/demo` previously loaded the hero through

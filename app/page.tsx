@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Car, Plus } from 'lucide-react';
+import { ArrowRight, Car } from 'lucide-react';
 import { VehicleCard } from '@/components/VehicleCard';
 import GarageDoor from '@/components/GarageDoor';
 import LandingHero from '@/components/LandingHero';
+import { useAuth } from '@/components/AuthProvider';
 import { useDemoVehicles, type GarageVehicle } from '@/hooks/useVehicles';
 
 // Self-hosted (was hot-linked from Unsplash — a third-party outage or
@@ -37,6 +38,50 @@ export default function GaragePage() {
   );
 }
 
+/**
+ * The nav actions on a page anyone can reach.
+ *
+ * This slot used to hold "Add Vehicle" pointing at `/onboard`, which is in
+ * `PROTECTED_ROUTES` — so the first thing an anonymous visitor could click on
+ * the public demo bounced them to `/login?redirect=/onboard`. For an audience
+ * that arrives from a portfolio link, that is an auth wall as a first
+ * impression, and it was the only CTA in the nav.
+ *
+ * While the session is still resolving, the signed-out pair is rendered rather
+ * than a gap: `/` is public and most of its traffic is anonymous, so that is
+ * both the likely answer and the one that avoids a hole in the nav.
+ */
+function PublicNavActions() {
+  const { user, loading } = useAuth();
+
+  if (!loading && user) {
+    return (
+      <Link href="/garage">
+        <Button className="bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-xl transition-all text-sm h-9 px-4">
+          My Garage
+          <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+      </Link>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1 sm:gap-3">
+      <Link
+        href="/login"
+        className="px-3 py-2 text-sm font-medium text-white/60 hover:text-white transition-colors rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
+      >
+        Sign in
+      </Link>
+      <Link href="/signup">
+        <Button className="bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-xl transition-all text-sm h-9 px-4">
+          Create an account
+        </Button>
+      </Link>
+    </div>
+  );
+}
+
 /*
  * Split out so the page below the door is an ordinary component that mounts
  * once and knows nothing about the intro. The predecessor threaded an `isOpen`
@@ -65,14 +110,7 @@ function GarageContents() {
                 <Car className="h-6 w-6 text-white transition-transform group-hover:scale-105" />
                 <span className="text-lg font-semibold text-white tracking-tight">CrewChief</span>
               </Link>
-              <div className="flex items-center gap-3">
-                <Link href="/onboard">
-                  <Button className="bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-xl transition-all text-sm h-9 px-4">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Vehicle
-                  </Button>
-                </Link>
-              </div>
+              <PublicNavActions />
             </div>
           </div>
         </nav>
@@ -80,17 +118,22 @@ function GarageContents() {
         <main className="max-w-7xl mx-auto px-6 lg:px-12 py-14">
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
             <div>
+              {/*
+                Not "My Garage" any more. These are the three seeded demo cars
+                and this page is public, so the possessive was telling every
+                anonymous visitor that somebody else's vehicles were theirs.
+              */}
               <h1 className="text-4xl lg:text-5xl font-bold text-white mb-2 tracking-tight">
-                My Garage
+                A Live Garage
               </h1>
               <p className="text-base text-white/50">
                 {isLoading
-                  ? 'Loading your garage…'
+                  ? 'Loading the demo garage…'
                   : queryError
                   ? 'Unable to load vehicles'
                   : vehicles.length === 0
-                  ? 'No vehicles yet — add one and CrewChief builds its dossier'
-                  : `${vehicles.length} vehicle${vehicles.length !== 1 ? 's' : ''} tracked`}
+                  ? 'Demo vehicles unavailable'
+                  : 'Three real cars, fully researched — open any one to see its dossier'}
               </p>
             </div>
           </div>
@@ -127,20 +170,28 @@ function GarageContents() {
                 </div>
               ))
             ) : (
+              /*
+                An empty result here is a data failure, not an empty garage.
+                This page always shows the three seeded demo cars, so zero rows
+                means the query came back empty — and the old copy responded by
+                inviting an anonymous visitor to add their first vehicle via a
+                protected route. Offering a retry is the honest answer.
+              */
               <div className="col-span-full text-center py-20">
                 <Car className="h-10 w-10 text-white/25 mx-auto mb-5" />
-                <h2 className="text-xl font-semibold text-white mb-2">Your garage is empty</h2>
+                <h2 className="text-xl font-semibold text-white mb-2">
+                  Demo vehicles unavailable
+                </h2>
                 <p className="text-white/50 text-sm max-w-md mx-auto mb-7">
-                  Add a vehicle and CrewChief builds its dossier &mdash; known issues,
-                  factory maintenance schedule, fluid specs, and an AI consultant that
-                  knows your car.
+                  The demo garage could not be loaded just now. This is usually
+                  temporary &mdash; try again in a moment.
                 </p>
-                <Link href="/onboard">
-                  <Button className="bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-xl transition-all h-10 px-5">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Your First Vehicle
-                  </Button>
-                </Link>
+                <Button
+                  onClick={() => window.location.reload()}
+                  className="bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-xl transition-all h-10 px-5"
+                >
+                  Retry
+                </Button>
               </div>
             )}
           </div>
