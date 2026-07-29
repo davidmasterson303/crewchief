@@ -227,6 +227,38 @@ export function Panel({ d }: { d: string }) {
   );
 }
 
+/**
+ * Exposed structure that *is* the silhouette, at full body weight.
+ *
+ * ── Why this is not `Seam` ──────────────────────────────────────────────────
+ *
+ * `Seam` is deliberately faint at 1.6 because a door line or a bed break is
+ * detail drawn *on* a mass — it should recede, and on eleven of the twelve
+ * shapes that is right.
+ *
+ * The motorcycle has no mass to draw on. Its fork, bars, frame triangle and
+ * shock are not markings on a body; they are the body. Drawing them with the
+ * recede-into-the-background primitive is a category error, and it showed:
+ * rev 1's own review flagged the fork and bars reading as "thin floating
+ * strokes" at 200px. They were, because they were drawn at seam weight while
+ * doing silhouette work.
+ *
+ * Same token, same cap, same join as `Panel` — only the weight differs, so the
+ * set still resolves to two greys plus the ground.
+ */
+export function Strut({ d }: { d: string }) {
+  return (
+    <path
+      d={d}
+      stroke="hsl(var(--muted-foreground))"
+      strokeWidth={STROKE}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
+  );
+}
+
 /** A door seam, bed line or frame member. Deliberately faint — structure, not decoration. */
 export function Seam({ d }: { d: string }) {
   return (
