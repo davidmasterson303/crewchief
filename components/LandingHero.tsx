@@ -19,6 +19,14 @@ import FeaturesDrawer from './FeaturesDrawer';
  * and three calls to action, which is all this ever needed to be — and it is
  * now testable and reusable without dragging a full-screen fixed overlay along
  * with it.
+ *
+ * **The staggered entrances below must all finish inside
+ * `INTRO_PANEL_SETTLED_MS`**, because the door starts lifting at
+ * `INTRO_HOLD_MS` and fades this whole panel out as it goes. They previously
+ * ran to 1220ms against a 900ms hold, so three of the four elements were still
+ * fading in while the wrapper faded out — they composited to something
+ * permanently dim, and the headline was at full strength for 50ms. A test
+ * holds the relationship now; the numbers here are half of it.
  */
 
 interface LandingHeroProps {
@@ -38,7 +46,7 @@ export default function LandingHero({ onEnter }: LandingHeroProps) {
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15, duration: 0.7, ease: 'easeOut' }}
+          transition={{ delay: 0.05, duration: 0.45, ease: 'easeOut' }}
         >
           <h1
             className="text-6xl md:text-[5.25rem] font-bold text-white leading-tight"
@@ -65,17 +73,17 @@ export default function LandingHero({ onEnter }: LandingHeroProps) {
           style={{ maxWidth: '600px' }}
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.7, ease: 'easeOut' }}
+          transition={{ delay: 0.15, duration: 0.45, ease: 'easeOut' }}
         >
-          Stop guessing. Start strategizing. CrewChief researches your specific car to tell you what
-          breaks, when to upgrade, and how to bundle maintenance to save thousands.
+          CrewChief researches your exact year, make and trim — what fails, when it fails, and what
+          to bundle so one shop visit does the work of three.
         </motion.p>
 
         <motion.div
           className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-12"
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.45, duration: 0.7, ease: 'easeOut' }}
+          transition={{ delay: 0.25, duration: 0.42, ease: 'easeOut' }}
         >
           <button
             onClick={onEnter}
@@ -105,7 +113,7 @@ export default function LandingHero({ onEnter }: LandingHeroProps) {
           className="mt-8"
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.62, duration: 0.6, ease: 'easeOut' }}
+          transition={{ delay: 0.32, duration: 0.38, ease: 'easeOut' }}
         >
           <Link href="/demo">
             <button className="demo-btn group relative flex items-center gap-2.5 px-6 py-3 rounded-full border border-cyan-400/25 bg-transparent hover:bg-cyan-500/10 transition-all duration-250 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50">

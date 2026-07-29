@@ -27,9 +27,11 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   decideIntro,
+  INTRO_DWELL_MS,
   INTRO_HOLD_MS,
   INTRO_LIFT_MS,
   INTRO_LIFT_TIMEOUT_MS,
+  INTRO_PANEL_SETTLED_MS,
   INTRO_PLAYED_KEY,
   INTRO_PLAYED_VALUE,
   type IntroConditions,
@@ -124,9 +126,46 @@ describe('the intro timings', () => {
     expect(Number(lift![1])).toBe(INTRO_LIFT_MS);
   });
 
-  it('holds the door closed long enough to be seen, briefly', () => {
-    expect(INTRO_HOLD_MS).toBeGreaterThanOrEqual(500);
-    expect(INTRO_HOLD_MS).toBeLessThanOrEqual(1200);
+  it('lets the panel finish arriving before the door starts leaving', () => {
+    /*
+      The relationship that was wrong, and the reason the intro was reported as
+      faint and buggy: the hold was 900ms while the panel's entrance ran to
+      1220ms, so the door began lifting — fading the panel out — while three of
+      its four elements were still fading in. Opposing opacity animations
+      composite, so they simply never got bright.
+
+      A whole second of dwell rather than a hair's breadth, because the failure
+      mode of getting this wrong is not a jitter; it is content that can never
+      be read.
+    */
+    expect(INTRO_HOLD_MS).toBeGreaterThan(INTRO_PANEL_SETTLED_MS);
+    expect(INTRO_DWELL_MS).toBeGreaterThanOrEqual(1000);
+  });
+
+  it('is matched by every entrance in the panel it waits for', () => {
+    /*
+      The other half. INTRO_PANEL_SETTLED_MS is a claim about a file it cannot
+      see, so it is checked against that file: every framer-motion transition in
+      LandingHero must land inside the budget. Adding one more staggered element
+      with a late delay is the natural way to reintroduce the bug, and it fails
+      here rather than looking merely dim in a browser.
+    */
+    const hero = readFileSync(join(__dirname, '..', '..', 'components', 'LandingHero.tsx'), 'utf8');
+
+    // `exec` in a loop rather than spreading `matchAll`: this project targets
+    // es5, where spreading an iterator needs downlevelIteration.
+    const pattern = /delay:\s*([\d.]+),\s*duration:\s*([\d.]+)/g;
+    const transitions: number[] = [];
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(hero)) !== null) {
+      transitions.push(Math.round((Number(match[1]) + Number(match[2])) * 1000));
+    }
+
+    // Guards the guard: a rewrite away from framer-motion would otherwise make
+    // this pass against an empty list.
+    expect(transitions.length).toBeGreaterThanOrEqual(4);
+
+    expect(transitions.filter((end) => end > INTRO_PANEL_SETTLED_MS)).toEqual([]);
   });
 
   it('gives the lift longer to finish than the lift takes', () => {
@@ -135,8 +174,16 @@ describe('the intro timings', () => {
     expect(INTRO_LIFT_TIMEOUT_MS).toBeGreaterThan(INTRO_LIFT_MS);
   });
 
-  it('keeps the whole intro under two and a half seconds', () => {
-    // The annoyance budget. Nobody waits longer than this to see a page.
-    expect(INTRO_HOLD_MS + INTRO_LIFT_MS).toBeLessThanOrEqual(2500);
+  it('keeps the whole intro under three and a half seconds', () => {
+    /*
+      The annoyance budget, raised from 2500ms once the dwell was real.
+
+      It was not raised to accommodate a slow animation — the lift is unchanged.
+      It was raised because the old ceiling was being met by *skipping the part
+      that matters*: a door nobody can read the words on is not a shorter intro,
+      it is a broken one. This runs once per session and can be dismissed with
+      the button on it.
+    */
+    expect(INTRO_HOLD_MS + INTRO_LIFT_MS).toBeLessThanOrEqual(3500);
   });
 });

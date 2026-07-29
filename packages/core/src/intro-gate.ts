@@ -69,14 +69,36 @@ export function decideIntro({
 /**
  * How long the door sits closed before it lifts, in milliseconds.
  *
- * Long enough to register as a door, short enough that nobody waits for it.
- * The old value was 600ms and it was measured from the *page's* mount while
- * the curtain arrived in a separately-loaded chunk — so on a slow load the
- * timer had already fired before the curtain existed, and the intro silently
- * never rendered. That race is gone (the curtain is server-rendered now), but
- * the number is kept honest here rather than inlined in a component.
+ * **Must exceed {@link INTRO_PANEL_SETTLED_MS}, and visibly.** At 900ms it did
+ * not, and the intro was reported as "faint, quick and buggy" — correctly. The
+ * panel's own entrance ran to 1220ms, so the lift began while three of its four
+ * elements were still fading *in*. Two opposing opacity animations composited:
+ * the headline held full brightness for 50ms, and the paragraph, the buttons
+ * and the test-drive link never reached it at all. Nothing was mistimed by a
+ * little; the curtain was leaving before the content had arrived.
+ *
+ * The gap between the two is the dwell — the beat where the door is simply a
+ * door with legible words on it, which is the entire point of having one.
+ *
+ * The original value was 600ms, measured from the *page's* mount while the
+ * curtain arrived in a separately-loaded chunk, so on a slow load it fired
+ * before the curtain existed and the intro silently never rendered. That race
+ * is gone. This number is kept here, beside the thing it must clear, rather
+ * than inlined in a component where the relationship is invisible.
  */
-export const INTRO_HOLD_MS = 900;
+export const INTRO_HOLD_MS = 1800;
+
+/**
+ * When the panel on the door has finished arriving.
+ *
+ * The last of `LandingHero`'s staggered entrances, delay plus duration. Kept
+ * here so {@link INTRO_HOLD_MS} can be checked against it by a test instead of
+ * by whoever next edits one of the two.
+ */
+export const INTRO_PANEL_SETTLED_MS = 700;
+
+/** How long the panel is fully legible before the door starts to move. */
+export const INTRO_DWELL_MS = INTRO_HOLD_MS - INTRO_PANEL_SETTLED_MS;
 
 /** Duration of the lift itself. Must match `--intro-lift-ms` in globals.css. */
 export const INTRO_LIFT_MS = 1500;
