@@ -69,8 +69,13 @@ const config: Config = {
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         // Warmed elevation ladder, addressable as bg-surface-nav / bg-surface-1.
+        // 2 and 3 join it for v7's form controls, so `bg-surface-3` is a real
+        // utility rather than something a call site inlines — the roadmap's
+        // condition for not writing `hsl(var(--surface-3))` by hand.
         'surface-nav': 'hsl(var(--surface-nav))',
         'surface-1': 'hsl(var(--surface-1))',
+        'surface-2': 'hsl(var(--surface-2))',
+        'surface-3': 'hsl(var(--surface-3))',
         // Informational — links, column headers, non-CTA labels. Never a CTA.
         info: {
           DEFAULT: 'var(--info)',

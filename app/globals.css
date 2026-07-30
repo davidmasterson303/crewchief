@@ -30,6 +30,50 @@ nav {
     --input: 20 9% 14%;               /* #262220 */
     --border: 30 11% 18%;             /* #332E29 */
 
+    /* ── the elevation ladder's semantic names (v7 C0) ────────────────────
+     *
+     * Aliases, deliberately, not new literals.
+     *
+     * The v7 roadmap specifies `--surface-2: 33 11% 11%` and
+     * `--surface-3: 24 9% 14%`. Those render to #1F1C19 and #272320 — which is
+     * byte-for-byte what `--card` (34 12% 11%) and `--secondary` (20 9% 14%)
+     * already render to. Different spellings of one colour; the comments two
+     * lines above already say "surface-2" and "surface-3" out loud.
+     *
+     * Writing the literals again would put two names on one colour with no
+     * mechanism keeping them equal, which is the "two sources of truth" defect
+     * this repo has fixed four times (the hero and the card showing different
+     * photographs; the score printing twice; three field designs, below).
+     * Pointing at the existing token makes drift impossible instead.
+     *
+     * The names still earn their place: `--secondary` means "secondary", and
+     * using it for a *field fill* is semantically wrong even when the colour is
+     * right. C1 wants to say `hsl(var(--surface-3))` and mean "inset well".
+     *
+     * NB both documents' hex comments are off by one unit — 33 11% 11% is
+     * #1F1C19, not #201D19. Inherited, not introduced; left as-is so the
+     * numbers still match the design system's.
+     */
+    --surface-2: var(--card);         /* card surface: panels, modals */
+    --surface-3: var(--secondary);    /* inset well: input fields, nested rows */
+
+    /* ── form-control edges (v7 C0) ───────────────────────────────────────
+     *
+     * Translucent white, not a fixed neutral, and literal rgb() because an HSL
+     * triplet cannot carry the alpha. `--border` (#332E29) was sampled against
+     * one surface and disappears on the others; a control has to hold its edge
+     * on surface-0 through surface-3 alike.
+     *
+     * Controls only. Never card or panel borders.
+     */
+    --border-field: rgb(255 255 255 / 0.14);
+    --border-field-hover: rgb(255 255 255 / 0.24);
+
+    /* The 3px halo behind a focused control. `--ring` at 0.55 was tuned as a
+     * 2px outline colour and reads as a glow at halo thickness — same hue,
+     * halo weight. */
+    --focus-ring-soft: rgb(34 211 238 / 0.22);
+
     --foreground: 36 20% 95%;         /* #F5F3F0 */
     --card-foreground: 36 20% 95%;
     --popover-foreground: 36 20% 95%;
