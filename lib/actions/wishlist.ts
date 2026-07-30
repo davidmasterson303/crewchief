@@ -1,8 +1,24 @@
 'use server';
 
-import { getServiceRoleClient } from '@/lib/supabase';
+import { authorizeVehicleAccess } from '@/lib/api-auth';
 import { logger } from '@crewchief/core/logger';
 import { wishlistItemIdentifier } from '@crewchief/core/wishlist-identifier';
+
+/*
+ * These are 'use server' exports, which Next.js compiles into POST endpoints
+ * whose action IDs ship in the client bundle. That makes each one remotely
+ * callable on its own terms, so the guard belongs HERE, at the privileged
+ * call — not in the app/actions.ts wrappers that re-export them.
+ *
+ * That distinction is what went wrong: the wrappers were bare pass-throughs,
+ * and the Phase 0 ratchet reads one function body at a time looking for
+ * getServiceRoleClient(. A pass-through contains no such call, so every one of
+ * these was skipped by the check meant to catch exactly this.
+ *
+ * The demo path does not come through here — hooks/useWishlist.ts branches to
+ * a cache-only toggle for demo vehicles — so 'write' is safe. Reads stay
+ * 'read' so the demo garage can still load its pre-seeded items via anon.
+ */
 
 type WishlistItemType = 'issue' | 'maintenance' | 'modification';
 
@@ -18,7 +34,12 @@ export async function addItemToWishlist(
   itemType: WishlistItemType
 ): Promise<{ success: boolean; error?: string; data?: unknown; alreadyExisted?: boolean }> {
   try {
-    const client = getServiceRoleClient();
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
+    const client = access.client;
     const itemIdentifier = wishlistItemIdentifier(itemType, itemName);
 
     const { data, error } = await client
@@ -76,7 +97,12 @@ export async function removeFromWishlist(
   itemType?: WishlistItemType
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const client = getServiceRoleClient();
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
+    const client = access.client;
 
     if (itemType) {
       const itemIdentifier = wishlistItemIdentifier(itemType, itemName);
@@ -112,7 +138,15 @@ export async function removeFromWishlist(
 
 export async function getWishlistItems(vehicleId: string) {
   try {
-    const client = getServiceRoleClient();
+    // 'read', not 'write': the demo garage loads its pre-seeded wishlist on
+    // page view, and authorizeVehicleAccess hands back an anon client for that
+    // case — RLS-scoped to is_demo rows, which is exactly the access it needs.
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'read' });
+    if (!access.ok) {
+      return { success: false, data: [] };
+    }
+
+    const client = access.client;
     const { data, error } = await client
       .from('wishlist_items')
       .select('*')

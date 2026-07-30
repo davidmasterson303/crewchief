@@ -124,8 +124,6 @@ const NOT_PORTABLE: Record<string, string> = {
   'lib/vehicle-images.ts': 'reaches Supabase through lib/supabase',
   'lib/storage-objects.ts': 'reaches Supabase through lib/supabase',
   'lib/gemini.ts': 'client at module scope — a build-time server key (§19)',
-  'lib/actions/quotes.ts': 'reaches Supabase through lib/supabase',
-  'lib/actions/vehicles.ts': 'reaches Supabase through lib/supabase',
   'lib/actions/wishlist.ts': 'reaches Supabase through lib/supabase',
   // Splits, not moves — the effort the plan warned about.
   'lib/deletion-recovery.ts': 'queue logic is portable; persistence uses localStorage',
