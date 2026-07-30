@@ -55,9 +55,33 @@ describe('the hero always renders', () => {
 
     expect(plate(container).dataset.hasPhoto).toBe('false');
     expect(container.querySelectorAll('img').length).toBe(0);
-    // The vehicle is named beneath the band, not on it.
-    expect(screen.getByText('2015 BMW M235i')).toBeInTheDocument();
+
+    /*
+      The plate itself names the car, and the hero no longer repeats it.
+
+      This used to assert the caption's serif "2015 BMW M235i" under a comment
+      saying "the vehicle is named beneath the band, not on it" — which was true
+      with a photograph and false without one. In the no-photo state the plate
+      *is* the naming, so the caption was a second copy about 150px away, and the
+      page heading a third a little higher up.
+
+      What must stay true is that the hero identifies its vehicle. Asserted here
+      on the plate's own text and, below, on the section's accessible name.
+    */
+    expect(screen.getByText('M235i')).toBeInTheDocument();
+    expect(screen.getByText(/2015 BMW/)).toBeInTheDocument();
     expect(screen.getByText('No photo yet')).toBeInTheDocument();
+  });
+
+  it('is identifiable to a screen reader whether or not it has a photo', () => {
+    // The accessible name is what survives dropping the visible duplicate — the
+    // information was never the problem, the third rendering of it was.
+    const { unmount } = render(<DiagnosticHero {...M235i} />);
+    expect(screen.getByRole('region', { name: '2015 BMW M235i' })).toBeInTheDocument();
+    unmount();
+
+    render(<DiagnosticHero {...M235i} photo="https://example.test/car.jpg" />);
+    expect(screen.getByRole('region', { name: '2015 BMW M235i' })).toBeInTheDocument();
   });
 
   it('shows the photo when there is one', () => {
@@ -80,8 +104,9 @@ describe('when the photo fails to load', () => {
 
     expect(plate(container).dataset.hasPhoto).toBe('false');
     expect(container.querySelectorAll('img').length).toBe(0);
-    // And the hero is still a hero — the vehicle is still named.
-    expect(screen.getByText('2015 BMW M235i')).toBeInTheDocument();
+    // And the hero is still a hero — the plate names the vehicle where the
+    // broken photograph was, rather than leaving a hole.
+    expect(screen.getByText('M235i')).toBeInTheDocument();
   });
 });
 

@@ -79,7 +79,11 @@ export default function DiagnosticHero({
   const shown = scanDone ? Math.round(displayScore) : 0;
 
   return (
-    <section ref={containerRef} className="rounded-2xl overflow-hidden border border-white/8">
+    <section
+      ref={containerRef}
+      aria-label={vehicleName}
+      className="rounded-2xl overflow-hidden border border-white/8"
+    >
       <div className="relative">
         <VehicleIdentity
           variant="band"
@@ -117,12 +121,28 @@ export default function DiagnosticHero({
         lives here now rather than on the photograph.
       */}
       <div className="bg-[#0f1318]/90 px-6 sm:px-8 py-6">
-        <p className="label-uppercase mb-1">
+        {/*
+          The vehicle is not named again here.
+
+          It was, in a serif h2 directly under the band — and on a car with no
+          photograph that printed the model twice within about 150px, because the
+          plate above carries "M235i / 2015 BMW · xDrive" precisely when there is
+          no photo to carry instead. A third copy sits in the page heading a
+          couple of hundred pixels higher. Three renderings of one fact on one
+          screen.
+
+          VehicleIdentity's docblock already draws this line: "when a photo
+          renders, the type and the glyph do not… Callers put a vehicle's name in
+          the layout around the band, not on top of it." The page heading is that
+          layout. This band's job is the photograph, the status and the score.
+
+          `vehicleName` is kept as the section's accessible name, so a screen
+          reader still hears which vehicle the hero belongs to — the information
+          was never the problem, the third copy of it was.
+        */}
+        <p className="label-uppercase mb-6">
           {!photo ? 'No photo yet' : scanDone ? 'Diagnostics complete' : 'Scanning…'}
         </p>
-        <h2 className="display-serif text-3xl sm:text-4xl text-white tracking-tight leading-none mb-6">
-          {vehicleName}
-        </h2>
 
         {healthScore !== undefined && (
           <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-8">
