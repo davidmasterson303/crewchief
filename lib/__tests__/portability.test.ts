@@ -122,6 +122,14 @@ const NOT_PORTABLE: Record<string, string> = {
   'lib/rate-limit.ts': 'reaches Supabase through lib/supabase',
   'lib/sign-out.ts': 'Supabase types',
   'lib/vehicle-images.ts': 'reaches Supabase through lib/supabase',
+  /*
+    The precedence rule — owner photo over stock, the unphotographed-demo
+    carve-out — is portable and duplicated in hooks/useSignedUrl.ts. What is
+    not portable is the half that mints the signed URL, which needs a Supabase
+    storage client. Worth splitting when the native client needs the rule, and
+    that split is the same shape as image-downscale.ts's.
+  */
+  'lib/vehicle-photo.ts': 'mints signed URLs through a Supabase storage client',
   'lib/storage-objects.ts': 'reaches Supabase through lib/supabase',
   'lib/gemini.ts': 'client at module scope — a build-time server key (§19)',
   'lib/actions/wishlist.ts': 'reaches Supabase through lib/supabase',
