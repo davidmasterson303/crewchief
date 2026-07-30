@@ -283,11 +283,11 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                 <span className="label-uppercase">Mileage</span>
                 {isEditingCurrentMileage ? (
                   <div className="flex items-center gap-2">
-                    <Input
+                    <Input fieldSize="sm"
                       type="number"
                       value={currentMileage}
                       onChange={(e) => setCurrentMileage(e.target.value)}
-                      className="w-28 h-8 bg-white/8 border-white/20 text-white text-sm"
+                      className="w-28 text-sm"
                       disabled={isSaving}
                       autoFocus
                     />
@@ -315,11 +315,11 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                 <span className="label-uppercase">Avg. Monthly Miles</span>
                 {isEditingAvgMileage ? (
                   <div className="flex items-center gap-2">
-                    <Input
+                    <Input fieldSize="sm"
                       type="number"
                       value={avgMileage}
                       onChange={(e) => setAvgMileage(e.target.value)}
-                      className="w-24 h-8 bg-white/8 border-white/20 text-white text-sm"
+                      className="w-24 text-sm"
                       disabled={isSaving}
                       autoFocus
                     />

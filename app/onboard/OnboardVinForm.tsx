@@ -109,7 +109,7 @@ export default function OnboardVinForm() {
                 value={vin}
                 onChange={(e) => setVin(e.target.value.toUpperCase())}
                 maxLength={17}
-                className="font-mono text-base h-12 bg-white/6 border-white/12 text-white placeholder:text-white/25 focus:border-cyan-400/60 focus:bg-white/8 transition-colors"
+                className="font-mono text-base"
                 disabled={loading}
                 autoComplete="off"
                 spellCheck={false}

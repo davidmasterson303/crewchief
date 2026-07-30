@@ -675,11 +675,11 @@ export default function ConsultantChat({
           </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
-            <Input
+            <Input fieldSize="sm"
               placeholder="Search chats..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 h-8 text-xs bg-white/5 border-white/10 text-white placeholder:text-white/30 rounded-lg"
+              className="pl-8 text-xs"
             />
           </div>
         </div>

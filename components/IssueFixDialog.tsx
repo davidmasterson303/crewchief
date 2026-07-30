@@ -68,7 +68,6 @@ export default function IssueFixDialog({
               value={dateCompleted}
               onChange={(e) => setDateCompleted(e.target.value)}
               required
-              className="bg-white/5 border-white/20 text-white"
             />
           </div>
 
@@ -81,7 +80,6 @@ export default function IssueFixDialog({
               placeholder="e.g., Local Garage, DIY"
               value={shopName}
               onChange={(e) => setShopName(e.target.value)}
-              className="bg-white/5 border-white/20 text-white placeholder:text-white/40"
             />
           </div>
 
@@ -96,7 +94,6 @@ export default function IssueFixDialog({
               step="0.01"
               value={cost}
               onChange={(e) => setCost(e.target.value)}
-              className="bg-white/5 border-white/20 text-white placeholder:text-white/40"
             />
           </div>
 
@@ -109,7 +106,7 @@ export default function IssueFixDialog({
               placeholder="Add any additional details..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="bg-white/5 border-white/20 text-white placeholder:text-white/40 resize-none"
+              className="resize-none"
               rows={3}
             />
           </div>

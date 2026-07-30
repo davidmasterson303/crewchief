@@ -586,6 +586,18 @@ nav {
     border: 1px solid var(--border-field);
     border-radius: var(--radius-sm);
     color: var(--text-primary);
+    /*
+     * 14px, because that is what shipped. Stock shadcn carried `text-sm` and C1
+     * did not replace it, so `.field` inherited the 16px body size and every bare
+     * field in the app silently grew two points. Caught by measuring, not by
+     * reading the diff.
+     *
+     * Worth knowing if this is ever revisited: iOS Safari zooms the viewport when
+     * a focused input is under 16px, so 16 has an argument. That is a deliberate
+     * change to every field in the app and belongs to whoever wants it, not to a
+     * primitive refactor.
+     */
+    font-size: 14px;
     transition:
       border-color var(--duration-fast) var(--ease-standard),
       box-shadow var(--duration-fast) var(--ease-standard),
