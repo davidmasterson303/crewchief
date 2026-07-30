@@ -46,7 +46,7 @@ import {
   ShieldAlert,
   TriangleAlert,
 } from 'lucide-react';
-import { updateVehicleMileage } from '@/app/actions';
+import { deleteVehicle, updateVehicleMileage } from '@/app/actions';
 import { logger } from '@crewchief/core/logger';
 import { isDemoVehicleId, DEMO_IMAGES } from '@crewchief/core/demo';
 import { useRouter } from 'next/navigation';
@@ -54,7 +54,6 @@ import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { invalidateDashboardCache } from '@crewchief/core/query-invalidation';
 import { queryClient } from '@crewchief/core/query-client';
-import { supabase } from '@/lib/supabase';
 import { MileageUpdatePrompt } from './MileageUpdatePrompt';
 import { VehiclePhotoUploadDialog } from './VehiclePhotoUploadDialog';
 
@@ -166,18 +165,23 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary, alerts }: V
     }
     setIsDeleting(true);
     try {
-      const { error: deleteError } = await supabase.from('vehicles').delete().eq('id', vehicle.id);
-      if (!deleteError) {
+      const result = await deleteVehicle(vehicle.id);
+      if (result.success) {
         setDeleteDialogOpen(false);
         setIsDeleted(true);
-        queryClient.setQueryData(['vehicles'], (old: any) => {
-          if (Array.isArray(old)) return old.filter((v: any) => v.id !== vehicle.id);
-          return old;
-        });
+        /*
+          Prefix invalidation, not setQueryData. The garage queries are keyed
+          ['vehicles','mine',userId] and ['vehicles','demo'] since useVehicles
+          was split; setQueryData matches keys *exactly*, so the previous
+          ['vehicles'] write had been silently hitting nothing. The card is
+          already out of the DOM via isDeleted — this is what makes the
+          underlying list agree on the next read.
+        */
+        queryClient.invalidateQueries({ queryKey: ['vehicles'] });
         toast.success(`${vehicle.year} ${vehicle.make} ${vehicle.model} removed from garage`);
       } else {
         setIsDeleting(false);
-        toast.error(deleteError.message || 'Failed to delete vehicle');
+        toast.error(result.error || 'Failed to delete vehicle');
       }
     } catch (error) {
       setIsDeleting(false);
