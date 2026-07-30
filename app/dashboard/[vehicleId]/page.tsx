@@ -7,6 +7,7 @@ import RecallAlerts from '@/components/RecallAlerts';
 import HealthSummary from '@/components/HealthSummary';
 import HealthHistoryChart from '@/components/HealthHistoryChart';
 import DiagnosticHero from '@/components/DiagnosticHero';
+import CollapsibleSection from '@/components/CollapsibleSection';
 import { getClientSupabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { useQuery } from '@tanstack/react-query';
@@ -118,18 +119,52 @@ export default function DashboardPage({ params }: { params: { vehicleId: string 
             onComplete={refetch}
           />
 
-          <HealthSummary
-            healthSummary={data.healthSummary}
-            vehicleId={params.vehicleId}
-            recalls={data.nhtsa?.recalls || []}
-          />
+          {/*
+            Everything below the recalls folds away, and remembers.
 
-          <HealthHistoryChart
-            vehicleId={params.vehicleId}
-            currentScore={data.healthSummary?.health_score}
-          />
+            The page was seven expanded sections deep, most of it reference
+            material you consult occasionally and scroll past constantly. What
+            opens by default is what answers "does this car need attention":
+            the health report. The dossier, the score history and the wishlist
+            start folded, each carrying a one-line summary so the fold still
+            says what is inside.
 
-          <DashboardContent vehicle={data.vehicle} knowledge={data.knowledge} />
+            Keyed per vehicle — collapsing the dossier on one car must not
+            collapse it on another.
+          */}
+          <CollapsibleSection
+            title="Health report"
+            storageKey={`dash:health:${params.vehicleId}`}
+            defaultOpen
+            summary={
+              data.healthSummary?.health_score != null
+                ? `Score ${data.healthSummary.health_score}`
+                : undefined
+            }
+          >
+            <HealthSummary
+              healthSummary={data.healthSummary}
+              vehicleId={params.vehicleId}
+              recalls={data.nhtsa?.recalls || []}
+            />
+          </CollapsibleSection>
+
+          <CollapsibleSection
+            title="Score history"
+            storageKey={`dash:history:${params.vehicleId}`}
+            defaultOpen={false}
+          >
+            <HealthHistoryChart
+              vehicleId={params.vehicleId}
+              currentScore={data.healthSummary?.health_score}
+            />
+          </CollapsibleSection>
+
+          <DashboardContent
+            vehicle={data.vehicle}
+            knowledge={data.knowledge}
+            vehicleId={params.vehicleId}
+          />
         </div>
       </DashboardLayout>
     </ErrorBoundary>
