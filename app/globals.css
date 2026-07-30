@@ -74,6 +74,43 @@ nav {
      * halo weight. */
     --focus-ring-soft: rgb(34 211 238 / 0.22);
 
+    /* ── design-system vocabulary, aliased onto the app's tokens (v7 C0) ──
+     *
+     * The v7 specs are written in these names; this file was written in the
+     * shadcn ones. Aliasing rather than restating keeps one value per colour —
+     * the same argument C3 makes about field styles, applied to the tokens
+     * themselves.
+     *
+     * These resolve to *colours*, not HSL triplets, so call sites write
+     * `var(--brand-accent)`. The surfaces above are triplets and still need
+     * `hsl(var(--surface-3))`. Mixing the two up produces no colour at all.
+     */
+    --brand-accent: hsl(var(--accent));
+    --text-primary: hsl(var(--foreground));
+    --text-muted: hsl(var(--muted-foreground));
+    --border-default: hsl(var(--border));
+
+    /*
+     * The three below have no alias target, so they are the only literals here.
+     *
+     * `--radius-sm` is a control radius. `--radius` is 14px and belongs to
+     * cards; a 40px-tall input at card radius reads as a pill.
+     *
+     * `--border-subtle` is a hairline inside a well — the EmptyState icon disc,
+     * the PendingCard edge — quieter than `--border-default` without vanishing.
+     * 8% codifies what the dialogs already reach for by hand (`border-white/8`
+     * is throughout them) rather than introducing a seventh value. Known
+     * divergence: the design system ships this at 5%; 8% is deliberate here.
+     *
+     * `--text-muted-40` cannot be expressed as an alias — it needs alpha, and
+     * `--muted-foreground` is a solid triplet. Note it is `--foreground`'s
+     * colour at 40%, *not* `--text-muted`'s: do not "simplify" it to
+     * `--text-muted` with an alpha, which would change the hue.
+     */
+    --radius-sm: 8px;
+    --border-subtle: rgb(255 255 255 / 0.08);
+    --text-muted-40: rgb(245 243 240 / 0.4);
+
     --foreground: 36 20% 95%;         /* #F5F3F0 */
     --card-foreground: 36 20% 95%;
     --popover-foreground: 36 20% 95%;
@@ -516,6 +553,105 @@ nav {
     .meta-edit {
       opacity: 1;
     }
+  }
+
+  /*
+   * ── .field — every text control in the app (v7 C1/C2) ──────────────────
+   *
+   * `components/ui/input.tsx` and `textarea.tsx` were untouched shadcn:
+   * `bg-background border-input … ring-offset-2`. Against this app's tokens
+   * that is fill `--background` (#100F0D, surface-0) — so a field rendered
+   * *darker than the card holding it* — with a `--input` border measuring
+   * **1.09:1** against a card, and no hover state at all: nothing moved when
+   * you aimed at it. 64 bare fields shipped like that.
+   *
+   * The whole state set lives here rather than in a class string so the
+   * primitive is the only place it is written down. A call site that still
+   * needs a colour after this is a bug in the primitive.
+   *
+   * Two things easy to get wrong, both from the spec:
+   *
+   *   - **No ring offset.** An offset gap on a dark surface reads as a
+   *     hairline crack, not a ring. The halo touches the border.
+   *   - The fill is the *same value* as a surface-3 container, so on that
+   *     surface the fill distinguishes nothing and **the border carries the
+   *     control**. That is intended. What must not come back is a fill darker
+   *     than its container.
+   */
+  .field {
+    width: 100%;
+    min-height: 40px;
+    padding: 10px 12px;
+    background: hsl(var(--surface-3));
+    border: 1px solid var(--border-field);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    transition:
+      border-color var(--duration-fast) var(--ease-standard),
+      box-shadow var(--duration-fast) var(--ease-standard),
+      background var(--duration-fast) var(--ease-standard);
+  }
+
+  .field::placeholder {
+    color: var(--text-muted);
+  }
+
+  /* Guarded so hover cannot repaint a focused or disabled control. */
+  .field:hover:not(:disabled):not([readonly]):not(:focus):not(:focus-visible) {
+    border-color: var(--border-field-hover);
+  }
+
+  .field:focus,
+  .field:focus-visible {
+    outline: none;
+    border-color: var(--brand-accent);
+    box-shadow: 0 0 0 3px var(--focus-ring-soft);
+  }
+
+  /*
+   * Invalid is an attribute, never a conditional class (C2).
+   *
+   * Anything that sets `aria-invalid` — a component, a form library, native
+   * validation — gets the treatment, and a screen reader is told. Conditional
+   * colouring did the first half and never the second.
+   */
+  .field[aria-invalid='true'] {
+    border-color: var(--critical-red-border);
+  }
+
+  .field[aria-invalid='true']:focus,
+  .field[aria-invalid='true']:focus-visible {
+    border-color: var(--critical-red);
+    box-shadow: 0 0 0 3px var(--critical-red-wash);
+  }
+
+  .field:disabled,
+  .field[readonly] {
+    background: hsl(var(--surface-2));
+    color: var(--text-muted);
+    cursor: not-allowed;
+  }
+
+  /*
+   * The `sm` size step. 13px is the app's existing small-body size — the
+   * design system calls this `--text-body-sm` but ships no value for it, so
+   * this is a literal until one arrives. One place to change.
+   */
+  .field-sm {
+    min-height: 34px;
+    padding: 7px 10px;
+    font-size: 13px;
+  }
+
+  /*
+   * Textareas size from `rows`, not a fixed min-height, so a caller picks a
+   * height without reaching for a className — which is what `min-h-[80px]`
+   * forced them to do.
+   */
+  .field-textarea {
+    resize: vertical;
+    line-height: 1.55;
+    min-height: unset;
   }
 
   /*
