@@ -90,7 +90,15 @@ describe('the curtain cannot be lazily loaded', () => {
     */
     const source = readFileSync(join(ROOT, rel), 'utf8');
 
-    expect(source).toMatch(/^import GarageDoor from '@\/components\/GarageDoor';$/m);
+    /*
+      Matches the default import in any shape — `import GarageDoor from …` and
+      `import GarageDoor, { useIntroRevealed } from …` alike. It was pinned to
+      the exact former string and failed the moment the module grew a named
+      export, which is a guard objecting to something it does not care about.
+      What it cares about is the second assertion: that the door is not behind
+      `dynamic()`.
+    */
+    expect(source).toMatch(/^import GarageDoor\b[^;]*from '@\/components\/GarageDoor';$/m);
     expect(source).not.toMatch(/dynamic\([^)]*(?:GarageDoor|LandingHero)/);
   });
 });

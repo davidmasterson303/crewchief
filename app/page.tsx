@@ -4,14 +4,24 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Car } from 'lucide-react';
 import { VehicleCard } from '@/components/VehicleCard';
-import GarageDoor from '@/components/GarageDoor';
+import GarageDoor, { useIntroRevealed } from '@/components/GarageDoor';
 import LandingHero from '@/components/LandingHero';
 import { useAuth } from '@/components/AuthProvider';
 import { useDemoVehicles, type GarageVehicle } from '@/hooks/useVehicles';
 
-// Self-hosted (was hot-linked from Unsplash — a third-party outage or
-// rate limit would grey out the landing visual).
-const INTERIOR_URL = '/dark-roomb.jpeg';
+/*
+ * Self-hosted (was hot-linked from Unsplash — a third-party outage or rate
+ * limit would grey out the landing visual).
+ *
+ * Points at the 1920-wide derivative rather than the 3333×2000 master: this is
+ * a full-bleed background, so it was serving about three times the pixels any
+ * viewport asked for. 480 KB → 142 KB.
+ *
+ * `public/CREDITS.md` records what is known about this file, and — unlike every
+ * other image on the site — that includes not knowing its photographer or
+ * licence. Worth reading before it appears in a store capture.
+ */
+const INTERIOR_URL = '/garage-interior-1920.jpg';
 
 function VehicleCardSkeleton() {
   return (
@@ -90,17 +100,35 @@ function PublicNavActions() {
  */
 function GarageContents() {
   const { data: vehicles = [], isLoading, error: queryError } = useDemoVehicles();
+  const revealed = useIntroRevealed();
 
   return (
     <div className="relative w-full min-h-screen">
+      {/*
+        The scrim was rgba(15,23,42,0.85) → 0.95, which let 5–15% of the
+        photograph through. It read as flat near-black with a couple of faint
+        smudges, and the garage it is a photograph *of* was not legible at any
+        point — 480 KB doing almost no visual work, which is the exact fault
+        DiagnosticHero's comment records ("roughly a tenth of each 700 KB
+        photograph did any visual work").
+
+        Opened up to 0.58 → 0.88. Still a dark room, still comfortably behind
+        white text, but now a room. The gradient stays top-heavier at the bottom
+        so the cards keep their contrast where they actually sit.
+      */}
       <div
         className="fixed inset-0 z-0"
         style={{
-          backgroundImage: `linear-gradient(rgba(15,23,42,0.85), rgba(15,23,42,0.95)), url('${INTERIOR_URL}')`,
+          backgroundImage: `linear-gradient(rgba(15,23,42,0.58), rgba(15,23,42,0.88)), url('${INTERIOR_URL}')`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
         }}
       />
+
+      {/* The signature photography treatment, as every other photo surface
+          gets it. This one was hand-rolling a scrim and skipping the vignette,
+          which is the drift `.vignette-frame` exists to stop. */}
+      <div className="fixed inset-0 z-0 vignette-frame pointer-events-none" aria-hidden="true" />
 
       <div className="relative z-10">
         <nav className="border-b border-white/8 bg-black/80 backdrop-blur-xl">
@@ -122,6 +150,14 @@ function GarageContents() {
                 Not "My Garage" any more. These are the three seeded demo cars
                 and this page is public, so the possessive was telling every
                 anonymous visitor that somebody else's vehicles were theirs.
+
+                And no longer "three *real* cars". public/vehicles/CREDITS.md
+                records that the Accord is an 8th-generation car standing in for
+                a 2018 tenth-gen, the WRX is a VB standing in for a 2020, and the
+                M3 may be an F30 with the M-Sport package rather than an F80.
+                "Real" invites exactly the one inspection the photographs fail,
+                on a page whose audience is people paid to look closely. What is
+                genuinely real is the research, so the claim moved onto that.
               */}
               <h1 className="text-4xl lg:text-5xl font-bold text-white mb-2 tracking-tight">
                 A Live Garage
@@ -133,7 +169,7 @@ function GarageContents() {
                   ? 'Unable to load vehicles'
                   : vehicles.length === 0
                   ? 'Demo vehicles unavailable'
-                  : 'Three real cars, fully researched — open any one to see its dossier'}
+                  : 'Three cars, researched end to end — open any one for its dossier'}
               </p>
             </div>
           </div>
@@ -157,10 +193,21 @@ function GarageContents() {
               [1, 2, 3].map((i) => <VehicleCardSkeleton key={i} />)
             ) : vehicles.length > 0 ? (
               vehicles.map((vehicle: GarageVehicle, index: number) => (
+                /*
+                  The stagger waits for the door.
+
+                  It used to run on mount, behind a closed curtain, and finish
+                  about a second later — so on any load that played the intro
+                  the cards had already settled before the visitor pressed the
+                  opener, and the door lifted onto a static grid.
+
+                  `revealed` is true immediately when there is no intro, so a
+                  returning visitor still gets the entrance on page load.
+                */
                 <div
                   key={vehicle.id}
-                  className="animate-slide-up"
-                  style={{ animationDelay: `${Math.min(index * 90, 700)}ms` }}
+                  className={revealed ? 'animate-slide-up' : 'opacity-0'}
+                  style={revealed ? { animationDelay: `${Math.min(index * 90, 700)}ms` } : undefined}
                 >
                   <VehicleCard
                     vehicle={vehicle}

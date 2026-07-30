@@ -1,7 +1,9 @@
 'use client';
 
 import {
+  createContext,
   useCallback,
+  useContext,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -57,6 +59,26 @@ interface GarageDoorProps {
 }
 
 type Phase = 'closed' | 'lifting' | 'gone';
+
+/**
+ * Whether the door is out of the way, for the page underneath.
+ *
+ * Defaults to `true` so a page rendered outside a `GarageDoor` behaves normally
+ * rather than waiting forever for a curtain that does not exist. The failure
+ * mode of the other default is a permanently invisible page, which is much
+ * worse than a missed animation.
+ */
+const IntroRevealContext = createContext(true);
+
+/**
+ * For content that should wait for the door before it moves.
+ *
+ * Only worth using for an entrance the visitor is meant to *see*. Anything
+ * load-bearing must not depend on this — it is a timing hint, not a gate.
+ */
+export function useIntroRevealed(): boolean {
+  return useContext(IntroRevealContext);
+}
 
 /**
  * A layout effect on the client, an ordinary one on the server.
@@ -186,8 +208,30 @@ export default function GarageDoor({ panel, children }: GarageDoorProps) {
     setPhase('gone');
   };
 
+  /*
+    The page needs to know when it has been revealed.
+
+    Without this the reveal landed on a page that had already finished moving.
+    The garage grid's stagger fires on mount — which happens behind a *closed*
+    door — and is done about a second later, while the visitor is still reading
+    the panel. By the time they pressed the opener, every card had long since
+    settled, so the best beat in the sequence was spent where nobody could see
+    it. Holding the stagger until the door is gone is the whole point of having
+    a door.
+
+    True from the moment the door *starts* moving, not when it finishes.
+
+    Waiting for `gone` was worse than not waiting at all: the door takes 2.6s to
+    travel, uncovering the page as it goes, so the visitor would watch an empty
+    garage slide into view and then have the cards pop in after the door had
+    cleared. Starting on the lift means the content arrives *as* the door
+    reveals it, which is the beat the door exists to set up. While the door is
+    still closed the page is behind something opaque, so nothing is lost there.
+  */
+  const revealed = phase === 'lifting' || phase === 'gone';
+
   return (
-    <>
+    <IntroRevealContext.Provider value={revealed}>
       {children}
 
       {phase !== 'gone' && (
@@ -204,6 +248,6 @@ export default function GarageDoor({ panel, children }: GarageDoorProps) {
           )}
         </div>
       )}
-    </>
+    </IntroRevealContext.Provider>
   );
 }

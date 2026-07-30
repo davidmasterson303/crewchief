@@ -81,14 +81,23 @@ export default function LandingHero({ onEnter }: LandingHeroProps) {
         </motion.p>
 
         {/*
-          Three ways in, and one way to read about it.
+          Three ways in, in a deliberate order of weight.
 
-          "Enter Garage" was the label before, and it did not say what it did —
-          the thing behind this door is the demo, so the button says so. Sign in
-          and sign up sit beside it because they are the other two ways in, and
-          until this pass neither existed on any public page.
+          Two things were wrong before. Sign in and sign up were *identical*
+          outline pills, giving equal weight to unequal actions — and the nav
+          under the door said the opposite, rendering sign-up filled and sign-in
+          as plain text. The same pair, two hierarchies, on the same page.
 
-          Nothing here says "free": whether there is a free tier is undecided.
+          One hierarchy now, and the nav matches it: enter the demo, then sign
+          up, then sign in.
+
+          Radius is the design-system token (`--radius`, consumed as rounded-xl)
+          rather than rounded-full. The v4 notes in globals.css record that radii
+          were deliberately *sharpened*; the pill shape here predated that and
+          was the last place still round, so the landing page was advertising a
+          product it no longer looked like.
+
+          Nothing says "free": whether there is a free tier is undecided.
         */}
         <motion.div
           className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-12"
@@ -98,7 +107,7 @@ export default function LandingHero({ onEnter }: LandingHeroProps) {
         >
           <button
             onClick={onEnter}
-            className="enter-garage-btn group relative flex items-center gap-2 h-14 px-9 text-base font-semibold text-black rounded-full overflow-hidden transition-all duration-300 hover:shadow-[0_0_32px_rgba(34,211,238,0.45)] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+            className="enter-garage-btn group relative flex items-center justify-center gap-2 h-14 px-9 text-base font-semibold text-black rounded-xl overflow-hidden transition-all duration-300 hover:glow-cyan focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
             style={{
               background: 'linear-gradient(105deg, #22d3ee 0%, #38bdf8 50%, #3b82f6 100%)',
               minWidth: '200px',
@@ -112,17 +121,17 @@ export default function LandingHero({ onEnter }: LandingHeroProps) {
           </button>
 
           <Link
-            href="/login"
-            className="flex items-center justify-center h-14 px-7 text-base font-medium text-white/80 hover:text-white rounded-full border border-white/[0.18] bg-transparent hover:bg-white/[0.07] transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+            href="/signup"
+            className="flex items-center justify-center h-14 px-7 text-base font-semibold text-white bg-cyan-600 hover:bg-cyan-500 rounded-xl transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
           >
-            Sign in
+            Sign up
           </Link>
 
           <Link
-            href="/signup"
-            className="flex items-center justify-center h-14 px-7 text-base font-medium text-white/80 hover:text-white rounded-full border border-white/[0.18] bg-transparent hover:bg-white/[0.07] transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+            href="/login"
+            className="flex items-center justify-center h-14 px-7 text-base font-medium text-white/70 hover:text-white rounded-xl border border-white/[0.14] bg-transparent hover:bg-white/[0.06] transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
           >
-            Sign up
+            Sign in
           </Link>
         </motion.div>
 
