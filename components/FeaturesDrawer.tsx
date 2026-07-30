@@ -27,78 +27,91 @@ interface FeaturesDrawerProps {
   onOpenChange: (open: boolean) => void;
 }
 
+/*
+ * Nine features, rewritten.
+ *
+ * The previous copy had one rhythm and used it nine times: a promise, then
+ * "CrewChief" as the subject of a sentence explaining the promise, then a
+ * closing flourish about darkness or gloveboxes. Read end to end it flattened —
+ * every item sounded equally important, which is the same as none of them being.
+ *
+ * Two rules for the rewrite. Headings state what you get, not how it feels.
+ * Bodies say the concrete thing — the actual data source, the actual artefact
+ * that comes out — and stop, because a reader who opened a feature list is
+ * already interested and does not need selling to twice.
+ */
 const FEATURES = [
   {
     icon: Brain,
     label: 'AI Consultant',
     badge: 'Core',
-    heading: 'Your car has a dedicated expert on call',
+    heading: 'Answers about your car, not cars in general',
     body:
-      "Ask anything about your vehicle and get answers grounded in your actual maintenance history, open issues, and the vehicle's known reliability profile. CrewChief connects the dots so you're never making decisions in the dark.",
+      'Ask what that noise is, whether a quote is fair, or what to do first. It answers with your mileage, your service history and your model’s known failure points already in hand.',
   },
   {
     icon: ShieldAlert,
-    label: 'Recall & Health Alerts',
+    label: 'Recalls & Health',
     badge: 'Safety',
-    heading: 'Know about problems before they strand you',
+    heading: 'Open recalls, pulled from the NHTSA',
     body:
-      "We pull live NHTSA recall data for your specific year, make, and model and surface it directly in your garage. A health score and plain-English summary give you an at-a-glance read on where your car stands today.",
+      'Live recall data for your exact year, make and model, surfaced in the garage rather than buried on a federal website. A health score summarises what needs attention now.',
   },
   {
     icon: ClipboardList,
-    label: 'Maintenance History',
+    label: 'Service History',
     badge: 'Records',
-    heading: 'Every receipt, captured and searchable',
+    heading: 'Photograph a receipt, get a timeline',
     body:
-      "Upload invoices and service documents. CrewChief reads them, extracts line items, and builds a searchable maintenance timeline so you always know what was done, when, and what it cost — without digging through a glovebox.",
+      'Upload an invoice and the line items are read out of it — parts, labour, cost, date. What you get back is a searchable history instead of a folder of scans.',
   },
   {
     icon: ListChecks,
-    label: 'Mod & Repair Wishlist',
+    label: 'Wishlist',
     badge: 'Planning',
-    heading: 'Plan your upgrades and repairs in one place',
+    heading: 'A queue for everything the car needs',
     body:
-      "Queue up modifications, maintenance items, and issues you want to address. Assign estimated costs and labor hours, then generate a consolidated shop quote for multiple items at once to save time and negotiate better.",
+      'Repairs, maintenance and modifications in one list, with your cost and labour estimates against each. Sort out what is urgent and what can wait until the next visit.',
   },
   {
     icon: FileText,
-    label: 'Quote Generation',
+    label: 'Shop Quotes',
     badge: 'Savings',
-    heading: 'Walk into any shop fully prepared',
+    heading: 'Arrive with the job already written down',
     body:
-      "Select items from your wishlist and CrewChief drafts a detailed quote request you can send directly to a shop. Bundle related work to cut down on labor time and walk in knowing what a fair price looks like.",
+      'Pick items off the wishlist and get a quote request you can hand to a shop. Bundling related work is where the labour savings are, so the draft groups it for you.',
   },
   {
     icon: Zap,
-    label: 'Performance Profiles',
+    label: 'Performance Goals',
     badge: 'Enthusiast',
-    heading: 'Set a goal, get a roadmap',
+    heading: 'Advice that knows what you want the car for',
     body:
-      "Tell CrewChief what you want from your car — daily reliability, weekend performance, track-day capability — and it tailors its recommendations to match. Performance stats and powertrain details are tracked so advice stays relevant.",
+      'A commuter and a track car do not want the same maintenance plan. Set the goal — reliability, weekend pace, track days — and recommendations change to match.',
   },
   {
     icon: Star,
-    label: 'Vehicle Insights',
+    label: 'Model Knowledge',
     badge: 'Intelligence',
-    heading: 'Model-specific knowledge, not generic advice',
+    heading: 'What owners of your car have already learned',
     body:
-      "CrewChief builds a knowledge base around your exact vehicle — common failure points, recommended service intervals, and owner community intelligence — then uses it as context for everything from the AI chat to health scoring.",
+      'Common failure points, real service intervals and owner-community findings, collected per model and used as the basis for the consultant’s answers and the health score.',
   },
   {
     icon: MessageSquare,
-    label: 'Multi-Session Chat History',
+    label: 'Chat History',
     badge: 'Continuity',
-    heading: 'Conversations that pick up where you left off',
+    heading: 'Conversations you can come back to',
     body:
-      "Every consultant conversation is saved and titled automatically. Switch between sessions, revisit old advice, or start a fresh thread for a new topic without losing context from previous discussions.",
+      'Every thread is saved and titled. Pick up a repair discussion from three months ago, or start a clean one, without losing either.',
   },
   {
     icon: Wrench,
-    label: 'Document Library',
+    label: 'Documents',
     badge: 'Storage',
-    heading: 'All your vehicle documents in one place',
+    heading: 'Paperwork attached to the car it belongs to',
     body:
-      "Invoices, inspection reports, and service records are stored and linked directly to the vehicle they belong to. The consultant can read them as context when answering questions, making every response smarter.",
+      'Invoices, inspections and service records stored against the vehicle. The consultant reads them too, so an answer can cite what a shop actually did.',
   },
 ];
 
@@ -115,7 +128,7 @@ export default function FeaturesDrawer({ open, onOpenChange }: FeaturesDrawerPro
               What CrewChief Does
             </SheetTitle>
             <p className="text-gray-400 text-sm leading-relaxed mt-1">
-              A full-stack ownership tool built for people who actually care about their cars.
+              Nine things it does, and what each one actually gives you.
             </p>
           </SheetHeader>
         </div>
@@ -162,7 +175,7 @@ export default function FeaturesDrawer({ open, onOpenChange }: FeaturesDrawerPro
           <div className="mt-4 flex flex-col items-center gap-3 pb-2">
             <Link href="/signup" onClick={() => onOpenChange(false)} className="w-full">
               <Button className="w-full h-11 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-xl transition-all">
-                Create an account
+                Sign up
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>

@@ -75,7 +75,7 @@ function PublicNavActions() {
       </Link>
       <Link href="/signup">
         <Button className="bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-xl transition-all text-sm h-9 px-4">
-          Create an account
+          Sign up
         </Button>
       </Link>
     </div>

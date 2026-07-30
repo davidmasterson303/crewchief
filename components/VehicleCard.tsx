@@ -237,6 +237,12 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary, alerts }: V
   const resolvedImageUrl = useVehicleImage(vehicle);
 
   const getVehicleImageUrl = (): string | undefined => {
+    /*
+      The deliberately-unphotographed demo car needs no check here: it has no
+      DEMO_IMAGES entry, and `useVehicleImage` returns undefined for it so the
+      fall-through cannot resurrect the seeded row's `image_url`. That lives in
+      the hook because all five screens that show a vehicle photo have to agree.
+    */
     if (isDemoVehicleId(vehicle.id) && DEMO_IMAGES[vehicle.id]) {
       return DEMO_IMAGES[vehicle.id];
     }
@@ -371,9 +377,19 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary, alerts }: V
             </h3>
             <p className="text-sm text-white/50 mt-0.5">{vehicle.model}{vehicle.trim ? ` · ${vehicle.trim}` : ''}</p>
 
-            {/* With no strip the chip has nowhere to sit, and the card would
-                stop saying what the car is for. */}
-            {!photoUrl && <div className="mt-2 flex">{nicknameChip}</div>}
+            {/*
+              The chip used to be repeated here when there was no photograph,
+              on the reasoning that "with no strip the chip has nowhere to sit".
+              That premise expired with CC-142: the plate above is rendered
+              whether or not a photo exists, and it carries the chip at
+              top-left unconditionally — so this printed "Daily Driver" twice on
+              any car without a photograph.
+
+              Nothing caught it because nothing ever rendered that state.
+              VehicleIdentity's docblock predicted exactly this ("the first real
+              user vehicle would have found it"); putting one demo car in the
+              unphotographed state found it instead.
+            */}
 
             {/*
               Mileage as a meta line, replacing a filled bordered well with its

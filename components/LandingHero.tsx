@@ -80,6 +80,16 @@ export default function LandingHero({ onEnter }: LandingHeroProps) {
           to bundle so one shop visit does the work of three.
         </motion.p>
 
+        {/*
+          Three ways in, and one way to read about it.
+
+          "Enter Garage" was the label before, and it did not say what it did —
+          the thing behind this door is the demo, so the button says so. Sign in
+          and sign up sit beside it because they are the other two ways in, and
+          until this pass neither existed on any public page.
+
+          Nothing here says "free": whether there is a free tier is undecided.
+        */}
         <motion.div
           className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-12"
           initial={{ opacity: 0, y: 16 }}
@@ -96,50 +106,48 @@ export default function LandingHero({ onEnter }: LandingHeroProps) {
           >
             <span className="shimmer-layer absolute inset-0 pointer-events-none" aria-hidden="true" />
             <span className="relative z-10 flex items-center gap-2">
-              Enter Garage
+              Enter demo
               <ArrowRight className="h-5 w-5 transition-transform duration-300 group-hover:translate-x-1.5" />
             </span>
           </button>
 
-          <button
-            onClick={() => setDrawerOpen(true)}
-            className="group flex items-center gap-2 h-14 px-7 text-base font-medium text-white/80 hover:text-white rounded-full border border-white/[0.18] bg-transparent hover:bg-white/[0.07] transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+          <Link
+            href="/login"
+            className="flex items-center justify-center h-14 px-7 text-base font-medium text-white/80 hover:text-white rounded-full border border-white/[0.18] bg-transparent hover:bg-white/[0.07] transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
           >
-            Learn More
-            <ChevronDown className="h-4 w-4 transition-transform duration-300 group-hover:translate-y-0.5" />
-          </button>
+            Sign in
+          </Link>
+
+          <Link
+            href="/signup"
+            className="flex items-center justify-center h-14 px-7 text-base font-medium text-white/80 hover:text-white rounded-full border border-white/[0.18] bg-transparent hover:bg-white/[0.07] transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+          >
+            Sign up
+          </Link>
         </motion.div>
 
         {/*
-          The third affordance used to be "Take a Test Drive" pointing at /demo.
-          That page was a duplicate of the one behind this door, so the button
-          offered a trip to where you already were — and pressing "Enter Garage"
-          *is* the test drive. What was missing instead was any way at all to
-          reach an account: no public page linked to /login or /signup, so a
-          returning visitor had to type the URL.
+          Learn more is deliberately not a button.
+
+          The three above are ways *in* — they change where you are. This one
+          only opens a panel of explanation and leaves you exactly where you
+          were, so giving it the same pill would advertise it as a fourth door.
+          An underlined text control in a quieter colour says "reading, not
+          leaving", which is what it does.
         */}
         <motion.div
-          className="mt-8 flex items-center gap-4 text-sm"
+          className="mt-9"
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.32, duration: 0.38, ease: 'easeOut' }}
         >
-          <Link
-            href="/login"
-            className="font-medium text-white/55 hover:text-white/85 transition-colors rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
+          <button
+            onClick={() => setDrawerOpen(true)}
+            className="group inline-flex items-center gap-1.5 text-sm font-normal text-white/45 hover:text-white/75 underline decoration-white/20 hover:decoration-white/50 decoration-1 underline-offset-[5px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 rounded"
           >
-            Sign in
-          </Link>
-          <span className="text-white/15" aria-hidden="true">
-            &middot;
-          </span>
-          <Link
-            href="/signup"
-            className="group inline-flex items-center gap-1.5 font-medium text-cyan-300 hover:text-cyan-200 transition-colors rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
-          >
-            Create an account
-            <ArrowRight className="h-3.5 w-3.5 text-cyan-400/70 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:text-cyan-400" />
-          </Link>
+            What CrewChief does
+            <ChevronDown className="h-3.5 w-3.5 opacity-60 transition-transform duration-300 group-hover:translate-y-0.5" />
+          </button>
         </motion.div>
       </div>
 

@@ -57,5 +57,41 @@ export function isDemoVehicleId(vehicleId: string): boolean {
 export const DEMO_IMAGES: Record<string, string> = {
   'a1000000-0000-0000-0000-000000000001': '/vehicles/accord/card-800.jpg',
   'a2000000-0000-0000-0000-000000000002': '/vehicles/wrx/card-800.jpg',
-  'a3000000-0000-0000-0000-000000000003': '/vehicles/m3/card-800.jpg',
 };
+
+/**
+ * Demo vehicles that deliberately have **no** photograph.
+ *
+ * The M3 is unphotographed on purpose, so a visitor browsing the demo sees what
+ * their own car will look like before they upload anything. Every real user
+ * starts in this state and, until now, nothing in the product ever showed it.
+ *
+ * `components/VehicleIdentity.tsx` states the design case for it plainly: the
+ * no-photo state is the *primary* design, not a fallback — and its docblock
+ * records that `/vehicles/default/hero-3x2.jpg` and `/vehicles/placeholder.jpg`
+ * could both 404 unnoticed precisely because all three seeded vehicles carried
+ * hand-placed files, so no code path ever rendered the absent case. "The first
+ * real user vehicle would have found it." This is that path, exercised on the
+ * surface recruiters actually look at.
+ *
+ * ── Why this is a list and not just an absent key ───────────────────────────
+ *
+ * Dropping an id from DEMO_IMAGES is not enough. `VehicleCard` falls through to
+ * the vehicle's own columns, and for the seeded demo rows those still hold the
+ * old Pexels CDN URLs that DEMO_IMAGES was introduced to get off the page —
+ * migration 20260726230000 has not been applied everywhere. An absent key would
+ * therefore restore a remote photograph rather than remove one. Saying it out
+ * loud makes the intent survive the database.
+ *
+ * The M3 was chosen because it is the least entangled of the three: the Accord
+ * is `DEMO_SMOKE_EXPECTATIONS.dashboard`, and the WRX is
+ * `CONSULTANT_ROUND_TRIP` (its Stage 1 seed data is what the gate asks about).
+ */
+export const DEMO_UNPHOTOGRAPHED_VEHICLE_IDS = [
+  'a3000000-0000-0000-0000-000000000003',
+] as const;
+
+/** Whether a demo vehicle is one of the deliberately unphotographed ones. */
+export function isUnphotographedDemoVehicle(id: string): boolean {
+  return (DEMO_UNPHOTOGRAPHED_VEHICLE_IDS as readonly string[]).includes(id);
+}

@@ -24,7 +24,11 @@ import {
   ANON_READ_TABLES,
   isDemoVehicleId as contractIsDemoVehicleId,
 } from '@crewchief/core/demo-contract';
-import { DEMO_VEHICLE_IDS as APP_DEMO_IDS, isDemoVehicleId } from '@crewchief/core/demo';
+import {
+  DEMO_VEHICLE_IDS as APP_DEMO_IDS,
+  DEMO_UNPHOTOGRAPHED_VEHICLE_IDS,
+  isDemoVehicleId,
+} from '@crewchief/core/demo';
 import { isProtectedRoute, resolveRoute, PROTECTED_ROUTES } from '@/middleware';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -156,6 +160,21 @@ describe('verify-demo.mjs stays in step with the contract', () => {
 
     const listed = (block![1].match(/'[a-z_]+'/g) ?? []).map((s) => s.slice(1, -1));
     expect(listed.sort()).toEqual([...ANON_READ_TABLES.required].sort());
+  });
+
+  it('agrees on which demo car is deliberately unphotographed', () => {
+    /*
+      The script reports that car as "deliberately unphotographed" instead of
+      asserting its image_url resolves. If the two lists drift, it either claims
+      a photograph the app does not render, or checks a file for a car that has
+      none — both of which are the script lying about the demo, which is the one
+      thing it exists not to do.
+    */
+    const block = script.match(/const DEMO_UNPHOTOGRAPHED_VEHICLE_IDS = \[([\s\S]*?)\];/);
+    expect(block).not.toBeNull();
+
+    const listed = (block![1].match(/'[0-9a-f-]+'/g) ?? []).map((s) => s.slice(1, -1));
+    expect(listed.sort()).toEqual([...DEMO_UNPHOTOGRAPHED_VEHICLE_IDS].sort());
   });
 
   it('drops the known-gap branch once the contract records no gaps', () => {

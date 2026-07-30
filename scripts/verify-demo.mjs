@@ -26,6 +26,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 // The contract is TypeScript, so mirror the few values needed rather than
 // adding a build step to a script whose whole point is being runnable now.
 const DEMO_VEHICLE_ID = 'a1000000-0000-0000-0000-000000000001';
+// Mirrors DEMO_UNPHOTOGRAPHED_VEHICLE_IDS in packages/core/src/demo.ts, and
+// demo-availability.test.ts fails if the two drift apart.
+const DEMO_UNPHOTOGRAPHED_VEHICLE_IDS = ['a3000000-0000-0000-0000-000000000003'];
 const REQUIRED_ANON_TABLES = [
   'vehicles',
   'vehicle_health_summary',
@@ -252,7 +255,7 @@ async function checkVehicleImages(supabaseUrl, key) {
   let rows;
   try {
     const res = await fetch(
-      `${supabaseUrl}/rest/v1/vehicles?select=make,model,image_url&is_demo=eq.true`,
+      `${supabaseUrl}/rest/v1/vehicles?select=id,make,model,image_url&is_demo=eq.true`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     if (!res.ok) {
@@ -267,6 +270,18 @@ async function checkVehicleImages(supabaseUrl, key) {
 
   for (const v of rows) {
     const label = `${v.make} ${v.model}`;
+
+    /*
+      One demo car is unphotographed on purpose, so that a visitor sees the state
+      every real user starts in. Its seeded row still carries an image_url the app
+      deliberately ignores, so asserting that file resolves would be checking an
+      asset nothing renders — and reporting a photograph where there is none.
+    */
+    if (DEMO_UNPHOTOGRAPHED_VEHICLE_IDS.includes(v.id)) {
+      pass(`${label} — deliberately unphotographed, renders the identity plate`);
+      continue;
+    }
+
     if (!v.image_url) {
       warn(`${label} has no image_url`);
       continue;
