@@ -525,7 +525,7 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary, alerts }: V
                 value={mileageInput}
                 onChange={(e) => setMileageInput(e.target.value)}
                 placeholder={vehicle.current_mileage.toString()}
-                className="mt-2 bg-white/8 border-white/15 text-white"
+                className="mt-2"
               />
             </div>
             <div className="flex gap-2">

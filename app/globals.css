@@ -655,6 +655,40 @@ nav {
   }
 
   /*
+   * A field with a leading glyph, as one surface.
+   *
+   * The control keeps a single edge — the icon sits inside it rather than beside
+   * it in a second bordered box. Every site that wanted this hand-rolled the
+   * wrapper, the absolute positioning and its own padding compensation, which is
+   * how `pl-9` ended up welded to a colour theme at the call site.
+   *
+   * The icon dims to `--text-muted-40` at rest and lifts to `--text-muted` on
+   * `:focus-within`, so the whole control acknowledges focus rather than just
+   * its border.
+   */
+  .field-group {
+    position: relative;
+  }
+
+  .field-group > svg:first-child {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted-40);
+    pointer-events: none;
+    transition: color var(--duration-fast) var(--ease-standard);
+  }
+
+  .field-group:focus-within > svg:first-child {
+    color: var(--text-muted);
+  }
+
+  .field-group > .field {
+    padding-left: 36px;
+  }
+
+  /*
    * The consultant composer, as one surface.
    *
    * The panel owns the border and the focus ring so the textarea inside it can

@@ -254,13 +254,21 @@ export default function MaintenanceHistory({ vehicleId, documents, lineItems = [
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 text-white/30 transform -translate-y-1/2 pointer-events-none" />
+          {/*
+            `.field-group` owns the icon's position, colour and the field's
+            padding compensation (v7 C3). This carried its own absolute
+            positioning plus `pl-9` welded to a full colour theme — the padding
+            was real, the theme was working around a broken primitive. The glyph
+            also now lifts on `:focus-within` instead of sitting at a fixed
+            `text-white/30`.
+          */}
+          <div className="flex-1 field-group">
+            <Search className="h-4 w-4" />
             <Input
+              fieldSize="sm"
               placeholder="Search description, shop, part number..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9 bg-white/4 border-white/10 text-white placeholder:text-white/30 focus:border-cyan-400/40 text-sm"
             />
           </div>
           {availableFilters.length > 0 && (
