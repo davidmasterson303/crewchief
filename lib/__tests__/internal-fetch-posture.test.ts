@@ -147,4 +147,27 @@ describe('the internal-fetch posture', () => {
     // since the only thing it ever called out to was itself.
     expect(source.replace(/\/\*[\s\S]*?\*\//g, '')).not.toMatch(/\bfetch\s*\(/);
   });
+
+  it('never fetches a URL that came from a caller', () => {
+    /*
+      Outbound SSRF rather than the internal-loopback kind the rest of this
+      suite is about, but it is the same rule — a request URL this process
+      builds from something it was handed.
+
+      lib/storage-objects.ts did exactly that until 31 Jul: a `file_url` that
+      was not a storage path fell through to `fetch(fileUrl)`, with the
+      response body passed to Gemini and described back to the caller. Both of
+      its callers are exported server actions, so the URL was request-supplied
+      and the fetch reached addresses this process can resolve and a browser
+      cannot.
+
+      Asserted as "this module makes no outbound request at all", which is
+      true and easy to check, rather than as a taint analysis that would be
+      neither. It reads objects out of Storage; it has no business holding a
+      URL.
+    */
+    const source = readFileSync(join(ROOT, 'lib/storage-objects.ts'), 'utf8');
+
+    expect(source.replace(/\/\*[\s\S]*?\*\//g, '')).not.toMatch(/\bfetch\s*\(/);
+  });
 });

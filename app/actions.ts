@@ -13,6 +13,7 @@ import { getVehicleImage } from '@/lib/vehicle-images';
 import { logger } from '@crewchief/core/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { downloadStoredFile } from '@/lib/storage-objects';
+import { loadConsultantContext } from '@/lib/consultant-context';
 import { authorizeVehicleAccess, authorizeVehicleScopedRow, requireSession } from '@/lib/api-auth';
 import { isDemoVehicleId } from '@crewchief/core/demo';
 import {
@@ -861,19 +862,54 @@ export async function sendConsultantMessage(params: {
   vehicleId: string;
   sessionId: string;
   message: string;
+  /**
+   * The conversation so far. Still supplied by the caller, and deliberately:
+   * a demo session is never persisted, so there is no server-side record to
+   * read it from. It is the user's own conversation — the worst a caller can
+   * do by editing it is mislead their own advisor.
+   */
   messageHistory: any[];
-  vehicle: any;
-  knowledge: any;
-  wishlistItems: any[];
-  allServiceItems: any[];
-  completedItems: any[];
-  maintenanceLineItems: any[];
-  documents: any[];
-  issueTracking: any[];
-  modTracking?: any[];
+  /**
+   * Files attached to *this* message, before they are recorded against the
+   * session. Each `file_url` is checked against `vehicleId` in
+   * `downloadStoredFile` — see the note there; unscoped paths used to be read
+   * with the service role.
+   */
   attachedDocuments?: any[];
+  /* ── Superseded. Accepted, ignored, and safe to stop sending. ────────────
+   *
+   * All of it is now loaded from the database by `loadConsultantContext`, for
+   * the reasons written out in that module: a phone cannot post a vehicle's
+   * history on every message, and caller-supplied context is caller-supplied
+   * input to a model prompt.
+   *
+   * Kept in the signature so the web client keeps compiling while it is
+   * updated to stop assembling them. Delete this block once ConsultantChat.tsx
+   * no longer sends them.
+   */
+  /** @deprecated Ignored — derived server-side from `vehicleId`. */
+  vehicle?: any;
+  /** @deprecated Ignored — derived server-side from `vehicleId`. */
+  knowledge?: any;
+  /** @deprecated Ignored — derived server-side from `vehicleId`. */
+  wishlistItems?: any[];
+  /** @deprecated Ignored, and was already unread before that. */
+  allServiceItems?: any[];
+  /** @deprecated Ignored — derived server-side from `vehicleId`. */
+  completedItems?: any[];
+  /** @deprecated Ignored — derived server-side from `vehicleId`. */
+  maintenanceLineItems?: any[];
+  /** @deprecated Ignored — derived server-side from `vehicleId`. */
+  documents?: any[];
+  /** @deprecated Ignored — derived server-side from `vehicleId`. */
+  issueTracking?: any[];
+  /** @deprecated Ignored — derived server-side from `vehicleId`. */
+  modTracking?: any[];
+  /** @deprecated Ignored — derived server-side from `vehicleId`. */
   nhtsaData?: any;
+  /** @deprecated Ignored — derived server-side from `vehicleId`. */
   healthSummary?: any;
+  /** @deprecated Ignored — derived server-side from `vehicleId`. */
   modWishlistItems?: any[];
   /** @deprecated Client-supplied and ignored. Demo status is derived from the
    *  vehicle id server-side — see the note in the body. Callers may still pass
@@ -930,25 +966,42 @@ export async function sendConsultantMessage(params: {
       return { success: false, error: access.error };
     }
 
+    const { vehicleId, sessionId, message, messageHistory, attachedDocuments } = params;
+
+    /*
+      Context is derived from vehicleId, never taken from the caller.
+
+      Everything below used to arrive as parameters — vehicle, knowledge,
+      wishlist, history, recalls, health — and the prompt was assembled from
+      whatever was posted. That is caller-controlled input to a model prompt,
+      which this function already refuses to accept for the authorization
+      question two blocks up: `params.isDemo` is ignored "because a caller
+      could downgrade the check on a real vehicle". The same argument covers
+      the rest of it. A caller chooses which vehicle to ask about; the server
+      decides what is true of it.
+
+      It also makes /api/v1/consultant possible. A phone cannot post a
+      vehicle's entire history on every message, and it should not be trusted
+      to if it could.
+    */
+    const contextResult = await loadConsultantContext(vehicleId, access.client);
+    if (!contextResult.ok) {
+      return { success: false, error: contextResult.error };
+    }
+
     const {
-      vehicleId,
-      sessionId,
-      message,
-      messageHistory,
       vehicle,
       knowledge,
       wishlistItems,
-      allServiceItems,
       completedItems,
       maintenanceLineItems,
       documents,
       issueTracking,
       modTracking,
-      attachedDocuments,
       nhtsaData,
       healthSummary,
       modWishlistItems,
-    } = params;
+    } = contextResult.context;
 
     const knownIssues = (knowledge?.known_issues || [])
       .map((issue: any) => `${issue.part} (${issue.mileage_range}) - ${issue.severity}: ${issue.description}`);
@@ -1056,7 +1109,9 @@ export async function sendConsultantMessage(params: {
       for (const doc of attachedDocuments) {
         // Read out of storage, not over HTTP — the bucket is private, so
         // fetching one of its objects by URL cannot work.
-        const buffer = await downloadStoredFile(doc.file_url);
+        // Scoped to the vehicle authorized above, not merely to the fact that
+        // some vehicle was. doc.file_url is client-supplied.
+        const buffer = await downloadStoredFile(doc.file_url, vehicleId);
 
         if (buffer) {
           parts.push({
@@ -1572,7 +1627,9 @@ export async function processConsultantInvoiceToMaintenance(vehicleId: string, f
 
     const client = getServiceRoleClient();
 
-    const buffer = await downloadStoredFile(fileUrl);
+    // fileUrl is a caller-supplied parameter of this exported action, and the
+    // authorization above covers vehicleId only. The two are tied together here.
+    const buffer = await downloadStoredFile(fileUrl, vehicleId);
     if (!buffer) return { success: false, error: 'Failed to fetch document', itemsProcessed: 0, issueUpdates: 0, modUpdates: 0 };
     const base64Data = buffer.toString('base64');
 
@@ -2538,120 +2595,6 @@ export async function getSignedStorageUrl(fileUrl: string) {
   } catch (error) {
     logger.error('SIGNED_URL:EXCEPTION', error as Error, { hasFileUrl: !!fileUrl });
     return { success: false, error: 'Failed to generate signed URL' };
-  }
-}
-
-export async function uploadInvoiceToMaintenanceItems(vehicleId: string, fileBase64: string, mimeType: string, fileName: string) {
-  try {
-    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
-    if (!access.ok) {
-      return { success: false, error: access.error };
-    }
-
-    const client = getServiceRoleClient();
-    const prompt = `Extract data from this invoice image. Return a JSON object with: shop_name, service_date, and an array of items. Each item must have: description (e.g., "Water Pump"), part_number (if visible), quantity, unit_cost, total_cost, and category (guess "Parts", "Labor", or "Misc").
-
-IMPORTANT: Be thorough and extract ALL line items from the invoice.
-CRITICAL: DO NOT extract tax as a line item - skip any tax lines.
-
-Example format:
-{
-  "shop_name": "Quick Fix Auto",
-  "service_date": "2024-01-15",
-  "items": [
-    {
-      "description": "Oil Change Service",
-      "part_number": null,
-      "quantity": 1,
-      "unit_cost": 45.00,
-      "total_cost": 45.00,
-      "category": "Labor"
-    },
-    {
-      "description": "Synthetic Oil Filter",
-      "part_number": "PF-123",
-      "quantity": 1,
-      "unit_cost": 12.00,
-      "total_cost": 12.00,
-      "category": "Parts"
-    }
-  ]
-}
-
-Return ONLY valid JSON, no markdown formatting.`;
-
-    let invoiceData = {
-      shop_name: fileName,
-      service_date: new Date().toISOString().split('T')[0],
-      items: [] as unknown[],
-    };
-
-    try {
-      const contentParts: any[] = [{ text: prompt }];
-
-      if (fileBase64 && mimeType) {
-        contentParts.push({
-          inlineData: {
-            mimeType: mimeType,
-            data: fileBase64,
-          },
-        });
-      }
-
-      const result = await genAI.models.generateContent({
-        model: FLASH_VISION_MODEL,
-        contents: [{ role: 'user', parts: contentParts }],
-        config: flashStructuredConfig,
-      });
-
-      const responseText = result.text || '{}';
-      const parsed = extractJSON(responseText);
-
-      invoiceData = {
-        shop_name: (parsed.shop_name as string | undefined) || fileName,
-        service_date: (parsed.service_date as string | undefined) || new Date().toISOString().split('T')[0],
-        items: Array.isArray(parsed.items) ? (parsed.items as unknown[]) : [],
-      };
-    } catch (parseError) {
-      logger.warn('INVOICE:PARSE_ERROR', 'Failed to parse invoice with AI', { error: (parseError as Error).message });
-    }
-
-    const invoiceUrl = `placeholder://${vehicleId}/${Date.now()}-${fileName}`;
-
-    const lineItemsToInsert = invoiceData.items.map((item: any) => ({
-      vehicle_id: vehicleId,
-      service_date: invoiceData.service_date,
-      shop_name: invoiceData.shop_name,
-      item_description: item.description || 'Unknown',
-      part_number: item.part_number || null,
-      quantity: parseFloat(item.quantity) || 1,
-      unit_cost: parseFloat(item.unit_cost) || 0,
-      total_cost: parseFloat(item.total_cost) || 0,
-      category: (item.category || 'other').toLowerCase(),
-      invoice_url: invoiceUrl,
-    }));
-
-    if (lineItemsToInsert.length > 0) {
-      const { error: insertError } = await client
-        .from('maintenance_line_items')
-        .insert(lineItemsToInsert);
-
-      if (insertError) {
-        console.error('Failed to insert maintenance line items:', insertError);
-        return { success: false, error: 'Failed to save line items' };
-      }
-    }
-
-    return {
-      success: true,
-      lineItems: lineItemsToInsert,
-      shopName: invoiceData.shop_name,
-      serviceDate: invoiceData.service_date,
-      count: lineItemsToInsert.length,
-    };
-  } catch (error) {
-    console.error('Upload invoice error:', error);
-    return { success: false, error: 'Failed to process invoice' };
   }
 }
 

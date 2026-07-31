@@ -23,7 +23,17 @@ const customJestConfig = {
     a worktree pinned to an older commit reports its stale expectations as
     passes, and a green run stops meaning the working tree is green.
   */
-  testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/.claude/worktrees/'],
+  /*
+    `apps/` is ignored because this config is the *web* app's — jsdom
+    environment, next/jest transform, React 18 types. The Expo client runs
+    React 19 under jest-expo and needs its own runner; discovering that as a
+    wall of transform errors in this suite would teach nobody anything.
+  */
+  testPathIgnorePatterns: [
+    '<rootDir>/node_modules/',
+    '<rootDir>/.claude/worktrees/',
+    '<rootDir>/apps/',
+  ],
   collectCoverageFrom: [
     'lib/**/*.{js,jsx,ts,tsx}',
     'app/**/*.{js,jsx,ts,tsx}',

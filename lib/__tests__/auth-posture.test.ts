@@ -49,7 +49,32 @@ const USES_SERVICE_ROLE = /getServiceRoleClient\s*\(/;
  * in scope.
  */
 const PROVES_OWNERSHIP =
-  /authorizeVehicle(Access|ScopedRow)|requireSession\s*\(|auth\.getUser\s*\(\)/;
+  /authorizeVehicle(Access|ScopedRow)|require(Session|Caller)\s*\(|auth\.getUser\s*\(\)/;
+
+/**
+ * Authorization that goes through the one module that owns it.
+ *
+ * `auth.getUser()` is in PROVES_OWNERSHIP above because server actions
+ * legitimately use it, but it is a *weaker* signal than it looks: it proves a
+ * route authenticated somebody, not which credentials it accepts. A route that
+ * builds its own cookie client and calls `auth.getUser()` rejects every bearer
+ * token — correct-looking, green in this suite, and unreachable from a native
+ * client. That is exactly what `/api/v1/vehicles` did until 31 Jul.
+ */
+const USES_API_AUTH = /from ['"]@\/lib\/api-auth['"]/;
+
+/**
+ * True when a route resolves the caller itself instead of asking lib/api-auth.
+ *
+ * Pure and exported so it can be probed with a real violation rather than
+ * trusted for being green — the same standard `findDelegationLeaks` is held to,
+ * and for the same reason: the only other way to see this fire is to break a
+ * live route's authorization and watch the suite go red.
+ */
+export function handRollsAuthentication(source: string): boolean {
+  const resolvesCallerItself = /auth\.getUser\s*\(|createServerActionClient\s*\(/.test(source);
+  return resolvesCallerItself && !USES_API_AUTH.test(source);
+}
 
 interface Fn {
   name: string;
@@ -148,6 +173,15 @@ const ROUTE_POSTURE: Record<string, 'vehicle-scoped' | 'session' | 'public' | 's
   // Both delegate to server actions in app/actions.ts, which authorize there.
   'app/api/v1/upload-document/route.ts': 'vehicle-scoped',
   'app/api/v1/consultant/upload-document/route.ts': 'vehicle-scoped',
+  /*
+    The three advisor routes (task 3.0.1). Each authorizes through lib/api-auth
+    for the status code and then delegates to an action that authorizes again
+    on its own account — see app/api/v1/consultant/route.ts for why that is two
+    different jobs rather than one done twice.
+  */
+  'app/api/v1/consultant/route.ts': 'vehicle-scoped',
+  'app/api/v1/consultant/conversations/route.ts': 'vehicle-scoped',
+  'app/api/v1/consultant/conversations/[sessionId]/route.ts': 'vehicle-scoped',
   /*
     Returns the commit SHA this deployment was built from — a public repo's
     public commit id, and nothing else. No database, no session, no service
@@ -262,6 +296,75 @@ describe('API routes', () => {
     expect(source).toMatch(/headers\.get\(/);
     // Fails closed: there is a branch on the secret being absent.
     expect(source).toMatch(/if\s*\(!\s*secret\s*\)/);
+  });
+
+  it.each(
+    Object.entries(ROUTE_POSTURE)
+      .filter(([, posture]) => posture === 'session' || posture === 'vehicle-scoped')
+      .map(([route]) => route)
+  )('%s authenticates through lib/api-auth, not its own client', (route) => {
+    /*
+      Both postures mean "a credential decides who this is", and there is one
+      module allowed to answer that — the whole argument in lib/api-auth's
+      header. A route that hand-rolls it gets whichever credential types its
+      own implementation happens to know about, which is how the garage list
+      ended up cookie-only while the bearer path had shipped months earlier.
+
+      Routes that delegate to a server action satisfy this by importing nothing
+      and authorizing there; they are 'vehicle-scoped' and covered by the
+      service-role assertion below instead. So this checks the import only
+      where the route itself resolves a caller.
+    */
+    expect(handRollsAuthentication(readFileSync(join(ROOT, route), 'utf8'))).toBe(false);
+  });
+
+  describe('the hand-rolled-authentication detector itself', () => {
+    /*
+      The synthetic input below is `/api/v1/vehicles` as it stood until 31 Jul:
+      its own cookie client, its own getUser, no import from lib/api-auth. It
+      looked authorized, passed this suite, and rejected every bearer token —
+      so the garage screen was unreachable from the client Phase 2.1 was built
+      for. If this detector cannot see that, it is decoration.
+    */
+    const handRolled = `
+      import { createServerActionClient } from '@/lib/supabase';
+      export async function GET(): Promise<Response> {
+        const supabase = createServerActionClient();
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error || !user) return Response.json({ success: false }, { status: 401 });
+        return Response.json({ success: true });
+      }
+    `;
+
+    const viaApiAuth = `
+      import { requireCaller } from '@/lib/api-auth';
+      export async function GET(): Promise<Response> {
+        const caller = await requireCaller();
+        if (!caller.ok) return caller.response;
+        return Response.json({ success: true });
+      }
+    `;
+
+    const delegates = `
+      import { fetchThing } from '@/app/actions';
+      export async function POST(): Promise<Response> {
+        return Response.json(await fetchThing());
+      }
+    `;
+
+    it('catches a route that resolves the caller itself', () => {
+      expect(handRollsAuthentication(handRolled)).toBe(true);
+    });
+
+    it('clears the same route once it goes through lib/api-auth', () => {
+      expect(handRollsAuthentication(viaApiAuth)).toBe(false);
+    });
+
+    it('does not fire on a route that delegates to a server action', () => {
+      // Those authorize in the action. Flagging them would push the suite
+      // toward being switched off, which is how a ratchet dies.
+      expect(handRollsAuthentication(delegates)).toBe(false);
+    });
   });
 
   it('has no stale registry entries for deleted routes', () => {
@@ -438,11 +541,27 @@ describe('server actions', () => {
 describe('demo consultant path', () => {
   const actionsSource = readFileSync(join(ROOT, 'app/actions.ts'), 'utf8');
 
+  /*
+    Sliced to the function's own boundary, not to a byte count.
+
+    This used to take `start + 12000`, which broke the moment the signature
+    grew — task 3.0.1 deprecated twelve parameters and pushed the demo guard
+    past the window. Widening the number would have restored it until next
+    time, but the fixed window was the more interesting problem: the two
+    `not.toMatch` assertions below pass *vacuously* on a window that falls
+    short. A guard that reports safety when it has run out of text to read is
+    the `cc-product-0003` failure again, in the instrument.
+  */
   function sendConsultantMessageBody(): string {
     const start = actionsSource.indexOf('export async function sendConsultantMessage');
     expect(start).toBeGreaterThan(-1);
-    // Far enough to cover the authorization block and the demo guard.
-    return actionsSource.slice(start, start + 12000);
+
+    const next = actionsSource.indexOf('\nexport async function', start + 1);
+    const body = actionsSource.slice(start, next === -1 ? actionsSource.length : next);
+
+    // The negative assertions are only meaningful against a real body.
+    expect(body.length).toBeGreaterThan(2000);
+    return body;
   }
 
   it('does not ask for write access on a demo vehicle', () => {
@@ -462,6 +581,28 @@ describe('demo consultant path', () => {
     expect(body).toMatch(/const isDemoVehicle = isDemoVehicleId\(params\.vehicleId\)/);
     expect(body).toMatch(/if \(!isDemoVehicle\) \{/);
     expect(body).not.toMatch(/if \(!isDemo\) \{/);
+  });
+
+  /*
+    The same regression, one layer out. `/api/v1/consultant` authorizes on its
+    own account so it can return a status code, which means it makes the same
+    intent decision the action does — and could get it wrong the same way. The
+    Phase 3 plan called this out specifically: "auth-posture.test.ts guards the
+    action but would not guard a new route." Now it does.
+  */
+  describe('the consultant route makes the same demo decision', () => {
+    const routeSource = readFileSync(join(ROOT, 'app/api/v1/consultant/route.ts'), 'utf8');
+
+    it('derives demo status from the vehicle id, not the request body', () => {
+      expect(routeSource).toMatch(/const isDemoVehicle = isDemoVehicleId\(vehicleId\)/);
+      // body.isDemo would be the client deciding its own authorization.
+      expect(routeSource).not.toMatch(/body\.isDemo/);
+    });
+
+    it('does not ask for write access on a demo vehicle', () => {
+      expect(routeSource).toMatch(/intent:\s*isDemoVehicle\s*\?\s*'read'\s*:\s*'write'/);
+      expect(routeSource).not.toMatch(/authorizeVehicleAccess\([^)]*\{\s*intent:\s*'write'\s*\}/);
+    });
   });
 
   it('keeps demo vehicles read-only in the authorization helper', () => {

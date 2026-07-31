@@ -131,6 +131,7 @@ const NOT_PORTABLE: Record<string, string> = {
   */
   'lib/vehicle-photo.ts': 'mints signed URLs through a Supabase storage client',
   'lib/storage-objects.ts': 'reaches Supabase through lib/supabase',
+  'lib/consultant-context.ts': 'queries Supabase — the shape it returns is portable, the loading is not',
   'lib/gemini.ts': 'client at module scope — a build-time server key (§19)',
   'lib/actions/wishlist.ts': 'reaches Supabase through lib/supabase',
   // Splits, not moves — the effort the plan warned about.

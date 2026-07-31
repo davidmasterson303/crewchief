@@ -260,13 +260,37 @@ export type SessionResult = SessionGranted | VehicleAccessDenied;
  * `authorizeVehicleAccess` — see `resolveCaller`.
  */
 export async function requireSession(): Promise<SessionResult> {
+  const result = await requireCaller();
+
+  // Narrowed on purpose: a server action that only needs to know *who* is
+  // calling should not be handed a client it did not ask for.
+  return result.ok ? { ok: true, userId: result.userId } : result;
+}
+
+export type CallerGranted = { ok: true; userId: string; client: SupabaseClient };
+export type CallerResult = CallerGranted | VehicleAccessDenied;
+
+/**
+ * `requireSession`, plus the RLS-scoped client the caller was authenticated
+ * with.
+ *
+ * For routes that read a *collection* rather than one addressed resource —
+ * a garage list, say — where `authorizeVehicleAccess` has no single vehicle to
+ * authorize but the query still must be scoped to the caller.
+ *
+ * The client returned is never privileged: RLS applies to it. Routes using it
+ * must still filter on `user_id` explicitly. That is deliberate belt-and-braces
+ * — RLS is the control, and an explicit filter means a policy regression shows
+ * up as a bug in one route rather than as a cross-tenant read.
+ */
+export async function requireCaller(): Promise<CallerResult> {
   const caller = await resolveCaller();
 
   if (!caller) {
     return deny('Unauthorized', 401);
   }
 
-  return { ok: true, userId: caller.userId };
+  return { ok: true, userId: caller.userId, client: caller.client };
 }
 
 export type VehicleScopedTable =

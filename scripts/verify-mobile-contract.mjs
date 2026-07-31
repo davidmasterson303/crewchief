@@ -37,6 +37,11 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import {
+  findUnresolvableUrls,
+  findMissingFields,
+  findLeakedFields,
+} from './lib/response-contract.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -221,12 +226,196 @@ async function checkStaleCredential() {
   else fail(`expected 401 on an unverifiable bearer, got HTTP ${res.status}`);
 }
 
+/**
+ * The fields each flow's client will actually read.
+ *
+ * Stated here rather than inferred from a live response, because a check that
+ * asserts a response matches itself asserts nothing. `cc-product-0001` fixes
+ * the scope at three flows; this is what each one needs on the wire.
+ */
+const FLOW_CONTRACTS = {
+  'garage health': {
+    required: ['id', 'year', 'make', 'model', 'photo_url'],
+    forbidden: ['custom_image_url'],
+  },
+  'one vehicle': {
+    required: ['id', 'year', 'make', 'model', 'photo_url'],
+    forbidden: ['custom_image_url'],
+  },
+};
+
+/** Reports every unresolvable URL anywhere in a body, at any depth. */
+function assertNoUnresolvableUrls(label, body) {
+  const found = findUnresolvableUrls(body);
+  if (found.length === 0) {
+    pass(`${label}: nothing a client cannot resolve, anywhere in the body`);
+    return;
+  }
+  for (const leak of found) {
+    fail(`${label}: shipped a storage path a client cannot resolve — ${leak}`);
+  }
+}
+
+function assertShape(label, object, contract) {
+  const missing = findMissingFields(object, contract.required);
+  const leaked = findLeakedFields(object, contract.forbidden);
+
+  if (missing.length) fail(`${label}: missing field(s) the client reads — ${missing.join(', ')}`);
+  if (leaked.length) fail(`${label}: shipped internal column(s) — ${leaked.join(', ')}`);
+  if (!missing.length && !leaked.length) pass(`${label}: shape matches what the client reads`);
+}
+
+async function checkResponseShapes() {
+  console.log('\n6. Response bodies, not just status codes');
+
+  /*
+    Until now this script asserted nothing about any body, which is exactly how
+    two routes shipped `select('*')` and a placeholder:// path while the
+    contract stayed green. Status codes prove a route answers; they do not
+    prove it answers something usable.
+  */
+
+  const demo = await fetch(`${base}/api/v1/load-vehicle?vehicleId=${DEMO_VEHICLE_ID}`);
+  if (demo.ok) {
+    const body = await demo.json();
+    assertNoUnresolvableUrls('load-vehicle (demo)', body);
+    assertShape('load-vehicle (demo)', body?.vehicle, FLOW_CONTRACTS['one vehicle']);
+  } else {
+    fail(`load-vehicle returned HTTP ${demo.status} for the demo vehicle — cannot check its shape`);
+  }
+
+  if (!token) {
+    skip('MOBILE_TEST_TOKEN is not set — the garage list is unverified, and it is the route that was broken');
+    return;
+  }
+
+  const headers = { Authorization: `Bearer ${token}` };
+
+  /*
+    The garage list. It accepted a cookie session only until 31 Jul, so the
+    interesting assertion is the plain one: a bearer token gets a 200 at all.
+  */
+  const garage = await fetch(`${base}/api/v1/vehicles`, { headers });
+
+  if (garage.status === 401) {
+    fail('/api/v1/vehicles rejected a valid bearer token — a phone cannot load the garage');
+    return;
+  }
+  if (!garage.ok) {
+    fail(`/api/v1/vehicles returned HTTP ${garage.status} to a bearer caller`);
+    return;
+  }
+
+  const body = await garage.json();
+  pass('garage list answers a bearer token');
+  assertNoUnresolvableUrls('vehicles', body);
+
+  if (!Array.isArray(body?.vehicles)) {
+    fail('vehicles: response carried no vehicles array');
+  } else if (body.vehicles.length === 0) {
+    /*
+      Not a pass. An empty garage satisfies every assertion below without
+      exercising one of them, and reporting that as green is precisely the
+      degradation this script exists to argue against.
+    */
+    skip("vehicles: this account's garage is empty — the per-vehicle shape is unverified");
+  } else {
+    assertShape('vehicles[0]', body.vehicles[0], FLOW_CONTRACTS['garage health']);
+  }
+}
+
+async function checkConsultant() {
+  console.log('\n8. Ask the advisor — the 4.2 Minimum Functionality flow');
+
+  // No credential must not reach a model. This one is free to assert and is
+  // the assertion that matters most: the route spends Gemini tokens.
+  const anon = await fetch(`${base}/api/v1/consultant`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ vehicleId: UNOWNED_VEHICLE_ID, message: 'hello' }),
+  });
+  if (anon.status === 401) pass('401 without a credential — an anonymous caller cannot spend tokens');
+  else fail(`expected 401 from /api/v1/consultant without a credential, got HTTP ${anon.status}`);
+
+  const demo = await fetch(`${base}/api/v1/consultant`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      vehicleId: DEMO_VEHICLE_ID,
+      /*
+        Deliberately asks for facts the request does not contain. Before task
+        3.0.1 the caller posted the vehicle's entire context and the prompt was
+        built from it, so an answer proved nothing about what the server knew.
+        This is the assertion that context is server-derived.
+      */
+      message:
+        'Reply with only these three values separated by commas and nothing else: my exact current mileage as digits, my trim, my reliability score out of 10.',
+    }),
+  });
+
+  if (demo.status === 403) {
+    fail('403 on a demo vehicle — the route asked for write access, the regression that killed the demo consultant once already');
+    return;
+  }
+  if (!demo.ok) {
+    fail(`demo consultant returned HTTP ${demo.status}`);
+    return;
+  }
+
+  const body = await demo.json();
+  assertNoUnresolvableUrls('consultant (demo)', body);
+
+  const answer = typeof body?.response === 'string' ? body.response : '';
+  if (!answer) {
+    fail('demo consultant answered 200 but carried no response');
+    return;
+  }
+
+  pass(`demo consultant answered anonymously — "${answer.slice(0, 70).replace(/\s+/g, ' ')}…"`);
+
+  /*
+    The demo Accord's own values, from the seed. Checked as facts rather than
+    as a non-empty string, because a model that answered "I don't have your
+    mileage" would satisfy every assertion above.
+  */
+  const facts = [
+    ['mileage', /94[,.]?800/],
+    ['trim', /sport/i],
+    ['reliability score', /\b8\b/],
+  ];
+
+  const missing = facts.filter(([, pattern]) => !pattern.test(answer)).map(([name]) => name);
+
+  if (missing.length === 0) {
+    pass('the answer carries vehicle facts the request never supplied — context is server-derived');
+  } else {
+    /*
+      A model declining to state a fact is not the same as the server not
+      knowing it, so this reports rather than fails outright — but it reports
+      loudly, because it is the only end-to-end evidence that the context load
+      reaches the prompt.
+    */
+    fail(`the answer omitted ${missing.join(', ')} — either context is not reaching the prompt, or the model declined to state it. Read the answer above before dismissing this`);
+  }
+}
+
+async function checkGarageNeedsCredential() {
+  console.log('\n7. The garage list with no credential');
+
+  const res = await fetch(`${base}/api/v1/vehicles`);
+  if (res.status === 401) pass('401 without a credential');
+  else fail(`expected 401 from /api/v1/vehicles without a credential, got HTTP ${res.status}`);
+}
+
 console.log(`\nMobile client contract at ${base}`);
 await checkPreflight();
 await checkAnonymousDemo();
 await checkNoCredential();
 await checkBearer();
 await checkStaleCredential();
+await checkResponseShapes();
+await checkGarageNeedsCredential();
+await checkConsultant();
 
 console.log('\n' + '─'.repeat(60));
 if (failures > 0) {

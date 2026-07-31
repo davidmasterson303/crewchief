@@ -39,7 +39,16 @@ const TESTS_DIR = __dirname;
 const STATIC_ANALYSIS_SUITES = [
   'auth-posture.test.ts',
   'internal-fetch-posture.test.ts',
+  // Reads apps/mobile off disk to prove the Expo client never queries Supabase
+  // directly. It cannot import what it checks: those modules are React Native,
+  // and loading one under this runner would fail on the transform rather than
+  // on the rule. Absence of `.from(` in the source is the whole signal.
+  'mobile-api-only.test.ts',
   'vehicles-rls-posture.test.ts',
+  // Replays the migration corpus to find blanket RLS policies a rebuild would
+  // declare. There is nothing to import: the subject is the SQL on disk, and
+  // the live database is a different question this deliberately does not ask.
+  'rls-blanket-policies.test.ts',
   'portability.test.ts',
   'ws-optional-deps.test.ts',
   'illustration-tokens.test.ts',
