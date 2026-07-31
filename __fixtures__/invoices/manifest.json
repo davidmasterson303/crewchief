@@ -1,0 +1,29 @@
+{
+  "$comment": [
+    "Ground truth for the invoice vision corpus. See README.md in this directory.",
+    "Ground truth is established by a HUMAN READING THE INVOICE — never by recording what",
+    "the model returned, which would enshrine today's errors as the standard.",
+    "Partial truth is fine: expectTotal alone still catches a model that drops line items.",
+    "THIS REPO IS PUBLIC. Synthetic and sample invoices only — see README.md."
+  ],
+
+  "schema": {
+    "file": "filename in this directory",
+    "case": "what this fixture is testing — the awkwardness it represents",
+    "isAutomotive": "boolean. false = a control that validateConsultantDocument must REJECT",
+    "expectVendor": "shop name as printed, or null if not asserting",
+    "expectDate": "YYYY-MM-DD, or null",
+    "expectTotal": "number, or null. The single most useful assertion",
+    "expectLineItemCount": "integer, or null. Catches silent truncation",
+    "expectLineItems": [
+      {
+        "description": "as printed on the invoice",
+        "amount": "number",
+        "kind": "part | labour | fee | discount"
+      }
+    ],
+    "notes": "anything a human needs to know — unreadable fields, ambiguity, why truth is partial"
+  },
+
+  "fixtures": []
+}
