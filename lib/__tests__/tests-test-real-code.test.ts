@@ -49,6 +49,11 @@ const STATIC_ANALYSIS_SUITES = [
   // declare. There is nothing to import: the subject is the SQL on disk, and
   // the live database is a different question this deliberately does not ask.
   'rls-blanket-policies.test.ts',
+  // Reads the maintenance page and app/actions.ts to prove no provenance claim
+  // is rendered that nothing on the row substantiates. The badge it pins had
+  // no condition anywhere near it, so absence in the source is the signal;
+  // rendering the page would test the claim's styling, not its truth.
+  'provenance-claims.test.ts',
   'portability.test.ts',
   'ws-optional-deps.test.ts',
   'illustration-tokens.test.ts',

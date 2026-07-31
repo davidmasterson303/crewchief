@@ -2,12 +2,11 @@
 
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
-import { FileText, CircleCheck as CheckCircle2, Calendar, MessageSquare } from 'lucide-react';
+import { FileText, Calendar, MessageSquare } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getClientSupabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { useVehicleImage } from '@/hooks/useSignedUrl';
-import { FLASH_VISION_MODEL } from '@crewchief/core/ai/models';
 
 /**
  * Service history, read from what was actually extracted.
@@ -155,11 +154,23 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
         <div className="flex justify-between items-center mb-8">
           <div>
             <h2 className="text-2xl font-bold text-white">Service History</h2>
-            {/* Named from the constant, so it cannot describe a model this app
-                does not call. The literal here read "Gemini 2.0 Flash Vision"
-                through two model generations without anyone noticing. */}
+            {/*
+              This read "Digitized by <the vision model>" whenever any
+              history existed. Naming the model from the constant fixed one
+              problem — the literal had said "Gemini 2.0 Flash Vision" through
+              two model generations — but left a larger one: the sentence is
+              false unless a model actually digitised these rows.
+
+              It did not, for two of the three writers of this table, and it
+              never has for any demo car. Same defect as the per-row badge
+              below, at page scale: the claim was attached to the *page* rather
+              than to any record on it.
+
+              Says what is true instead. When rows carry provenance, this can
+              name the model again for the ones that earned it.
+            */}
             <p className="text-white/50 text-sm mt-1">
-              {hasHistory ? `Digitized by ${FLASH_VISION_MODEL}` : 'Upload an invoice to build your history'}
+              {hasHistory ? 'Every visit on file' : 'Upload an invoice to build your history'}
             </p>
           </div>
           <Button
@@ -213,13 +224,38 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
                   <div>
                     <h3 className="text-base font-semibold text-white flex items-center gap-2 flex-wrap">
                       {visit.vendor}
-                      {/* Honest here in a way it was not before: the only writer
-                          of this table is the vision extraction path, so every
-                          row on this page really was read by a model. */}
-                      <span className="text-[10px] uppercase tracking-wider bg-info-wash text-info px-2 py-0.5 rounded-full flex items-center gap-1 font-medium">
-                        <CheckCircle2 className="w-3 h-3" />
-                        AI Extracted
-                      </span>
+                      {/*
+                        The "AI Extracted" badge was here, unconditionally, and
+                        its comment argued it was safe "because the only writer
+                        of this table is the vision extraction path". That was
+                        not true, in two ways:
+
+                          - `moveServiceItemToHistory` writes a row from a
+                            user-typed completion form — date, shop, cost,
+                            notes. No model reads anything.
+                          - Every row on all three demo cars comes from
+                            `20260314142241_seed_demo_vehicles.sql`, an INSERT
+                            in a migration.
+
+                        So on the public demo — the recruiter-facing surface —
+                        every record carried a provenance claim that was false.
+                        That is a smaller version of exactly what `ae45710`
+                        removed from this page: a confidence signal asserted
+                        rather than earned.
+
+                        Removed rather than gated, because provenance is not
+                        currently recorded. `maintenance_line_items` has no
+                        column saying where a row came from — `extraction_status`
+                        exists on `vehicle_documents`, not here — and any
+                        distinguisher based on which fields happen to be
+                        populated would be a guess wearing a badge.
+
+                        The badge is worth having back: a row genuinely read
+                        off an invoice by a model is the product's argument.
+                        It needs a `source` column set at each write site, which
+                        is a migration, and migrations here are applied by hand.
+                        Recorded in the roadmap rather than guessed at now.
+                      */}
                     </h3>
                     {visit.date && (
                       <div className="flex items-center gap-4 text-sm text-white/50 mt-1">
