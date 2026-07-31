@@ -1056,7 +1056,9 @@ export async function sendConsultantMessage(params: {
       for (const doc of attachedDocuments) {
         // Read out of storage, not over HTTP — the bucket is private, so
         // fetching one of its objects by URL cannot work.
-        const buffer = await downloadStoredFile(doc.file_url);
+        // Scoped to the vehicle authorized above, not merely to the fact that
+        // some vehicle was. doc.file_url is client-supplied.
+        const buffer = await downloadStoredFile(doc.file_url, vehicleId);
 
         if (buffer) {
           parts.push({
@@ -1572,7 +1574,9 @@ export async function processConsultantInvoiceToMaintenance(vehicleId: string, f
 
     const client = getServiceRoleClient();
 
-    const buffer = await downloadStoredFile(fileUrl);
+    // fileUrl is a caller-supplied parameter of this exported action, and the
+    // authorization above covers vehicleId only. The two are tied together here.
+    const buffer = await downloadStoredFile(fileUrl, vehicleId);
     if (!buffer) return { success: false, error: 'Failed to fetch document', itemsProcessed: 0, issueUpdates: 0, modUpdates: 0 };
     const base64Data = buffer.toString('base64');
 
