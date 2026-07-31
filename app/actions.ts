@@ -1,7 +1,13 @@
 'use server';
 
 import { supabase, getServiceRoleClient, createServerActionClient, getServerClient } from '@/lib/supabase';
-import { genAI, flashStructuredConfig, flashConfig } from '@/lib/gemini';
+import {
+  genAI,
+  flashStructuredConfig,
+  flashConfig,
+  proStructuredConfig,
+  classificationConfig,
+} from '@/lib/gemini';
 import { VEHICLE_RESEARCH_PROMPT, POWERTRAIN_OPTIONS_PROMPT, CONSULTANT_SYSTEM_PROMPT, CONSULTANT_DOCUMENT_VALIDATION_PROMPT } from '@crewchief/core/prompts';
 import { getVehicleImage } from '@/lib/vehicle-images';
 import { logger } from '@crewchief/core/logger';
@@ -21,7 +27,7 @@ import { validateData, vehicleIdSchema, serviceItemSchema, maintenanceLineItemSc
 import { withRetry } from '@crewchief/core/retry';
 import type { Vehicle, ServiceItem, MaintenanceLineItem, KnowledgeBase, ApiResponse, ConsultantContext } from '@crewchief/core/types';
 import { z } from 'zod';
-import { FLASH_MODEL, PRO_MODEL, FLASH_VISION_MODEL } from '@crewchief/core/ai/models';
+import { FLASH_MODEL, PRO_MODEL, LITE_MODEL, FLASH_VISION_MODEL } from '@crewchief/core/ai/models';
 
 import {
   addItemToWishlist as _addItemToWishlist,
@@ -481,9 +487,9 @@ export async function generateVehicleDossier(vehicleId: string, vehicleData?: an
         const response = await withTimeout(
           () =>
             genAI.models.generateContent({
-              model: 'gemini-2.5-flash',
+              model: PRO_MODEL,
               contents: prompt,
-              config: flashStructuredConfig,
+              config: proStructuredConfig,
             }),
           RESEARCH_TIMEOUT_MS,
           'vehicle research'
@@ -736,9 +742,9 @@ export async function fetchPowertrainOptions(
     const prompt = POWERTRAIN_OPTIONS_PROMPT(year, make, model, trim);
 
     const response = await genAI.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: LITE_MODEL,
       contents: prompt,
-      config: flashStructuredConfig,
+      config: classificationConfig,
     });
 
     const text = response.text || '';
@@ -1072,7 +1078,7 @@ export async function sendConsultantMessage(params: {
     }
 
     const result = await genAI.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: FLASH_MODEL,
       contents,
       config: flashConfig,
     });
@@ -1713,7 +1719,7 @@ Important: Frame all recommendations as "based on your provided service history"
 Format as valid JSON only, no markdown.`;
 
     const result = await genAI.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: FLASH_MODEL,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: flashStructuredConfig,
     });
@@ -1906,7 +1912,7 @@ Provide a detailed analysis in JSON format with exactly these fields:
 Format as valid JSON only, no markdown or explanations.`;
 
     const result = await genAI.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: FLASH_MODEL,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: flashStructuredConfig,
     });
@@ -2593,7 +2599,7 @@ Return ONLY valid JSON, no markdown formatting.`;
       }
 
       const result = await genAI.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: FLASH_VISION_MODEL,
         contents: [{ role: 'user', parts: contentParts }],
         config: flashStructuredConfig,
       });
@@ -3061,7 +3067,7 @@ Return ONLY valid JSON, no markdown code blocks, no explanations.`;
       }
 
       const result = await genAI.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: FLASH_VISION_MODEL,
         contents: [{ role: 'user', parts: contentParts }],
         config: flashStructuredConfig,
       });
@@ -3564,7 +3570,7 @@ export async function validateConsultantDocument(
     const prompt = CONSULTANT_DOCUMENT_VALIDATION_PROMPT(vehicle);
 
     const result = await genAI.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: FLASH_VISION_MODEL,
       contents: [
         {
           role: 'user',
@@ -4161,7 +4167,7 @@ Return ONLY valid JSON with no additional text.`;
       result = await withRetry(
         async () => {
           return await genAI.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: FLASH_MODEL,
             contents: prompt,
           });
         },
@@ -4295,7 +4301,7 @@ Return ONLY the email body text. Do NOT include a subject line. The email should
     const result = await withRetry(
       async () => {
         return await genAI.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: FLASH_MODEL,
           contents: prompt,
         });
       },
@@ -5364,7 +5370,7 @@ Respond with ONLY valid JSON, no markdown:
 {"modName": "Exact Modification Name", "difficulty": "${tier === 'mild' ? 'Easy' : tier === 'moderate' ? 'Moderate' : 'Hard'}", "purpose": "One sentence purpose"}`;
 
     const result = await genAI.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: FLASH_MODEL,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: flashStructuredConfig,
     });
@@ -5587,7 +5593,7 @@ Respond with ONLY valid JSON:
 
       try {
         const result = await genAI.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: FLASH_MODEL,
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
           config: flashStructuredConfig,
         });
