@@ -40,9 +40,106 @@ export async function resolveVehiclePhoto(
   vehicle: VehiclePhotoColumns,
   client: SupabaseClient
 ): Promise<string | null> {
+  const plan = planVehiclePhoto(vehicleId, vehicle);
+
+  if (plan.kind === 'resolved') return plan.url;
+
+  try {
+    const { data, error } = await client.storage
+      .from('vehicle-documents')
+      .createSignedUrl(plan.path, SIGNED_URL_TTL_SECONDS);
+
+    if (error || !data) {
+      logger.warn('VEHICLE_PHOTO', 'Could not sign stored photo', { vehicleId });
+      return plan.fallback;
+    }
+
+    return data.signedUrl;
+  } catch (error) {
+    logger.warn('VEHICLE_PHOTO', 'Signing threw', { vehicleId, error });
+    return plan.fallback;
+  }
+}
+
+/**
+ * The same rule, for a list.
+ *
+ * A garage is many vehicles and each stored photo needs its own signed URL.
+ * Calling `resolveVehiclePhoto` in a loop costs one storage round trip per car,
+ * which on a phone connection is the difference between a garage that loads and
+ * one that appears broken. `createSignedUrls` takes the whole list at once.
+ *
+ * Deliberately *not* a second implementation of the rule: both functions decide
+ * what to do via `planVehiclePhoto` and differ only in how they sign. The rule
+ * about which photo a vehicle has is the thing that must never fork.
+ *
+ * Returns a map keyed by vehicle id. Every input id is present in the output,
+ * with null where there is nothing renderable.
+ */
+export async function resolveVehiclePhotos(
+  vehicles: Array<{ id: string } & VehiclePhotoColumns>,
+  client: SupabaseClient
+): Promise<Map<string, string | null>> {
+  const resolved = new Map<string, string | null>();
+  const toSign: { id: string; path: string; fallback: string | null }[] = [];
+
+  for (const vehicle of vehicles) {
+    const plan = planVehiclePhoto(vehicle.id, vehicle);
+    if (plan.kind === 'resolved') resolved.set(vehicle.id, plan.url);
+    else toSign.push({ id: vehicle.id, path: plan.path, fallback: plan.fallback });
+  }
+
+  if (toSign.length === 0) return resolved;
+
+  try {
+    const { data, error } = await client.storage
+      .from('vehicle-documents')
+      .createSignedUrls(
+        toSign.map((entry) => entry.path),
+        SIGNED_URL_TTL_SECONDS
+      );
+
+    if (error || !data) {
+      logger.warn('VEHICLE_PHOTO', 'Could not batch-sign stored photos', {
+        count: toSign.length,
+      });
+      for (const entry of toSign) resolved.set(entry.id, entry.fallback);
+      return resolved;
+    }
+
+    /*
+      Positional, because that is the correspondence the API guarantees: results
+      come back in request order. Matching on the returned `path` instead would
+      break on two vehicles pointing at the same object, which is rare but is
+      exactly the case a lookup-by-key would silently collapse.
+    */
+    toSign.forEach((entry, index) => {
+      const signed = data[index];
+      resolved.set(entry.id, signed?.signedUrl && !signed.error ? signed.signedUrl : entry.fallback);
+    });
+
+    return resolved;
+  } catch (error) {
+    logger.warn('VEHICLE_PHOTO', 'Batch signing threw', { error });
+    for (const entry of toSign) resolved.set(entry.id, entry.fallback);
+    return resolved;
+  }
+}
+
+type PhotoPlan =
+  | { kind: 'resolved'; url: string | null }
+  | { kind: 'sign'; path: string; fallback: string | null };
+
+/**
+ * Decide what a vehicle's photo should be, without doing any I/O.
+ *
+ * Pure, so the rule can be tested directly instead of through a storage mock —
+ * and so the single and batch resolvers above cannot drift apart.
+ */
+function planVehiclePhoto(vehicleId: string, vehicle: VehiclePhotoColumns): PhotoPlan {
   // One demo car is unphotographed on purpose and still carries a seeded
   // image_url; honoured here so every surface answers the same way.
-  if (isUnphotographedDemoVehicle(vehicleId)) return null;
+  if (isUnphotographedDemoVehicle(vehicleId)) return { kind: 'resolved', url: null };
 
   const storedPath = storagePathFromStoredUrl(vehicle.custom_image_url);
 
@@ -58,7 +155,7 @@ export async function resolveVehiclePhoto(
     const isMalformedStored = vehicle.custom_image_url?.startsWith(STORED_URL_SCHEME);
     const passthrough = isMalformedStored ? null : vehicle.custom_image_url;
 
-    return passthrough || vehicle.image_url || null;
+    return { kind: 'resolved', url: passthrough || vehicle.image_url || null };
   }
 
   /*
@@ -72,22 +169,8 @@ export async function resolveVehiclePhoto(
     logger.warn('VEHICLE_PHOTO', 'Stored photo path is not scoped to this vehicle', {
       vehicleId,
     });
-    return vehicle.image_url || null;
+    return { kind: 'resolved', url: vehicle.image_url || null };
   }
 
-  try {
-    const { data, error } = await client.storage
-      .from('vehicle-documents')
-      .createSignedUrl(storedPath, SIGNED_URL_TTL_SECONDS);
-
-    if (error || !data) {
-      logger.warn('VEHICLE_PHOTO', 'Could not sign stored photo', { vehicleId });
-      return vehicle.image_url || null;
-    }
-
-    return data.signedUrl;
-  } catch (error) {
-    logger.warn('VEHICLE_PHOTO', 'Signing threw', { vehicleId, error });
-    return vehicle.image_url || null;
-  }
+  return { kind: 'sign', path: storedPath, fallback: vehicle.image_url || null };
 }
