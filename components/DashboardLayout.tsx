@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Car, ChevronLeft, Clock, MessageSquare, Wrench, CreditCard as Edit2, Check, X, Info, ChevronRight, Tag } from 'lucide-react';
+import { Car, Clock, MessageSquare, Wrench, CreditCard as Edit2, Check, X, Info, ChevronRight, Tag } from 'lucide-react';
 import { isDemoVehicleId } from '@crewchief/core/demo';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -197,26 +197,21 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
             </div>
 
             {/*
-              Goes to the caller's own garage.
+              There was a `< Garage` button here, and it is deliberately gone.
 
-              Every one of the four "Garage" controls in this layout — the mark,
-              this button, the breadcrumb and the footer link — pushed `/`, which
-              is the *demo* garage. For a signed-in user looking at their own car
-              that is a door out of their data and into three vehicles belonging
-              to nobody, and because the two surfaces look alike it reads as
-              theirs having vanished. It also read as a dead control: `/` now
-              redirects a signed-in user back to /garage, so the visible result
-              of pressing it was a flicker and no apparent change.
+              This layout carried FOUR controls that all went to the garage: the
+              mark, this button, the breadcrumb and the footer link. An earlier
+              pass fixed where they pointed — every one of them used to push `/`,
+              the *demo* garage, so a signed-in user looking at their own car got
+              a door out of their data and into three vehicles belonging to
+              nobody, which reads as theirs having vanished.
+
+              Fixing the destination left the redundancy. This button sat inches
+              from a breadcrumb whose second element is the word "Garage" and goes
+              to the same place, so it was a second control competing with a
+              perfectly good first one. Removed 30 Jul; the breadcrumb is the
+              route back.
             */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.push(homeHref)}
-              className="text-white/60 hover:text-white hover:bg-white/8 gap-1.5 transition-colors min-h-[44px]"
-            >
-              <ChevronLeft className="h-4 w-4" />
-              <span className="hidden sm:inline">Garage</span>
-            </Button>
             {/* Hidden in demo mode — an anonymous visitor has no account to
                 manage, and a sign-out that does nothing is worse than absent. */}
             {!isDemo && <AccountMenu />}

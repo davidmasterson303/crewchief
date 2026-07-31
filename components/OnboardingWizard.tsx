@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Loader as Loader2, CircleCheck as CheckCircle2, CircleAlert as AlertCircle, X, Upload, Image as ImageIcon } from 'lucide-react';
 import { logger } from '@crewchief/core/logger';
+import { queryClient } from '@crewchief/core/query-client';
 import { createVehicle, updateVehiclePowertrain, fetchPowertrainOptions, uploadVehiclePhoto } from '@/app/actions';
 import { detectUncertainPowertrainFields } from '@crewchief/core/vehicle-utils';
 import PowertrainSelector from '@/components/PowertrainSelector';
@@ -65,6 +66,29 @@ function StepIndicator({ currentStep, totalSteps, labels }: { currentStep: numbe
 
 export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps) {
   const router = useRouter();
+
+  /**
+   * Leave onboarding for the new vehicle's dashboard.
+   *
+   * The invalidation is the point, and it is not optional. `useMyVehicles`
+   * caches the garage under `['vehicles','mine',userId]` with a five-minute
+   * staleTime. Nothing here wrote to that cache, so a user who had already
+   * loaded the garage — which every new user has, because an empty garage is
+   * what sends them to onboarding — went back to it after adding their first
+   * car and was told **"Your Garage is Empty"**. The vehicle was fine. The
+   * list was five minutes stale.
+   *
+   * That is the worst possible moment for it: the first thing the product
+   * asks you to do, appearing to have silently failed. Reported 30 Jul.
+   *
+   * Both exits from this wizard go through here so the two cannot drift —
+   * the same second-implementation problem that produced the dead
+   * `setQueryData(['vehicles'])` in VehicleCard, fixed the same morning.
+   */
+  const goToDashboard = (vehicleId: string) => {
+    queryClient.invalidateQueries({ queryKey: ['vehicles'] });
+    router.push(`/dashboard/${vehicleId}`);
+  };
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -315,7 +339,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
       return;
     }
 
-    router.push(`/dashboard/${result.vehicleId}`);
+    goToDashboard(result.vehicleId);
   };
 
   const handleClarificationSubmit = async () => {
@@ -357,7 +381,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
 
     // Same reasoning as the main path: the vehicle exists and the user has
     // told us what we needed. Enrichment belongs to the dashboard.
-    router.push(`/dashboard/${vehicleId}`);
+    goToDashboard(vehicleId);
   };
 
   const getStepTitle = () => {

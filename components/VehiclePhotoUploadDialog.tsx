@@ -14,6 +14,26 @@ import { toast } from 'sonner';
 import { uploadVehiclePhoto, removeVehiclePhoto } from '@/app/actions';
 import { downscaleImage } from '@/lib/image-downscale';
 import { useRouter } from 'next/navigation';
+import { queryClient } from '@crewchief/core/query-client';
+
+/**
+ * `router.refresh()` alone was not enough, and the reason is worth stating.
+ *
+ * It re-renders server components. The garage does not come from one — it
+ * comes from `useMyVehicles`, a TanStack Query cache with a five-minute
+ * staleTime that `router.refresh()` never touches. So an uploaded photo did
+ * not appear until a full page reload, which reads as the upload having
+ * failed. Reported 30 Jul, alongside two siblings: a newly created vehicle
+ * missing from the garage, and VehicleCard's dead `setQueryData(['vehicles'])`.
+ *
+ * Three instances of one bug — a mutation that changes the garage without
+ * telling the cache. Both refreshes are needed: the server one for anything
+ * rendered server-side, the invalidation for the list the user is looking at.
+ */
+function refreshVehicleViews(router: { refresh: () => void }) {
+  queryClient.invalidateQueries({ queryKey: ['vehicles'] });
+  router.refresh();
+}
 
 interface VehiclePhotoUploadDialogProps {
   vehicleId: string;
@@ -189,7 +209,7 @@ export function VehiclePhotoUploadDialog({
       setPreviewUrl(null);
       setStep('select');
       onOpenChange(false);
-      router.refresh();
+      refreshVehicleViews(router);
     } else {
       toast.error(result.error || 'Failed to upload photo');
     }
@@ -202,7 +222,7 @@ export function VehiclePhotoUploadDialog({
     if (result.success) {
       toast.success('Custom photo removed');
       onOpenChange(false);
-      router.refresh();
+      refreshVehicleViews(router);
     } else {
       toast.error(result.error || 'Failed to remove photo');
     }
