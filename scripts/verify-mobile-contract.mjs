@@ -37,6 +37,11 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import {
+  findUnresolvableUrls,
+  findMissingFields,
+  findLeakedFields,
+} from './lib/response-contract.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -221,12 +226,120 @@ async function checkStaleCredential() {
   else fail(`expected 401 on an unverifiable bearer, got HTTP ${res.status}`);
 }
 
+/**
+ * The fields each flow's client will actually read.
+ *
+ * Stated here rather than inferred from a live response, because a check that
+ * asserts a response matches itself asserts nothing. `cc-product-0001` fixes
+ * the scope at three flows; this is what each one needs on the wire.
+ */
+const FLOW_CONTRACTS = {
+  'garage health': {
+    required: ['id', 'year', 'make', 'model', 'photo_url'],
+    forbidden: ['custom_image_url'],
+  },
+  'one vehicle': {
+    required: ['id', 'year', 'make', 'model', 'photo_url'],
+    forbidden: ['custom_image_url'],
+  },
+};
+
+/** Reports every unresolvable URL anywhere in a body, at any depth. */
+function assertNoUnresolvableUrls(label, body) {
+  const found = findUnresolvableUrls(body);
+  if (found.length === 0) {
+    pass(`${label}: nothing a client cannot resolve, anywhere in the body`);
+    return;
+  }
+  for (const leak of found) {
+    fail(`${label}: shipped a storage path a client cannot resolve — ${leak}`);
+  }
+}
+
+function assertShape(label, object, contract) {
+  const missing = findMissingFields(object, contract.required);
+  const leaked = findLeakedFields(object, contract.forbidden);
+
+  if (missing.length) fail(`${label}: missing field(s) the client reads — ${missing.join(', ')}`);
+  if (leaked.length) fail(`${label}: shipped internal column(s) — ${leaked.join(', ')}`);
+  if (!missing.length && !leaked.length) pass(`${label}: shape matches what the client reads`);
+}
+
+async function checkResponseShapes() {
+  console.log('\n6. Response bodies, not just status codes');
+
+  /*
+    Until now this script asserted nothing about any body, which is exactly how
+    two routes shipped `select('*')` and a placeholder:// path while the
+    contract stayed green. Status codes prove a route answers; they do not
+    prove it answers something usable.
+  */
+
+  const demo = await fetch(`${base}/api/v1/load-vehicle?vehicleId=${DEMO_VEHICLE_ID}`);
+  if (demo.ok) {
+    const body = await demo.json();
+    assertNoUnresolvableUrls('load-vehicle (demo)', body);
+    assertShape('load-vehicle (demo)', body?.vehicle, FLOW_CONTRACTS['one vehicle']);
+  } else {
+    fail(`load-vehicle returned HTTP ${demo.status} for the demo vehicle — cannot check its shape`);
+  }
+
+  if (!token) {
+    skip('MOBILE_TEST_TOKEN is not set — the garage list is unverified, and it is the route that was broken');
+    return;
+  }
+
+  const headers = { Authorization: `Bearer ${token}` };
+
+  /*
+    The garage list. It accepted a cookie session only until 31 Jul, so the
+    interesting assertion is the plain one: a bearer token gets a 200 at all.
+  */
+  const garage = await fetch(`${base}/api/v1/vehicles`, { headers });
+
+  if (garage.status === 401) {
+    fail('/api/v1/vehicles rejected a valid bearer token — a phone cannot load the garage');
+    return;
+  }
+  if (!garage.ok) {
+    fail(`/api/v1/vehicles returned HTTP ${garage.status} to a bearer caller`);
+    return;
+  }
+
+  const body = await garage.json();
+  pass('garage list answers a bearer token');
+  assertNoUnresolvableUrls('vehicles', body);
+
+  if (!Array.isArray(body?.vehicles)) {
+    fail('vehicles: response carried no vehicles array');
+  } else if (body.vehicles.length === 0) {
+    /*
+      Not a pass. An empty garage satisfies every assertion below without
+      exercising one of them, and reporting that as green is precisely the
+      degradation this script exists to argue against.
+    */
+    skip("vehicles: this account's garage is empty — the per-vehicle shape is unverified");
+  } else {
+    assertShape('vehicles[0]', body.vehicles[0], FLOW_CONTRACTS['garage health']);
+  }
+}
+
+async function checkGarageNeedsCredential() {
+  console.log('\n7. The garage list with no credential');
+
+  const res = await fetch(`${base}/api/v1/vehicles`);
+  if (res.status === 401) pass('401 without a credential');
+  else fail(`expected 401 from /api/v1/vehicles without a credential, got HTTP ${res.status}`);
+}
+
 console.log(`\nMobile client contract at ${base}`);
 await checkPreflight();
 await checkAnonymousDemo();
 await checkNoCredential();
 await checkBearer();
 await checkStaleCredential();
+await checkResponseShapes();
+await checkGarageNeedsCredential();
 
 console.log('\n' + '─'.repeat(60));
 if (failures > 0) {
