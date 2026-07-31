@@ -47,6 +47,25 @@ import { NextResponse } from 'next/server';
  * point is to tell a deploy script "the credential works" without telling a
  * reader anything they could use.
  *
+ * ── Why it also names the models (30 Jul) ───────────────────────────────────
+ *
+ * It was already fetching the list and throwing all but the length away.
+ *
+ * The models this application uses are chosen per call site, and the
+ * identifiers are versioned strings that are not guessable — a wrong one fails
+ * at call time, in production, on a path a typecheck cannot see. Choosing them
+ * from release notes is guessing; choosing them from the list this deployment's
+ * own credential can see is not. See
+ * `TICKET_gemini_model_tiering_2026-07-30.md`.
+ *
+ * `models` stays a count, because `verify-demo.mjs` prints it as one and a
+ * health check should not break its own consumer to add a field. Names arrive
+ * beside it as `modelNames`.
+ *
+ * This discloses nothing: the model catalogue is public documentation, and
+ * which models a key can reach says nothing about the key. It remains a
+ * metadata call that generates nothing and takes no user input.
+ *
  * ── The 60s cache is load-bearing ──────────────────────────────────────────
  *
  * Deliberately no database rate limiter: a health check that fails because the
@@ -99,8 +118,24 @@ export async function GET() {
     }
 
     const data = await res.json();
-    const models = Array.isArray(data?.models) ? data.models.length : 0;
-    cached = { at: Date.now(), status: 200, body: { ok: true, models } };
+    const list = Array.isArray(data?.models) ? data.models : [];
+
+    /*
+      Google returns fully-qualified names — `models/gemini-2.5-flash`. The
+      application uses the bare identifier, so strip the prefix here rather
+      than making every reader remember to. Sorted so two deployments are
+      diffable.
+    */
+    const modelNames = list
+      .map((m: { name?: unknown }) => (typeof m?.name === 'string' ? m.name.replace(/^models\//, '') : null))
+      .filter((n: string | null): n is string => !!n)
+      .sort();
+
+    cached = {
+      at: Date.now(),
+      status: 200,
+      body: { ok: true, models: list.length, modelNames },
+    };
     return NextResponse.json({ ...cached.body, cached: false }, { status: 200, headers: noStore });
   } catch (error) {
     cached = {
