@@ -22,7 +22,9 @@
       "predictiveBackGestureEnabled": false
     },
     "extra": {
-      "apiBaseUrl": "https://effulgent-blancmange-6adfdf.netlify.app"
+      "apiBaseUrl": "https://effulgent-blancmange-6adfdf.netlify.app",
+      "supabaseUrl": "https://hcldnnfwnrerznpruazf.supabase.co",
+      "supabasePublishableKey": "sb_publishable_cojGPM6Cxjwg8G4VoybnEA_vq-qvIjN"
     }
   }
 }

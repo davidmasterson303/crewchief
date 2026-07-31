@@ -1,73 +1,60 @@
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import type { Session } from '@supabase/supabase-js';
 
-import { API_BASE_URL } from './src/config';
-import { checkSharedCore, type CoreCheck } from './src/core-check';
+import { onSessionChange, startSessionAutoRefresh } from './src/auth/session';
+import { supabase } from './src/auth/supabase';
+import { SignInScreen } from './src/screens/SignInScreen';
+import { SignedInScreen } from './src/screens/SignedInScreen';
 
 /**
- * Day-one scaffold, and it earns its keep by proving one thing.
+ * The session gate.
  *
- * The monorepo was chosen so that `@crewchief/core` is a direct workspace
- * dependency — one commit changes an API and its client together, rather than
- * the two drifting apart, which is this codebase's named recurring bug. That
- * argument is worth nothing if core does not actually resolve inside Metro,
- * and "it typechecks" does not prove it does: Metro has its own resolver, and
- * the repo now holds two majors of React for it to pick the wrong one of.
+ * Three states, and the third is the one that matters: **unknown**. Reading the
+ * stored session off the Keychain is asynchronous, so for the first frames the
+ * app does not yet know whether anyone is signed in. Rendering the sign-in
+ * screen during that window would flash a login form at a signed-in user on
+ * every cold start — `hooks/useVehicles.ts` carries the web version of this
+ * lesson, where a query fired before the session resolved and cached an empty
+ * garage.
  *
- * So the first screen runs shared code and shows the result. When this is
- * replaced by the real sign-in screen, the checks move into a test rather than
- * being deleted.
+ * So `undefined` means "still asking" and renders nothing but a spinner.
  */
 export default function App() {
-  const checks = checkSharedCore();
-  const failed = checks.filter((c) => !c.ok);
+  const [session, setSession] = useState<Session | null | undefined>(undefined);
+
+  useEffect(() => {
+    // Drives token refresh off foreground/background — see session.ts.
+    const stopRefresh = startSessionAutoRefresh();
+
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+
+    const unsubscribe = onSessionChange(setSession);
+
+    return () => {
+      stopRefresh();
+      unsubscribe();
+    };
+  }, []);
 
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>CrewChief</Text>
-        <Text style={styles.subtitle}>
-          {failed.length === 0
-            ? '@crewchief/core resolves and runs'
-            : `${failed.length} shared-core check(s) failed`}
-        </Text>
-
-        {checks.map((check) => (
-          <CheckRow key={check.label} check={check} />
-        ))}
-
-        <Text style={styles.footer}>API: {API_BASE_URL}</Text>
-      </ScrollView>
+    <View style={styles.root}>
+      {session === undefined ? (
+        <View style={styles.loading}>
+          <ActivityIndicator color="rgba(255,255,255,0.5)" />
+        </View>
+      ) : session ? (
+        <SignedInScreen session={session} />
+      ) : (
+        <SignInScreen />
+      )}
       <StatusBar style="light" />
     </View>
   );
 }
 
-function CheckRow({ check }: { check: CoreCheck }) {
-  return (
-    <View style={styles.row}>
-      <Text style={[styles.mark, check.ok ? styles.ok : styles.bad]}>
-        {check.ok ? '✓' : '✗'}
-      </Text>
-      <View style={styles.rowText}>
-        <Text style={styles.label}>{check.label}</Text>
-        <Text style={styles.detail}>{check.detail}</Text>
-      </View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#080808' },
-  content: { padding: 24, paddingTop: 72, gap: 12 },
-  title: { color: '#fff', fontSize: 28, fontWeight: '700', letterSpacing: -0.5 },
-  subtitle: { color: 'rgba(255,255,255,0.45)', fontSize: 14, marginBottom: 12 },
-  row: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
-  rowText: { flex: 1 },
-  mark: { fontSize: 15, width: 16 },
-  ok: { color: '#4ade80' },
-  bad: { color: '#f87171' },
-  label: { color: '#fff', fontSize: 14 },
-  detail: { color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 2 },
-  footer: { color: 'rgba(255,255,255,0.25)', fontSize: 11, marginTop: 24 },
+  root: { flex: 1, backgroundColor: '#080808' },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 });

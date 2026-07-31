@@ -4,6 +4,7 @@
   "main": "index.ts",
   "dependencies": {
     "@crewchief/core": "*",
+    "@supabase/supabase-js": "^2.111.0",
     "expo": "~57.0.9",
     "expo-constants": "^57.0.8",
     "expo-secure-store": "^57.0.1",
