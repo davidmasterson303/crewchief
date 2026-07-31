@@ -324,6 +324,81 @@ async function checkResponseShapes() {
   }
 }
 
+async function checkConsultant() {
+  console.log('\n8. Ask the advisor — the 4.2 Minimum Functionality flow');
+
+  // No credential must not reach a model. This one is free to assert and is
+  // the assertion that matters most: the route spends Gemini tokens.
+  const anon = await fetch(`${base}/api/v1/consultant`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ vehicleId: UNOWNED_VEHICLE_ID, message: 'hello' }),
+  });
+  if (anon.status === 401) pass('401 without a credential — an anonymous caller cannot spend tokens');
+  else fail(`expected 401 from /api/v1/consultant without a credential, got HTTP ${anon.status}`);
+
+  const demo = await fetch(`${base}/api/v1/consultant`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      vehicleId: DEMO_VEHICLE_ID,
+      /*
+        Deliberately asks for facts the request does not contain. Before task
+        3.0.1 the caller posted the vehicle's entire context and the prompt was
+        built from it, so an answer proved nothing about what the server knew.
+        This is the assertion that context is server-derived.
+      */
+      message:
+        'Reply with only these three values separated by commas and nothing else: my exact current mileage as digits, my trim, my reliability score out of 10.',
+    }),
+  });
+
+  if (demo.status === 403) {
+    fail('403 on a demo vehicle — the route asked for write access, the regression that killed the demo consultant once already');
+    return;
+  }
+  if (!demo.ok) {
+    fail(`demo consultant returned HTTP ${demo.status}`);
+    return;
+  }
+
+  const body = await demo.json();
+  assertNoUnresolvableUrls('consultant (demo)', body);
+
+  const answer = typeof body?.response === 'string' ? body.response : '';
+  if (!answer) {
+    fail('demo consultant answered 200 but carried no response');
+    return;
+  }
+
+  pass(`demo consultant answered anonymously — "${answer.slice(0, 70).replace(/\s+/g, ' ')}…"`);
+
+  /*
+    The demo Accord's own values, from the seed. Checked as facts rather than
+    as a non-empty string, because a model that answered "I don't have your
+    mileage" would satisfy every assertion above.
+  */
+  const facts = [
+    ['mileage', /94[,.]?800/],
+    ['trim', /sport/i],
+    ['reliability score', /\b8\b/],
+  ];
+
+  const missing = facts.filter(([, pattern]) => !pattern.test(answer)).map(([name]) => name);
+
+  if (missing.length === 0) {
+    pass('the answer carries vehicle facts the request never supplied — context is server-derived');
+  } else {
+    /*
+      A model declining to state a fact is not the same as the server not
+      knowing it, so this reports rather than fails outright — but it reports
+      loudly, because it is the only end-to-end evidence that the context load
+      reaches the prompt.
+    */
+    fail(`the answer omitted ${missing.join(', ')} — either context is not reaching the prompt, or the model declined to state it. Read the answer above before dismissing this`);
+  }
+}
+
 async function checkGarageNeedsCredential() {
   console.log('\n7. The garage list with no credential');
 
@@ -340,6 +415,7 @@ await checkBearer();
 await checkStaleCredential();
 await checkResponseShapes();
 await checkGarageNeedsCredential();
+await checkConsultant();
 
 console.log('\n' + '─'.repeat(60));
 if (failures > 0) {

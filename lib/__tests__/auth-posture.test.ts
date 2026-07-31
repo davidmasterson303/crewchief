@@ -174,6 +174,15 @@ const ROUTE_POSTURE: Record<string, 'vehicle-scoped' | 'session' | 'public' | 's
   'app/api/v1/upload-document/route.ts': 'vehicle-scoped',
   'app/api/v1/consultant/upload-document/route.ts': 'vehicle-scoped',
   /*
+    The three advisor routes (task 3.0.1). Each authorizes through lib/api-auth
+    for the status code and then delegates to an action that authorizes again
+    on its own account — see app/api/v1/consultant/route.ts for why that is two
+    different jobs rather than one done twice.
+  */
+  'app/api/v1/consultant/route.ts': 'vehicle-scoped',
+  'app/api/v1/consultant/conversations/route.ts': 'vehicle-scoped',
+  'app/api/v1/consultant/conversations/[sessionId]/route.ts': 'vehicle-scoped',
+  /*
     Returns the commit SHA this deployment was built from — a public repo's
     public commit id, and nothing else. No database, no session, no service
     role. It has to be reachable unauthenticated because the thing asking is
@@ -572,6 +581,28 @@ describe('demo consultant path', () => {
     expect(body).toMatch(/const isDemoVehicle = isDemoVehicleId\(params\.vehicleId\)/);
     expect(body).toMatch(/if \(!isDemoVehicle\) \{/);
     expect(body).not.toMatch(/if \(!isDemo\) \{/);
+  });
+
+  /*
+    The same regression, one layer out. `/api/v1/consultant` authorizes on its
+    own account so it can return a status code, which means it makes the same
+    intent decision the action does — and could get it wrong the same way. The
+    Phase 3 plan called this out specifically: "auth-posture.test.ts guards the
+    action but would not guard a new route." Now it does.
+  */
+  describe('the consultant route makes the same demo decision', () => {
+    const routeSource = readFileSync(join(ROOT, 'app/api/v1/consultant/route.ts'), 'utf8');
+
+    it('derives demo status from the vehicle id, not the request body', () => {
+      expect(routeSource).toMatch(/const isDemoVehicle = isDemoVehicleId\(vehicleId\)/);
+      // body.isDemo would be the client deciding its own authorization.
+      expect(routeSource).not.toMatch(/body\.isDemo/);
+    });
+
+    it('does not ask for write access on a demo vehicle', () => {
+      expect(routeSource).toMatch(/intent:\s*isDemoVehicle\s*\?\s*'read'\s*:\s*'write'/);
+      expect(routeSource).not.toMatch(/authorizeVehicleAccess\([^)]*\{\s*intent:\s*'write'\s*\}/);
+    });
   });
 
   it('keeps demo vehicles read-only in the authorization helper', () => {
