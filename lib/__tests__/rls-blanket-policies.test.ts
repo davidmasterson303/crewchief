@@ -36,6 +36,36 @@
  *
  * Which makes this more useful, not less. A fresh environment is built from
  * these files. If they declare an open database, that is what a rebuild gets.
+ *
+ * ── Measured against live, 31 Jul. The two disagree, and by how much ────────
+ *
+ * Read-only probe of the live project, so this is not an argument from first
+ * principles. **The baseline overstates live exposure, in the safe direction.**
+ *
+ *   - **Ten of the thirteen tables are not granted to `anon` at all.** They
+ *     return `42501`, which is a GRANT failure — it happens *before* any policy
+ *     is consulted. Their blanket policies are unreachable by an anonymous
+ *     caller whatever the policy says. That grant-versus-RLS distinction is the
+ *     thing both July migrations are built around, and it is the thing a
+ *     confident wrong answer was given about on 30 Jul.
+ *
+ *   - **The three that are granted are already scoped in the database.**
+ *     `nhtsa_data`, `vehicle_health_summary` and `vehicle_knowledge_base` each
+ *     hold four rows; an anonymous reader sees three. A live `USING (true)`
+ *     would return four. So those three are scoped live and this corpus does
+ *     not know it — drift in the safe direction, and the same drift
+ *     `vehicles-rls-posture.test.ts` found on `vehicles`.
+ *
+ * So the honest label for this list is **"blanket policies a rebuild would
+ * declare"**, not "blanket policies this database has". Keeping the sixteen
+ * frozen is still right — a rebuild really would produce them — but nobody
+ * should read the number as live exposure. It is not.
+ *
+ * What is *not* measured: these policies are `TO public`, which includes
+ * `authenticated`. Measuring what a signed-in account can reach needs a user
+ * JWT, and none was available when this was written. That is the larger
+ * surface, since an authenticated caller plausibly holds grants `anon` does
+ * not — and it is the open question this file cannot answer.
  */
 
 import { readdirSync, readFileSync } from 'node:fs';
@@ -139,7 +169,8 @@ export function key(policy: Policy): string {
  * untrusted callers. **This list may only ever SHRINK.**
  *
  * Frozen as a baseline rather than fixed in one go, deliberately. Sixteen
- * policies across eleven tables cannot be closed in a single reviewed change,
+ * policies across **thirteen** tables — twelve with one each, plus
+ * `service_items` with four — cannot be closed in a single reviewed change,
  * and demanding that as the price of having a ratchet is how a project ends up
  * with no ratchet. Freezing them makes the *next* one fail the build, which is
  * the property actually worth having.
