@@ -45,6 +45,10 @@ const STATIC_ANALYSIS_SUITES = [
   // on the rule. Absence of `.from(` in the source is the whole signal.
   'mobile-api-only.test.ts',
   'vehicles-rls-posture.test.ts',
+  // Replays the migration corpus to find blanket RLS policies a rebuild would
+  // declare. There is nothing to import: the subject is the SQL on disk, and
+  // the live database is a different question this deliberately does not ask.
+  'rls-blanket-policies.test.ts',
   'portability.test.ts',
   'ws-optional-deps.test.ts',
   'illustration-tokens.test.ts',
