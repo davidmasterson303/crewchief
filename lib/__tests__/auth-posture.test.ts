@@ -532,11 +532,27 @@ describe('server actions', () => {
 describe('demo consultant path', () => {
   const actionsSource = readFileSync(join(ROOT, 'app/actions.ts'), 'utf8');
 
+  /*
+    Sliced to the function's own boundary, not to a byte count.
+
+    This used to take `start + 12000`, which broke the moment the signature
+    grew — task 3.0.1 deprecated twelve parameters and pushed the demo guard
+    past the window. Widening the number would have restored it until next
+    time, but the fixed window was the more interesting problem: the two
+    `not.toMatch` assertions below pass *vacuously* on a window that falls
+    short. A guard that reports safety when it has run out of text to read is
+    the `cc-product-0003` failure again, in the instrument.
+  */
   function sendConsultantMessageBody(): string {
     const start = actionsSource.indexOf('export async function sendConsultantMessage');
     expect(start).toBeGreaterThan(-1);
-    // Far enough to cover the authorization block and the demo guard.
-    return actionsSource.slice(start, start + 12000);
+
+    const next = actionsSource.indexOf('\nexport async function', start + 1);
+    const body = actionsSource.slice(start, next === -1 ? actionsSource.length : next);
+
+    // The negative assertions are only meaningful against a real body.
+    expect(body.length).toBeGreaterThan(2000);
+    return body;
   }
 
   it('does not ask for write access on a demo vehicle', () => {

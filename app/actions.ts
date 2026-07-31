@@ -13,6 +13,7 @@ import { getVehicleImage } from '@/lib/vehicle-images';
 import { logger } from '@crewchief/core/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { downloadStoredFile } from '@/lib/storage-objects';
+import { loadConsultantContext } from '@/lib/consultant-context';
 import { authorizeVehicleAccess, authorizeVehicleScopedRow, requireSession } from '@/lib/api-auth';
 import { isDemoVehicleId } from '@crewchief/core/demo';
 import {
@@ -861,19 +862,54 @@ export async function sendConsultantMessage(params: {
   vehicleId: string;
   sessionId: string;
   message: string;
+  /**
+   * The conversation so far. Still supplied by the caller, and deliberately:
+   * a demo session is never persisted, so there is no server-side record to
+   * read it from. It is the user's own conversation — the worst a caller can
+   * do by editing it is mislead their own advisor.
+   */
   messageHistory: any[];
-  vehicle: any;
-  knowledge: any;
-  wishlistItems: any[];
-  allServiceItems: any[];
-  completedItems: any[];
-  maintenanceLineItems: any[];
-  documents: any[];
-  issueTracking: any[];
-  modTracking?: any[];
+  /**
+   * Files attached to *this* message, before they are recorded against the
+   * session. Each `file_url` is checked against `vehicleId` in
+   * `downloadStoredFile` — see the note there; unscoped paths used to be read
+   * with the service role.
+   */
   attachedDocuments?: any[];
+  /* ── Superseded. Accepted, ignored, and safe to stop sending. ────────────
+   *
+   * All of it is now loaded from the database by `loadConsultantContext`, for
+   * the reasons written out in that module: a phone cannot post a vehicle's
+   * history on every message, and caller-supplied context is caller-supplied
+   * input to a model prompt.
+   *
+   * Kept in the signature so the web client keeps compiling while it is
+   * updated to stop assembling them. Delete this block once ConsultantChat.tsx
+   * no longer sends them.
+   */
+  /** @deprecated Ignored — derived server-side from `vehicleId`. */
+  vehicle?: any;
+  /** @deprecated Ignored — derived server-side from `vehicleId`. */
+  knowledge?: any;
+  /** @deprecated Ignored — derived server-side from `vehicleId`. */
+  wishlistItems?: any[];
+  /** @deprecated Ignored, and was already unread before that. */
+  allServiceItems?: any[];
+  /** @deprecated Ignored — derived server-side from `vehicleId`. */
+  completedItems?: any[];
+  /** @deprecated Ignored — derived server-side from `vehicleId`. */
+  maintenanceLineItems?: any[];
+  /** @deprecated Ignored — derived server-side from `vehicleId`. */
+  documents?: any[];
+  /** @deprecated Ignored — derived server-side from `vehicleId`. */
+  issueTracking?: any[];
+  /** @deprecated Ignored — derived server-side from `vehicleId`. */
+  modTracking?: any[];
+  /** @deprecated Ignored — derived server-side from `vehicleId`. */
   nhtsaData?: any;
+  /** @deprecated Ignored — derived server-side from `vehicleId`. */
   healthSummary?: any;
+  /** @deprecated Ignored — derived server-side from `vehicleId`. */
   modWishlistItems?: any[];
   /** @deprecated Client-supplied and ignored. Demo status is derived from the
    *  vehicle id server-side — see the note in the body. Callers may still pass
@@ -930,25 +966,42 @@ export async function sendConsultantMessage(params: {
       return { success: false, error: access.error };
     }
 
+    const { vehicleId, sessionId, message, messageHistory, attachedDocuments } = params;
+
+    /*
+      Context is derived from vehicleId, never taken from the caller.
+
+      Everything below used to arrive as parameters — vehicle, knowledge,
+      wishlist, history, recalls, health — and the prompt was assembled from
+      whatever was posted. That is caller-controlled input to a model prompt,
+      which this function already refuses to accept for the authorization
+      question two blocks up: `params.isDemo` is ignored "because a caller
+      could downgrade the check on a real vehicle". The same argument covers
+      the rest of it. A caller chooses which vehicle to ask about; the server
+      decides what is true of it.
+
+      It also makes /api/v1/consultant possible. A phone cannot post a
+      vehicle's entire history on every message, and it should not be trusted
+      to if it could.
+    */
+    const contextResult = await loadConsultantContext(vehicleId, access.client);
+    if (!contextResult.ok) {
+      return { success: false, error: contextResult.error };
+    }
+
     const {
-      vehicleId,
-      sessionId,
-      message,
-      messageHistory,
       vehicle,
       knowledge,
       wishlistItems,
-      allServiceItems,
       completedItems,
       maintenanceLineItems,
       documents,
       issueTracking,
       modTracking,
-      attachedDocuments,
       nhtsaData,
       healthSummary,
       modWishlistItems,
-    } = params;
+    } = contextResult.context;
 
     const knownIssues = (knowledge?.known_issues || [])
       .map((issue: any) => `${issue.part} (${issue.mileage_range}) - ${issue.severity}: ${issue.description}`);
