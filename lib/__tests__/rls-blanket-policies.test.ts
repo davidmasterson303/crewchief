@@ -178,26 +178,24 @@ export function key(policy: Policy): string {
  * Removing an entry requires a migration that drops it. Adding one is not a
  * way to make a failing build pass.
  *
- * Four are already spoken for: `20260731030000` closes
- * `maintenance_line_items` (already absent below — the replay sees the drop),
- * and the drafted successor closes `service_items` ×4,
- * `known_issue_tracking` and `modification_tracking`. When that lands, delete
- * those six lines; the honesty assertion below fails until you do.
+ * **Was sixteen; is ten.** `20260731030000` closed `maintenance_line_items`
+ * and `20260731040000` closed `service_items` ×4, `known_issue_tracking` and
+ * `modification_tracking`. Both are absent below because the replay sees their
+ * drops — and the honesty assertion is what forced this list to be updated
+ * rather than left stale, which is the ratchet working as designed.
+ *
+ * Ten remain, across ten tables. Two of them — `vehicle_documents` and
+ * `consultant_conversations` — hold real invoices and real chat history and
+ * need policies written deliberately rather than this pattern applied again.
  */
 const BLANKET_BASELINE = new Set<string>([
   'consultant_conversations:Allow all operations on consultant_conversations',
   'consultant_documents:Allow all operations on consultant_documents',
-  'known_issue_tracking:Allow all operations on known_issue_tracking',
   'labor_bundles:Allow all operations on labor_bundles',
   'location_zones:Allow all operations on location_zones',
   'modification_details:Allow all operations on modification_details',
-  'modification_tracking:Allow all operations on modification_tracking',
   'nhtsa_data:Allow all operations on nhtsa_data',
   'quote_requests:Allow all operations on quote_requests',
-  'service_items:Users can delete their service items',
-  'service_items:Users can insert their service items',
-  'service_items:Users can update their service items',
-  'service_items:Users can view their service items',
   'vehicle_documents:Allow all operations on vehicle_documents',
   'vehicle_health_summary:Allow all operations on vehicle_health_summary',
   'vehicle_knowledge_base:Allow all operations on vehicle_knowledge_base',
@@ -239,7 +237,9 @@ describe('blanket RLS policies, as a rebuild would declare them', () => {
 
   it('ratchets down — the backlog never grows', () => {
     // Lower this as migrations close them. It must never be raised.
-    expect(BLANKET_BASELINE.size).toBeLessThanOrEqual(16);
+    // 16 → 10 on 31 Jul, when 20260731040000 closed service_items ×4,
+    // known_issue_tracking and modification_tracking.
+    expect(BLANKET_BASELINE.size).toBeLessThanOrEqual(10);
   });
 
   it('leaves maintenance_line_items closed', () => {
