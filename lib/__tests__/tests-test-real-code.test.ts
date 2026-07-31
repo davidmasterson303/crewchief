@@ -45,6 +45,12 @@ const STATIC_ANALYSIS_SUITES = [
   'illustration-tokens.test.ts',
   'env-parity.test.ts',
   'tests-test-real-code.test.ts',
+  // Reads components/ to prove that anything mutating a vehicle also
+  // invalidates the garage query key. The bug it pins is invisible at runtime
+  // in a unit test — the garage is a TanStack cache in a browser, and all
+  // three instances found on 30 Jul were a mutation that simply never
+  // mentioned the cache. Absence in the source is the only signal.
+  'garage-cache-invalidation.test.ts',
   // Reads @google/genai's own dist entries to prove the protobufjs CRITICAL is
   // never loaded. Importing the tokenizer to test it would load the very module
   // the suite exists to show is unreachable.
