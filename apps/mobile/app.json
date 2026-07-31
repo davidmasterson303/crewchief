@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "CrewChief",
+    "slug": "crewchief",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "crewchief",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "bundleIdentifier": "co.davidmasterson.crewchief",
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "co.davidmasterson.crewchief",
+      "adaptiveIcon": {
+        "backgroundColor": "#080808",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "extra": {
+      "apiBaseUrl": "https://effulgent-blancmange-6adfdf.netlify.app"
+    }
+  }
+}

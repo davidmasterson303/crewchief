@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "apps/*"
   ],
   "_dependencyNotes": {
     "bufferutil, utf-8-validate": "Optional native deps of `ws`, reached via @google/genai -> lib/gemini.ts. Nothing here imports them and a pruning pass will read them as dead weight. DO NOT REMOVE: without them webpack emits 'Module not found' and every request through the Gemini path HANGS INDEFINITELY rather than erroring. Cost an evening on 28 Jul. Guarded by lib/__tests__/ws-optional-deps.test.ts.",

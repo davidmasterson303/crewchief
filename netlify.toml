@@ -2,5 +2,16 @@
 command = "npx next build"
 publish = ".next"
 
+# Skip the web build when a commit touched only the Expo client.
+#
+# Netlify cancels the build when this command exits 0. `git diff --quiet`
+# exits 0 when there is no difference, so this reads: "nothing changed outside
+# apps/ — don't rebuild the web app."
+#
+# On the first build of a branch CACHED_COMMIT_REF is unset, the command fails,
+# and the build proceeds. That is the safe direction: an unnecessary build
+# costs minutes, a skipped one that should have run costs a stale deployment.
+ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- . ':(exclude)apps'"
+
 [[plugins]]
 package = "@netlify/plugin-nextjs"
