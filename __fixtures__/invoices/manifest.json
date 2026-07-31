@@ -7,10 +7,46 @@
     "THIS REPO IS PUBLIC. Synthetic and sample invoices only — see README.md."
   ],
 
+  "$conventions": [
+    "TAX IS NOT A LINE ITEM. app/actions.ts instructs the model to skip tax lines, so",
+    "expectLineItems and expectLineItemCount EXCLUDE tax, while expectTotal is the grand",
+    "total shown on the document, which INCLUDES tax. sum(expectLineItems) + tax = expectTotal.",
+    "",
+    "SUMMARY LINES ARE NOT LINE ITEMS. Where a document restates a section subtotal (fixture",
+    "04 repeats an unitemised 'Labor $1,250.00' on page 2), the correct extraction keeps the",
+    "itemised rows and drops the restatement. Extracting both is double counting.",
+    "",
+    "kind is this file's vocabulary: part | labour | fee | discount. The app's own field is",
+    "`category` with values parts | labor | misc, and it has no discount value — a negative",
+    "line is expected back as category 'parts' or 'misc' with a negative total_cost.",
+    "",
+    "expectRejected is the pass condition for the non-automotive control: parseInvoiceLineItems",
+    "should return error NOT_AUTOMOTIVE_INVOICE rather than an extraction."
+  ],
+
+  "$provenance": [
+    "All eight fixtures were generated synthetically on 2026-07-30 — no document here came",
+    "from a real shop, a real customer, or the internet. Shop names, addresses, phone numbers",
+    "and invoice numbers are invented. The phone numbers are not dialable — 555 followed by",
+    "eight digits is not a valid US number. The addresses use the state abbreviation 'ST',",
+    "which does not exist, so no address resolves anywhere; note that two of the five-digit",
+    "codes used (00733, 00735) do fall inside Puerto Rico's real range, which is why the",
+    "fictional state abbreviation, not the number, is what makes them unambiguously invented.",
+    "VINs use the DEMO* prefix from supabase/migrations/*seed_demo_vehicles.sql and are 21",
+    "characters, so they are not valid 17-character VINs.",
+    "JPEG fixtures carry no EXIF; PDF fixtures carry no author/creator/producer and a fixed",
+    "timestamp. Manufacturer part numbers are product identifiers, not personal data.",
+    "",
+    "Vehicles deliberately match the three seeded demo vehicles (2018 Honda Accord Sport 2.0T,",
+    "2020 Subaru WRX, 2019 BMW M3 Competition) so uploads exercise extraction rather than",
+    "tripping the VEHICLE_MISMATCH guard. There is currently no fixture that tests that guard."
+  ],
+
   "schema": {
     "file": "filename in this directory",
     "case": "what this fixture is testing — the awkwardness it represents",
     "isAutomotive": "boolean. false = a control that validateConsultantDocument must REJECT",
+    "expectRejected": "boolean. true = a correct run returns NOT_AUTOMOTIVE_INVOICE, not items",
     "expectVendor": "shop name as printed, or null if not asserting",
     "expectDate": "YYYY-MM-DD, or null",
     "expectTotal": "number, or null. The single most useful assertion",
@@ -25,5 +61,160 @@
     "notes": "anything a human needs to know — unreadable fields, ambiguity, why truth is partial"
   },
 
-  "fixtures": []
+  "fixtures": [
+    {
+      "file": "01-clean-scan-itemised.pdf",
+      "case": "Clean digital scan, itemised. The baseline — if this fails, something is badly wrong",
+      "isAutomotive": true,
+      "expectRejected": false,
+      "expectVendor": "Northgate Auto Service",
+      "expectDate": "2026-03-14",
+      "expectTotal": 226.95,
+      "expectLineItemCount": 7,
+      "expectLineItems": [
+        { "description": "Full Synthetic Oil Change - Labor", "amount": 49.95, "kind": "labour" },
+        { "description": "Mobil 1 5W-30 Full Synthetic (5 qt)", "amount": 46.75, "kind": "part" },
+        { "description": "Oil Filter - Honda 15400-PLM-A02", "amount": 12.40, "kind": "part" },
+        { "description": "Cabin Air Filter Replacement - Labor", "amount": 24.00, "kind": "labour" },
+        { "description": "Cabin Air Filter", "amount": 28.60, "kind": "part" },
+        { "description": "Tire Rotation & Balance - Labor", "amount": 39.00, "kind": "labour" },
+        { "description": "Shop Supplies", "amount": 8.95, "kind": "fee" }
+      ],
+      "notes": "Vector PDF, every field crisp. Invoice #NG-24831. Vehicle 2018 Honda Accord Sport 2.0T, VIN DEMO1HGCV1F30JA000001, odometer 93,140. Subtotal 209.65 + tax 17.30 = 226.95; the 17.30 must NOT appear as a line item. Two rows pair a labour charge with its part under near-identical names (Cabin Air Filter Replacement - Labor / Cabin Air Filter) — a model that collapses them will return 6 items."
+    },
+    {
+      "file": "02-phone-photo-angled.jpg",
+      "case": "Phone photo at an angle with slight blur — how a real user actually captures one",
+      "isAutomotive": true,
+      "expectRejected": false,
+      "expectVendor": "Cascade Performance Garage",
+      "expectDate": "2026-05-02",
+      "expectTotal": 803.65,
+      "expectLineItemCount": 6,
+      "expectLineItems": [
+        { "description": "Stage 1 ECU Tune - Labor", "amount": 350.00, "kind": "labour" },
+        { "description": "Front Brake Pad Replacement - Labor", "amount": 120.00, "kind": "labour" },
+        { "description": "Hawk HPS Front Brake Pads HB533F.668", "amount": 118.50, "kind": "part" },
+        { "description": "Brake Fluid Flush - Labor", "amount": 95.00, "kind": "labour" },
+        { "description": "Motul RBF 600 Brake Fluid", "amount": 43.90, "kind": "part" },
+        { "description": "Shop Supplies", "amount": 15.00, "kind": "fee" }
+      ],
+      "notes": "Invoice #CPG-1188. Vehicle 2020 Subaru WRX, VIN DEMO2JF1VA1G60L9000002, odometer 40,655. The real difficulty is geometric, not optical: perspective makes each row's baseline slope, so a description on the left sits visibly higher than its own qty/unit/amount on the right, and each description reads as if it belongs to the row above. Row-to-amount association is what this fixture tests. Every character remains legible to a human at full size. Subtotal 742.40 + tax 61.25 = 803.65."
+    },
+    {
+      "file": "03-faded-thermal-receipt.jpg",
+      "case": "Faded thermal receipt — common at independent shops, low contrast",
+      "isAutomotive": true,
+      "expectRejected": false,
+      "expectVendor": "QuickLube Express #214",
+      "expectDate": "2026-06-19",
+      "expectTotal": 166.11,
+      "expectLineItemCount": 5,
+      "expectLineItems": [
+        { "description": "FULL SYNTHETIC OIL CHG", "amount": 79.99, "kind": "labour" },
+        { "description": "OIL FILTER", "amount": 11.99, "kind": "part" },
+        { "description": "ENGINE AIR FILTER", "amount": 24.99, "kind": "part" },
+        { "description": "WIPER BLADE PAIR", "amount": 32.98, "kind": "part" },
+        { "description": "ENVIRO DISPOSAL FEE", "amount": 3.50, "kind": "fee" }
+      ],
+      "notes": "Ticket T-70455, timestamped 06/19/2026 10:42 AM. Vehicle printed as '2018 HONDA ACCORD' only — no trim and no VIN, so a correct run leaves VIN null and must not flag a mismatch on partial info. Print is faded overall with vertical bands where the head is worn; whole words sit inside those bands and are the likeliest misreads. All five amounts are legible to a human. 'NEXT SVC 99,812 MI' is a service reminder, not a line item. The card line reads VISA ************1000 — a fabricated masked number, no real PAN. Subtotal 153.45 + tax 12.66 = 166.11."
+    },
+    {
+      "file": "04-multipage-invoice.pdf",
+      "case": "Multi-page invoice — does it read past page one, or silently stop",
+      "isAutomotive": true,
+      "expectRejected": false,
+      "expectVendor": "Bavarian Werks Independent Service",
+      "expectDate": "2026-04-08",
+      "expectTotal": 2367.21,
+      "expectLineItemCount": 11,
+      "expectLineItems": [
+        { "description": "Water Pump & Thermostat Replacement - Labor", "amount": 780.00, "kind": "labour" },
+        { "description": "Coolant System Flush & Bleed - Labor", "amount": 165.00, "kind": "labour" },
+        { "description": "Spark Plug Replacement (6 cyl) - Labor", "amount": 210.00, "kind": "labour" },
+        { "description": "Oil Service - Labor", "amount": 95.00, "kind": "labour" },
+        { "description": "Water Pump, OEM", "amount": 462.30, "kind": "part" },
+        { "description": "Thermostat, OEM", "amount": 138.75, "kind": "part" },
+        { "description": "Coolant, BMW G48 Concentrate", "amount": 71.90, "kind": "part" },
+        { "description": "Spark Plugs NGK", "amount": 108.00, "kind": "part" },
+        { "description": "Engine Oil Filter Kit", "amount": 22.85, "kind": "part" },
+        { "description": "Castrol Edge 10W-60", "amount": 91.00, "kind": "part" },
+        { "description": "Shop Supplies & Hazardous Disposal", "amount": 42.00, "kind": "fee" }
+      ],
+      "notes": "Invoice #BW-2261, two pages. Vehicle 2019 BMW M3 Competition, VIN DEMO3WBS8M9C55J5000003. This fixture carries two distinct traps. (1) Truncation: page 1 holds only the four labour rows, so a model that stops after page 1 returns 4 items and a total near 1,250.00 — the shape of that failure is unmistakable. (2) Double counting: page 2's SUMMARY block restates 'Labor (see page 1 for itemization) $1,250.00'. That restatement must NOT be extracted; a model that takes it returns 12 items summing to 3,436.80 before tax against a printed subtotal of 2,186.80. Part numbers are printed in their own column (11517635803, 11537848577, 83192211191, 95770, 11427854445, 15A2D1) and belong in part_number, not in the description. Subtotal 2,186.80 + tax 180.41 = 2,367.21."
+    },
+    {
+      "file": "05-handwritten-additions.jpg",
+      "case": "Handwritten additions on a printed form — very common in small garages",
+      "isAutomotive": true,
+      "expectRejected": false,
+      "expectVendor": "Ridgeway Garage",
+      "expectDate": "2026-07-06",
+      "expectTotal": 209.46,
+      "expectLineItemCount": 5,
+      "expectLineItems": [
+        { "description": "Replace rear diff fluid", "amount": 85.00, "kind": "labour" },
+        { "description": "Redline 75W90 gear oil - 2 qt", "amount": 38.00, "kind": "part" },
+        { "description": "Alignment check", "amount": 60.00, "kind": "labour" },
+        { "description": "Diff crush washer", "amount": 4.50, "kind": "part" },
+        { "description": "SHOP SUPPLIES", "amount": 6.00, "kind": "fee" }
+      ],
+      "notes": "R.O. 4472, date written as '7/6/26' — a correct run resolves that to 2026-07-06, and reading it as 6 July vs some other order is itself worth checking. Four line items, the R.O. number, the date, the vehicle, the odometer and all three totals are handwritten; only SHOP SUPPLIES 6.00 is printed, which makes a partial read easy to spot (printed row present, handwritten rows missing). Vehicle written as '2020 Subaru WRX', no VIN. The form has ten ruled rows and six are blank — blank rows must not become empty line items. Ignore the signature 'D. Reyes' and the margin note 'paid cash - thanks!'. HONEST LIMITATION: the handwriting is a chancery script face with per-glyph jitter, not a real hand. It is more regular than genuine handwriting, so this fixture almost certainly UNDERSTATES how hard real handwriting is. Treat a pass here as necessary, not sufficient. Subtotal 193.50 + tax 15.96 = 209.46."
+    },
+    {
+      "file": "06-parts-labour-sections.pdf",
+      "case": "Parts and labour split into separate sections — tests structure, not just OCR",
+      "isAutomotive": true,
+      "expectRejected": false,
+      "expectVendor": "Meridian Auto Works",
+      "expectDate": "2026-02-21",
+      "expectTotal": 3158.46,
+      "expectLineItemCount": 9,
+      "expectLineItems": [
+        { "description": "Clutch Replacement - Labor", "amount": 1180.00, "kind": "labour" },
+        { "description": "Transmission R&R - Labor", "amount": 420.00, "kind": "labour" },
+        { "description": "Rear Main Seal - Labor", "amount": 90.00, "kind": "labour" },
+        { "description": "Clutch Kit - Exedy", "amount": 685.00, "kind": "part" },
+        { "description": "Lightweight Flywheel", "amount": 412.50, "kind": "part" },
+        { "description": "Rear Main Seal", "amount": 18.40, "kind": "part" },
+        { "description": "Manual Transmission Fluid 75W-90", "amount": 44.85, "kind": "part" },
+        { "description": "Shop Supplies", "amount": 55.00, "kind": "fee" },
+        { "description": "Hazardous Waste Disposal", "amount": 12.00, "kind": "fee" }
+      ],
+      "notes": "Titled REPAIR ORDER rather than INVOICE — worth confirming that alone does not cause a rejection. Invoice #MAW-3390. Vehicle 2020 Subaru WRX, VIN DEMO2JF1VA1G60L9000002. Three sections each carry their own subtotal row (Labor Subtotal 1,690.00, Parts Subtotal 1,160.75, Misc Subtotal 67.00); none of those three is a line item, and taking them yields 12 items and roughly double the subtotal. 'Rear Main Seal' appears twice by design — once as labour at 90.00 and once as a part at 18.40 — so a model that de-duplicates on description alone drops a real row and returns 8. Part numbers 15803HD, FW-SB6, 806732050, K0375Y0700 are in their own column. Subtotal 2,917.75 + tax 240.71 = 3,158.46."
+    },
+    {
+      "file": "07-discounts-and-credits.pdf",
+      "case": "Line items with discounts and credits — negative numbers are quietly mishandled",
+      "isAutomotive": true,
+      "expectRejected": false,
+      "expectVendor": "Northgate Auto Service",
+      "expectDate": "2026-07-11",
+      "expectTotal": 606.85,
+      "expectLineItemCount": 8,
+      "expectLineItems": [
+        { "description": "Front & Rear Brake Service - Labor", "amount": 340.00, "kind": "labour" },
+        { "description": "Brake Pads, Front - Akebono ACT1654", "amount": 78.40, "kind": "part" },
+        { "description": "Brake Pads, Rear - Akebono ACT1451", "amount": 66.20, "kind": "part" },
+        { "description": "Brake Rotors, Front", "amount": 164.00, "kind": "part" },
+        { "description": "Rotor Core Credit", "amount": -35.00, "kind": "discount" },
+        { "description": "Coupon - 15% Off Brake Labor", "amount": -51.00, "kind": "discount" },
+        { "description": "Loyalty Discount", "amount": -20.00, "kind": "discount" },
+        { "description": "Shop Supplies", "amount": 18.00, "kind": "fee" }
+      ],
+      "notes": "Invoice #NG-25107. Vehicle 2018 Honda Accord Sport 2.0T, VIN DEMO1HGCV1F30JA000001, odometer 95,602. Three negative rows, printed with a leading minus (-$35.00, -$51.00, -$20.00). The failure to watch for is sign loss: returning them as +35.00 / +51.00 / +20.00 keeps the item count at 8 and still yields well-formed JSON, but the subtotal becomes 772.60 against a printed 560.60. A second failure mode is dropping them entirely, giving 5 items. Rotor Core Credit is qty 2.0 at -17.50 each; the line total is -35.00. Discounts are applied before tax, so tax 46.25 is 8.25% of the discounted 560.60, not of the gross. The app has no 'discount' category — expect these back as parts or misc with a negative total_cost."
+    },
+    {
+      "file": "08-restaurant-bill-control.jpg",
+      "case": "Non-automotive invoice (control) — validateConsultantDocument must REJECT this",
+      "isAutomotive": false,
+      "expectRejected": true,
+      "expectVendor": "Trellis & Vine Kitchen",
+      "expectDate": "2026-07-18",
+      "expectTotal": 160.31,
+      "expectLineItemCount": null,
+      "expectLineItems": [],
+      "notes": "THE PASS CONDITION IS REJECTION, NOT EXTRACTION. parseInvoiceLineItems should return is_valid_invoice false and error NOT_AUTOMOTIVE_INVOICE; validateConsultantDocument should likewise decline it. An accepted restaurant bill is a real bug and means the corpus has caught a validator that says yes to everything. expectVendor, expectDate and expectTotal are recorded because they are facts about the document and are useful for diagnosing a wrongful accept — they are NOT a target to extract. Check 0472, table 12, 07/18/2026 7:58 PM. Six food and drink items totalling 125.00, plus sales tax 10.31 and gratuity 25.00 = 160.31. Nothing on it is automotive; there is no vehicle, no VIN, no parts and no labour. Note that it does contain the words CHECK, SUBTOTAL, SALES TAX and TOTAL, which is precisely why a keyword-shaped validator would wave it through."
+    }
+  ]
 }
