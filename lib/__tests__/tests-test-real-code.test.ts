@@ -49,6 +49,21 @@ const STATIC_ANALYSIS_SUITES = [
   // never loaded. Importing the tokenizer to test it would load the very module
   // the suite exists to show is unreachable.
   'protobufjs-unreachable.test.ts',
+  // Reads app/actions.ts to prove a parameter is actually referenced. An unused
+  // parameter raises no type error, so only a source scan catches it returning.
+  'performance-goal.test.ts',
+  // Reads app/actions.ts against two migration files, because the failures it
+  // pins are agreements between code and schema that no runtime in this repo
+  // checks: an upsert conflict target naming a constraint that does not exist,
+  // a status outside its CHECK, a NOT NULL column omitted. Every one was
+  // rejected by Postgres and had its error discarded, so the only place the
+  // disagreement is visible is the source of both sides.
+  'mod-details-goal-key.test.ts',
+  // Reads globals.css and the two curtain components to prove the garage-door
+  // intro is still drawn rather than photographed. The thing it guards against
+  // — swapping the CSS slats for a 1.4 MB JPEG — renders correctly, so no
+  // runtime assertion can see it. Only the source can.
+  'garage-door-cost.test.ts',
 ];
 
 /**

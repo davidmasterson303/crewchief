@@ -4,7 +4,6 @@ import * as React from 'react';
 import { TriangleAlert } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { cn } from '@crewchief/core/utils';
 
 /**
  * A text field with a real error state.
@@ -54,7 +53,20 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
           aria-invalid={invalid || undefined}
           // Point at whichever message is actually rendered, never both.
           aria-describedby={invalid ? errorId : hint ? hintId : undefined}
-          className={cn(invalid && 'border-red-400/60 focus-visible:ring-red-400/50', className)}
+          /*
+            No conditional error class (v7 C2).
+
+            This carried `invalid && 'border-red-400/60 focus-visible:ring-red-400/50'`.
+            `aria-invalid` is already set two lines above, and `.field` now styles
+            the control off that attribute — so the colouring came for free and the
+            hardcoded `red-400/60` was competing with `--critical-red-border`.
+
+            Driving it off the attribute also means anything that sets it — a form
+            library, native validation, a future component — gets the treatment,
+            and a screen reader is told. The conditional class did the first half
+            and never the second.
+          */
+          className={className}
           {...props}
         />
 

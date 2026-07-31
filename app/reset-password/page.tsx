@@ -190,7 +190,7 @@ export default function ResetPasswordPage() {
                   placeholder="Min. 6 characters"
                   required
                   autoComplete="new-password"
-                  className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-cyan-500 focus:ring-cyan-500/20 h-11 rounded-xl pr-11"
+                  className="pr-11"
                 />
                 <button
                   type="button"
@@ -212,7 +212,6 @@ export default function ResetPasswordPage() {
                 placeholder="Repeat your password"
                 required
                 autoComplete="new-password"
-                className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-cyan-500 focus:ring-cyan-500/20 h-11 rounded-xl"
               />
             </div>
 

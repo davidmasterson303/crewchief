@@ -6,6 +6,7 @@ import {
   Glass,
   Panel,
   Seam,
+  Strut,
   ROOF,
   SILL,
   type RoofHeight,
@@ -333,15 +334,21 @@ export function MotorcycleIllustration(props: VehicleIllustrationProps) {
     >
       {/* Seat and tail, stepped down off the back of the tank. */}
       <Panel d="M129 49 L150 47 L155 41 L158 44 L153 53 C152 56 149 57 145 57 L130 57 Z" />
-      {/* Fork, from the front hub up to the steering head, and the bars. */}
-      <Seam d={`M${front} ${hub} L74 38`} />
-      <Seam d="M74 38 L75 33" />
-      <Seam d="M64 34 L86 32" />
-      {/* The frame triangle and the engine mass that fills it. */}
-      <Seam d="M92 61 L108 76 L128 60" />
+      {/*
+        Fork, bars, frame and shock are `Strut`, not `Seam`.
+
+        On every other shape a stroke is detail drawn on a mass. Here there is
+        no mass — these lines *are* the motorcycle, and at seam weight they read
+        as thin floating strokes rather than structure. Body weight is what
+        makes them silhouette. The engine line below stays a `Seam`, because it
+        is the one mark here that really is detail inside the frame triangle.
+      */}
+      <Strut d={`M${front} ${hub} L74 38`} />
+      <Strut d="M74 38 L75 33" />
+      <Strut d="M64 34 L86 32" />
+      <Strut d="M92 61 L108 76 L128 60" />
       <Seam d="M100 70 L124 70" />
-      {/* Rear shock down to the hub. */}
-      <Seam d={`M128 57 L${rear - 8} ${hub - 6}`} />
+      <Strut d={`M128 57 L${rear - 8} ${hub - 6}`} />
     </IllustrationFrame>
   );
 }

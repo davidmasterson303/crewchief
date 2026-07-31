@@ -1,179 +1,164 @@
 'use client';
 
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, ChevronDown, Gauge } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { ArrowRight, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import FeaturesDrawer from './FeaturesDrawer';
 
-const DOOR_URL = '/64e52859-aa2e-4ab3-84f2-ba516f699d7d.jpeg';
+/**
+ * The pitch that sits on the garage door. Content only.
+ *
+ * It used to be the curtain as well as the content: it owned an
+ * `AnimatePresence`, a 1.41 MB photograph of a garage door as its backdrop,
+ * four stacked black gradients over that photograph (the topmost at 0.97, which
+ * is why the door read as very nearly black on screen), and an `isOpen` prop
+ * whose state lived in whichever page happened to render it.
+ *
+ * All of that moved to `components/GarageDoor.tsx`. What is left is a headline
+ * and three calls to action, which is all this ever needed to be — and it is
+ * now testable and reusable without dragging a full-screen fixed overlay along
+ * with it.
+ *
+ * **The staggered entrances below must all finish inside
+ * `INTRO_PANEL_SETTLED_MS`.** This panel carries the button that opens the
+ * door, and a control still fading in is a control nobody can press. They
+ * previously ran to 1220ms against a door that started lifting at 900ms, so
+ * three of the four elements were still arriving while the wrapper faded out —
+ * they composited to something permanently dim, and the headline was at full
+ * strength for 50ms. A test holds the relationship now; the numbers here are
+ * half of it.
+ */
 
 interface LandingHeroProps {
-  isOpen: boolean;
+  /**
+   * Raises the door immediately. Supplied by `GarageDoor`'s panel render prop;
+   * this component never holds the door's state itself.
+   */
   onEnter: () => void;
 }
 
-export default function LandingHero({ isOpen, onEnter }: LandingHeroProps) {
+export default function LandingHero({ onEnter }: LandingHeroProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   return (
     <>
-      <AnimatePresence>
-        {!isOpen && (
-          <motion.div
-            className="fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden"
-            initial={{ y: 0 }}
-            exit={{ y: '-100%' }}
-            transition={{ duration: 1.5, ease: [0.45, 0.05, 0.55, 0.95] }}
+      <div className="flex w-full max-w-4xl flex-col items-center">
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05, duration: 0.45, ease: 'easeOut' }}
+        >
+          <h1
+            className="text-6xl md:text-[5.25rem] font-bold text-white leading-tight"
+            style={{ letterSpacing: '-0.04em' }}
           >
-            <div
-              className="absolute inset-0"
+            Your Personal Auto
+            <br />
+            <span
+              className="text-transparent bg-clip-text gradient-text-animate"
               style={{
-                backgroundImage: `url('${DOOR_URL}')`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
+                backgroundImage:
+                  'linear-gradient(90deg, #22d3ee 0%, #38bdf8 25%, #60a5fa 50%, #38bdf8 75%, #22d3ee 100%)',
+                backgroundSize: '200% 100%',
+                letterSpacing: '-0.045em',
               }}
-            />
-
-            <div
-              className="absolute inset-0"
-              style={{
-                background: 'radial-gradient(ellipse 65% 65% at 50% 50%, rgba(0,0,0,0.38) 0%, rgba(0,0,0,0.72) 55%, rgba(0,0,0,0.97) 100%)',
-              }}
-            />
-
-            <div
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                background: 'radial-gradient(ellipse 100% 55% at 50% 100%, rgba(0,0,0,0.88) 0%, transparent 65%)',
-              }}
-            />
-
-            <div
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                background: 'radial-gradient(ellipse 40% 80% at 0% 50%, rgba(0,0,0,0.75) 0%, transparent 60%)',
-              }}
-            />
-            <div
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                background: 'radial-gradient(ellipse 40% 80% at 100% 50%, rgba(0,0,0,0.75) 0%, transparent 60%)',
-              }}
-            />
-
-            <motion.div
-              className="relative z-10 flex flex-col items-center text-center px-6 max-w-4xl w-full"
-              initial={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.4 }}
             >
-              <motion.div
-                initial={{ opacity: 0, y: 24 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.15, duration: 0.7, ease: 'easeOut' }}
-              >
-                <h1
-                  className="text-6xl md:text-[5.25rem] font-bold text-white leading-tight"
-                  style={{ letterSpacing: '-0.04em' }}
-                >
-                  Your Personal Auto
-                  <br />
-                  <span
-                    className="text-transparent bg-clip-text gradient-text-animate"
-                    style={{
-                      backgroundImage: 'linear-gradient(90deg, #22d3ee 0%, #38bdf8 25%, #60a5fa 50%, #38bdf8 75%, #22d3ee 100%)',
-                      backgroundSize: '200% 100%',
-                      letterSpacing: '-0.045em',
-                    }}
-                  >
-                    Ownership Consultant
-                  </span>
-                </h1>
-              </motion.div>
+              Ownership Consultant
+            </span>
+          </h1>
+        </motion.div>
 
-              <motion.p
-                className="text-xl text-gray-300 leading-relaxed mx-auto mt-6"
-                style={{ maxWidth: '600px' }}
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3, duration: 0.7, ease: 'easeOut' }}
-              >
-                Stop guessing. Start strategizing. CrewChief researches your specific car to tell you what breaks, when to upgrade, and how to bundle maintenance to save thousands.
-              </motion.p>
+        <motion.p
+          className="text-xl text-gray-300 leading-relaxed mx-auto mt-6"
+          style={{ maxWidth: '600px' }}
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15, duration: 0.45, ease: 'easeOut' }}
+        >
+          CrewChief researches your exact year, make and trim — what fails, when it fails, and what
+          to bundle so one shop visit does the work of three.
+        </motion.p>
 
-              <motion.div
-                className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-12"
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.45, duration: 0.7, ease: 'easeOut' }}
-              >
-                <button
-                  onClick={onEnter}
-                  className="enter-garage-btn group relative flex items-center gap-2 h-14 px-9 text-base font-semibold text-black rounded-full overflow-hidden transition-all duration-300 hover:shadow-[0_0_32px_rgba(34,211,238,0.45)] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
-                  style={{
-                    background: 'linear-gradient(105deg, #22d3ee 0%, #38bdf8 50%, #3b82f6 100%)',
-                    minWidth: '200px',
-                  }}
-                >
-                  <span
-                    className="shimmer-layer absolute inset-0 pointer-events-none"
-                    aria-hidden="true"
-                  />
-                  <span className="relative z-10 flex items-center gap-2">
-                    Enter Garage
-                    <ArrowRight className="h-5 w-5 transition-transform duration-300 group-hover:translate-x-1.5" />
-                  </span>
-                </button>
+        {/*
+          Three ways in, in a deliberate order of weight.
 
-                <button
-                  onClick={() => setDrawerOpen(true)}
-                  className="group flex items-center gap-2 h-14 px-7 text-base font-medium text-white/80 hover:text-white rounded-full border border-white/[0.18] bg-transparent hover:bg-white/[0.07] transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-                >
-                  Learn More
-                  <ChevronDown className="h-4 w-4 transition-transform duration-300 group-hover:translate-y-0.5" />
-                </button>
-              </motion.div>
+          Two things were wrong before. Sign in and sign up were *identical*
+          outline pills, giving equal weight to unequal actions — and the nav
+          under the door said the opposite, rendering sign-up filled and sign-in
+          as plain text. The same pair, two hierarchies, on the same page.
 
-              <motion.div
-                className="mt-8"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.62, duration: 0.6, ease: 'easeOut' }}
-              >
-                <Link href="/demo">
-                  <button className="demo-btn group relative flex items-center gap-2.5 px-6 py-3 rounded-full border border-cyan-400/25 bg-transparent hover:bg-cyan-500/10 transition-all duration-250 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50">
-                    <span
-                      className="absolute inset-0 rounded-full pointer-events-none demo-glow"
-                      aria-hidden="true"
-                    />
-                    <Gauge className="relative z-10 h-4 w-4 text-cyan-400 transition-transform duration-300 group-hover:scale-110" />
-                    <span className="relative z-10 text-sm font-medium text-cyan-300 group-hover:text-cyan-200 tracking-wide">
-                      Take a Test Drive
-                    </span>
-                    <ArrowRight className="relative z-10 h-3.5 w-3.5 text-cyan-400/70 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:text-cyan-400" />
-                    <span className="relative z-10 text-xs text-white/30 ml-0.5">— no signup needed</span>
-                  </button>
-                </Link>
-              </motion.div>
-            </motion.div>
+          One hierarchy now, and the nav matches it: enter the demo, then sign
+          up, then sign in.
 
-            <motion.div
-              className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 z-10"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 1.1, duration: 0.6 }}
-            >
-              <motion.div
-                animate={{ y: [0, 6, 0] }}
-                transition={{ repeat: Infinity, duration: 2.2, ease: 'easeInOut' }}
-              >
-                <ChevronDown className="h-5 w-5 text-white/25" />
-              </motion.div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          Radius is the design-system token (`--radius`, consumed as rounded-xl)
+          rather than rounded-full. The v4 notes in globals.css record that radii
+          were deliberately *sharpened*; the pill shape here predated that and
+          was the last place still round, so the landing page was advertising a
+          product it no longer looked like.
+
+          Nothing says "free": whether there is a free tier is undecided.
+        */}
+        <motion.div
+          className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-12"
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25, duration: 0.42, ease: 'easeOut' }}
+        >
+          <button
+            onClick={onEnter}
+            className="enter-garage-btn group relative flex items-center justify-center gap-2 h-14 px-9 text-base font-semibold text-black rounded-xl overflow-hidden transition-all duration-300 hover:glow-cyan focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+            style={{
+              background: 'linear-gradient(105deg, #22d3ee 0%, #38bdf8 50%, #3b82f6 100%)',
+              minWidth: '200px',
+            }}
+          >
+            <span className="shimmer-layer absolute inset-0 pointer-events-none" aria-hidden="true" />
+            <span className="relative z-10 flex items-center gap-2">
+              Enter demo
+              <ArrowRight className="h-5 w-5 transition-transform duration-300 group-hover:translate-x-1.5" />
+            </span>
+          </button>
+
+          <Link
+            href="/signup"
+            className="flex items-center justify-center h-14 px-7 text-base font-semibold text-white bg-cyan-600 hover:bg-cyan-500 rounded-xl transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+          >
+            Sign up
+          </Link>
+
+          <Link
+            href="/login"
+            className="flex items-center justify-center h-14 px-7 text-base font-medium text-white/70 hover:text-white rounded-xl border border-white/[0.14] bg-transparent hover:bg-white/[0.06] transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+          >
+            Sign in
+          </Link>
+        </motion.div>
+
+        {/*
+          Learn more is deliberately not a button.
+
+          The three above are ways *in* — they change where you are. This one
+          only opens a panel of explanation and leaves you exactly where you
+          were, so giving it the same pill would advertise it as a fourth door.
+          An underlined text control in a quieter colour says "reading, not
+          leaving", which is what it does.
+        */}
+        <motion.div
+          className="mt-9"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.32, duration: 0.38, ease: 'easeOut' }}
+        >
+          <button
+            onClick={() => setDrawerOpen(true)}
+            className="group inline-flex items-center gap-1.5 text-sm font-normal text-white/45 hover:text-white/75 underline decoration-white/20 hover:decoration-white/50 decoration-1 underline-offset-[5px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 rounded"
+          >
+            What CrewChief does
+            <ChevronDown className="h-3.5 w-3.5 opacity-60 transition-transform duration-300 group-hover:translate-y-0.5" />
+          </button>
+        </motion.div>
+      </div>
 
       <style jsx global>{`
         .shimmer-layer {
@@ -190,15 +175,6 @@ export default function LandingHero({ isOpen, onEnter }: LandingHeroProps) {
         @keyframes shimmer {
           0%   { background-position: 200% center; }
           100% { background-position: -200% center; }
-        }
-
-        .demo-glow {
-          box-shadow: 0 0 0 0 rgba(34, 211, 238, 0);
-          transition: box-shadow 0.3s ease;
-        }
-
-        .demo-btn:hover .demo-glow {
-          box-shadow: 0 0 18px 2px rgba(34, 211, 238, 0.18);
         }
 
         .enter-garage-btn:hover {

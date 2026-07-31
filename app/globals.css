@@ -30,6 +30,87 @@ nav {
     --input: 20 9% 14%;               /* #262220 */
     --border: 30 11% 18%;             /* #332E29 */
 
+    /* ── the elevation ladder's semantic names (v7 C0) ────────────────────
+     *
+     * Aliases, deliberately, not new literals.
+     *
+     * The v7 roadmap specifies `--surface-2: 33 11% 11%` and
+     * `--surface-3: 24 9% 14%`. Those render to #1F1C19 and #272320 — which is
+     * byte-for-byte what `--card` (34 12% 11%) and `--secondary` (20 9% 14%)
+     * already render to. Different spellings of one colour; the comments two
+     * lines above already say "surface-2" and "surface-3" out loud.
+     *
+     * Writing the literals again would put two names on one colour with no
+     * mechanism keeping them equal, which is the "two sources of truth" defect
+     * this repo has fixed four times (the hero and the card showing different
+     * photographs; the score printing twice; three field designs, below).
+     * Pointing at the existing token makes drift impossible instead.
+     *
+     * The names still earn their place: `--secondary` means "secondary", and
+     * using it for a *field fill* is semantically wrong even when the colour is
+     * right. C1 wants to say `hsl(var(--surface-3))` and mean "inset well".
+     *
+     * NB both documents' hex comments are off by one unit — 33 11% 11% is
+     * #1F1C19, not #201D19. Inherited, not introduced; left as-is so the
+     * numbers still match the design system's.
+     */
+    --surface-2: var(--card);         /* card surface: panels, modals */
+    --surface-3: var(--secondary);    /* inset well: input fields, nested rows */
+
+    /* ── form-control edges (v7 C0) ───────────────────────────────────────
+     *
+     * Translucent white, not a fixed neutral, and literal rgb() because an HSL
+     * triplet cannot carry the alpha. `--border` (#332E29) was sampled against
+     * one surface and disappears on the others; a control has to hold its edge
+     * on surface-0 through surface-3 alike.
+     *
+     * Controls only. Never card or panel borders.
+     */
+    --border-field: rgb(255 255 255 / 0.14);
+    --border-field-hover: rgb(255 255 255 / 0.24);
+
+    /* The 3px halo behind a focused control. `--ring` at 0.55 was tuned as a
+     * 2px outline colour and reads as a glow at halo thickness — same hue,
+     * halo weight. */
+    --focus-ring-soft: rgb(34 211 238 / 0.22);
+
+    /* ── design-system vocabulary, aliased onto the app's tokens (v7 C0) ──
+     *
+     * The v7 specs are written in these names; this file was written in the
+     * shadcn ones. Aliasing rather than restating keeps one value per colour —
+     * the same argument C3 makes about field styles, applied to the tokens
+     * themselves.
+     *
+     * These resolve to *colours*, not HSL triplets, so call sites write
+     * `var(--brand-accent)`. The surfaces above are triplets and still need
+     * `hsl(var(--surface-3))`. Mixing the two up produces no colour at all.
+     */
+    --brand-accent: hsl(var(--accent));
+    --text-primary: hsl(var(--foreground));
+    --text-muted: hsl(var(--muted-foreground));
+    --border-default: hsl(var(--border));
+
+    /*
+     * The three below have no alias target, so they are the only literals here.
+     *
+     * `--radius-sm` is a control radius. `--radius` is 14px and belongs to
+     * cards; a 40px-tall input at card radius reads as a pill.
+     *
+     * `--border-subtle` is a hairline inside a well — the EmptyState icon disc,
+     * the PendingCard edge — quieter than `--border-default` without vanishing.
+     * 8% codifies what the dialogs already reach for by hand (`border-white/8`
+     * is throughout them) rather than introducing a seventh value. Known
+     * divergence: the design system ships this at 5%; 8% is deliberate here.
+     *
+     * `--text-muted-40` cannot be expressed as an alias — it needs alpha, and
+     * `--muted-foreground` is a solid triplet. Note it is `--foreground`'s
+     * colour at 40%, *not* `--text-muted`'s: do not "simplify" it to
+     * `--text-muted` with an alpha, which would change the hue.
+     */
+    --radius-sm: 8px;
+    --border-subtle: rgb(255 255 255 / 0.08);
+    --text-muted-40: rgb(245 243 240 / 0.4);
+
     --foreground: 36 20% 95%;         /* #F5F3F0 */
     --card-foreground: 36 20% 95%;
     --popover-foreground: 36 20% 95%;
@@ -475,6 +556,151 @@ nav {
   }
 
   /*
+   * ── .field — every text control in the app (v7 C1/C2) ──────────────────
+   *
+   * `components/ui/input.tsx` and `textarea.tsx` were untouched shadcn:
+   * `bg-background border-input … ring-offset-2`. Against this app's tokens
+   * that is fill `--background` (#100F0D, surface-0) — so a field rendered
+   * *darker than the card holding it* — with a `--input` border measuring
+   * **1.09:1** against a card, and no hover state at all: nothing moved when
+   * you aimed at it. 64 bare fields shipped like that.
+   *
+   * The whole state set lives here rather than in a class string so the
+   * primitive is the only place it is written down. A call site that still
+   * needs a colour after this is a bug in the primitive.
+   *
+   * Two things easy to get wrong, both from the spec:
+   *
+   *   - **No ring offset.** An offset gap on a dark surface reads as a
+   *     hairline crack, not a ring. The halo touches the border.
+   *   - The fill is the *same value* as a surface-3 container, so on that
+   *     surface the fill distinguishes nothing and **the border carries the
+   *     control**. That is intended. What must not come back is a fill darker
+   *     than its container.
+   */
+  .field {
+    width: 100%;
+    min-height: 40px;
+    padding: 10px 12px;
+    background: hsl(var(--surface-3));
+    border: 1px solid var(--border-field);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    /*
+     * 14px, because that is what shipped. Stock shadcn carried `text-sm` and C1
+     * did not replace it, so `.field` inherited the 16px body size and every bare
+     * field in the app silently grew two points. Caught by measuring, not by
+     * reading the diff.
+     *
+     * Worth knowing if this is ever revisited: iOS Safari zooms the viewport when
+     * a focused input is under 16px, so 16 has an argument. That is a deliberate
+     * change to every field in the app and belongs to whoever wants it, not to a
+     * primitive refactor.
+     */
+    font-size: 14px;
+    transition:
+      border-color var(--duration-fast) var(--ease-standard),
+      box-shadow var(--duration-fast) var(--ease-standard),
+      background var(--duration-fast) var(--ease-standard);
+  }
+
+  .field::placeholder {
+    color: var(--text-muted);
+  }
+
+  /* Guarded so hover cannot repaint a focused or disabled control. */
+  .field:hover:not(:disabled):not([readonly]):not(:focus):not(:focus-visible) {
+    border-color: var(--border-field-hover);
+  }
+
+  .field:focus,
+  .field:focus-visible {
+    outline: none;
+    border-color: var(--brand-accent);
+    box-shadow: 0 0 0 3px var(--focus-ring-soft);
+  }
+
+  /*
+   * Invalid is an attribute, never a conditional class (C2).
+   *
+   * Anything that sets `aria-invalid` — a component, a form library, native
+   * validation — gets the treatment, and a screen reader is told. Conditional
+   * colouring did the first half and never the second.
+   */
+  .field[aria-invalid='true'] {
+    border-color: var(--critical-red-border);
+  }
+
+  .field[aria-invalid='true']:focus,
+  .field[aria-invalid='true']:focus-visible {
+    border-color: var(--critical-red);
+    box-shadow: 0 0 0 3px var(--critical-red-wash);
+  }
+
+  .field:disabled,
+  .field[readonly] {
+    background: hsl(var(--surface-2));
+    color: var(--text-muted);
+    cursor: not-allowed;
+  }
+
+  /*
+   * The `sm` size step. 13px is the app's existing small-body size — the
+   * design system calls this `--text-body-sm` but ships no value for it, so
+   * this is a literal until one arrives. One place to change.
+   */
+  .field-sm {
+    min-height: 34px;
+    padding: 7px 10px;
+    font-size: 13px;
+  }
+
+  /*
+   * Textareas size from `rows`, not a fixed min-height, so a caller picks a
+   * height without reaching for a className — which is what `min-h-[80px]`
+   * forced them to do.
+   */
+  .field-textarea {
+    resize: vertical;
+    line-height: 1.55;
+    min-height: unset;
+  }
+
+  /*
+   * A field with a leading glyph, as one surface.
+   *
+   * The control keeps a single edge — the icon sits inside it rather than beside
+   * it in a second bordered box. Every site that wanted this hand-rolled the
+   * wrapper, the absolute positioning and its own padding compensation, which is
+   * how `pl-9` ended up welded to a colour theme at the call site.
+   *
+   * The icon dims to `--text-muted-40` at rest and lifts to `--text-muted` on
+   * `:focus-within`, so the whole control acknowledges focus rather than just
+   * its border.
+   */
+  .field-group {
+    position: relative;
+  }
+
+  .field-group > svg:first-child {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted-40);
+    pointer-events: none;
+    transition: color var(--duration-fast) var(--ease-standard);
+  }
+
+  .field-group:focus-within > svg:first-child {
+    color: var(--text-muted);
+  }
+
+  .field-group > .field {
+    padding-left: 36px;
+  }
+
+  /*
    * The consultant composer, as one surface.
    *
    * The panel owns the border and the focus ring so the textarea inside it can
@@ -701,6 +927,183 @@ nav {
 }
 
 /*
+ * The garage door — the first-load intro curtain. See components/GarageDoor.tsx.
+ *
+ * The slats are drawn, not photographed. The version this replaces used a
+ * 1.41 MB JPEG of a garage door as a CSS background-image, set in an inline
+ * style inside an `ssr: false` chunk — so it was invisible to the preload
+ * scanner and could not begin downloading until the JS had parsed, which is
+ * how a curtain ends up painting as a black rectangle. For scale, the whole
+ * three-card demo grid is held to 250 KB by demo-image-budget.test.ts. This
+ * costs nothing and cannot arrive late.
+ *
+ * The gradient stack is three layers, bottom-up: the panel body, the
+ * horizontal slat ribbing, and the vertical seams between door sections.
+ */
+.garage-door {
+  /*
+    Hidden by default, shown only when the pre-paint script in app/layout.tsx
+    has decided this load gets an intro. That default matters: with JavaScript
+    off the script never runs, the attribute is never set, and the page is
+    simply a page. The alternative default — visible until told otherwise —
+    would leave a permanent curtain over the site.
+  */
+  display: none;
+
+  background-image:
+    /*
+      Vertical seams between door sections — three panel columns, at every
+      viewport width.
+    *
+      Proportional rather than a fixed pitch, and both halves of that were
+      learned by looking. At a fixed 160px the door read as tiling rather than
+      as a door: eight columns across a laptop, where a real sectional door has
+      three or four. Widening to a fixed 360px fixed the laptop and broke the
+      phone — 375px wide means barely one column, so the panel structure
+      vanished entirely and the door became pure horizontal ribbing.
+    */
+    linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.22) 0px,
+      transparent 1px,
+      transparent calc(100% - 1px),
+      rgba(0, 0, 0, 0.22) 100%
+    ),
+    /*
+      Section seams — the horizontal joints between the door's large panels.
+
+      A real sectional door is four or five hinged panels, each carrying fine
+      ribbing. Without this it was one uniform corrugation from top to bottom,
+      which reads as a shutter or a radiator grille. The dark line with a lit
+      edge just under it is the hinge shadow, and it is what makes the ribbing
+      above and below it belong to two different pieces of metal.
+    */
+    linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.5) 0px,
+      rgba(0, 0, 0, 0.26) 2px,
+      rgba(255, 255, 255, 0.055) 4px,
+      transparent 7px
+    ),
+    /*
+      The slats, and their tonal range is deliberate rather than inherited.
+      The first pass ran #232323–#4a4a4a, which is a dark object on a dark page:
+      it read as an absence rather than as a door, and the intro was reported as
+      "faint". Lifting the whole ramp about twelve points gives the metal
+      somewhere to catch light, and keeps the white headline sitting on it at a
+      comfortable contrast instead of glowing in a void.
+    */
+    repeating-linear-gradient(
+      180deg,
+      #4f4f4f 0px,
+      #5e5e5e 2px,
+      #4a4a4a 5px,
+      #373737 22px,
+      #2d2d2d 40px,
+      #373737 43px,
+      #4f4f4f 46px
+    ),
+    linear-gradient(180deg, #3a3a3a 0%, #2b2b2b 50%, #333333 100%);
+  /* Section pitch is 184px — four slats to a panel. */
+  background-size: 33.3333% 100%, 100% 184px, 100% 46px, 100% 100%;
+  background-position: center;
+  box-shadow:
+    inset 0 4px 20px rgba(0, 0, 0, 0.6),
+    inset 0 -4px 20px rgba(0, 0, 0, 0.45);
+}
+
+html[data-intro='play'] .garage-door {
+  display: flex;
+}
+
+/* A soft top-light across the door, so the slats read as lit rather than flat. */
+.garage-door::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    115% 75% at 50% -5%,
+    rgba(255, 255, 255, 0.11) 0%,
+    rgba(255, 255, 255, 0.04) 38%,
+    transparent 68%
+  );
+  pointer-events: none;
+}
+
+/*
+ * The threshold. At rest it is a floor shadow — the cue that the door has a
+ * bottom edge resting on something.
+ *
+ * While the door is lifting it becomes warm light instead, because that is the
+ * whole image the intro is trading on: a garage door going up and the light
+ * from inside spilling out under it. The element is a child of the door, so it
+ * travels with the bottom edge as it rises rather than staying put, which is
+ * what makes it read as light escaping rather than as a glow pinned to the
+ * screen.
+ */
+.garage-door::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 90px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.65), transparent);
+  pointer-events: none;
+  transition: background 700ms ease-out, height 700ms ease-out;
+}
+
+.garage-door.is-lifting::after {
+  height: 150px;
+  background: linear-gradient(
+    to top,
+    rgba(255, 214, 160, 0.5) 0%,
+    rgba(255, 200, 140, 0.16) 35%,
+    transparent 100%
+  );
+}
+
+/*
+ * A door on a chain drive, not a panel on an ease-out.
+ *
+ * The first version travelled a full viewport height in 1.5s on a symmetric
+ * ease-in-out, and read as a slide rather than as a door — "garage doors don't
+ * open that fast", which is exactly right. Three things were wrong with it, and
+ * only one of them was the duration.
+ *
+ * The settle at 4% is the motor taking the load: a real opener pulls the door
+ * down a few millimetres against its own weight before the chain starts lifting
+ * it. It is 3px over about a tenth of a second — under a conscious threshold,
+ * but the difference between machinery and animation.
+ *
+ * The middle is close to linear because a chain drive is close to linear. Easing
+ * belongs at the ends, where the motor is starting and stopping, and nowhere in
+ * between; the old symmetric curve spent the whole travel accelerating or
+ * decelerating, which is what made it feel weightless.
+ */
+@keyframes garageDoorLift {
+  0%   { transform: translateY(0); }
+  4%   { transform: translateY(3px); }
+  100% { transform: translateY(-100%); }
+}
+
+/*
+ * `forwards` is load-bearing. Without it the door snaps back down on the last
+ * frame, and the component removes it a tick later — a visible flicker at the
+ * exact moment the user is looking at the reveal.
+ */
+.garage-door.is-lifting {
+  animation: garageDoorLift 2600ms cubic-bezier(0.3, 0.2, 0.7, 0.82) forwards;
+  will-change: transform;
+}
+
+/* The panel clears as the door takes up, over a beat rather than a blink. */
+.garage-door.is-lifting .garage-door-content {
+  opacity: 0;
+  transition: opacity 600ms ease-out;
+}
+
+/*
  * Reduced motion. There was no handling of this anywhere before — every
  * animation ran regardless of the user's system preference.
  *
@@ -723,5 +1126,16 @@ nav {
   .scroll-reveal {
     opacity: 1;
     transform: none;
+  }
+
+  /*
+    The intro is skipped outright rather than played instantly. The pre-paint
+    script decides this too, so the door normally never renders for a
+    reduced-motion visitor; this is the fallback for the case where the
+    preference changes after the script has run.
+  */
+  .garage-door,
+  html[data-intro='play'] .garage-door {
+    display: none;
   }
 }

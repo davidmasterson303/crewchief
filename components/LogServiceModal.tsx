@@ -183,44 +183,44 @@ export function LogServiceModal({
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs text-white/55">Service Date *</Label>
-                  <Input
+                  <Input fieldSize="sm"
                     type="date"
                     value={manualDate}
                     onChange={(e) => setManualDate(e.target.value)}
-                    className="bg-white/5 border-white/12 text-white text-sm h-9 [color-scheme:dark]"
+                    className="text-sm [color-scheme:dark]"
                   />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs text-white/55">Mileage *</Label>
-                  <Input
+                  <Input fieldSize="sm"
                     type="number"
                     value={manualMileage}
                     onChange={(e) => setManualMileage(e.target.value)}
                     placeholder={String(currentMileage)}
-                    className="bg-white/5 border-white/12 text-white text-sm h-9"
+                    className="text-sm"
                   />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs text-white/55">Shop / DIY</Label>
-                  <Input
+                  <Input fieldSize="sm"
                     value={manualShop}
                     onChange={(e) => setManualShop(e.target.value)}
                     placeholder="e.g. Jiffy Lube or DIY"
-                    className="bg-white/5 border-white/12 text-white text-sm h-9 placeholder:text-white/20"
+                    className="text-sm"
                   />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs text-white/55">Cost (optional)</Label>
                   <div className="relative">
                     <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/30 text-sm">$</span>
-                    <Input
+                    <Input fieldSize="sm"
                       type="number"
                       value={manualCost}
                       onChange={(e) => setManualCost(e.target.value)}
                       placeholder="0.00"
-                      className="bg-white/5 border-white/12 text-white text-sm h-9 pl-6 placeholder:text-white/20"
+                      className="text-sm pl-6"
                     />
                   </div>
                 </div>
@@ -232,7 +232,7 @@ export function LogServiceModal({
                   onChange={(e) => setManualNotes(e.target.value)}
                   placeholder="Brand used, condition observed, etc."
                   rows={2}
-                  className="bg-white/5 border-white/12 text-white text-sm placeholder:text-white/20 resize-none"
+                  className="text-sm resize-none"
                 />
               </div>
               <Button
@@ -262,7 +262,6 @@ export function LogServiceModal({
                   type="number"
                   value={dismissMileage}
                   onChange={(e) => setDismissMileage(e.target.value)}
-                  className="bg-white/5 border-white/12 text-white h-10"
                 />
                 <p className="text-[10px] text-white/30">Defaults to your current mileage ({currentMileage.toLocaleString()} mi)</p>
               </div>

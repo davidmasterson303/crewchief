@@ -56,6 +56,54 @@ interface Fn {
   body: string;
 }
 
+interface LocatedFn extends Fn {
+  file: string;
+}
+
+/**
+ * Find exported actions that look clean but delegate the privileged work to an
+ * unguarded function in another module.
+ *
+ * A pass-through defeats a per-function body scan: `return _doThing(x)`
+ * contains no `getServiceRoleClient(` call, so the body reads as safe while
+ * the service role is reached one module away. That is exactly how six
+ * unguarded wishlist actions passed this suite for the whole of Phase 0.
+ *
+ * Pure, and takes its source reader as an argument, so the detector itself can
+ * be tested against synthetic code. That matters here more than usual: the
+ * only other way to prove this check fires is to strip a real authorization
+ * guard and watch the suite go red, which is not a thing to do to a security
+ * control on a whim.
+ */
+export function findDelegationLeaks(
+  actions: LocatedFn[],
+  readSource: (file: string) => string
+): string[] {
+  const leaks: string[] = [];
+
+  for (const fn of actions) {
+    // Skip the signature line so a function's own name cannot match.
+    const delegate = /^\s*return (\w+)\(/m.exec(fn.body.split('\n').slice(1).join('\n'));
+    if (!delegate) continue;
+
+    const localName = delegate[1];
+
+    // `import { realName as localName } from '...'` — the aliasing the
+    // wrappers actually use.
+    const aliased = new RegExp(`(\\w+) as ${localName}\\b`).exec(readSource(fn.file));
+    const realName = aliased ? aliased[1] : localName;
+
+    const target = actions.find((a) => a.name === realName && a.file !== fn.file);
+    if (!target) continue;
+
+    if (USES_SERVICE_ROLE.test(target.body) && !PROVES_OWNERSHIP.test(target.body)) {
+      leaks.push(`${fn.file}:${fn.name} -> ${target.file}:${target.name}`);
+    }
+  }
+
+  return leaks;
+}
+
 function exportedActions(source: string): Fn[] {
   const lines = source.split('\n');
   const starts: { name: string; line: number }[] = [];
@@ -142,13 +190,21 @@ const ROUTE_POSTURE: Record<string, 'vehicle-scoped' | 'session' | 'public' | 's
  * Server actions that touch the service role but legitimately need no
  * vehicle-scoped check. Keep this list very short and justify each entry.
  */
+/*
+  Qualified by file, not bare names. When these were bare, the exemption for
+  app/actions.ts's demo-filtered `fetchAllVehicles` was silently also covering
+  an identically-named function in lib/actions/vehicles.ts that had no filter
+  at all and read every vehicle in the table. Same name, opposite behaviour,
+  one exemption covering both. The dead file is now deleted, but the shape of
+  that mistake is what the qualification prevents from recurring.
+*/
 const EXEMPT_ACTIONS = new Set<string>([
   // Reads only the three seeded demo vehicles, which are public by design.
-  'fetchDemoVehicles',
+  'app/actions.ts:fetchDemoVehicles',
   // Misleading name: filters .eq('is_demo', true), so it returns demo
   // vehicles only and leaks nothing. Worth renaming — it reads like a
   // cross-tenant query and invites someone to "fix" the filter away.
-  'fetchAllVehicles',
+  'app/actions.ts:fetchAllVehicles',
 ]);
 
 /**
@@ -222,16 +278,124 @@ describe('API routes', () => {
   });
 });
 
+/**
+ * Every file that declares 'use server'.
+ *
+ * This used to be hardcoded to app/actions.ts alone, which meant four other
+ * server-action files were never checked — and one of them, lib/actions/
+ * wishlist.ts, was reaching the service role with no ownership check on six
+ * live exports. Discovered 30 Jul.
+ *
+ * Discovered by walking the tree rather than by list, so a new 'use server'
+ * file is covered the day it is written instead of the day someone remembers
+ * to register it.
+ */
+function findServerActionFiles(dir: string, acc: string[] = []): string[] {
+  for (const entry of readdirSync(dir)) {
+    if (entry === 'node_modules' || entry === '.next' || entry.startsWith('.')) continue;
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) findServerActionFiles(full, acc);
+    else if (entry.endsWith('.ts') && !entry.endsWith('.test.ts')) {
+      const head = readFileSync(full, 'utf8').slice(0, 200);
+      if (/^['"]use server['"]/m.test(head)) acc.push(full.replace(ROOT + '/', ''));
+    }
+  }
+  return acc;
+}
+
 describe('server actions', () => {
-  const source = readFileSync(join(ROOT, 'app', 'actions.ts'), 'utf8');
-  const actions = exportedActions(source);
+  const files = ['app', 'lib'].flatMap((d) => findServerActionFiles(join(ROOT, d)));
+
+  const actions = files.flatMap((file) =>
+    exportedActions(readFileSync(join(ROOT, file), 'utf8')).map((fn) => ({ ...fn, file }))
+  );
 
   const unauthorized = actions
     .filter((fn) => USES_SERVICE_ROLE.test(fn.body) && !PROVES_OWNERSHIP.test(fn.body))
-    .map((fn) => fn.name);
+    .map((fn) => `${fn.file}:${fn.name}`);
 
   it('parses the action surface', () => {
     expect(actions.length).toBeGreaterThan(50);
+  });
+
+  it('scans every use-server file, not just app/actions.ts', () => {
+    // The bug this suite shipped with: one hardcoded path, four files unread.
+    // Named rather than counted: a count passes for the wrong reasons the
+    // moment a file is added or deleted, which is how this assertion would
+    // rot into decoration.
+    expect(files.sort()).toEqual([
+      'app/account-actions.ts',
+      'app/actions.ts',
+      'lib/actions/wishlist.ts',
+    ]);
+  });
+
+  /**
+   * A pass-through defeats the per-function scan above: `return _doThing(x)`
+   * contains no getServiceRoleClient( call, so the body looks clean while the
+   * privileged work happens one module away. That is precisely how six
+   * unguarded wishlist actions passed this suite for the whole of Phase 0.
+   *
+   * So: an exported action whose body only delegates to an import must be
+   * delegating to something that itself proves authorization. Checked by
+   * resolving the callee in the imported module and re-running the same test
+   * on it.
+   */
+  it('sees through pass-throughs to the function doing the privileged work', () => {
+    expect(findDelegationLeaks(actions, (file) => readFileSync(join(ROOT, file), 'utf8')))
+      .toEqual([]);
+  });
+
+  /*
+    The detector, probed with a real violation rather than trusted because the
+    suite is green (cc-tech-0004). The synthetic input below is the shape of
+    the bug found on 30 Jul: a bare re-export in app/actions.ts standing in
+    front of an unguarded service-role write in lib/actions/wishlist.ts.
+  */
+  describe('the pass-through detector itself', () => {
+    const wrapper = (body: string): LocatedFn => ({
+      file: 'app/actions.ts',
+      name: 'addItemToWishlist',
+      body,
+    });
+
+    const primitive = (body: string): LocatedFn => ({
+      file: 'lib/actions/wishlist.ts',
+      name: '_addItemToWishlist',
+      body,
+    });
+
+    const importLine = "import { _addItemToWishlist as addItemToWishlist } from '@/lib/actions/wishlist';";
+
+    it('catches a pass-through to an unguarded service-role write', () => {
+      const leaks = findDelegationLeaks(
+        [
+          wrapper('export async function addItemToWishlist(id: string) {\n  return addItemToWishlist(id);\n}'),
+          primitive(
+            'export async function _addItemToWishlist(id: string) {\n  const c = getServiceRoleClient();\n  return c.from("wishlist_items").insert({});\n}'
+          ),
+        ],
+        () => importLine
+      );
+
+      expect(leaks).toEqual([
+        'app/actions.ts:addItemToWishlist -> lib/actions/wishlist.ts:_addItemToWishlist',
+      ]);
+    });
+
+    it('clears the same pass-through once the primitive authorizes', () => {
+      const leaks = findDelegationLeaks(
+        [
+          wrapper('export async function addItemToWishlist(id: string) {\n  return addItemToWishlist(id);\n}'),
+          primitive(
+            'export async function _addItemToWishlist(id: string) {\n  const a = await authorizeVehicleAccess(id, { intent: "write" });\n  if (!a.ok) return a;\n  const c = getServiceRoleClient();\n  return c.from("wishlist_items").insert({});\n}'
+          ),
+        ],
+        () => importLine
+      );
+
+      expect(leaks).toEqual([]);
+    });
   });
 
   it('introduces no NEW unauthorized service-role caller', () => {

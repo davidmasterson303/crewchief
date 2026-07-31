@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { Input } from '@/components/ui/input';
 import { useRouter } from 'next/navigation';
 import { Car, Eye, EyeOff, Loader as Loader2, CircleCheck as CheckCircle2, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -211,7 +212,7 @@ export default function SignupPage() {
               <label htmlFor="email" className="text-white/70 text-sm font-medium block">
                 Email
               </label>
-              <input
+              <Input
                 id="email"
                 name="email"
                 type="email"
@@ -221,7 +222,6 @@ export default function SignupPage() {
                 required
                 autoComplete="email"
                 suppressHydrationWarning
-                className="w-full bg-white/5 border border-white/10 text-white placeholder:text-white/30 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 h-11 rounded-xl px-3 text-sm transition-colors"
               />
             </div>
 
@@ -230,7 +230,7 @@ export default function SignupPage() {
                 Password
               </label>
               <div className="relative">
-                <input
+                <Input
                   id="password"
                   name="password"
                   type={showPassword ? 'text' : 'password'}
@@ -240,7 +240,7 @@ export default function SignupPage() {
                   required
                   autoComplete="new-password"
                   suppressHydrationWarning
-                  className="w-full bg-white/5 border border-white/10 text-white placeholder:text-white/30 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 h-11 rounded-xl px-3 pr-11 text-sm transition-colors"
+                  className="pr-11"
                 />
                 <button
                   type="button"
@@ -282,7 +282,7 @@ export default function SignupPage() {
               <label htmlFor="confirm-password" className="text-white/70 text-sm font-medium block">
                 Confirm Password
               </label>
-              <input
+              <Input
                 id="confirm-password"
                 name="confirm-password"
                 type={showPassword ? 'text' : 'password'}
@@ -292,7 +292,6 @@ export default function SignupPage() {
                 required
                 autoComplete="new-password"
                 suppressHydrationWarning
-                className="w-full bg-white/5 border border-white/10 text-white placeholder:text-white/30 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 h-11 rounded-xl px-3 text-sm transition-colors"
               />
             </div>
 
@@ -321,7 +320,7 @@ export default function SignupPage() {
           </div>
 
           <div className="mt-4 text-center">
-            <Link href="/demo" className="text-white/30 hover:text-white/50 text-xs transition-colors">
+            <Link href="/" className="text-white/30 hover:text-white/50 text-xs transition-colors">
               Or try the demo without an account
             </Link>
           </div>

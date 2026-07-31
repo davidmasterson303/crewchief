@@ -217,3 +217,39 @@ describe('accessibility survives the redraw', () => {
     unmount();
   });
 });
+
+describe('the motorcycle is drawn as structure, not as markings', () => {
+  /*
+    Rev 1's own review flagged the fork and bars as "thin floating strokes" at
+    200px. They were drawn with `Seam`, the primitive that is deliberately faint
+    at 1.6 because on every other shape a stroke is detail *on* a mass and
+    should recede.
+
+    The motorcycle has no mass to recede against. Its fork, bars, frame triangle
+    and shock are the silhouette, so they are `Strut` at full body weight. This
+    is the one shape where swapping the two primitives is a visual regression
+    rather than a style preference, which is why it is pinned.
+  */
+  const strokeWidths = () => {
+    const Illustration = ILLUSTRATION_BY_STYLE['motorcycle'];
+    const { container, unmount } = render(<Illustration size={200} />);
+    const widths = Array.from(container.querySelectorAll('path'))
+      .map((p) => p.getAttribute('stroke-width'))
+      .filter((w): w is string => !!w);
+    unmount();
+    return widths;
+  };
+
+  it('draws its exposed structure at body weight', () => {
+    const widths = strokeWidths();
+    // Fork, bar stem, bars, frame triangle, rear shock — five, plus the tank
+    // and the seat panel which were always body weight.
+    expect(widths.filter((w) => w === '2.4').length).toBeGreaterThanOrEqual(7);
+  });
+
+  it('keeps exactly one faint seam — the engine line inside the frame', () => {
+    // If this climbs, someone has drawn silhouette with the recede primitive
+    // again. If it hits zero, the one genuine piece of detail was promoted.
+    expect(strokeWidths().filter((w) => w === '1.6')).toHaveLength(1);
+  });
+});

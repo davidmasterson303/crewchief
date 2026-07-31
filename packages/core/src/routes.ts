@@ -28,6 +28,24 @@ export const PROTECTED_ROUTES = [
 export const AUTH_ROUTES = ['/login', '/signup'] as const;
 
 /**
+ * The demo garage. A signed-in user has no reason to be here either.
+ *
+ * `/` shows three seeded cars that belong to nobody. Someone with their own
+ * garage landing on it has been taken somewhere strictly less useful than where
+ * they were, and the two surfaces look near enough alike that it reads as their
+ * data having vanished. Clicking the CrewChief mark in the nav did exactly that.
+ *
+ * Deliberately *only* the garage, not every public demo path. A demo vehicle's
+ * dashboard is a shareable link — someone may well send one to a signed-in user,
+ * and silently bouncing them off it would break sharing to solve a problem
+ * nobody has. `/garage` is the surface that needs separating from `/`.
+ */
+export const DEMO_GARAGE_ROUTE = '/';
+
+/** Where a signed-in user belongs instead. */
+export const SIGNED_IN_HOME = '/garage';
+
+/**
  * Vehicle-detail routes are `/<section>/<vehicleId>`. When that id is one of
  * the seeded demo vehicles the page is public — the whole point of the demo
  * is browsing it without an account.
@@ -74,7 +92,26 @@ export function resolveRoute({
   }
 
   if (AUTH_ROUTES.includes(pathname as (typeof AUTH_ROUTES)[number]) && isAuthenticated) {
-    return { type: 'redirect', location: new URL('/garage', requestUrl).toString() };
+    return { type: 'redirect', location: new URL(SIGNED_IN_HOME, requestUrl).toString() };
+  }
+
+  /*
+    A signed-in user does not get the demo garage. See DEMO_GARAGE_ROUTE.
+
+    **This rule is enforced on the client, not by middleware**, and that is a
+    cost decision rather than an oversight. `/` is deliberately absent from the
+    middleware matcher — the config records why, at length: matching it would put
+    a `getUser()` network round trip in front of every anonymous load of the most
+    visited page on the site, which is the recruiter-facing demo. Paying that on
+    every visit to slightly tidy the experience of the one signed-in user is the
+    wrong trade.
+
+    `components/AuthProvider.tsx` applies it, and it is written here so the policy
+    has one definition and can be tested without a browser. If `/` is ever added
+    to the matcher this starts working there too, with no change.
+  */
+  if (pathname === DEMO_GARAGE_ROUTE && isAuthenticated) {
+    return { type: 'redirect', location: new URL(SIGNED_IN_HOME, requestUrl).toString() };
   }
 
   return { type: 'next' };

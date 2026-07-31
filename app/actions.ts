@@ -1804,6 +1804,41 @@ export async function getVehicleHealthSummary(vehicleId: string) {
   }
 }
 
+/*
+  The union of both vocabularies, because the app genuinely has both.
+
+  `performance_mindedness` (enum)      : stock | mild | aggressive
+  `performance_goal` (text + CHECK)    : mild  | moderate | aggressive
+
+  'stock' and 'moderate' each exist in exactly one of them, so any lookup keyed
+  on one vocabulary and fed from the other has a hole in it. Covering the union
+  is what closes the hole — and typing it as a Record means adding a value to
+  either column fails the build here instead of rendering `undefined` into a
+  prompt sent to Gemini.
+*/
+type GoalKey = 'stock' | 'mild' | 'moderate' | 'aggressive';
+
+const GOAL_CONTEXT: Record<GoalKey, string> = {
+  stock:
+    'to keep the car factory-correct. Prioritise originality, warranty and resale above all else. Be explicit about what a modification costs them in those terms, and say plainly when the honest answer is to leave it alone.',
+  mild: 'subtle improvements that maintain OEM+ reliability. Prioritize longevity and minimal risk. Recommend conservative, proven upgrades that add refinement without compromising the factory engineering.',
+  moderate:
+    'balanced performance and reliability. Suggest upgrades that enhance the driving experience while maintaining reasonable reliability. Focus on well-tested modifications with strong community support.',
+  aggressive:
+    "maximum performance with track-focused priorities. Recommend serious performance upgrades for someone who values power and handling over comfort and longevity. Suggest modifications that push the vehicle's capabilities.",
+};
+
+/**
+ * Coerce whatever a caller has to a key this module can look up.
+ *
+ * 'moderate' is the fallback rather than 'stock' because it is what the
+ * database default has silently meant for every vehicle to date — an unknown
+ * value should land where the old behaviour landed, not somewhere new.
+ */
+function normaliseGoal(value: unknown): GoalKey {
+  return typeof value === 'string' && value in GOAL_CONTEXT ? (value as GoalKey) : 'moderate';
+}
+
 export async function generateModificationDetails(vehicleId: string, modName: string, vehicle: any, performanceMindset: string) {
   // Cost control: server actions are publicly invokable POST endpoints
   // and demo mode has no auth, so every Gemini-backed path is rate limited.
@@ -1820,20 +1855,40 @@ export async function generateModificationDetails(vehicleId: string, modName: st
     }
 
     const client = getServiceRoleClient();
-    const performanceGoal = vehicle.performance_goal || 'moderate';
 
-    const goalContext = {
-      mild: 'subtle improvements that maintain OEM+ reliability. Prioritize longevity and minimal risk. Recommend conservative, proven upgrades that add refinement without compromising the factory engineering.',
-      moderate: 'balanced performance and reliability. Suggest upgrades that enhance the driving experience while maintaining reasonable reliability. Focus on well-tested modifications with strong community support.',
-      aggressive: 'maximum performance with track-focused priorities. Recommend serious performance upgrades for someone who values power and handling over comfort and longevity. Suggest modifications that push the vehicle\'s capabilities.'
-    };
+    /*
+      ── Two columns model this, and only one of them is real ──────────────────
+
+      `performance_mindedness` is an enum the owner actually picks in
+      onboarding. It gates the UI: VehicleInsights hides the mods tab entirely
+      when it is 'stock'.
+
+      `performance_goal` is a text column added later with a CHECK of
+      ('mild','moderate','aggressive') and a NOT NULL default of 'moderate'.
+      **No screen in the app ever writes it.** It is 'moderate' for every
+      vehicle that has ever existed.
+
+      This function took the owner's real choice as `performanceMindset` and
+      then ignored the parameter, reading `performance_goal` instead — so an
+      owner who said 'aggressive' in onboarding got modification analysis
+      written for a 'moderate' owner, every time, and an owner who said 'stock'
+      got mod analysis at all. That is the reported disagreement between the two
+      fields: they never disagreed so much as one of them was never consulted.
+
+      Preferring the parameter fixes it. `performance_goal` stays as the
+      fallback so a caller that has not been updated still behaves as before
+      rather than losing context entirely.
+    */
+    const performanceGoal: GoalKey = normaliseGoal(
+      performanceMindset || vehicle.performance_mindedness || vehicle.performance_goal
+    );
 
     const prompt = `You are an expert automotive consultant analyzing a modification for a specific vehicle owner.
 
 VEHICLE:
 - ${vehicle.year} ${vehicle.make} ${vehicle.model}
 - Owner's Performance Goal: ${performanceGoal.toUpperCase()}
-- Performance Goal Context: The owner wants ${goalContext[performanceGoal as keyof typeof goalContext]}
+- Performance Goal Context: The owner wants ${GOAL_CONTEXT[performanceGoal]}
 - Ownership Objective: ${vehicle.ownership_objective || 'Not specified'}
 
 MODIFICATION: ${modName}
@@ -1880,11 +1935,22 @@ Format as valid JSON only, no markdown or explanations.`;
       logger.warn('MOD:PARSE_ERROR', 'Failed to parse modification details', { error: (parseError as Error).message });
     }
 
+    /*
+      The goal is part of the row's identity, not metadata on it.
+
+      Every field below is written *from* `performanceGoal` — the prompt above
+      says so in as many words, and `alignment_with_goals` is about nothing
+      else. Keying on `(vehicle_id, mod_name)` alone gave four different answers
+      one cache slot, so whichever goal ran last won and the rest read its text.
+      See migration 20260729060000 for why this only became observable once the
+      owner's real choice started reaching the prompt.
+    */
     const { error: upsertError } = await client
       .from('modification_details')
       .upsert({
         vehicle_id: vehicleId,
         mod_name: modName,
+        performance_goal: performanceGoal,
         performance_impact: details.performance_impact,
         reliability_impact: details.reliability_impact,
         cost_benefit_analysis: details.cost_benefit_analysis,
@@ -1893,7 +1959,7 @@ Format as valid JSON only, no markdown or explanations.`;
         compatibility_notes: details.compatibility_notes,
         updated_at: new Date().toISOString(),
       }, {
-        onConflict: 'vehicle_id,mod_name',
+        onConflict: 'vehicle_id,mod_name,performance_goal',
       });
 
     if (upsertError) {
@@ -1901,14 +1967,22 @@ Format as valid JSON only, no markdown or explanations.`;
       return { success: false, error: 'Failed to save details' };
     }
 
-    return { success: true, data: details };
+    return { success: true, data: { ...details, performance_goal: performanceGoal } };
   } catch (error) {
     console.error('Generate modification details error:', error);
     return { success: false, error: 'Failed to generate modification details' };
   }
 }
 
-export async function getModificationDetails(vehicleId: string, modName: string) {
+/**
+ * Read cached analysis for one modification, **under one goal**.
+ *
+ * `performanceGoal` is required rather than optional on purpose. An optional
+ * parameter would let an un-updated call site keep reading across goals and
+ * silently serve another goal's text — which is the bug. Making it required
+ * turns every such call site into a compile error instead.
+ */
+export async function getModificationDetails(vehicleId: string, modName: string, performanceGoal: string) {
   try {
     const access = await authorizeVehicleAccess(vehicleId, { intent: 'read' });
     if (!access.ok) {
@@ -1921,6 +1995,7 @@ export async function getModificationDetails(vehicleId: string, modName: string)
       .select('*')
       .eq('vehicle_id', vehicleId)
       .eq('mod_name', modName)
+      .eq('performance_goal', normaliseGoal(performanceGoal))
       .maybeSingle();
 
     if (error) {
@@ -1935,7 +2010,7 @@ export async function getModificationDetails(vehicleId: string, modName: string)
   }
 }
 
-export async function getModificationDetailsBatch(vehicleId: string, modNames: string[]) {
+export async function getModificationDetailsBatch(vehicleId: string, modNames: string[], performanceGoal: string) {
   try {
     const access = await authorizeVehicleAccess(vehicleId, { intent: 'read' });
     if (!access.ok) {
@@ -1946,11 +2021,13 @@ export async function getModificationDetailsBatch(vehicleId: string, modNames: s
       return { success: true, data: {}, missing: [] };
     }
 
+    const goal = normaliseGoal(performanceGoal);
     const client = getServiceRoleClient();
     const { data, error } = await client
       .from('modification_details')
       .select('*')
       .eq('vehicle_id', vehicleId)
+      .eq('performance_goal', goal)
       .in('mod_name', modNames);
 
     if (error) {
@@ -1969,18 +2046,37 @@ export async function getModificationDetailsBatch(vehicleId: string, modNames: s
     const missing = modNames.filter(name => !foundNames.has(name));
 
     if (missing.length > 0) {
-      const client = getServiceRoleClient();
-      await client
+      /*
+        This enqueue disagreed with its own table in three ways, and none of
+        them could surface because the result was never inspected:
+
+          - `performance_goal` is NOT NULL on `mod_detail_queue` and was not
+            supplied, so every row violated the constraint;
+          - `onConflict: 'vehicle_id,mod_name'` names no constraint that exists
+            — the table is UNIQUE on (vehicle_id, mod_name, performance_goal) —
+            which Postgres rejects outright (42P10);
+          - the error was discarded, so a queue that never accepted a single
+            row looked exactly like a queue with nothing to do.
+
+        The queue table has been goal-keyed since January. It was the only part
+        of this feature that got it right; the writer never caught up.
+      */
+      const { error: enqueueError } = await client
         .from('mod_detail_queue')
         .upsert(
           missing.map(modName => ({
             vehicle_id: vehicleId,
             mod_name: modName,
+            performance_goal: goal,
             status: 'pending',
             created_at: new Date().toISOString(),
           })),
-          { onConflict: 'vehicle_id,mod_name', ignoreDuplicates: true }
+          { onConflict: 'vehicle_id,mod_name,performance_goal', ignoreDuplicates: true }
         );
+
+      if (enqueueError) {
+        console.error('Failed to enqueue modification details:', enqueueError);
+      }
 
       processModDetailQueue(vehicleId).catch((err) => {
         console.error('Failed to process mod detail queue:', err);
@@ -2027,33 +2123,49 @@ export async function processModDetailQueue(vehicleId: string, batchSize: number
 
     let processed = 0;
 
-    for (const item of queueItems) {
-      await client
+    /*
+      A queue item identifies work for one goal, so both the status writes and
+      the generation must carry that goal.
+
+      Two bugs lived in the four lines below. `'processing'` is not one of the
+      four values the status CHECK allows ('pending', 'in_progress',
+      'completed', 'failed'), so the claim was rejected and the item stayed
+      pending — collectable again on the next pass, and paid for twice at
+      Gemini. And matching on `(vehicle_id, mod_name)` alone marked *every*
+      goal's item complete when one of them finished.
+
+      Generation took `vehicle.performance_mindedness` rather than the item's
+      own goal, which is the same collapse one layer up: three queued goals,
+      one answer.
+    */
+    const markStatus = async (item: any, status: 'in_progress' | 'completed' | 'failed') => {
+      const { error } = await client
         .from('mod_detail_queue')
-        .update({ status: 'processing', updated_at: new Date().toISOString() })
+        .update({ status, updated_at: new Date().toISOString() })
         .eq('vehicle_id', item.vehicle_id)
-        .eq('mod_name', item.mod_name);
+        .eq('mod_name', item.mod_name)
+        .eq('performance_goal', item.performance_goal);
+
+      if (error) {
+        console.error(`Failed to mark queue item ${status}:`, error);
+      }
+    };
+
+    for (const item of queueItems) {
+      await markStatus(item, 'in_progress');
 
       const result = await generateModificationDetails(
         item.vehicle_id,
         item.mod_name,
         vehicle,
-        vehicle.performance_mindedness
+        item.performance_goal
       );
 
       if (result.success) {
-        await client
-          .from('mod_detail_queue')
-          .update({ status: 'completed', updated_at: new Date().toISOString() })
-          .eq('vehicle_id', item.vehicle_id)
-          .eq('mod_name', item.mod_name);
+        await markStatus(item, 'completed');
         processed++;
       } else {
-        await client
-          .from('mod_detail_queue')
-          .update({ status: 'failed', updated_at: new Date().toISOString() })
-          .eq('vehicle_id', item.vehicle_id)
-          .eq('mod_name', item.mod_name);
+        await markStatus(item, 'failed');
       }
     }
 
@@ -4898,7 +5010,17 @@ export async function preloadAllPerformanceModifications(vehicleId: string) {
 
         const detailPromises = batch.map(async (mod: any) => {
           try {
-            const detailResult = await getModificationDetails(vehicleId, mod.name);
+            /*
+              The read must be scoped to `goal` or this loop launders one
+              goal's analysis into all three.
+
+              The mild pass generated and cached; the moderate and aggressive
+              passes then hit that row through a goal-blind read, took mild
+              text, and wrote it into `performance_mod_cache` under their own
+              labels. Three caches, three labels, one goal's answer — and the
+              two later passes looked fast because they were doing nothing.
+            */
+            const detailResult = await getModificationDetails(vehicleId, mod.name, goal);
 
             if (detailResult.success && detailResult.data) {
               return { ...mod, details: detailResult.data };

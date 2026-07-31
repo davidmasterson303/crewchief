@@ -376,7 +376,6 @@ export function QuoteRequestDialogV2({
                   value={state.zipCode}
                   onChange={(e) => dispatch({ type: 'SET_ZIP_CODE', zipCode: e.target.value })}
                   maxLength={5}
-                  className="bg-white/4 border-white/10 text-white placeholder:text-white/25 focus:border-cyan-400/50 focus:bg-white/6 h-11 rounded-xl"
                 />
                 <p className="text-xs text-white/30">Used to estimate regional labor rates</p>
               </div>
@@ -391,7 +390,6 @@ export function QuoteRequestDialogV2({
                   placeholder="e.g., Summer Maintenance Package"
                   value={state.quoteName}
                   onChange={(e) => dispatch({ type: 'SET_QUOTE_NAME', name: e.target.value })}
-                  className="bg-white/4 border-white/10 text-white placeholder:text-white/25 focus:border-cyan-400/50 focus:bg-white/6 h-11 rounded-xl"
                 />
               </div>
 
@@ -407,7 +405,7 @@ export function QuoteRequestDialogV2({
                   value={state.additionalNotes}
                   onChange={(e) => dispatch({ type: 'SET_ADDITIONAL_NOTES', notes: e.target.value })}
                   rows={5}
-                  className="resize-none bg-white/4 border-white/10 text-white placeholder:text-white/25 focus:border-cyan-400/50 focus:bg-white/6 rounded-xl"
+                  className="resize-none"
                 />
               </div>
             </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,6 +20,7 @@ import { invalidateDashboardCache } from '@crewchief/core/query-invalidation';
 import RecallHistoryModal from './RecallHistoryModal';
 import { useCountUp } from '@/hooks/use-count-up';
 import { useHealthBand, getHealthBand } from '@/hooks/use-health-band';
+import { isDemoVehicleId } from '@crewchief/core/demo';
 
 interface HealthSummaryProps {
   vehicleId: string;
@@ -73,6 +74,8 @@ function ScoreRing({ score }: { score: number }) {
 export default function HealthSummary({ vehicleId, healthSummary, recalls = [], compact = false }: HealthSummaryProps) {
   const router = useRouter();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  /** One auto-generation per mounted instance. See the effect below. */
+  const autoRunAttempted = useRef(false);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -86,6 +89,47 @@ export default function HealthSummary({ vehicleId, healthSummary, recalls = [], 
     }
     setIsRefreshing(false);
   };
+
+  /*
+    The first report runs itself.
+
+    Asking someone to press "Generate Health Report" before the dashboard says
+    anything about their car makes the product's headline feature look like a
+    chore — and there is nothing for the user to decide, so there was nothing for
+    the button to ask.
+
+    **This does not add LLM traffic beyond the first run.** The persistence David
+    asked for already exists: `generateVehicleHealthSummary` reads
+    `vehicle_health_summary` first and returns the stored row untouched when
+    `last_generated` is under 24 hours old (app/actions.ts). This calls it with
+    `forceRefresh: false`, so it takes that cache; the button keeps `true`,
+    because pressing Refresh deliberately means "I want a new one".
+
+    Guards, each load-bearing:
+      - `attempted` — a ref, so a re-render cannot fire a second generation, and
+        a failure does not retry in a loop.
+      - demo vehicles are skipped. They are read-only and already seeded, and an
+        anonymous visitor must never be able to trigger a Gemini call by loading
+        a page.
+  */
+  useEffect(() => {
+    if (healthSummary || autoRunAttempted.current) return;
+    if (isDemoVehicleId(vehicleId)) return;
+
+    autoRunAttempted.current = true;
+    setIsRefreshing(true);
+
+    generateVehicleHealthSummary(vehicleId, false)
+      .then((result) => {
+        if (result.success) {
+          invalidateDashboardCache(vehicleId);
+          router.refresh();
+        }
+        // Silent on failure: the button below is still there, and a toast on
+        // page load for something the user did not ask for is noise.
+      })
+      .finally(() => setIsRefreshing(false));
+  }, [healthSummary, vehicleId, router]);
 
   if (!healthSummary) {
     return (

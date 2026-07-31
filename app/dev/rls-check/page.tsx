@@ -131,6 +131,9 @@ export default function RlsCheckPage() {
       <label className="block text-sm mb-2 text-white/70">
         A vehicle id belonging to a <em>different</em> account
       </label>
+      {/* Deliberately a raw input, not the shared `Input` (v7 C3): this is a dev
+          tool, not a product surface, and the one place an unstyled control costs
+          nothing. Not an oversight — please leave it. */}
       <input
         value={vehicleId}
         onChange={(e) => setVehicleId(e.target.value)}

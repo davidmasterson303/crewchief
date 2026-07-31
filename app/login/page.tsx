@@ -2,6 +2,7 @@
 
 import { useState, Suspense } from 'react';
 import Link from 'next/link';
+import { Input } from '@/components/ui/input';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Car, Eye, EyeOff, Loader as Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -57,7 +58,15 @@ function LoginForm() {
         <label htmlFor="email" className="text-white/70 text-sm font-medium">
           Email
         </label>
-        <input
+        {/*
+          Converted from a raw `<input>` to the shared primitive (v7 C3).
+
+          This screen and signup were the only two bypassing `Input` entirely, so
+          C1 reached every form in the app except the first two anyone meets.
+          Type, name, autoComplete and `required` are unchanged — this is a
+          conversion, not a restyle.
+        */}
+        <Input
           id="email"
           name="email"
           type="email"
@@ -66,7 +75,6 @@ function LoginForm() {
           placeholder="you@example.com"
           autoComplete="username"
           required
-          className="w-full bg-white/5 border border-white/10 text-white placeholder:text-white/30 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 h-11 rounded-xl px-3 text-sm transition-colors"
         />
       </div>
 
@@ -80,7 +88,9 @@ function LoginForm() {
           </Link>
         </div>
         <div className="relative">
-          <input
+          {/* `pr-11` stays — it clears the show/hide button, which is layout,
+              not theme. */}
+          <Input
             id="password"
             name="password"
             type={showPassword ? 'text' : 'password'}
@@ -89,7 +99,7 @@ function LoginForm() {
             placeholder="••••••••"
             autoComplete="current-password"
             required
-            className="w-full bg-white/5 border border-white/10 text-white placeholder:text-white/30 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 h-11 rounded-xl px-3 pr-11 text-sm transition-colors"
+            className="pr-11"
           />
           <button
             type="button"
@@ -148,7 +158,7 @@ export default function LoginPage() {
           </div>
 
           <div className="mt-4 text-center">
-            <Link href="/demo" className="text-white/30 hover:text-white/50 text-xs transition-colors">
+            <Link href="/" className="text-white/30 hover:text-white/50 text-xs transition-colors">
               Or try the demo without an account
             </Link>
           </div>

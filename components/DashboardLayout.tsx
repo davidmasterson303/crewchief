@@ -13,6 +13,7 @@ import { updateVehicleAvgMileage, updateVehicleMileage, updateVehicleStatus } fr
 import { USAGE_PROFILES, usageProfileChip } from '@crewchief/core/usage-profile';
 import { invalidateDashboardCache } from '@crewchief/core/query-invalidation';
 import { AccountMenu } from '@/components/AccountMenu';
+import { useHomeHref } from '@/hooks/use-home-href';
 
 interface DashboardLayoutProps {
   vehicle: any;
@@ -32,6 +33,7 @@ const tabs = [
 
 export default function DashboardLayout({ vehicle, knowledge, currentPage, children, vehicleImage, healthSummary }: DashboardLayoutProps) {
   const router = useRouter();
+  const homeHref = useHomeHref();
   const activeBreadcrumb = tabs.find(({ key }) => key === currentPage)?.label ?? '';
   const [isEditingAvgMileage, setIsEditingAvgMileage] = useState(false);
   const [isEditingCurrentMileage, setIsEditingCurrentMileage] = useState(false);
@@ -163,7 +165,7 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           <div className={`flex items-center justify-between transition-all duration-200 ${scrolled ? 'py-3' : 'py-4'}`}>
             <div className="flex items-center gap-3">
-              <Link href="/" className="flex items-center space-x-2.5 group">
+              <Link href={homeHref} className="flex items-center space-x-2.5 group">
                 <Car className="h-6 w-6 text-cyan-400 transition-transform group-hover:scale-105" />
                 <span className={`font-semibold text-white tracking-tight transition-all duration-200 ${scrolled ? 'text-base' : 'text-lg'}`}>CrewChief</span>
               </Link>
@@ -171,7 +173,7 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
               <div className="hidden sm:flex items-center gap-1 text-white/30 text-sm">
                 <ChevronRight className="h-3.5 w-3.5" />
                 <button
-                  onClick={() => router.push('/')}
+                  onClick={() => router.push(homeHref)}
                   className="text-white/50 hover:text-white transition-colors min-h-[44px] flex items-center px-1"
                 >
                   Garage
@@ -194,10 +196,22 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
               </div>
             </div>
 
+            {/*
+              Goes to the caller's own garage.
+
+              Every one of the four "Garage" controls in this layout — the mark,
+              this button, the breadcrumb and the footer link — pushed `/`, which
+              is the *demo* garage. For a signed-in user looking at their own car
+              that is a door out of their data and into three vehicles belonging
+              to nobody, and because the two surfaces look alike it reads as
+              theirs having vanished. It also read as a dead control: `/` now
+              redirects a signed-in user back to /garage, so the visible result
+              of pressing it was a flicker and no apparent change.
+            */}
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => router.push('/')}
+              onClick={() => router.push(homeHref)}
               className="text-white/60 hover:text-white hover:bg-white/8 gap-1.5 transition-colors min-h-[44px]"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -269,11 +283,11 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                 <span className="label-uppercase">Mileage</span>
                 {isEditingCurrentMileage ? (
                   <div className="flex items-center gap-2">
-                    <Input
+                    <Input fieldSize="sm"
                       type="number"
                       value={currentMileage}
                       onChange={(e) => setCurrentMileage(e.target.value)}
-                      className="w-28 h-8 bg-white/8 border-white/20 text-white text-sm"
+                      className="w-28 text-sm"
                       disabled={isSaving}
                       autoFocus
                     />
@@ -301,11 +315,11 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                 <span className="label-uppercase">Avg. Monthly Miles</span>
                 {isEditingAvgMileage ? (
                   <div className="flex items-center gap-2">
-                    <Input
+                    <Input fieldSize="sm"
                       type="number"
                       value={avgMileage}
                       onChange={(e) => setAvgMileage(e.target.value)}
-                      className="w-24 h-8 bg-white/8 border-white/20 text-white text-sm"
+                      className="w-24 text-sm"
                       disabled={isSaving}
                       autoFocus
                     />
@@ -394,7 +408,7 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
           <span>CrewChief &copy; {new Date().getFullYear()}</span>
           <div className="flex items-center gap-4">
             <a href="mailto:feedback@crewchief.app" className="hover:text-white/50 transition-colors">Feedback</a>
-            <Link href="/" className="hover:text-white/50 transition-colors">Garage</Link>
+            <Link href={homeHref} className="hover:text-white/50 transition-colors">Garage</Link>
           </div>
         </footer>
       </div>

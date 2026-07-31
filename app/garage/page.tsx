@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Car, Plus } from 'lucide-react';
@@ -8,10 +9,14 @@ import { useMyVehicles } from '@/hooks/useVehicles';
 import { useAuth } from '@/components/AuthProvider';
 import { AccountMenu } from '@/components/AccountMenu';
 import { RevealOnScroll } from '@/components/RevealOnScroll';
+import { useHomeHref } from '@/hooks/use-home-href';
+import FeaturesDrawer from '@/components/FeaturesDrawer';
 
 export default function GaragePage() {
   const { loading: authLoading } = useAuth();
   const { data: vehicles = [], isLoading, error: queryError } = useMyVehicles();
+  const homeHref = useHomeHref();
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   // The vehicle query is disabled until the session resolves, and a disabled
   // query is not "loading" as far as TanStack Query is concerned. Without
@@ -42,7 +47,7 @@ export default function GaragePage() {
       <nav className="relative z-20 border-b border-info-border" style={{ backgroundColor: '#000000', backdropFilter: 'blur(12px)' }}>
         <div className="max-w-7xl mx-auto px-6 lg:px-12 py-5">
           <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center space-x-3 group">
+            <Link href={homeHref} className="flex items-center space-x-3 group">
               <Car className="h-7 w-7 text-cyan-400 transition-transform group-hover:scale-105" />
               <span className="text-xl font-semibold text-white tracking-tight">CrewChief</span>
             </Link>
@@ -99,11 +104,24 @@ export default function GaragePage() {
                   Add Your First Vehicle
                 </Button>
               </Link>
-              <Link href="/">
-                <Button size="lg" variant="outline" className="h-14 px-10 rounded-full text-base font-medium border-cyan-500/50 text-cyan-400 hover:bg-cyan-500/10">
-                  Learn More
-                </Button>
-              </Link>
+              {/*
+                Opens the feature drawer rather than linking to `/`.
+
+                This is the empty state of a *signed-in* garage, so "Learn More"
+                was sending someone who already has an account to the anonymous
+                demo — and now that a signed-in user is redirected off `/`, it
+                would have bounced them straight back here. Same affordance, no
+                round trip, and the drawer is the better answer anyway: it
+                explains the product without leaving the page they need to act on.
+              */}
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => setDrawerOpen(true)}
+                className="h-14 px-10 rounded-full text-base font-medium border-cyan-500/50 text-cyan-400 hover:bg-cyan-500/10"
+              >
+                Learn More
+              </Button>
             </div>
           </div>
         ) : (
@@ -122,6 +140,8 @@ export default function GaragePage() {
           </div>
         )}
       </main>
+
+      <FeaturesDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />
     </div>
   );
 }

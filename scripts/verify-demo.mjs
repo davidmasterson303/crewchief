@@ -26,6 +26,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 // The contract is TypeScript, so mirror the few values needed rather than
 // adding a build step to a script whose whole point is being runnable now.
 const DEMO_VEHICLE_ID = 'a1000000-0000-0000-0000-000000000001';
+// Mirrors DEMO_UNPHOTOGRAPHED_VEHICLE_IDS in packages/core/src/demo.ts, and
+// demo-availability.test.ts fails if the two drift apart.
+const DEMO_UNPHOTOGRAPHED_VEHICLE_IDS = ['a3000000-0000-0000-0000-000000000003'];
 const REQUIRED_ANON_TABLES = [
   'vehicles',
   'vehicle_health_summary',
@@ -42,10 +45,22 @@ const DEFAULT_BASE = 'https://crewchief-demo.davidmasterson.co';
 const base = (process.argv[2] || DEFAULT_BASE).replace(/\/$/, '');
 
 const PAGE_CHECKS = [
-  { path: '/demo', mustContain: ['Honda', 'Subaru', 'BMW'], label: 'demo garage' },
+  // `/`, not `/demo` — the demo garage lives at the root now. Checking /demo
+  // here would still pass, because the fetch below follows redirects, and would
+  // be asserting nothing about where the cars are.
+  { path: '/', mustContain: ['Honda', 'Subaru', 'BMW'], label: 'demo garage' },
   { path: `/dashboard/${DEMO_VEHICLE_ID}`, mustContain: ['Accord'], label: 'vehicle dashboard' },
   { path: `/consultant/${DEMO_VEHICLE_ID}`, mustContain: [], label: 'consultant' },
 ];
+
+/*
+ * Paths that must keep resolving somewhere useful, wherever that now is.
+ *
+ * README.md advertises the demo URL and davidmasterson.co/ai-work.html links to
+ * it, so /demo cannot 404 just because the page behind it was merged into /. It
+ * also must not land on /login, which is the failure this script was written for.
+ */
+const REDIRECT_CHECKS = [{ from: '/demo', to: '/', label: 'legacy /demo link' }];
 
 let failures = 0;
 let warnings = 0;
@@ -89,6 +104,27 @@ async function checkPages() {
         warn(`${check.label} loaded but initial HTML lacks: ${missing.join(', ')}`);
       } else {
         pass(`${check.label} — HTTP 200 at ${finalPath}`);
+      }
+    } catch (error) {
+      fail(`${check.label} — request failed: ${error.message}`);
+    }
+  }
+}
+
+async function checkRedirects() {
+  console.log('\nLinks published elsewhere that must still resolve');
+  for (const check of REDIRECT_CHECKS) {
+    const url = `${base}${check.from}`;
+    try {
+      const res = await fetch(url, { redirect: 'follow' });
+      const finalPath = new URL(res.url).pathname;
+
+      if (!res.ok) {
+        fail(`${check.label} returned HTTP ${res.status} — a published URL is dead`);
+      } else if (finalPath !== check.to) {
+        fail(`${check.label} landed on ${finalPath}, expected ${check.to}`);
+      } else {
+        pass(`${check.label} → ${finalPath}`);
       }
     } catch (error) {
       fail(`${check.label} — request failed: ${error.message}`);
@@ -219,7 +255,7 @@ async function checkVehicleImages(supabaseUrl, key) {
   let rows;
   try {
     const res = await fetch(
-      `${supabaseUrl}/rest/v1/vehicles?select=make,model,image_url&is_demo=eq.true`,
+      `${supabaseUrl}/rest/v1/vehicles?select=id,make,model,image_url&is_demo=eq.true`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     if (!res.ok) {
@@ -234,6 +270,18 @@ async function checkVehicleImages(supabaseUrl, key) {
 
   for (const v of rows) {
     const label = `${v.make} ${v.model}`;
+
+    /*
+      One demo car is unphotographed on purpose, so that a visitor sees the state
+      every real user starts in. Its seeded row still carries an image_url the app
+      deliberately ignores, so asserting that file resolves would be checking an
+      asset nothing renders — and reporting a photograph where there is none.
+    */
+    if (DEMO_UNPHOTOGRAPHED_VEHICLE_IDS.includes(v.id)) {
+      pass(`${label} — deliberately unphotographed, renders the identity plate`);
+      continue;
+    }
+
     if (!v.image_url) {
       warn(`${label} has no image_url`);
       continue;
@@ -320,6 +368,7 @@ async function checkDemoApiRoutes() {
 
 console.log(`\nVerifying demo at ${base}`);
 await checkPages();
+await checkRedirects();
 await checkAiCredential();
 await checkDemoApiRoutes();
 await checkAnonData();

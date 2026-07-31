@@ -1,12 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Activity, TrendingUp, TrendingDown, Minus } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
 
+/**
+ * History arrives as a prop, fetched by the dashboard.
+ *
+ * It used to run its own `vehicle_health_history` query in a `useEffect`. The
+ * dashboard now needs the same rows before this even renders — to decide whether
+ * the collapsed "Score history" section should exist at all, and to put a
+ * reading count in its folded summary — so leaving the fetch here meant two
+ * queries against one table on one page load.
+ */
 interface HealthHistoryChartProps {
-  vehicleId: string;
+  history: HistoryEntry[];
   currentScore?: number;
 }
 
@@ -73,31 +80,13 @@ function MiniSparkline({ data }: { data: HistoryEntry[] }) {
   );
 }
 
-export default function HealthHistoryChart({ vehicleId, currentScore }: HealthHistoryChartProps) {
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!supabase) return;
-
-    (async () => {
-      try {
-        const result = await supabase
-          .from('vehicle_health_history')
-          .select('health_score, recorded_at')
-          .eq('vehicle_id', vehicleId)
-          .order('recorded_at', { ascending: true })
-          .limit(12);
-        if (result.data && result.data.length > 0) {
-          setHistory(result.data as HistoryEntry[]);
-        }
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [vehicleId]);
-
-  if (loading || history.length < 2) return null;
+export default function HealthHistoryChart({ history, currentScore }: HealthHistoryChartProps) {
+  /*
+    Still guarded, even though the dashboard already checks before rendering
+    this. A two-point line is not a chart, and the component should not depend on
+    every future caller remembering that.
+  */
+  if (history.length < 2) return null;
 
   const scores = history.map(h => h.health_score);
   const firstScore = scores[0];

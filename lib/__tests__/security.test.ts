@@ -169,6 +169,52 @@ describe('Middleware: route protection', () => {
     });
   });
 
+  describe('the demo garage is not for signed-in users', () => {
+    /*
+      `/` shows three seeded cars that belong to nobody. A signed-in user landing
+      there has been moved somewhere strictly less useful than where they were,
+      and because the demo garage and their own garage look alike it reads as
+      their vehicles having disappeared. Every "Garage" control in the app used to
+      push `/`, so the CrewChief mark in the nav did exactly that.
+    */
+    it('sends a signed-in visitor from / to their own garage', () => {
+      const decision = decisionFor('/', true);
+
+      expect(decision.type).toBe('redirect');
+      expect(decision.type === 'redirect' && new URL(decision.location).pathname).toBe('/garage');
+    });
+
+    it('leaves an anonymous visitor on /', () => {
+      // Load-bearing in the other direction: `/` is the recruiter-facing demo
+      // and must stay reachable without an account. demo-contract.ts lists it.
+      expect(decisionFor('/', false).type).toBe('next');
+    });
+
+    it('does not bounce a signed-in visitor off a shared demo vehicle link', () => {
+      /*
+        Deliberately narrower than "never any demo path". A demo car's dashboard
+        is a shareable URL — someone may well send one to a signed-in user, and
+        silently redirecting them off it would break sharing to solve a problem
+        nobody reported. The garage is the surface that needed separating.
+      */
+      expect(decisionFor('/dashboard/a1000000-0000-0000-0000-000000000001', true).type).toBe(
+        'next'
+      );
+    });
+
+    it('is enforced on the client, because / is deliberately unmatched', () => {
+      /*
+        Guards the guard, and records the trade. The rule above is real policy but
+        middleware never sees it: matching `/` would put a getUser() round trip in
+        front of every anonymous load of the most visited page on the site.
+        components/AuthProvider.tsx applies it instead. If this assertion ever
+        fails, someone has added `/` to the matcher and should check they meant to
+        pay that cost — the rule itself will simply start working there too.
+      */
+      expect(middlewareConfig.matcher).not.toContain('/');
+    });
+  });
+
   describe('matcher wiring', () => {
     it('is not empty — an empty matcher disables middleware entirely', () => {
       expect(middlewareConfig.matcher.length).toBeGreaterThan(0);

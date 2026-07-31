@@ -130,7 +130,11 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
         setModTracking(modResult.data);
         const modNames = (knowledge?.common_mods || []).map((mod: any) => mod.name);
         if (modNames.length > 0) {
-          const batchResult = await getModificationDetailsBatch(vehicle.id, modNames);
+          const batchResult = await getModificationDetailsBatch(
+            vehicle.id,
+            modNames,
+            vehicle.performance_mindedness
+          );
           if (batchResult.success) setModDetails(batchResult.data);
         }
       }

@@ -3,14 +3,32 @@ import * as React from 'react';
 import { cn } from '@crewchief/core/utils';
 
 export interface TextareaProps
-  extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {}
+  extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+  /** Matches `Input`'s `sm` step, for a textarea sitting in a dense form. */
+  fieldSize?: 'default' | 'sm';
+}
 
+/**
+ * The one textarea. Shares every state with `Input` through `.field`.
+ *
+ * See `input.tsx` for what this was and why it changed.
+ *
+ * **Height comes from `rows`, not a fixed minimum.** The old `min-h-[80px]` meant
+ * a caller wanting anything else had to override it with a className — which is
+ * how `QuoteRequestDialogV2` ended up carrying a whole field theme just to change
+ * a height. `rows` defaults to 3 and the browser derives the height from it, so
+ * `rows={6}` is now the entire API for "taller". `.field-textarea` clears the
+ * `min-height` that `.field` sets for inputs so `rows` is actually in charge.
+ */
 const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
-  ({ className, ...props }, ref) => {
+  ({ className, rows = 3, fieldSize = 'default', ...props }, ref) => {
     return (
       <textarea
+        rows={rows}
         className={cn(
-          'flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
+          'field field-textarea',
+          fieldSize === 'sm' && 'field-sm',
+          'disabled:opacity-60',
           className
         )}
         ref={ref}

@@ -20,7 +20,11 @@
 
 import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { DEMO_IMAGES } from '@crewchief/core/demo';
+import {
+  DEMO_IMAGES,
+  DEMO_UNPHOTOGRAPHED_VEHICLE_IDS,
+  DEMO_VEHICLE_IDS,
+} from '@crewchief/core/demo';
 
 const PUBLIC = join(__dirname, '..', '..', 'public');
 
@@ -41,9 +45,37 @@ function sizeOf(publicPath: string): number {
 describe('the demo garage grid stays inside its payload budget', () => {
   const paths = Object.values(DEMO_IMAGES);
 
-  it('has three demo photographs to measure', () => {
+  it('has photographs to measure', () => {
     // Guards the guard: an empty map would make every assertion below vacuous.
-    expect(paths).toHaveLength(3);
+    expect(paths.length).toBeGreaterThan(0);
+  });
+
+  it('accounts for every demo vehicle, photographed or deliberately not', () => {
+    /*
+      This replaces a bare `toHaveLength(3)`, which was the right assertion while
+      all three cars carried a file and the wrong one the moment the M3 stopped.
+      A count cannot tell "we removed a photograph on purpose" from "a photograph
+      fell out of the map", and the second is exactly the silent regression this
+      suite exists for — a missing key sends the card back to the vehicle's own
+      column, which still holds an old remote hero.
+
+      So the invariant is accounting rather than arithmetic: each demo vehicle is
+      in exactly one of the two lists, and the lists together cover all of them.
+    */
+    const photographed = Object.keys(DEMO_IMAGES);
+    // Widened deliberately: the const assertion narrows to a literal union, so
+    // `includes` would reject any id that is not already the expected one.
+    const unphotographed: string[] = [...DEMO_UNPHOTOGRAPHED_VEHICLE_IDS];
+
+    expect([...photographed, ...unphotographed].sort()).toEqual([...DEMO_VEHICLE_IDS].sort());
+    expect(photographed.filter((id) => unphotographed.includes(id))).toEqual([]);
+  });
+
+  it('keeps at least one car unphotographed, so the empty state is on show', () => {
+    // The demo's only live exercise of the no-photo design — see
+    // components/VehicleIdentity.tsx, which calls that state the primary one and
+    // records that nothing rendered it while every seeded car had a file.
+    expect(DEMO_UNPHOTOGRAPHED_VEHICLE_IDS.length).toBeGreaterThanOrEqual(1);
   });
 
   it.each(paths)('%s exists and is a card-sized derivative', (path) => {
@@ -51,7 +83,7 @@ describe('the demo garage grid stays inside its payload budget', () => {
     expect(sizeOf(path)).toBeLessThanOrEqual(PER_CARD_CEILING_BYTES);
   });
 
-  it('totals under 250 KB across all three cards', () => {
+  it('totals under 250 KB across the grid', () => {
     const total = paths.reduce((sum, p) => sum + sizeOf(p), 0);
 
     // Reported in KB so a failure says how far over, not just that it is over.

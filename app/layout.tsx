@@ -7,6 +7,7 @@ import { QueryProvider } from '@/components/QueryProvider';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import DemoBanner from '@/components/DemoBanner';
 import { AuthProvider } from '@/components/AuthProvider';
+import { INTRO_PLAYED_KEY, INTRO_PLAYED_VALUE } from '@crewchief/core/intro-gate';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -30,7 +31,15 @@ export const metadata: Metadata = {
       'An AI consultant that knows your car. Live demo with sample vehicles — no signup required.',
     url: 'https://crewchief-demo.davidmasterson.co',
     siteName: 'CrewChief',
-    images: [{ url: '/dark-roomb.jpeg', width: 1920, height: 1280 }],
+    /*
+       Points at the derivative, with its real dimensions.
+
+       It declared 1920×1280 against a file that is 3333×2000 — neither the
+       width, the height, nor the aspect ratio was right. Scrapers use these to
+       lay out a card before the image arrives, so a wrong ratio is a cropped or
+       letterboxed preview, and this is the link David's portfolio shares.
+    */
+    images: [{ url: '/garage-interior-1920.jpg', width: 1920, height: 1152 }],
     type: 'website',
   },
   twitter: { card: 'summary_large_image' },
@@ -49,6 +58,30 @@ export default function RootLayout({
         <link
           href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap"
           rel="stylesheet"
+        />
+        {/*
+          Decides the garage-door intro before the first paint. See
+          components/GarageDoor.tsx and @crewchief/core/intro-gate.
+
+          It has to be a blocking inline script, and the two alternatives are
+          both visibly wrong. Deciding in an effect means the page paints
+          first and the curtain drops *onto* it — which is exactly what the
+          old GarageDoorAnimation did, with its inverted `if (!shouldRender)
+          return null`. Rendering the curtain unconditionally and hiding it on
+          the client means every returning visitor gets a flash of door.
+
+          Same technique next-themes already uses two lines below to avoid a
+          flash of the wrong theme, for the same reason.
+
+          The catch is not defensive padding: sessionStorage throws outright,
+          not returns null, in a partitioned or storage-blocked context. Any
+          failure resolves to 'skip', so the worst case is no intro rather
+          than a stuck curtain.
+        */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var d=document.documentElement;try{var p=sessionStorage.getItem('${INTRO_PLAYED_KEY}')==='${INTRO_PLAYED_VALUE}';var r=window.matchMedia('(prefers-reduced-motion: reduce)').matches;d.setAttribute('data-intro',(p||r||document.hidden)?'skip':'play')}catch(e){d.setAttribute('data-intro','skip')}})()`,
+          }}
         />
       </head>
       <body className={inter.className}>

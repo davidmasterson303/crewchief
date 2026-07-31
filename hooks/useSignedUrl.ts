@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { getSignedStorageUrl } from '@/app/actions';
 import { storagePathFromStoredUrl } from '@crewchief/core/storage-paths';
+import { isUnphotographedDemoVehicle } from '@crewchief/core/demo';
 
 /**
  * The client half of the private-bucket convention.
@@ -67,6 +68,14 @@ export function useSignedUrl(url: string | null | undefined): string | undefined
 }
 
 interface VehicleImageFields {
+  /**
+   * Read only to honour the deliberately-unphotographed demo car.
+   *
+   * Optional because not every caller has it, and a caller without it simply
+   * gets the ordinary resolution — the carve-out is a demo concern, not a
+   * correctness one.
+   */
+  id?: string | null;
   /** The owner's uploaded photo, stored as a path. */
   custom_image_url?: string | null;
   /** The stock photo — a local `/vehicles/…` asset, already renderable. */
@@ -90,6 +99,18 @@ export function useVehicleImage(
   vehicle: VehicleImageFields | null | undefined
 ): string | undefined {
   const signed = useSignedUrl(vehicle?.custom_image_url);
+
+  /*
+    One demo car is unphotographed on purpose, and the check belongs here rather
+    than at a call site because "does this vehicle have a photograph" has to
+    answer the same way everywhere. Putting it in VehicleCard alone gave the M3 a
+    plate in the garage and a photograph on its dashboard — the seeded row still
+    carries an `image_url`, so every other surface kept rendering it.
+
+    Five screens resolve a vehicle photo through this hook. This is the only
+    place all five agree.
+  */
+  if (vehicle?.id && isUnphotographedDemoVehicle(vehicle.id)) return undefined;
 
   if (vehicle?.custom_image_url) return signed;
   return vehicle?.image_url ?? undefined;

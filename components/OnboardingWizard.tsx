@@ -418,7 +418,6 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
                     type="number"
                     value={formData.year}
                     onChange={(e) => updateFormData('year', parseInt(e.target.value))}
-                    className="bg-white/5 border-white/12 text-white placeholder:text-white/25 focus:border-cyan-400/50"
                   />
                 </div>
                 <div>
@@ -426,7 +425,6 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
                   <Input
                     value={formData.make}
                     onChange={(e) => updateFormData('make', e.target.value)}
-                    className="bg-white/5 border-white/12 text-white placeholder:text-white/25 focus:border-cyan-400/50"
                   />
                 </div>
               </div>
@@ -435,7 +433,6 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
                 <Input
                   value={formData.model}
                   onChange={(e) => updateFormData('model', e.target.value)}
-                  className="bg-white/5 border-white/12 text-white placeholder:text-white/25 focus:border-cyan-400/50"
                 />
               </div>
               <div>
@@ -444,7 +441,6 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
                   value={formData.trim}
                   onChange={(e) => updateFormData('trim', e.target.value)}
                   placeholder="e.g., LX, Sport, Limited"
-                  className="bg-white/5 border-white/12 text-white placeholder:text-white/25 focus:border-cyan-400/50"
                 />
               </div>
               <div>
@@ -453,7 +449,6 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
                   value={formData.color}
                   onChange={(e) => updateFormData('color', e.target.value)}
                   placeholder="e.g., Black, Silver, Red"
-                  className="bg-white/5 border-white/12 text-white placeholder:text-white/25 focus:border-cyan-400/50"
                   required
                 />
                 <p className="text-xs text-white/30 mt-1.5">This helps us find the right vehicle image</p>
@@ -558,7 +553,6 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
                   placeholder="e.g., 45000"
                   value={formData.current_mileage}
                   onChange={(e) => updateFormData('current_mileage', e.target.value)}
-                  className="bg-white/5 border-white/12 text-white placeholder:text-white/25 focus:border-cyan-400/50"
                   required
                 />
                 <p className="text-xs text-white/30 mt-1.5">Enter total miles on your vehicle</p>
@@ -586,7 +580,6 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
                   placeholder="Or enter custom amount"
                   value={formData.avg_miles_per_month}
                   onChange={(e) => updateFormData('avg_miles_per_month', e.target.value)}
-                  className="bg-white/5 border-white/12 text-white placeholder:text-white/25 focus:border-cyan-400/50"
                 />
               </div>
             </div>
@@ -632,7 +625,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
                   value={formData.ownership_details}
                   onChange={(e) => updateFormData('ownership_details', e.target.value)}
                   rows={3}
-                  className="bg-white/5 border-white/12 text-white placeholder:text-white/25 focus:border-cyan-400/50 resize-none"
+                  className="resize-none"
                 />
               </div>
             </div>
@@ -677,7 +670,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
                   value={formData.driving_style}
                   onChange={(e) => updateFormData('driving_style', e.target.value)}
                   rows={3}
-                  className="bg-white/5 border-white/12 text-white placeholder:text-white/25 focus:border-cyan-400/50 resize-none"
+                  className="resize-none"
                 />
               </div>
             </div>

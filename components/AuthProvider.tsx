@@ -6,6 +6,7 @@ import type { User, Session } from '@supabase/supabase-js';
 import { createBrowserSupabaseClient, hasSupabaseConfig } from '@/lib/supabase';
 import { queryClient } from '@crewchief/core/query-client';
 import { resolveAuthEvent } from '@crewchief/core/auth-session';
+import { resolveRoute } from '@crewchief/core/routes';
 
 /**
  * The app's one auth-state listener.
@@ -120,6 +121,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Subscribe once. `router` is stable and the path is read through a ref.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /*
+    A signed-in user does not sit on the demo garage.
+
+    The policy is `resolveRoute`'s, shared with the middleware rather than
+    restated here — but middleware cannot apply this one: `/` is deliberately not
+    in its matcher, because matching it would put a getUser() round trip in front
+    of every anonymous load of the demo. So the rule lands here, where a session
+    is already known and costs an anonymous visitor nothing.
+
+    `replace`, not `push`: the demo garage should not be a back-button stop for
+    someone who was never meant to be on it.
+
+    Waits for `loading` to settle. Acting while the session is still resolving
+    would send every anonymous visitor to /garage on first paint and bounce them
+    straight back off it by the middleware, which is a visible flicker on the
+    page that matters most.
+  */
+  useEffect(() => {
+    if (loading || !session) return;
+
+    const decision = resolveRoute({
+      pathname,
+      isAuthenticated: true,
+      requestUrl: window.location.href,
+    });
+
+    if (decision.type === 'redirect') {
+      router.replace(new URL(decision.location).pathname);
+    }
+  }, [loading, session, pathname, router]);
 
   return (
     <AuthContext.Provider value={{ user: session?.user ?? null, session, loading }}>
