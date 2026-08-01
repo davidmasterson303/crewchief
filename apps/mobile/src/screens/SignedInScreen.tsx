@@ -109,6 +109,42 @@ export function SignedInScreen({ session }: { session: Session }) {
           </Text>
         ))}
 
+      {/*
+        The access token, readable off the device.
+
+        `scripts/verify-mobile-contract.mjs` takes MOBILE_TEST_TOKEN and runs the
+        credentialed half of the contract — the bearer happy path, the unowned-
+        vehicle 404, and the garage list that accepted a cookie session only
+        until 31 Jul. Without the variable those checks `skip()`, and the script
+        prints "This is not a green build". They have been unrun across four
+        pieces of work.
+
+        The roadmap says signing in here closes that gap. It did not: there was
+        no way to get the token out of the app, so the value the script needs
+        never left the phone. Ten lines of selectable text is the whole fix —
+        long-press, copy, send it to the Mac.
+
+        __DEV__ only. This is a debugging affordance, not a feature: a shipping
+        build must never render a bearer token where a screenshot or a shoulder
+        can take it. Expo Go is always __DEV__, so it is present exactly where
+        it is needed and compiled out of a release build.
+
+        A token is a password for the API until it expires. Treat a copied one
+        the same way, and prefer a throwaway account over the real one.
+      */}
+      {__DEV__ ? (
+        <View>
+          <Text style={styles.heading}>Access token — dev builds only</Text>
+          <Text style={styles.detail}>
+            Long-press to select and copy. Set as MOBILE_TEST_TOKEN to run the
+            credentialed contract checks.
+          </Text>
+          <Text selectable style={styles.token}>
+            {session.access_token}
+          </Text>
+        </View>
+      ) : null}
+
       <View style={styles.actions}>
         <Pressable style={styles.secondary} onPress={loadGarage}>
           <Text style={styles.secondaryText}>Retry</Text>
@@ -137,6 +173,17 @@ const styles = StyleSheet.create({
   good: { color: '#4ade80', fontSize: 14, marginTop: 4 },
   bad: { color: '#f87171', fontSize: 14, marginTop: 4 },
   detail: { color: 'rgba(255,255,255,0.45)', fontSize: 13, marginTop: 3 },
+  // Monospaced and small: a JWT is long, and it has to be selectable as one
+  // run of text rather than reflowed into something that copies back broken.
+  token: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 10,
+    fontFamily: 'Courier',
+    marginTop: 8,
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
   actions: { flexDirection: 'row', gap: 10, marginTop: 32 },
   secondary: {
     borderWidth: 1,
