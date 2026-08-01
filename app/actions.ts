@@ -13,7 +13,7 @@ import { getVehicleImage } from '@/lib/vehicle-images';
 import { logger } from '@crewchief/core/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { downloadStoredFile } from '@/lib/storage-objects';
-import { loadConsultantContext } from '@/lib/consultant-context';
+import { loadConsultantContext, loadedContextKinds } from '@/lib/consultant-context';
 import { authorizeVehicleAccess, authorizeVehicleScopedRow, requireSession } from '@/lib/api-auth';
 import { isDemoVehicleId } from '@crewchief/core/demo';
 import {
@@ -876,45 +876,22 @@ export async function sendConsultantMessage(params: {
    * with the service role.
    */
   attachedDocuments?: any[];
-  /* ── Superseded. Accepted, ignored, and safe to stop sending. ────────────
+  /*
+   * There is deliberately no vehicle, knowledge, wishlist, service history,
+   * document, issue, mod, recall or health parameter here, and no `isDemo`.
    *
-   * All of it is now loaded from the database by `loadConsultantContext`, for
-   * the reasons written out in that module: a phone cannot post a vehicle's
+   * All of it is loaded from the database by `loadConsultantContext`, for the
+   * reasons written out in that module: a phone cannot post a vehicle's
    * history on every message, and caller-supplied context is caller-supplied
-   * input to a model prompt.
+   * input to a model prompt. `isDemo` is derived from the vehicle id — see the
+   * note in the body on why trusting the caller for it is unsafe in both
+   * directions.
    *
-   * Kept in the signature so the web client keeps compiling while it is
-   * updated to stop assembling them. Delete this block once ConsultantChat.tsx
-   * no longer sends them.
+   * These were briefly kept as ignored optional fields so the web client would
+   * keep compiling. It no longer sends them, so the door is closed rather than
+   * left ajar: an optional field that is silently discarded reads, to the next
+   * caller, like one that works.
    */
-  /** @deprecated Ignored — derived server-side from `vehicleId`. */
-  vehicle?: any;
-  /** @deprecated Ignored — derived server-side from `vehicleId`. */
-  knowledge?: any;
-  /** @deprecated Ignored — derived server-side from `vehicleId`. */
-  wishlistItems?: any[];
-  /** @deprecated Ignored, and was already unread before that. */
-  allServiceItems?: any[];
-  /** @deprecated Ignored — derived server-side from `vehicleId`. */
-  completedItems?: any[];
-  /** @deprecated Ignored — derived server-side from `vehicleId`. */
-  maintenanceLineItems?: any[];
-  /** @deprecated Ignored — derived server-side from `vehicleId`. */
-  documents?: any[];
-  /** @deprecated Ignored — derived server-side from `vehicleId`. */
-  issueTracking?: any[];
-  /** @deprecated Ignored — derived server-side from `vehicleId`. */
-  modTracking?: any[];
-  /** @deprecated Ignored — derived server-side from `vehicleId`. */
-  nhtsaData?: any;
-  /** @deprecated Ignored — derived server-side from `vehicleId`. */
-  healthSummary?: any;
-  /** @deprecated Ignored — derived server-side from `vehicleId`. */
-  modWishlistItems?: any[];
-  /** @deprecated Client-supplied and ignored. Demo status is derived from the
-   *  vehicle id server-side — see the note in the body. Callers may still pass
-   *  it; nothing reads it. */
-  isDemo?: boolean;
 }) {
   // Cost control: server actions are publicly invokable POST endpoints
   // and demo mode has no auth, so every Gemini-backed path is rate limited.
@@ -1002,6 +979,8 @@ export async function sendConsultantMessage(params: {
       healthSummary,
       modWishlistItems,
     } = contextResult.context;
+
+    const contextKinds = loadedContextKinds(contextResult.context);
 
     const knownIssues = (knowledge?.known_issues || [])
       .map((issue: any) => `${issue.part} (${issue.mileage_range}) - ${issue.severity}: ${issue.description}`);
@@ -1250,7 +1229,14 @@ export async function sendConsultantMessage(params: {
         .eq('id', sessionId);
     }
 
-    return { success: true, response, wishlistActions, performanceUpdated, invoiceProcessed, invoiceItemsProcessed, issueUpdates, modUpdates };
+    /*
+      `contextKinds` is computed from the context this function actually
+      loaded, and travels back with the answer so the client can render the
+      "Based on" chips without knowing anything about the garage. It used to be
+      derived in ConsultantChat.tsx from the values it posted — which stopped
+      being the model's context the moment that context moved server-side.
+    */
+    return { success: true, response, contextKinds, wishlistActions, performanceUpdated, invoiceProcessed, invoiceItemsProcessed, issueUpdates, modUpdates };
   } catch (error) {
     console.error('Consultant message error:', error);
     return { success: false, error: 'Failed to get response from consultant' };

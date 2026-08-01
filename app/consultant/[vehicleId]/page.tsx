@@ -24,23 +24,26 @@ export default function ConsultantPage({ params }: { params: { vehicleId: string
     queryFn: async () => {
       const supabase = getClientSupabase();
 
+      /*
+        Five reads, and each one is drawn on this page.
+
+        There were eleven. The other six — maintenance_line_items,
+        known_issue_tracking, nhtsa_data, vehicle_health_summary,
+        wishlist_items, modification_tracking — existed only to be handed to
+        ConsultantChat, which posted them to the advisor. `loadConsultantContext`
+        has read all of that server-side since `a0e9894`, so the page was paying
+        six round trips on every visit to assemble a payload the server threw
+        away. Whatever the advisor needs, it now fetches itself.
+      */
       const [
         vehicleResult, knowledgeResult, sessionsResult,
-        allServiceResult, maintenanceLineItemsResult,
-        documentsResult, issueTrackingResult, nhtsaResult, healthResult,
-        modWishlistResult, modTrackingResult
+        allServiceResult, documentsResult
       ] = await Promise.all([
         supabase.from('vehicles').select('*').eq('id', params.vehicleId).maybeSingle(),
         supabase.from('vehicle_knowledge_base').select('*').eq('vehicle_id', params.vehicleId).maybeSingle(),
         supabase.from('consultant_conversations').select('id,title,created_at,updated_at').eq('vehicle_id', params.vehicleId).order('updated_at', { ascending: false }),
         supabase.from('service_items').select('*').eq('vehicle_id', params.vehicleId).order('date_completed', { ascending: false }),
-        supabase.from('maintenance_line_items').select('*').eq('vehicle_id', params.vehicleId).order('service_date', { ascending: false }),
         supabase.from('vehicle_documents').select('*').eq('vehicle_id', params.vehicleId),
-        supabase.from('known_issue_tracking').select('*').eq('vehicle_id', params.vehicleId),
-        supabase.from('nhtsa_data').select('recalls').eq('vehicle_id', params.vehicleId).maybeSingle(),
-        supabase.from('vehicle_health_summary').select('*').eq('vehicle_id', params.vehicleId).maybeSingle(),
-        supabase.from('wishlist_items').select('*').eq('vehicle_id', params.vehicleId).order('created_at', { ascending: false }),
-        supabase.from('modification_tracking').select('*').eq('vehicle_id', params.vehicleId)
       ]);
 
       if (vehicleResult.error) throw vehicleResult.error;
@@ -53,13 +56,7 @@ export default function ConsultantPage({ params }: { params: { vehicleId: string
         knowledge: knowledgeResult.data,
         sessions: sessionsResult.data || [],
         allServiceItems,
-        maintenanceLineItems: maintenanceLineItemsResult.data || [],
         documents: documentsResult.data || [],
-        issueTracking: issueTrackingResult.data || [],
-        nhtsaData: nhtsaResult.data,
-        healthSummary: healthResult.data,
-        modWishlistItems: modWishlistResult.data || [],
-        modTracking: modTrackingResult.data || [],
       };
     },
   });
@@ -129,30 +126,26 @@ export default function ConsultantPage({ params }: { params: { vehicleId: string
 
   if (!data?.vehicle) return null;
 
-  const { vehicle, knowledge, sessions, allServiceItems, maintenanceLineItems, documents, issueTracking, modTracking, nhtsaData, healthSummary, modWishlistItems } = data;
+  const { vehicle, knowledge, sessions, allServiceItems, documents } = data;
   const mostRecentSessionId = sessions.length > 0 ? sessions[0].id : undefined;
   const wishlistItems = allServiceItems.filter((i: any) => i.status === 'wishlist');
-  const completedItems = allServiceItems.filter((i: any) => i.status === 'completed');
 
   return (
     <ErrorBoundary context="CONSULTANT_PAGE">
       <DashboardLayout vehicle={vehicle} knowledge={knowledge} currentPage="consultant" vehicleImage={vehicleImage}>
+        {/*
+          The advisor's context is loaded server-side from the vehicle id, so
+          none of it is passed here any more. What remains is what the chat UI
+          itself draws.
+        */}
         <ConsultantChat
           vehicleId={params.vehicleId}
           vehicle={vehicle}
-          knowledge={knowledge}
           wishlistItems={wishlistItems}
           allServiceItems={allServiceItems}
-          completedItems={completedItems}
-          maintenanceLineItems={maintenanceLineItems}
           documents={documents}
-          issueTracking={issueTracking}
-          modTracking={modTracking}
           sessions={sessions}
           initialSessionId={mostRecentSessionId}
-          nhtsaData={nhtsaData}
-          healthSummary={healthSummary}
-          modWishlistItems={modWishlistItems}
         />
       </DashboardLayout>
     </ErrorBoundary>

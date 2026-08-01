@@ -163,6 +163,13 @@ export async function POST(request: NextRequest): Promise<Response> {
       success: true,
       sessionId: thread.sessionId,
       response: result.response,
+      /*
+        What the answer was grounded in, computed server-side from the context
+        actually loaded. The web client renders these as "Based on" chips; the
+        mobile client will want the same, and neither can derive them itself
+        now that the context never leaves the server.
+      */
+      contextKinds: result.contextKinds ?? [],
       wishlistActions: result.wishlistActions ?? [],
     } as ApiResponse);
   } catch (error) {
