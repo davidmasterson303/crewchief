@@ -7,17 +7,40 @@
   turns out to be different for each, which is why they are here together and
   not as a copy of that file.
 
-  ## What is actually wrong today
+  ## CORRECTION, 1 Aug — the premise below was wrong, the changes were not
 
-  Both carry `FOR ALL USING (true)` from 20260101215332. `anon` has no GRANT on
-  either, so an anonymous caller gets 42501 and the hole is invisible from
-  outside. **`authenticated` does hold the grant.** One blanket policy nullifies
-  every scoped policy beside it, so as things stand any signed-in user can read
-  every other user's invoices and every other user's chat transcripts.
+  This header originally said both tables carry `FOR ALL USING (true)` from
+  20260101215332, and that any signed-in user could therefore read every other
+  user's invoices and chat transcripts. **That was false, and it was false
+  before this migration ran.**
 
-  That is the whole reason to do this now rather than at Phase 3.3. It is not
-  currently exploitable in practice — there is one real account — but it is the
-  largest unmeasured surface named in the roadmap, and it costs one migration.
+  Cowork checked the live catalog before applying, three ways: zero
+  unconditional policies on either table, RLS enabled on both, and every policy
+  already scoped with owner and demo arms. `vehicle_documents` already had
+  "Users can view own vehicle documents"; `consultant_conversations` already had
+  "Users can view own conversations". The `FOR ALL USING (true)` is in this
+  repository's migration history. It is not in the database and had not been.
+
+  The claim came from reading migration files and the static replay in
+  `rls-blanket-policies.test.ts` — whose own header says it proves what a
+  *rebuild* would produce, not what live is running. That warning was read and
+  then contradicted in the same change.
+
+  **The fourth catalog-versus-repo disagreement, and the first running the other
+  way: live was tighter than the repo.** Drift is not conservatively safe in
+  either direction. A file read overstated a security finding here exactly as
+  readily as file reads have understated others.
+
+  The empirical audits were not wrong either. "anon blocked" was true and
+  irrelevant: `anon` has no grant, `authenticated` does, so an anonymous probe
+  could never have measured this.
+
+  ## What this migration actually did, both wanted
+
+  1. `vehicle_documents` lost its demo arm and is now owner-only. A genuine
+     tightening — just not the one originally described.
+  2. `consultant_conversations` gained the anon grant, so the demo's sidebar
+     renders the seeded transcripts instead of "No conversations yet".
 
   ## Why the two tables get different policies
 

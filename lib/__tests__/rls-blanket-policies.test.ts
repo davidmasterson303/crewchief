@@ -187,22 +187,35 @@ export function key(policy: Policy): string {
  * updated rather than left stale, which is the ratchet working as designed. It
  * fired on exactly those two entries when that migration landed.
  *
- * Eight remain, and the line this list has now crossed is narrower than "no
- * user data left". Stated precisely, because the looser version is the kind of
- * claim this file exists to stop:
+ * Eight remain. What a rebuild from these files would expose, by kind — and
+ * note the framing, which is "a rebuild would", not "the database does":
  *
  *   - `consultant_documents`, `quote_requests`, `labor_bundles` — empty.
  *   - `location_zones`, `modification_details` — shared reference data, the
  *     same rows for everybody.
- *   - `vehicle_knowledge_base`, `vehicle_health_summary`, `nhtsa_data` — **per
- *     vehicle, and therefore per user.** Derived rather than authored — a
- *     research profile, a computed health band, NHTSA recall lookups — so
- *     nothing here is a document or a transcript someone wrote. It is still a
- *     signed-in user seeing rows about another user's car, and it still needs
- *     closing.
+ *   - `vehicle_knowledge_base`, `vehicle_health_summary`, `nhtsa_data` — per
+ *     vehicle, and therefore per user. Derived rather than authored — a
+ *     research profile, a computed health band, NHTSA recall lookups — so none
+ *     of it is a document or transcript someone wrote.
  *
- * What changed is the severity, not the status: the backlog no longer includes
- * "one signed-in user can read another's invoices and chat history".
+ * Whether live is scoped on any of these is a separate question with a separate
+ * instrument. On the last two measured, it was.
+ *
+ * **What this list is, restated because it was just misread — by the person
+ * editing it.** These entries describe what a rebuild from these files would
+ * declare. They are not a report of live exposure, and the two have now been
+ * measured apart four times.
+ *
+ * `20260801140000` was written and committed on the premise that the
+ * `vehicle_documents` and `consultant_conversations` entries below meant a
+ * signed-in user could read another user's invoices and transcripts. A live
+ * catalog read on 1 Aug found both already scoped with owner and demo arms,
+ * RLS enabled, and no unconditional policy on either. Live was *tighter* than
+ * this list implies — the first drift in that direction.
+ *
+ * So: an entry here is a rebuild hazard and a reason to write a migration. It
+ * is never, on its own, evidence that the database is open. That takes a
+ * catalog read, and the header above has said so since the file was written.
  */
 const BLANKET_BASELINE = new Set<string>([
   'consultant_documents:Allow all operations on consultant_documents',
