@@ -13,6 +13,9 @@
  * URL assertions do not depend on which deployment the app happens to point at.
  */
 
+/* Module, not a global script — see the note in `mobile-session.test.ts`. */
+export {};
+
 jest.mock(
   '../../apps/mobile/src/config',
   () => ({ API_BASE_URL: 'https://example.test', API_PREFIX: '/api/v1' }),
