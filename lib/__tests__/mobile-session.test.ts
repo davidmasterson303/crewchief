@@ -60,6 +60,7 @@ const auth = {
   onAuthStateChange: jest.fn(),
   startAutoRefresh: jest.fn(),
   stopAutoRefresh: jest.fn(),
+  resend: jest.fn(),
 };
 
 jest.mock('../../apps/mobile/src/auth/supabase', () => ({ supabase: { auth } }), {
@@ -73,6 +74,7 @@ const {
   getAccessToken,
   onSessionChange,
   startSessionAutoRefresh,
+  resendConfirmation,
 } = require('../../apps/mobile/src/auth/session');
 
 beforeEach(() => {
@@ -83,6 +85,69 @@ beforeEach(() => {
   auth.getSession.mockResolvedValue({ data: { session: null } });
   auth.onAuthStateChange.mockReturnValue({
     data: { subscription: { unsubscribe: jest.fn() } },
+  });
+  auth.resend.mockResolvedValue({ error: null });
+});
+
+describe('resendConfirmation stays silent about who exists', () => {
+  /*
+    `signIn` collapses "Email not confirmed" into the generic message, which is
+    correct and — with confirmation disabled on this project — currently free.
+    Flip that toggle and an unconfirmed user has no way forward.
+
+    The tempting fix is a resend button shown for that case. It would move the
+    oracle rather than close it: a button appearing only for
+    registered-but-unconfirmed addresses announces exactly which those are. So
+    the capability is unconditional, and these pin that it cannot start
+    reporting.
+  */
+  it('resolves identically whether or not the address exists', async () => {
+    auth.resend.mockResolvedValue({ error: null });
+    await expect(resendConfirmation('real@example.com')).resolves.toBeUndefined();
+
+    auth.resend.mockResolvedValue({ error: { message: 'User not found' } });
+    await expect(resendConfirmation('nobody@example.com')).resolves.toBeUndefined();
+  });
+
+  it('swallows a rejected call rather than surfacing it', async () => {
+    // Including a network failure. Nothing here is actionable by the user, and
+    // anything returned is something a caller could render.
+    auth.resend.mockRejectedValue(new Error('Network request failed'));
+    await expect(resendConfirmation('a@b.co')).resolves.toBeUndefined();
+  });
+
+  it('returns nothing at all, so there is no result to branch on', async () => {
+    /*
+      The shape is the guard. A boolean or a status here would be rendered
+      conditionally by some caller eventually, and that conditional is the leak
+      coming back.
+    */
+    auth.resend.mockResolvedValue({ error: null });
+    expect(await resendConfirmation('a@b.co')).toBeUndefined();
+  });
+
+  it('asks for a signup confirmation, with the email trimmed', async () => {
+    await resendConfirmation('  someone@example.com  ');
+    expect(auth.resend).toHaveBeenCalledWith({
+      type: 'signup',
+      email: 'someone@example.com',
+    });
+  });
+});
+
+describe('signIn exposes no confirmation state', () => {
+  it('reports nothing beyond ok and error, even for an unconfirmed account', async () => {
+    /*
+      The regression this blocks: adding `needsConfirmation` so the screen can
+      show the resend button only when it is relevant. That flag exists solely
+      to be rendered conditionally, and the conditional is the oracle.
+    */
+    auth.signInWithPassword.mockResolvedValue({ error: { message: 'Email not confirmed' } });
+
+    const result = await signIn('a@b.co', 'pw');
+
+    expect(Object.keys(result).sort()).toEqual(['error', 'ok']);
+    expect(result.error).toBe('That email and password did not match.');
   });
 });
 
