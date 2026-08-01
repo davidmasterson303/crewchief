@@ -34,6 +34,24 @@ const customJestConfig = {
     '<rootDir>/.claude/worktrees/',
     '<rootDir>/apps/',
   ],
+  /*
+    `testPathIgnorePatterns` stops the worktrees being *run*. It does not stop
+    `jest-haste-map` crawling them, and the crawler reads every package.json it
+    finds — so each run printed:
+
+      Haste module naming collision: crewchief
+        * <rootDir>/package.json
+        * <rootDir>/.claude/worktrees/…/package.json
+
+    once for the root package and once for @crewchief/core. Noise rather than a
+    failure, which is the problem: a real warning appearing above 50 passing
+    suites is invisible next to two that always fire. Every verification today
+    started by reading past them.
+
+    This ignores the paths at the module-resolution layer, which is the one the
+    crawler consults.
+  */
+  modulePathIgnorePatterns: ['<rootDir>/.claude/worktrees/'],
   collectCoverageFrom: [
     'lib/**/*.{js,jsx,ts,tsx}',
     'app/**/*.{js,jsx,ts,tsx}',
