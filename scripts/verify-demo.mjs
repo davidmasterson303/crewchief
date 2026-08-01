@@ -322,10 +322,17 @@ async function checkVehicleImages(supabaseUrl, key) {
  * Same reasoning as checkAiCredential above: a 200 on the page proves the page
  * renders, not that the data path behind it works.
  *
- * Only demo-readable routes belong here. /api/v1/load-maintenance-data is
- * deliberately absent — the `anon` role is refused SELECT on all four tables
- * it reads, so it cannot serve an anonymous visitor by design, and asserting
- * it would be asserting something the demo does not depend on.
+ * Only demo-readable routes belong here. /api/v1/load-maintenance-data was
+ * deliberately absent, because `anon` was refused SELECT on all four tables it
+ * reads. Two of those four have since been granted (20260731030000,
+ * 20260731040000) and the route now narrows itself to them for a demo caller
+ * rather than 500ing, so it is demo-readable and belongs here after all.
+ *
+ * It is included precisely because of the failure this whole function exists
+ * for: Phase 3.3's maintenance screen is its first caller and does not exist
+ * yet, so nothing else would notice it breaking. A route with no caller is
+ * invisible to every gate that looks at pages — which is how load-vehicle
+ * stayed broken on two deployments.
  */
 async function checkDemoApiRoutes() {
   console.log('\nAPI routes the demo depends on');
@@ -336,6 +343,18 @@ async function checkDemoApiRoutes() {
       path: `/api/v1/load-vehicle?vehicleId=${DEMO_VEHICLE_ID}`,
       // The demo Accord. Proves it returned the vehicle, not merely a 200.
       mustContain: 'Accord',
+    },
+    {
+      label: '/api/v1/load-maintenance-data',
+      path: `/api/v1/load-maintenance-data?vehicleId=${DEMO_VEHICLE_ID}`,
+      /*
+        Asserts the narrowing, not just the 200. `omitted` is what tells a
+        client "you may not see invoices" rather than "this car has none" — if
+        the route reverted to sending `documents: []` with no `omitted`, the
+        status code would stay 200 and this check would be the only thing that
+        noticed.
+      */
+      mustContain: '"omitted":["documents","lineItems"]',
     },
   ];
 
