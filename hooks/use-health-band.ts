@@ -1,39 +1,36 @@
 'use client';
 
 /**
- * The single source of truth for health-score banding.
+ * Health-score banding, dressed for the web.
  *
  * Two components render a health score on the dashboard — `DiagnosticHero`
  * (the large hero display) and `HealthSummary`'s `ScoreRing`. They previously
  * banded independently, with DiagnosticHero missing the ≥40 boundary entirely,
- * so the same score could be styled two different ways on one screen. Both now
- * read from here; changing a threshold changes both.
+ * so the same score could be styled two different ways on one screen.
+ *
+ * **The thresholds and wording now live in `@crewchief/core/health-band`**, so
+ * the Expo garage bands a score the same way this does. Neither of the two
+ * fields added here can cross that boundary: `color` is a CSS custom property
+ * resolved by globals.css, and `textClass` is a Tailwind class. This module is
+ * the web's presentation of a shared judgement — it must not redefine the
+ * judgement.
  *
  * The ramp is deliberately not the chip/badge semantics. Reusing those made a
  * mid-score ring read as "another issue chip" among the real ones — these are
  * the same four bands desaturated ~15% so a score reads as a gauge.
  */
 
-export type HealthBandName = 'good' | 'ok' | 'warn' | 'bad';
+import {
+  getHealthBandJudgement,
+  type HealthBandJudgement,
+  type HealthBandName,
+} from '@crewchief/core/health-band';
 
-export interface HealthBand {
-  name: HealthBandName;
+export type { HealthBandName };
+
+export interface HealthBand extends HealthBandJudgement {
   /** CSS custom property reference — resolves through globals.css. */
   color: string;
-  /** Bare `r,g,b` channels, for building rgba() shadows and tracks. */
-  rgb: string;
-  /** Qualitative wording shown beside the score. */
-  label: string;
-  /**
-   * The same band, abbreviated — for the label under the garage card's 56px
-   * ring, where "Needs attention" will not fit in a three-up grid.
-   *
-   * It is an **abbreviation, never a different judgement.** `label` is the
-   * canonical wording and was set deliberately conservative (see below);
-   * shortening it here must not walk that back. Everywhere with room uses
-   * `label`.
-   */
-  short: string;
   /**
    * The text colour as a **literal** class.
    *
@@ -44,25 +41,23 @@ export interface HealthBand {
    * in the band colour, on the same dashboard.
    *
    * Spelling them out is what makes them real. Do not reconstruct this from
-   * `name`.
+   * `name`, and note that the same trap is why this map is keyed by an
+   * exhaustive `Record` rather than built with a template string.
    */
   textClass: string;
 }
 
 /*
- * Labels are deliberately conservative. The previous ramp called anything
- * from 60 up "Good", so a 61 — a car with real deferred maintenance — read
- * as reassuring. For a tool whose job is telling you what needs attention,
- * overstating condition is the more costly direction to be wrong in.
- *
- * Thresholds are unchanged; only the words moved down a step.
+ * Web dressing per band. Keyed by name so adding a band to core fails the
+ * typecheck here rather than silently rendering unstyled — the Record is
+ * exhaustive over HealthBandName.
  */
-const BANDS: ReadonlyArray<HealthBand & { min: number }> = [
-  { min: 80, name: 'good', color: 'var(--ring-good)', rgb: '127,206,156', label: 'Good', short: 'Good', textClass: 'text-health-good' },
-  { min: 60, name: 'ok', color: 'var(--ring-ok)', rgb: '95,174,192', label: 'Fair', short: 'Fair', textClass: 'text-health-ok' },
-  { min: 40, name: 'warn', color: 'var(--ring-warn)', rgb: '224,164,104', label: 'Needs attention', short: 'Attention', textClass: 'text-health-warn' },
-  { min: -Infinity, name: 'bad', color: 'var(--ring-bad)', rgb: '224,136,130', label: 'Critical', short: 'Critical', textClass: 'text-health-bad' },
-];
+const WEB_STYLING: Record<HealthBandName, { color: string; textClass: string }> = {
+  good: { color: 'var(--ring-good)', textClass: 'text-health-good' },
+  ok: { color: 'var(--ring-ok)', textClass: 'text-health-ok' },
+  warn: { color: 'var(--ring-warn)', textClass: 'text-health-warn' },
+  bad: { color: 'var(--ring-bad)', textClass: 'text-health-bad' },
+};
 
 /**
  * Resolve a score to its band. Pure — safe to call during render, and usable
@@ -72,7 +67,8 @@ const BANDS: ReadonlyArray<HealthBand & { min: number }> = [
  * colour cycles red → amber → green while a ring draws in.
  */
 export function getHealthBand(score: number): HealthBand {
-  return BANDS.find((band) => score >= band.min) ?? BANDS[BANDS.length - 1];
+  const judgement = getHealthBandJudgement(score);
+  return { ...judgement, ...WEB_STYLING[judgement.name] };
 }
 
 export function useHealthBand(score: number): HealthBand {
