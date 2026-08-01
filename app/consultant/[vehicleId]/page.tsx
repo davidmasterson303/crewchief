@@ -25,25 +25,28 @@ export default function ConsultantPage({ params }: { params: { vehicleId: string
       const supabase = getClientSupabase();
 
       /*
-        Five reads, and each one is drawn on this page.
+        Four reads, and each one is drawn on this page.
 
-        There were eleven. The other six — maintenance_line_items,
-        known_issue_tracking, nhtsa_data, vehicle_health_summary,
-        wishlist_items, modification_tracking — existed only to be handed to
-        ConsultantChat, which posted them to the advisor. `loadConsultantContext`
-        has read all of that server-side since `a0e9894`, so the page was paying
-        six round trips on every visit to assemble a payload the server threw
-        away. Whatever the advisor needs, it now fetches itself.
+        There were eleven. Six — maintenance_line_items, known_issue_tracking,
+        nhtsa_data, vehicle_health_summary, wishlist_items,
+        modification_tracking — existed only to be handed to ConsultantChat,
+        which posted them to the advisor. `loadConsultantContext` has read all of
+        that server-side since `a0e9894`, so the page was paying six round trips
+        on every visit to assemble a payload the server threw away.
+
+        The seventh is `vehicle_documents`. It survived that cut because it fed
+        a `documents` prop rather than the advisor payload — but the prop was
+        destructured and never rendered, so the read bought nothing either.
+        Removing it means no client anywhere reads that table, which is what
+        lets 20260801140000 scope it to owners with no demo arm.
       */
       const [
-        vehicleResult, knowledgeResult, sessionsResult,
-        allServiceResult, documentsResult
+        vehicleResult, knowledgeResult, sessionsResult, allServiceResult
       ] = await Promise.all([
         supabase.from('vehicles').select('*').eq('id', params.vehicleId).maybeSingle(),
         supabase.from('vehicle_knowledge_base').select('*').eq('vehicle_id', params.vehicleId).maybeSingle(),
         supabase.from('consultant_conversations').select('id,title,created_at,updated_at').eq('vehicle_id', params.vehicleId).order('updated_at', { ascending: false }),
         supabase.from('service_items').select('*').eq('vehicle_id', params.vehicleId).order('date_completed', { ascending: false }),
-        supabase.from('vehicle_documents').select('*').eq('vehicle_id', params.vehicleId),
       ]);
 
       if (vehicleResult.error) throw vehicleResult.error;
@@ -56,7 +59,6 @@ export default function ConsultantPage({ params }: { params: { vehicleId: string
         knowledge: knowledgeResult.data,
         sessions: sessionsResult.data || [],
         allServiceItems,
-        documents: documentsResult.data || [],
       };
     },
   });
@@ -126,7 +128,7 @@ export default function ConsultantPage({ params }: { params: { vehicleId: string
 
   if (!data?.vehicle) return null;
 
-  const { vehicle, knowledge, sessions, allServiceItems, documents } = data;
+  const { vehicle, knowledge, sessions, allServiceItems } = data;
   const mostRecentSessionId = sessions.length > 0 ? sessions[0].id : undefined;
   const wishlistItems = allServiceItems.filter((i: any) => i.status === 'wishlist');
 
@@ -143,7 +145,6 @@ export default function ConsultantPage({ params }: { params: { vehicleId: string
           vehicle={vehicle}
           wishlistItems={wishlistItems}
           allServiceItems={allServiceItems}
-          documents={documents}
           sessions={sessions}
           initialSessionId={mostRecentSessionId}
         />

@@ -41,7 +41,13 @@ interface ConsultantChatProps {
   wishlistItems: any[];
   /** All `service_items`, for the open-item count in the header. */
   allServiceItems: any[];
-  documents: any[];
+  /*
+    No `documents`. There was one, it was destructured and never read, and it
+    was the last client-side reason to query `vehicle_documents` at all — which
+    is what let 20260801140000 give that table an owner-only policy with no demo
+    arm. Attachments shown in the transcript come from `msg.documents`, recorded
+    on the turn, not from this prop.
+  */
   sessions: any[];
   initialSessionId?: string;
 }
@@ -187,7 +193,6 @@ export default function ConsultantChat({
   vehicle,
   wishlistItems,
   allServiceItems,
-  documents,
   sessions: initialSessions,
   initialSessionId,
 }: ConsultantChatProps) {

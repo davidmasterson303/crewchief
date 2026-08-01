@@ -178,25 +178,39 @@ export function key(policy: Policy): string {
  * Removing an entry requires a migration that drops it. Adding one is not a
  * way to make a failing build pass.
  *
- * **Was sixteen; is ten.** `20260731030000` closed `maintenance_line_items`
- * and `20260731040000` closed `service_items` ×4, `known_issue_tracking` and
- * `modification_tracking`. Both are absent below because the replay sees their
- * drops — and the honesty assertion is what forced this list to be updated
- * rather than left stale, which is the ratchet working as designed.
+ * **Was sixteen, then ten; is eight.** `20260731030000` closed
+ * `maintenance_line_items` and `20260731040000` closed `service_items` ×4,
+ * `known_issue_tracking` and `modification_tracking`. `20260801140000` closed
+ * the last two that hold user content: `vehicle_documents` and
+ * `consultant_conversations`. All are absent below because the replay sees
+ * their drops — and the honesty assertion is what forced this list to be
+ * updated rather than left stale, which is the ratchet working as designed. It
+ * fired on exactly those two entries when that migration landed.
  *
- * Ten remain, across ten tables. Two of them — `vehicle_documents` and
- * `consultant_conversations` — hold real invoices and real chat history and
- * need policies written deliberately rather than this pattern applied again.
+ * Eight remain, and the line this list has now crossed is narrower than "no
+ * user data left". Stated precisely, because the looser version is the kind of
+ * claim this file exists to stop:
+ *
+ *   - `consultant_documents`, `quote_requests`, `labor_bundles` — empty.
+ *   - `location_zones`, `modification_details` — shared reference data, the
+ *     same rows for everybody.
+ *   - `vehicle_knowledge_base`, `vehicle_health_summary`, `nhtsa_data` — **per
+ *     vehicle, and therefore per user.** Derived rather than authored — a
+ *     research profile, a computed health band, NHTSA recall lookups — so
+ *     nothing here is a document or a transcript someone wrote. It is still a
+ *     signed-in user seeing rows about another user's car, and it still needs
+ *     closing.
+ *
+ * What changed is the severity, not the status: the backlog no longer includes
+ * "one signed-in user can read another's invoices and chat history".
  */
 const BLANKET_BASELINE = new Set<string>([
-  'consultant_conversations:Allow all operations on consultant_conversations',
   'consultant_documents:Allow all operations on consultant_documents',
   'labor_bundles:Allow all operations on labor_bundles',
   'location_zones:Allow all operations on location_zones',
   'modification_details:Allow all operations on modification_details',
   'nhtsa_data:Allow all operations on nhtsa_data',
   'quote_requests:Allow all operations on quote_requests',
-  'vehicle_documents:Allow all operations on vehicle_documents',
   'vehicle_health_summary:Allow all operations on vehicle_health_summary',
   'vehicle_knowledge_base:Allow all operations on vehicle_knowledge_base',
 ]);
@@ -239,7 +253,9 @@ describe('blanket RLS policies, as a rebuild would declare them', () => {
     // Lower this as migrations close them. It must never be raised.
     // 16 → 10 on 31 Jul, when 20260731040000 closed service_items ×4,
     // known_issue_tracking and modification_tracking.
-    expect(BLANKET_BASELINE.size).toBeLessThanOrEqual(10);
+    // 10 → 8 on 1 Aug, when 20260801140000 closed vehicle_documents and
+    // consultant_conversations — the last two holding user content.
+    expect(BLANKET_BASELINE.size).toBeLessThanOrEqual(8);
   });
 
   it('leaves maintenance_line_items closed', () => {
