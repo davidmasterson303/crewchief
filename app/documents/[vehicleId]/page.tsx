@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
-import { FileText, Calendar, MessageSquare } from 'lucide-react';
+import { FileText, CircleCheck as CheckCircle2, Calendar, MessageSquare } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getClientSupabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
@@ -50,6 +50,12 @@ interface LineItem {
   part_number: string | null;
   total_cost: number | null;
   category: string | null;
+  /**
+   * Which writer produced this row — see `20260801120000`. `'vision'` is the
+   * invoice-extraction path and the only one a provenance claim is true of.
+   * `null` means the row predates the column and its origin is unknown.
+   */
+  source: 'vision' | 'manual' | 'seed' | null;
 }
 
 interface ServiceRecord {
@@ -58,6 +64,17 @@ interface ServiceRecord {
   vendor: string;
   items: LineItem[];
   total: number;
+  /**
+   * Every line in this visit came from the vision path.
+   *
+   * A visit is a grouping of rows, and the rows can disagree: add a forgotten
+   * item to a shop visit through the completion form and that date/shop pair
+   * now holds one extracted row and one typed one. The badge sits on the visit,
+   * so it may only claim what is true of all of them — "all" and not "any",
+   * because a badge on a partly hand-entered visit is the same overclaim in
+   * miniature.
+   */
+  allVision: boolean;
 }
 
 /**
@@ -72,9 +89,13 @@ function groupIntoVisits(rows: LineItem[]): ServiceRecord[] {
     const vendor = row.shop_name?.trim() || 'Unknown shop';
     const key = `${row.service_date ?? 'undated'}::${vendor}`;
 
-    const visit = visits.get(key) ?? { key, date: row.service_date, vendor, items: [], total: 0 };
+    const visit = visits.get(key)
+      ?? { key, date: row.service_date, vendor, items: [], total: 0, allVision: true };
     visit.items.push(row);
     visit.total += Number(row.total_cost ?? 0);
+    // Seeded and unknown-provenance rows both fail this, which is intended:
+    // neither was read off an invoice by a model.
+    visit.allVision = visit.allVision && row.source === 'vision';
     visits.set(key, visit);
   }
 
@@ -123,7 +144,7 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
       const supabase = getClientSupabase();
       const { data, error } = await supabase
         .from('maintenance_line_items')
-        .select('id, service_date, shop_name, item_description, part_number, total_cost, category')
+        .select('id, service_date, shop_name, item_description, part_number, total_cost, category, source')
         .eq('vehicle_id', params.vehicleId)
         .order('service_date', { ascending: false });
       if (error) throw error;
@@ -225,37 +246,31 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
                     <h3 className="text-base font-semibold text-white flex items-center gap-2 flex-wrap">
                       {visit.vendor}
                       {/*
-                        The "AI Extracted" badge was here, unconditionally, and
-                        its comment argued it was safe "because the only writer
-                        of this table is the vision extraction path". That was
-                        not true, in two ways:
+                        The badge, back — and gated on data this time.
 
-                          - `moveServiceItemToHistory` writes a row from a
-                            user-typed completion form — date, shop, cost,
-                            notes. No model reads anything.
-                          - Every row on all three demo cars comes from
-                            `20260314142241_seed_demo_vehicles.sql`, an INSERT
-                            in a migration.
+                        It shipped unconditionally until `9597869`, on the
+                        argument that "the only writer of this table is the
+                        vision extraction path". There were three. A user
+                        marking a service item complete had their own typing
+                        labelled machine-extracted, and every row on all three
+                        demo cars — the recruiter-facing surface — came from an
+                        INSERT in the seed migration.
 
-                        So on the public demo — the recruiter-facing surface —
-                        every record carried a provenance claim that was false.
-                        That is a smaller version of exactly what `ae45710`
-                        removed from this page: a confidence signal asserted
-                        rather than earned.
-
-                        Removed rather than gated, because provenance is not
-                        currently recorded. `maintenance_line_items` has no
-                        column saying where a row came from — `extraction_status`
-                        exists on `vehicle_documents`, not here — and any
-                        distinguisher based on which fields happen to be
-                        populated would be a guess wearing a badge.
-
-                        The badge is worth having back: a row genuinely read
-                        off an invoice by a model is the product's argument.
-                        It needs a `source` column set at each write site, which
-                        is a migration, and migrations here are applied by hand.
-                        Recorded in the roadmap rather than guessed at now.
+                        It was removed rather than gated because nothing
+                        recorded where a row came from, and the commit was
+                        explicit that guessing from which fields happen to be
+                        populated "would be a guess wearing a badge".
+                        `20260801120000` adds the column, both write sites set
+                        it, and this reads it. Rows predating the column carry
+                        NULL and stay unbadged, which is the honest answer to a
+                        question the database cannot retroactively answer.
                       */}
+                      {visit.allVision && (
+                        <span className="text-[10px] uppercase tracking-wider bg-info-wash text-info px-2 py-0.5 rounded-full flex items-center gap-1 font-medium">
+                          <CheckCircle2 className="w-3 h-3" />
+                          AI Extracted
+                        </span>
+                      )}
                     </h3>
                     {visit.date && (
                       <div className="flex items-center gap-4 text-sm text-white/50 mt-1">

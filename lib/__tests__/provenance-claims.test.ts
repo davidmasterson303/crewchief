@@ -72,22 +72,103 @@ describe('the maintenance page', () => {
     expect(rendered).toMatch(/maintenance_line_items/);
   });
 
+  /*
+    ── Widened on 1 Aug, in the way this file said to widen it ───────────────
+
+    The original assertion was `not.toMatch` on the whole file, with a note:
+    "If a genuine, data-driven badge is added later, this will fail — and the
+    right response is to widen the check to require the claim sit inside a
+    conditional on a provenance field, not to delete the test."
+
+    That is what happened. `20260801120000` adds `maintenance_line_items.source`,
+    both write sites set it, and the badge is now gated on `visit.allVision`. So
+    the rule is no longer "this phrase is absent" but "this phrase is guarded",
+    which is the property that was actually wanted all along — the earlier form
+    was the strongest check available while no provenance existed.
+  */
+  /** The exact JSX gate the badge is allowed to live behind. */
+  const GATE = "{visit.allVision && (";
+
+  /**
+   * The file with the gated badge block cut out of it.
+   *
+   * Everything this returns is, by construction, *not* behind the provenance
+   * conditional — so no provenance phrase may appear anywhere in it.
+   *
+   * ── The version of this that passed while proving nothing ─────────────────
+   *
+   * The first attempt split the file on `/allVision/` and checked the segments.
+   * It failed a probe: `allVision` appears in the `ServiceRecord` interface and
+   * in `groupIntoVisits`, both of which sit *above* the page heading, so the
+   * heading landed in a mid-file segment that the check then skipped. Restoring
+   * `Digitized by ...` to the heading — the exact page-scale defect `9597869`
+   * removed — passed all four patterns.
+   *
+   * That is the same failure as the fixed-byte window in the demo-consultant
+   * guard: an assertion that runs, goes green, and examines the wrong bytes.
+   * Anchoring on the literal gate rather than on the field name is what fixes
+   * it, because the field name occurs in three places and the gate in one.
+   */
+  function outsideTheGate(src: string): string {
+    const open = src.indexOf(GATE);
+    if (open === -1) return src; // No gate: nothing is exempt.
+
+    // The badge block is flat JSX — one <span>, no parenthesised children — so
+    // the first `)}` after the opener is its close.
+    const close = src.indexOf(')}', open + GATE.length);
+    if (close === -1) return src; // Unterminated: exempt nothing.
+
+    return src.slice(0, open) + src.slice(close + 2);
+  }
+
+  it('derives its provenance flag from the source column, not from a guess', () => {
+    /*
+      The gate has to be computed from data. A `visit.allVision` that was itself
+      hardcoded true would satisfy every assertion below while restoring the
+      exact bug — so pin it to the column that feeds it.
+    */
+    expect(rendered).toMatch(/row\.source === 'vision'/);
+    expect(rendered).toMatch(/visit\.allVision = visit\.allVision &&/);
+    expect(rendered).toMatch(/source/);
+  });
+
+  it('exempts only the badge, and nothing else', () => {
+    /*
+      Pins the carve-out itself. If `outsideTheGate` ever started returning the
+      whole file minus half the page, the assertions below would go quiet
+      without anyone noticing — so state its size: it removes a short block, not
+      a large region.
+    */
+    const removed = rendered.length - outsideTheGate(rendered).length;
+    expect(removed).toBeGreaterThan(0);
+    expect(removed).toBeLessThan(400);
+  });
+
   it.each(PROVENANCE_CLAIMS.map((p) => [String(p), p] as const))(
-    'makes no unconditional provenance claim matching %s',
+    'makes no provenance claim outside the badge conditional, matching %s',
     (_label, pattern) => {
       /*
-        Deliberately a whole-file check rather than a per-element one. The
-        badge that shipped was three lines of JSX with no condition anywhere
-        near it, and any parser clever enough to decide "is this element
-        gated?" would be a parser clever enough to be wrong about it.
-
-        If a genuine, data-driven badge is added later, this will fail — and
-        the right response is to widen the check to require the claim sit
-        inside a conditional on a provenance field, not to delete the test.
+        Deliberately not a JSX parser: a parser clever enough to decide "is this
+        element gated?" would be a parser clever enough to be wrong about it.
+        One literal gate is cut out; everything remaining must be clean. A claim
+        re-added anywhere else — a second badge, a card subtitle, or the page
+        heading where `Digitized by` lived — is outside, and fails here.
       */
-      expect(rendered).not.toMatch(pattern);
+      expect(outsideTheGate(rendered)).not.toMatch(pattern);
     }
   );
+
+  it('fails if the badge stops being conditional', () => {
+    /*
+      The specific regression: delete `visit.allVision &&` and leave the JSX.
+      `outsideTheGate` returns the whole file when the gate is missing, so the
+      assertions above already catch it — this states the rule directly so the
+      reason is legible when it fires.
+    */
+    if (PROVENANCE_CLAIMS.some((p) => p.test(rendered))) {
+      expect(rendered).toContain(GATE);
+    }
+  });
 
   it('still renders real maintenance history', () => {
     // The fix was to drop a false claim, not the data. If this page stopped

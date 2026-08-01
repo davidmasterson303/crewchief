@@ -3141,6 +3141,13 @@ Return ONLY valid JSON, no markdown code blocks, no explanations.`;
       category: item.original_category || item.category,
       original_category: item.original_category || item.category,
       invoice_url: invoiceUrl,
+      /*
+        The one writer of this table where a model genuinely read the record.
+        This is what earns the "AI Extracted" badge on the maintenance page —
+        see the column comment in 20260801120000. The badge was unconditional
+        until `9597869` and false for the other two writers.
+      */
+      source: 'vision',
     }));
 
     if (maintenanceItemsToInsert.length > 0) {
@@ -3933,6 +3940,13 @@ export async function moveServiceItemToHistory(
       total_cost: completionDetails.totalCost || (serviceItem.cost_parts + serviceItem.cost_labor) || 0,
       notes: completionDetails.notes || null,
       invoice_url: completionDetails.invoiceUrl || null,
+      /*
+        Typed by the owner into the completion form. No model reads anything on
+        this path, which is half of why the unconditional badge was false — a
+        user marking a service item complete had their own data labelled as
+        machine-extracted.
+      */
+      source: 'manual',
     };
 
     const { data: maintenanceItem, error: insertError } = await client
