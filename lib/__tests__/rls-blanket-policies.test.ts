@@ -198,8 +198,47 @@ export function key(policy: Policy): string {
  *     research profile, a computed health band, NHTSA recall lookups — so none
  *     of it is a document or transcript someone wrote.
  *
- * Whether live is scoped on any of these is a separate question with a separate
- * instrument. On the last two measured, it was.
+ * ── Measured live, 1 Aug, by scripts/audit-remaining-blanket-tables.sql ──────
+ *
+ * **Seven of these eight are already scoped in the database.** A schema-wide
+ * sweep for unconditional permissive policies returned exactly one row in all
+ * of `public`:
+ *
+ *     location_zones | "Anyone can read location zones" | SELECT | {public}
+ *
+ * and that one is defensible — `anon` holds no SELECT grant on it (42501 from
+ * outside), and it covers 16 rows of shared reference data with no vehicle_id.
+ * The name reads as intent.
+ *
+ * **A correction to the paragraph above, which was mine.** It said the three
+ * per-vehicle tables still meant "a signed-in user can see rows about another
+ * user's car". Measured, all three carry both arms —
+ * `EXISTS (… WHERE user_id = auth.uid() OR is_demo)` — so a signed-in caller
+ * reaches their own rows and the demo rows and nobody else's. That paragraph
+ * was written *as* a correction to an earlier overclaim, and was itself more
+ * pessimistic than the database. Fifth corpus-versus-live gap; second in the
+ * safe direction.
+ *
+ * The proof is also the first non-vacuous RLS test this project has run.
+ * `nhtsa_data`, `vehicle_health_summary` and `vehicle_knowledge_base` each hold
+ * four rows — three demo, one real — so an anonymous read *could* have returned
+ * the real one and did not, on all three. Every earlier anon check ran against
+ * tables where every row was a demo row and could not have failed.
+ *
+ * ── So why is this list still eight ─────────────────────────────────────────
+ *
+ * Because it measures the corpus, and the corpus is unchanged. Lowering it to
+ * one was tried: the replay still finds the other seven, so
+ * "introduces no NEW blanket policy" fails and names them. The baseline cannot
+ * drop ahead of migrations that actually drop the policies — which is the
+ * ratchet refusing to let a live measurement be recorded as repo progress, and
+ * is correct.
+ *
+ * What live's state does change is the *urgency*, not the status. No security
+ * migration is needed. A rebuild from these files still gets an open database,
+ * and the remaining work is to codify what live already does — now writable
+ * from measurement rather than from guesswork, which is the whole reason the
+ * audit script exists.
  *
  * **What this list is, restated because it was just misread — by the person
  * editing it.** These entries describe what a rebuild from these files would
