@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Car, Clock, MessageSquare, Wrench, CreditCard as Edit2, Check, X, Info, ChevronRight, Tag } from 'lucide-react';
+import { Car, Clock, MessageSquare, Wrench, CreditCard as Edit2, Check, X, Info, ChevronLeft, ChevronRight, Tag } from 'lucide-react';
 import { isDemoVehicleId } from '@crewchief/core/demo';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -120,6 +120,27 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
     }
   };
 
+  /**
+   * The health-score pill, in one place because it renders in two.
+   *
+   * R12 gives the phone its own compact breadcrumb, and the pill appears in
+   * both that and the full one. Three colour thresholds copy-pasted into two
+   * branches is how a green 79 and an amber 79 end up on the same page.
+   */
+  const healthPill = (score: number) => (
+    <span
+      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
+        score >= 80
+          ? 'bg-green-500/15 text-green-300 border border-green-400/25'
+          : score >= 60
+          ? 'bg-amber-500/15 text-amber-300 border border-amber-400/25'
+          : 'bg-red-500/15 text-red-300 border border-red-400/25'
+      }`}
+    >
+      {score}
+    </span>
+  );
+
   const getReliabilityBadge = (score: number) => {
     if (score >= 8) return { text: 'Excellent', color: 'bg-green-500/20 text-green-300 border-green-400/30' };
     if (score >= 6) return { text: 'Good', color: 'bg-info-wash text-info border-info-border' };
@@ -229,6 +250,37 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                 <span className={`font-semibold text-white tracking-tight transition-all duration-200 ${scrolled ? 'text-base' : 'text-lg'}`}>CrewChief</span>
               </Link>
 
+              {/*
+                R12 — the way back, on the viewport where it matters most.
+
+                The full breadcrumb is `hidden sm:flex`, and the comment on it
+                records that four separate routes back to the garage were
+                deliberately consolidated into this one control. That control
+                was then `display: none` below 640px, so what a phone had left
+                was a logo that happens to be a link — an affordance you have to
+                already know about.
+
+                Compact form, same destination: `‹ Garage · Accord · 61`. Model
+                only, because the year and make are the two parts of the name
+                that are never in question when you are already looking at the
+                car.
+              */}
+              <button
+                onClick={() => router.push(homeHref)}
+                className="sm:hidden flex items-center gap-1.5 min-h-[44px] px-1 text-sm text-white/50 hover:text-white transition-colors"
+              >
+                <ChevronLeft className="h-4 w-4 shrink-0" />
+                <span>Garage</span>
+                <span className="text-white/25" aria-hidden="true">·</span>
+                <span className="text-white/70 truncate max-w-[7.5rem]">{vehicle.model}</span>
+                {healthSummary?.health_score != null && (
+                  <>
+                    <span className="text-white/25" aria-hidden="true">·</span>
+                    {healthPill(healthSummary.health_score)}
+                  </>
+                )}
+              </button>
+
               <div className="hidden sm:flex items-center gap-1 text-white/30 text-sm">
                 <ChevronRight className="h-3.5 w-3.5" />
                 <button
@@ -240,15 +292,7 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                 <ChevronRight className="h-3.5 w-3.5" />
                 <span className="text-white/70 px-1">{vehicle.year} {vehicle.make} {vehicle.model}</span>
                 {scrolled && healthSummary?.health_score != null && (
-                  <span className={`ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
-                    healthSummary.health_score >= 80
-                      ? 'bg-green-500/15 text-green-300 border border-green-400/25'
-                      : healthSummary.health_score >= 60
-                      ? 'bg-amber-500/15 text-amber-300 border border-amber-400/25'
-                      : 'bg-red-500/15 text-red-300 border border-red-400/25'
-                  }`}>
-                    {healthSummary.health_score}
-                  </span>
+                  <span className="ml-1.5">{healthPill(healthSummary.health_score)}</span>
                 )}
                 <ChevronRight className="h-3.5 w-3.5" />
                 <span className="text-white px-1 font-medium">{activeBreadcrumb}</span>
@@ -342,7 +386,10 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
         <div className={appShell ? 'hidden md:block md:mb-8' : 'mb-8'}>
           <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
             <div>
-              <h1 className="text-4xl lg:text-5xl font-bold text-white tracking-tight mb-1.5">
+              {/* R11 — 36px for "2018 Honda Accord" in 279px is three lines
+                  before the trim even appears. The desktop size is the one
+                  that was designed; the phone just never had its own. */}
+              <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight mb-1.5">
                 {vehicle.year} {vehicle.make} {vehicle.model}
               </h1>
               {vehicle.trim && (
@@ -350,7 +397,11 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
               )}
             </div>
 
-            <div className="flex flex-wrap items-end gap-8">
+            {/* R11 — `flex flex-wrap gap-8` wrapped these four into a ragged
+                2 + 2 with 32px gutters on a phone. A grid makes the two
+                columns deliberate rather than a consequence of how wide
+                "Reliability" happens to be. Unchanged from `sm` up. */}
+            <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:flex sm:flex-wrap sm:items-end sm:gap-8">
               <div className="flex flex-col gap-1">
                 <span className="label-uppercase">Mileage</span>
                 {isEditingCurrentMileage ? (
