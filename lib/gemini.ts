@@ -104,7 +104,7 @@ export function withThinking<T extends GenerateContentConfig>(
   base: T,
   model: string,
   level: ThinkingLevelName
-): T {
+): T & Pick<GenerateContentConfig, 'thinkingConfig'> {
   if (!acceptsThinkingLevel(model)) return base;
   return { ...base, thinkingConfig: { thinkingLevel: ThinkingLevel[level] } };
 }
