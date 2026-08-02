@@ -9,7 +9,6 @@ import {
   classificationConfig,
 } from '@/lib/gemini';
 import { VEHICLE_RESEARCH_PROMPT, POWERTRAIN_OPTIONS_PROMPT, CONSULTANT_SYSTEM_PROMPT, CONSULTANT_DOCUMENT_VALIDATION_PROMPT } from '@crewchief/core/prompts';
-import { getVehicleImage } from '@/lib/vehicle-images';
 import { logger } from '@crewchief/core/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { downloadStoredFile } from '@/lib/storage-objects';
@@ -402,17 +401,29 @@ export async function enrichVehicle(vehicleId: string) {
     return { success: false, error: 'Vehicle not found' };
   }
 
-  // Best-effort and bounded. A missing photo must never fail enrichment —
-  // and as of 28 Jul GOOGLE_SEARCH_API_KEY is expired, so this currently
-  // always falls back.
-  try {
-    await getVehicleImage(vehicleId, vehicle);
-  } catch (error) {
-    logger.warn('ENRICH:IMAGE_FAILED', 'Vehicle image lookup failed', {
-      vehicleId,
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
+  /*
+    Enrichment no longer looks for a photograph, and `lib/vehicle-images.ts` is
+    gone with it.
+
+    It hotlinked whatever Google Custom Search returned for "2019 BMW M3 car
+    photo" and wrote that third-party URL onto the vehicle row. Every part of
+    that was a liability. The licence of an arbitrary indexed image is unknown
+    and unknowable at that scale — the filter list it carried (`-poster -art
+    -print`, plus a deny-list of etsy/redbubble/zazzle) is an admission that it
+    could not tell what it was fetching. Hotlinks rot, so a car that had a
+    photo in March is a broken hero in August. And the key expired on 28 Jul,
+    which means every vehicle created since already took this path to nothing.
+
+    Nothing replaces it because a replacement already exists and is better:
+    `VehicleIdentity`'s make-derived plate, which its own docblock now calls
+    "the primary design, not the fallback", plus owner upload with downscale
+    and EXIF orientation via `lib/image-downscale.ts`. A drawn plate is always
+    the right car, always the right licence, and always loads.
+
+    `image_url` stays on the row and is still read as a fallback by
+    `planVehiclePhoto` — the seeded demo vehicles use it. Nothing writes it
+    from a search any more.
+  */
 
   const dossier = await generateVehicleDossier(vehicleId);
   if (!dossier.success) {
