@@ -12,7 +12,7 @@ Source: `Live-Site Audit.dc.html` (2 Aug 2026), grounded in repo `davidmasterson
 against prod afterwards.
 
 **Not yet on production: everything from the afternoon session** — RP1, and the
-two Phase 2.95 cost items. All committed on `main`, none promoted. Promotion is
+three Phase 2.95 cost items (a, b, c). All committed on `main`, none promoted. Promotion is
 a separate deliberate step.
 
 | | Items | |
@@ -618,10 +618,10 @@ RB0/RP0 at 11:12, both after it was written.
 
 ## Where things stand
 
-- `main` = `8456afe`. Working tree clean. **Nothing from this session is
+- `main` = `bb83782`. Working tree clean. **Nothing from this session is
   pushed or promoted** — production still serves `e729ee96`, which is the
   morning's work.
-- 58 suites, 1001 tests, green. `npm run typecheck` clean.
+- 59 suites, 1030 tests, green. `npm run typecheck` clean.
 - **Two stale worktrees** under `.claude/worktrees/` (`confident-shtern`,
   `friendly-lewin`). Both are *behind* `main` with nothing ahead — checked, no
   stranded work. Prunable whenever.
@@ -638,6 +638,7 @@ is the one that changes the unit economics.
 | `b5d1c53` | **2.95a** — an explicit thinking level, and the gate that proves it |
 | `02c78cf` | A return-type fix, and a correction to `b5d1c53`'s own claim |
 | `8456afe` | **RP1** — R6, R9, R10 in one pass |
+| `bb83782` | **2.95c** — every Gemini call metered, per account |
 
 ### The two findings worth carrying, whatever you pick up next
 
@@ -688,15 +689,35 @@ at once, and `tsc` is perfectly happy about it. Always go through
    extraction is where a regression is invisible — fewer line items still returns
    valid JSON and still passes every gate. The corpus to settle it exists
    (`COWORK_PROMPT_invoice_vision_corpus_2026-07-30.md`). Measure, then set one.
+   It is now metered under `invoice_extraction`, so the cost half of that
+   question answers itself once the migration is applied.
+5. **A test that reads a migration must strip the comments first.** The first
+   draft of `ai-usage.test.ts` asserted the file contains no `USING (true)` and
+   failed on the migration's own comment *saying* it contains no `USING (true)`.
+   It was reading prose and reporting it as schema — the same instrument failure
+   this file keeps recording, this time caught in the instrument being written.
+
+## David's one item — a migration to apply
+
+**`20260802150000_meter_ai_usage_per_account.sql` is committed and unapplied.**
+Until it runs, every Gemini call logs `AI_USAGE:WRITE_FAILED` and records
+nothing. That is deliberate and safe — verified, not assumed: with the table
+absent the consultant health round trip still answered in 2.3s and the meter
+dropped the row. Deploying ahead of the migration breaks nothing. It just does
+not measure anything, and **the two-week clock on decision D2 does not start
+until it is applied.**
+
+Pure additions, no `DROP`, so the SQL Editor's "Potential issue detected" modal
+will not fire and it will not stall mid-run.
 
 ## What I would pick up first, in order
 
-1. **Promote, or decide not to.** Five commits sit unpromoted, including a
+1. **Promote, or decide not to.** Six commits sit unpromoted, including a
    consultant behaviour change. The round-trip gate passes locally; running it
    against the candidate is the thing that should gate the promote.
-2. **2.95c — per-account metering.** It is the substrate for tier limits, and
-   **decision D2 (price point) should not be taken until it has two weeks of
-   data.** Everything downstream of Path A waits on this.
+2. ~~**2.95c — per-account metering.**~~ **Done (`bb83782`)** — all ten call
+   sites record. Waiting only on the migration above, then two weeks of data
+   before **D2 (price point)** can be taken as a decision rather than a guess.
 3. **David: 5.0.** Entity, terms, privacy policy. Still the only genuine blocker
    on revenue and the only one whose duration nobody controls.
 4. **The R10 tail** — data and labels to 13px on mobile. Needs a judgement per
