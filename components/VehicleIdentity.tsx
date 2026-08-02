@@ -64,6 +64,42 @@ interface VehicleIdentityProps {
   className?: string;
 }
 
+/**
+ * The AVIF and WebP siblings of a demo photograph, if it has any.
+ *
+ * Only the files under `public/vehicles/` are built into three formats — by
+ * `scripts/build-image-derivatives.mjs`, which commits its output next to the
+ * JPEG. Everything else reaching this component is an owner upload arriving as
+ * a Supabase signed URL, which has exactly one representation and must be
+ * offered as-is: the signature covers a specific object, so inventing a
+ * sibling path would produce a 403 rather than a photograph.
+ *
+ * Returns `null` for those, and every caller then falls back to the plain URL.
+ */
+function photoFormats(src: string | null): { avif: string; webp: string } | null {
+  if (!src || !src.startsWith('/vehicles/') || !/\.jpe?g$/i.test(src)) return null;
+  const stem = src.replace(/\.jpe?g$/i, '');
+  return { avif: `${stem}.avif`, webp: `${stem}.webp` };
+}
+
+/**
+ * The two custom properties `.photo-layer` reads: a plain `url()` every browser
+ * understands, and an `image-set()` only newer ones are shown. See the class in
+ * globals.css for why both have to exist.
+ */
+function photoLayerVars(
+  src: string,
+  formats: { avif: string; webp: string } | null
+): React.CSSProperties {
+  const fallback = `url(${JSON.stringify(src)})`;
+  const set = formats
+    ? `image-set(url(${JSON.stringify(formats.avif)}) type("image/avif"), ` +
+      `url(${JSON.stringify(formats.webp)}) type("image/webp"), ` +
+      `${fallback} type("image/jpeg"))`
+    : fallback;
+  return { '--photo-fallback': fallback, '--photo-set': set } as React.CSSProperties;
+}
+
 export function VehicleIdentity({
   variant,
   photo,
@@ -86,6 +122,7 @@ export function VehicleIdentity({
   */
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const src = photo && photo !== failedUrl ? photo : null;
+  const formats = photoFormats(src);
 
   const field = vehicleField(make);
   const isBand = variant === 'band';
@@ -120,10 +157,10 @@ export function VehicleIdentity({
           */}
           <div
             aria-hidden="true"
-            className="absolute pointer-events-none"
+            className="absolute pointer-events-none photo-layer"
             style={{
               inset: '-6%',
-              backgroundImage: `url(${JSON.stringify(src)})`,
+              ...photoLayerVars(src, formats),
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               filter: 'blur(34px) saturate(.8) brightness(.52)',
@@ -132,9 +169,9 @@ export function VehicleIdentity({
           />
           {/* The sharp copy. Contained — the whole vehicle, always. */}
           <div
-            className="absolute inset-0"
+            className="absolute inset-0 photo-layer"
             style={{
-              backgroundImage: `url(${JSON.stringify(src)})`,
+              ...photoLayerVars(src, formats),
               backgroundSize: 'contain',
               backgroundPosition: 'center',
               backgroundRepeat: 'no-repeat',
@@ -147,14 +184,25 @@ export function VehicleIdentity({
             no-broken-image rule depends on hearing about one. This probe is the
             only <img> in the component: zero-area, never painted, present
             solely so `onError` has somewhere to fire.
+
+            It is wrapped in <picture> so it negotiates format the same way the
+            two background layers do. Without that it would request the JPEG
+            while the backgrounds requested the AVIF — two downloads of the same
+            photograph, and the larger one is the wasted one, which would have
+            made the whole derivative exercise a net loss. Matching sources put
+            both on the same cache entry: one fetch, as before.
           */}
-          <img
-            src={src}
-            alt=""
-            aria-hidden="true"
-            className="absolute w-0 h-0 opacity-0 pointer-events-none"
-            onError={() => setFailedUrl(src)}
-          />
+          <picture>
+            {formats && <source srcSet={formats.avif} type="image/avif" />}
+            {formats && <source srcSet={formats.webp} type="image/webp" />}
+            <img
+              src={src}
+              alt=""
+              aria-hidden="true"
+              className="absolute w-0 h-0 opacity-0 pointer-events-none"
+              onError={() => setFailedUrl(src)}
+            />
+          </picture>
           {/* Top highlight — the band's only decoration, and it is not over the photo. */}
           <div
             aria-hidden="true"

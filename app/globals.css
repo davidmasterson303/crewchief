@@ -265,6 +265,36 @@ nav {
     transition: transform 80ms var(--ease-standard);
   }
 
+  /* A photograph painted as a background, in the best format the browser takes.
+   *
+   * The demo photographs have AVIF and WebP siblings built by
+   * `scripts/build-image-derivatives.mjs` — 5.31 MB of JPEG becomes 1.46 MB of
+   * AVIF, same frames. `<picture>` is the usual way to offer them and it does
+   * not apply here: `VehicleIdentity` paints its photo as a CSS background,
+   * twice, deliberately — an over-scanned blurred fill under a contained sharp
+   * copy. `image-set()` is the background-image equivalent.
+   *
+   * The @supports guard is the point of the split. `image-set()` with `type()`
+   * needs Chrome 113 / Safari 17 / Firefox 113, and an unsupported
+   * background-image value does not degrade to the previous declaration — it
+   * makes the property invalid, which paints *nothing*. On a component whose
+   * entire contract is "never show a broken image", silently blanking the photo
+   * on an older browser is the one failure that matters. So the plain url()
+   * declaration is the base, and only browsers that have proven they can parse
+   * image-set() ever see the second one.
+   *
+   * Two custom properties rather than one class per photo because the URLs are
+   * per-vehicle and arrive at runtime — set both inline, the stylesheet decides
+   * which is used. */
+  .photo-layer {
+    background-image: var(--photo-fallback);
+  }
+  @supports (background-image: image-set(url('x.avif') type('image/avif'))) {
+    .photo-layer {
+      background-image: var(--photo-set);
+    }
+  }
+
   /* Page-level atmosphere over a background photograph. Vignette only — a
    * scrim belongs to a plate carrying text, not to a whole page. Used by the
    * garage and demo backgrounds. */
