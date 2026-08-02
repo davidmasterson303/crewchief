@@ -36,7 +36,13 @@ export class ApiRequestError extends Error {
 }
 
 interface RequestOptions {
-  method?: 'GET' | 'POST';
+  /*
+    DELETE is here for `/api/v1/account` — App Store 5.1.1(v). The route is
+    DELETE rather than POST deliberately (see its docblock), and adding the
+    verb here rather than working around it with a POST alias keeps the mobile
+    client speaking the same contract the web app and the tests do.
+  */
+  method?: 'GET' | 'POST' | 'DELETE';
   body?: unknown;
   /** Endpoints that serve demo data work without a session. */
   allowAnonymous?: boolean;

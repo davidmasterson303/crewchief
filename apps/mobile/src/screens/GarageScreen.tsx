@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 
 import { apiRequest, ApiRequestError } from '../api/client';
+import { AccountScreen } from './AccountScreen';
 import { getHealthBandJudgement, healthBandHex } from '@crewchief/core/health-band';
 
 /**
@@ -260,11 +261,21 @@ function DevToken({ token }: { token: string }) {
 
 export function GarageScreen({
   accessToken,
+  email,
   onSignOut,
 }: {
   accessToken: string;
+  email: string | null;
   onSignOut: () => void;
 }) {
+  /*
+    App Store 5.1.1(v). The account surface is one tap from here because the
+    guideline requires deletion to be genuinely available rather than buried —
+    and this is the only screen a signed-in user sees, so "buried" would be any
+    number of taps greater than one.
+  */
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [deletedNotice, setDeletedNotice] = useState<string | null>(null);
   const [state, setState] = useState<
     | { status: 'loading' }
     | { status: 'ok'; vehicles: Vehicle[] }
@@ -323,6 +334,18 @@ export function GarageScreen({
   }
 
   return (
+    <>
+    {deletedNotice && (
+      /*
+        Apple asks for confirmation that deletion actually happened, and this
+        is the last thing the account's owner will ever see from the app — the
+        session is cleared the moment they dismiss it, so there is nothing left
+        to inspect afterwards. It names what went, rather than saying "done".
+      */
+      <View style={styles.deletedNotice}>
+        <Text style={styles.deletedNoticeText}>{deletedNotice}</Text>
+      </View>
+    )}
     <FlatList
       data={state.vehicles}
       keyExtractor={(v) => v.id}
@@ -338,8 +361,13 @@ export function GarageScreen({
       ListHeaderComponent={
         <View style={styles.header}>
           <Text style={styles.heading}>Garage</Text>
-          <Pressable onPress={onSignOut} hitSlop={12}>
-            <Text style={styles.signOut}>Sign out</Text>
+          <Pressable
+            onPress={() => setAccountOpen(true)}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Account"
+          >
+            <Text style={styles.signOut}>Account</Text>
           </Pressable>
         </View>
       }
@@ -353,6 +381,26 @@ export function GarageScreen({
       }
       ListFooterComponent={<DevToken token={accessToken} />}
     />
+    <AccountScreen
+      visible={accountOpen}
+      email={email}
+      onClose={() => setAccountOpen(false)}
+      onSignOut={() => {
+        setAccountOpen(false);
+        onSignOut();
+      }}
+      onDeleted={(summary) => {
+        /*
+          Order matters. The notice is set before the session is cleared,
+          because clearing it unmounts this screen — showing the confirmation
+          after would show it to nobody.
+        */
+        setDeletedNotice(summary);
+        setAccountOpen(false);
+        onSignOut();
+      }}
+    />
+    </>
   );
 }
 
@@ -365,7 +413,18 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   heading: { color: '#fff', fontSize: 30, fontWeight: '700', letterSpacing: -0.6 },
-  signOut: { color: 'rgba(255,255,255,0.45)', fontSize: 14 },
+  signOut: { color: 'rgba(255,255,255,0.45)', fontSize: 14, minHeight: 44, lineHeight: 44 },
+  deletedNotice: {
+    position: 'absolute',
+    top: 60,
+    left: 16,
+    right: 16,
+    zIndex: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(22,163,74,0.95)',
+    padding: 14,
+  },
+  deletedNoticeText: { color: '#fff', fontSize: 14, lineHeight: 20 },
 
   card: {
     backgroundColor: 'rgba(255,255,255,0.05)',

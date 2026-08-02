@@ -51,7 +51,11 @@ export default function App() {
           — and it did, on the simulator, 1 Aug. The garage makes the same call
           and shows the answer as a product rather than as a diagnostic.
         */
-        <GarageScreen accessToken={session.access_token} onSignOut={() => void signOut()} />
+        <GarageScreen
+          accessToken={session.access_token}
+          email={session.user?.email ?? null}
+          onSignOut={() => void signOut()}
+        />
       ) : (
         <SignInScreen />
       )}
