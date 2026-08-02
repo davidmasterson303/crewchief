@@ -26,12 +26,15 @@ thread scrolling, zero overflow in either axis.
 | **Done** | 1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 16, 17 | 12 |
 | **Partial** | 13, 15 | 2 |
 | **Open** | 5, 12, 14, 18 | 4 |
-| **Done (work stream B)** | RB0, R1, R2, R3, R5, R6, R9, R10, R15, R4, **R8** | 11 |
-| **Open (work stream B)** | R7, R11, R12, R13, R14 | 5 |
+| **Done (work stream B)** | RB0, R1, R2, R3, R5, R6, R9, R10, R15, R4, R8, **R11, R12** | 13 |
+| **Invalid (work stream B)** | **R13, R14** — both target components nothing renders | 2 |
+| **Open (work stream B)** | R7 — folds into item 14 | 1 |
 
-**RP0 and RP1 are closed, and both of RP2's heaviest items went with them** —
-R4, its one CRITICAL, and R8. What remains is R11, R12, R13 and R14, plus R7,
-which folds into item 14.
+**Work stream B is finished, except for a decision that is not a fix.** RB0,
+RP0, RP1 and RP2 are all closed — R4, R8, R11 and R12 landed this afternoon.
+**R13 and R14 are invalid**: both describe real defects in components that no
+route renders, and the live equivalents do not have those defects. Deleting or
+wiring those two components is David's call. R7 remains folded into item 14.
 
 Every item below carries a status line. **Handoff notes are at the bottom of
 this file** — read those first if you are picking this up cold.
@@ -540,6 +543,30 @@ Add to `app/globals.css` and to the DS spec, then reference by name in review.
 - **Effort:** ~1 hour.
 
 ### R13. Service rows drop the date and truncate the job — MEDIUM
+> **INVALID AS WRITTEN — `components/MaintenanceHistory.tsx` is not rendered
+> anywhere.** Nothing imports it: no `<MaintenanceHistory`, no import of
+> `@/components/MaintenanceHistory` or `./MaintenanceHistory`, no
+> `dynamic()`/`lazy()` reference, in `app/` or `components/`. It exports a
+> default that no file consumes. The only mention left in the tree is a comment
+> in `CollapsibleSection.tsx`.
+>
+> **And the live page does not have this defect.**
+> `app/documents/[vehicleId]/page.tsx` renders the service history itself and
+> contains no `hidden sm:`, no `truncate` and no date formatting at all — the
+> date is printed plainly, which is the thing R13 asks for.
+>
+> The fix was written and then reverted rather than committed. Editing a
+> component nothing renders is work that looks like progress, cannot be
+> verified by any flow, and would leave the file looking maintained.
+>
+> **This is item 12's failure again, one layer over.** That entry records
+> `photography/build_assets.py` as "never committed… which is how the audit
+> reached a wrong conclusion in good faith". Same shape: the audit read source
+> and inferred that reading it meant it ran.
+>
+> **David's call, and it is a scope decision rather than a fix:** delete
+> `MaintenanceHistory.tsx` and `UpcomingMaintenance.tsx`, or wire them up if
+> they were meant to be reached. R13 and R14 only become real after that.
 - **Problem:** `MaintenanceHistory.tsx:347–376` keeps one line and pays for it — date `hidden sm:flex`, part number `hidden sm:inline`, description `truncate`, beside a category badge and a right-aligned cost. A maintenance record with its date hidden has the second-most-important fact removed, on the screen whose whole job is "what was done, when, for how much."
 - **Change:** two lines below `sm`, one line above —
   ```
@@ -549,6 +576,14 @@ Add to `app/globals.css` and to the DS spec, then reference by name in review.
 - **Effort:** ~2 hours.
 
 ### R14. A 260px carousel that fits neither phone nor desktop — MEDIUM
+> **INVALID AS WRITTEN — `components/UpcomingMaintenance.tsx` is not rendered
+> anywhere either.** Same evidence as R13, and the claim that it "is the only
+> horizontally-scrolling region in the app" is the tell: the only live
+> `overflow-x-auto` in `app/` or `components/` outside it are the dashboard's
+> tab strip, which carries `edge-fade-x` deliberately, and `EmailDraftDisplay`.
+> There is no carousel on any screen a user can reach.
+>
+> Fix written and reverted, for the reason under R13. Same decision needed.
 - **Problem:** `UpcomingMaintenance.tsx:136`, `:415` — fixed `w-[260px]` cards in a snap scroller. At 375px that leaves a 19px sliver of the next card: too little to read as "more," too much to read as an edge. At 1440px the same strip scrolls through four items while 600px of row sits empty. It is the only horizontally-scrolling region in the app and it scrolls at *every* width.
 - **Change:** below `sm` → `w-[78vw] max-w-[300px] snap-start` (a legible next-card peek); `md`+ → `grid grid-cols-2 xl:grid-cols-3`, no scroller.
 - **Effort:** ~1 hour.
@@ -625,7 +660,7 @@ RB0/RP0 at 11:12, both after it was written.
 
 ## Where things stand
 
-- `main` = `1a691e7`. Working tree clean. **Nothing from this session is
+- `main` = the R11/R12 commit. Working tree clean. **Nothing from this session is
   pushed or promoted** — production still serves `e729ee96`, which is the
   morning's work.
 - 61 suites, 1055 tests, green. `npm run typecheck` clean.
