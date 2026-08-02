@@ -9,6 +9,8 @@ import {
   classificationConfig,
   withThinking,
 } from '@/lib/gemini';
+import { checkMonthlyBudget } from '@/lib/ai-budget';
+import { budgetMessage } from '@crewchief/core/ai/budget';
 import { VEHICLE_RESEARCH_PROMPT, POWERTRAIN_OPTIONS_PROMPT, CONSULTANT_SYSTEM_PROMPT, CONSULTANT_DOCUMENT_VALIDATION_PROMPT } from '@crewchief/core/prompts';
 import { logger } from '@crewchief/core/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
@@ -971,6 +973,24 @@ export async function sendConsultantMessage(params: {
     });
     if (!access.ok) {
       return { success: false, error: access.error };
+    }
+
+    /*
+      5.1 — the monthly ceiling, checked after authorization and before the
+      model. The per-minute rate limit above bounds a burst; this bounds a
+      month, and until now nothing did: ten calls a minute per vehicle is a
+      ceiling of ~432,000 calls a month.
+
+      Ordered after `authorizeVehicleAccess` on purpose. Reading someone's
+      usage before establishing who they are would be a lookup on a
+      caller-supplied id, and the budget read uses the service role.
+
+      `access.userId` is null on the demo path, and `checkMonthlyBudget`
+      deliberately does not gate that — see the note in `lib/ai-budget.ts`.
+    */
+    const budget = await checkMonthlyBudget(access.userId);
+    if (!budget.allowed) {
+      return { success: false, error: budgetMessage(budget) };
     }
 
     const { vehicleId, sessionId, message, messageHistory, attachedDocuments } = params;
@@ -2923,6 +2943,14 @@ export async function parseInvoiceLineItems(documentId: string, vehicleId: strin
     const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
     if (!access.ok) {
       return { success: false, error: access.error };
+    }
+
+    // 5.1 — the other path a user can drive repeatedly, and the one still
+    // running at the default thinking level. See the consultant for the note
+    // on ordering.
+    const budget = await checkMonthlyBudget(access.userId);
+    if (!budget.allowed) {
+      return { success: false, error: budgetMessage(budget) };
     }
 
     const client = getServiceRoleClient();
