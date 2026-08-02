@@ -1,9 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useCountUp } from '@/hooks/use-count-up';
-import { useHealthBand } from '@/hooks/use-health-band';
 import { VehicleIdentity } from '@/components/VehicleIdentity';
+import { ClusterGauge } from '@/components/ClusterGauge';
 
 interface DiagnosticHeroProps {
   /** A renderable photo URL, already signed by the caller. Null is expected. */
@@ -64,10 +63,13 @@ export default function DiagnosticHero({
   const [scanDone, setScanDone] = useState(false);
   const [mounted, setMounted] = useState(false);
 
-  // Shared primitives: the same band table as HealthSummary's ScoreRing, so
-  // the two can never disagree about one score.
-  const band = useHealthBand(healthScore ?? 0);
-  const displayScore = useCountUp(healthScore ?? 0, 1400, scanDone && !!healthScore);
+  /*
+    The band table and the count-up both moved into ClusterGauge, which owns
+    the reading now. Keeping a second copy of either here is how the numeral
+    and the dial would come to disagree about one score — the exact drift the
+    old comment on this line was written to prevent, so the rule is unchanged
+    and only its address has moved.
+  */
 
   useEffect(() => {
     setMounted(true);
@@ -76,7 +78,6 @@ export default function DiagnosticHero({
   }, []);
 
   const score = healthScore ?? 0;
-  const shown = scanDone ? Math.round(displayScore) : 0;
 
   return (
     <section
@@ -144,81 +145,36 @@ export default function DiagnosticHero({
           {!photo ? 'No photo yet' : scanDone ? 'Diagnostics complete' : 'Scanning…'}
         </p>
 
-        {healthScore !== undefined && (
-          <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-8">
-            <div className="flex items-baseline gap-2">
-              {/* Numeral stays Inter: tabular figures matter more than flourish
-                  on a value that animates digit by digit. */}
-              <span
-                className="num text-6xl font-bold leading-none"
-                style={{
-                  color: band.color,
-                  textShadow: scanDone ? `0 0 44px rgba(${band.rgb},0.22)` : 'none',
-                }}
-              >
-                {scanDone ? shown : '—'}
-              </span>
-              <span className="text-lg text-white/35">/100</span>
-              {/* Derived from the score, never passed in — a hand-written label
-                  is how 61 came to be called "Good". */}
-              <span
-                className="text-sm font-semibold ml-1"
-                style={{ color: band.color }}
-              >
-                {scanDone ? band.label : ''}
-              </span>
-            </div>
+        {/*
+          One instrument, where there used to be a numeral and a separate
+          linear track beside it.
 
-            {/*
-              A band scale, not a progress bar. The ticks are the point: a bare
-              fill says "more is better" and nothing else, while 40 / 60 / 80
-              are where the label actually changes. A score of 62 sitting just
-              past a tick reads very differently from 62 on an unmarked track.
-            */}
-            <div className="flex-1 min-w-[180px] pb-1">
-              <div className="relative h-[3px] rounded-full bg-white/10">
-                <div
-                  className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-300"
-                  style={{
-                    width: `${Math.max(0, Math.min(100, scanDone ? shown : 0))}%`,
-                    background: band.color,
-                  }}
-                />
-                {[40, 60, 80].map((tick) => (
-                  <span
-                    key={tick}
-                    aria-hidden="true"
-                    className="absolute top-[-3px] w-px h-[9px] bg-white/25"
-                    style={{ left: `${tick}%` }}
-                  />
-                ))}
-                {scanDone && (
-                  <span
-                    aria-hidden="true"
-                    className="absolute top-[-3px] w-[2px] h-[9px] rounded-full transition-[left] duration-300"
-                    style={{
-                      left: `${Math.max(0, Math.min(100, shown))}%`,
-                      background: band.color,
-                    }}
-                  />
-                )}
-              </div>
-              <div className="relative mt-1.5 h-3">
-                {[40, 60, 80].map((tick) => (
-                  <span
-                    key={tick}
-                    className="num absolute text-[10px] text-white/30 -translate-x-1/2"
-                    style={{ left: `${tick}%` }}
-                  >
-                    {tick}
-                  </span>
-                ))}
-              </div>
-            </div>
+          The track's own comment made the argument this inherits: a bare fill
+          says "more is better" and nothing else, while 40 / 60 / 80 are the
+          only points on the scale where the label actually changes. That was
+          right, and the ticks survive — they have moved onto the arc, where
+          the reading and the scale are finally the same object rather than two
+          renderings of one number sitting side by side.
+
+          Deliberately *not* an additional dial next to the score. D5 removed
+          HealthSummary's ring from this page precisely because the dashboard
+          was printing the same figure twice within a screen; adding a gauge
+          beside the numeral would have reintroduced that with extra ink. The
+          numeral lives in the well of the arc, which is where a cluster puts
+          it.
+        */}
+        {healthScore !== undefined && (
+          <div className="flex flex-col sm:flex-row sm:items-center gap-5 sm:gap-9">
+            <ClusterGauge score={score} active={scanDone} />
+            {reason && (
+              <p className="text-sm text-white/50 leading-relaxed flex-1 max-w-prose">{reason}</p>
+            )}
           </div>
         )}
 
-        {reason && <p className="text-sm text-white/50 mt-4">{reason}</p>}
+        {healthScore === undefined && reason && (
+          <p className="text-sm text-white/50 mt-4">{reason}</p>
+        )}
       </div>
 
       <style jsx>{`
