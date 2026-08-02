@@ -6,38 +6,48 @@ import { useHealthBand } from '@/hooks/use-health-band';
 /*
  * The health score as an instrument cluster, not a progress donut.
  *
- * The reference is a modern flagship cluster at night, and its grammar is
- * specific: a near-black face, a thin luminous arc open at the bottom, fine
- * ticks with the numbers *on* the ticks, one accent hue used as light rather
- * than as fill, tabular numerals, and a needle sweep at ignition. What it
- * never does is close the ring — a 360° track has no start and no end, so it
- * reads as a loading spinner rather than a scale.
+ * Built to `docs/roadmap.md` item 7 (concept 2a). The reference is a modern
+ * flagship cluster at night, and its grammar is specific: a near-black face, a
+ * thin luminous arc open at the bottom, fine ticks with the numbers *on* the
+ * majors, one accent hue used as light rather than as fill, tabular numerals,
+ * and a needle sweep at ignition. What it never does is close the ring — a
+ * 360° track has no start and no end, so it reads as a loading spinner rather
+ * than a scale.
  *
- * The 270° arc is what buys the ticks. On a closed donut there is nowhere to
- * put 40 / 60 / 80 without them colliding with the fill, which is why the ring
- * this replaces had no marks on it at all: it could show that a score was
- * large, but not that 61 sits one tick past the boundary where the label stops
- * saying "Needs attention" and starts saying "Fair". The linear band scale in
- * DiagnosticHero already understood this — its comment makes the argument
- * outright — and this is the same idea given the shape it belongs in.
+ * The 270° opening is what buys the ticks. On a closed donut there is nowhere
+ * to put 40 / 60 / 80 without them colliding with the fill, which is why the
+ * ring this replaces had no marks at all: it could show that a score was
+ * large, but not that 68 sits one tick past the boundary where "Needs
+ * attention" becomes "Fair". The linear band scale this hero used to carry
+ * made the same argument in its own comment; the ticks have simply moved onto
+ * the arc, where the reading and the scale are one object.
  *
  * ── Geometry ────────────────────────────────────────────────────────────────
  *
- * viewBox 0 0 200 200, centre (100,100), arc radius 70, open 90° at the
- * bottom. A score maps to an angle by `2.7 * score - 135` degrees, measured
- * from twelve o'clock: 2.7 = 270/100, and -135 puts zero at the bottom-left
- * end of the arc. Every rotating part — needle, ticks, labels — uses that one
- * expression, so nothing can drift out of register with the track.
+ * viewBox 0 0 200 178, centre (100,100), arc radius 70, open 90° at the
+ * bottom. The height is 178 rather than 200 deliberately: the arc bottoms out
+ * at y≈152, and the 26 units left below it are exactly the readout's line.
+ * Cropping there is what stops the dial floating in a square of nothing.
  *
- * The track path is `M 50.5 149.5 A 70 70 0 1 1 149.5 149.5`. Those endpoints
- * are the same formula at score 0 and 100; the large-arc flag is 1 because 270°
- * exceeds a semicircle, which is the flag that is wrong in most hand-written
- * arcs. The filled portion reuses the identical `d` with `pathLength="100"`,
- * so `stroke-dasharray="${score} 100"` is the score in percent with no
- * circumference arithmetic to get wrong — and no chance of the fill and the
- * track describing different curves.
+ * A score maps to an angle by `2.7 * score - 135` degrees from twelve
+ * o'clock: 2.7 = 270/100, and -135 puts zero at the bottom-left end. Every
+ * rotating part — needle, ticks, labels — uses that one expression, so nothing
+ * can drift out of register with the track.
+ *
+ * The track path is `M 50.5 149.5 A 70 70 0 1 1 149.5 149.5`; those endpoints
+ * are the same formula at 0 and 100, and the large-arc flag is 1 because 270°
+ * exceeds a semicircle — the flag most hand-written arcs get wrong. The lit
+ * portion reuses the identical `d` with `pathLength="100"`, so the dasharray
+ * is literally the score: no circumference arithmetic, and no chance of the
+ * fill and the track describing different curves.
+ *
+ * Caps are butt, not round. A round cap adds half a stroke width of arc at
+ * each end, so a score of 0 would still paint a visible stub and every reading
+ * would sit ~2% long. On a dial with ticks that error is legible.
  */
 
+const VIEW_W = 200;
+const VIEW_H = 178;
 const CX = 100;
 const CY = 100;
 const R = 70;
@@ -48,21 +58,21 @@ function angleFor(score: number): number {
   return 2.7 * score - 135;
 }
 
-/** Where a label sits, just outside the ticks. */
-function labelPoint(score: number, radius = 88): { x: number; y: number } {
+/** A point at `radius` along the dial, for a score. */
+function pointAt(score: number, radius: number): { x: number; y: number } {
   const rad = (angleFor(score) * Math.PI) / 180;
   return { x: CX + radius * Math.sin(rad), y: CY - radius * Math.cos(rad) };
 }
 
 /*
-  The ticks. 0 and 100 close the scale; 40, 60 and 80 are the band boundaries
-  and are drawn brighter, because those are the only places on this scale where
-  the score's *meaning* changes. Only the three boundaries are numbered — 0 and
-  100 are self-evident from the ends of the arc, and labelling them adds two
-  numerals for no information.
+  Majors carry the numbers; minors are every 5 and carry nothing. 40, 60 and 80
+  are also band boundaries and are drawn brighter still — they are the only
+  points on this scale where the score's meaning changes, and the whole reason
+  the dial is ticked rather than smooth.
 */
-const TICKS = [0, 20, 40, 60, 80, 100];
+const MAJORS = [0, 20, 40, 60, 80, 100];
 const BOUNDARIES = new Set([40, 60, 80]);
+const MINORS = Array.from({ length: 21 }, (_, i) => i * 5).filter((t) => !MAJORS.includes(t));
 
 function prefersReducedMotion(): boolean {
   if (typeof window === 'undefined' || !window.matchMedia) return false;
@@ -70,17 +80,17 @@ function prefersReducedMotion(): boolean {
 }
 
 /**
- * The ignition sweep: 0 → 100 → score, then settle.
+ * The ignition sweep: 0 → 100 → settle on the score, ~900ms.
  *
- * Not decoration — it is how a cluster tells you the instrument is live and
- * what its range is, before it tells you the reading. Doing it in one hook
- * rather than two chained transitions keeps the needle and the arc on the same
- * value at every frame; they are the same number rendered twice.
+ * Not decoration — it is how a cluster says the instrument is live and what its
+ * range is, before it says the reading. Driving needle and arc from one value
+ * keeps them on the same number at every frame; they are one quantity drawn
+ * twice.
  *
  * Reduced motion lands on the final value immediately, and so does a hidden
- * document — `requestAnimationFrame` does not fire in a background tab, and
- * the failure mode there is not a missed animation but a needle parked at zero
- * next to the label "Fair". `use-count-up.ts` records finding exactly that.
+ * document — `requestAnimationFrame` does not fire in a background tab, and the
+ * failure there is not a missed animation but a needle parked at zero beside
+ * the label "Fair". `use-count-up.ts` records finding exactly that.
  */
 function useIgnitionSweep(target: number, enabled: boolean): number {
   const [value, setValue] = useState(() => (prefersReducedMotion() ? target : 0));
@@ -102,14 +112,10 @@ function useIgnitionSweep(target: number, enabled: boolean): number {
 
     const tick = (now: number) => {
       const elapsed = now - start;
-
       if (elapsed < SWEEP_UP) {
-        // Out to full scale, decelerating.
         const t = elapsed / SWEEP_UP;
         setValue(100 * (1 - Math.pow(1 - t, 3)));
       } else if (elapsed < SWEEP_UP + SETTLE) {
-        // Back down to the reading, decelerating again so it lands rather
-        // than snapping.
         const t = (elapsed - SWEEP_UP) / SETTLE;
         setValue(100 + (target - 100) * (1 - Math.pow(1 - t, 3)));
       } else {
@@ -130,181 +136,249 @@ function useIgnitionSweep(target: number, enabled: boolean): number {
 
 interface ClusterGaugeProps {
   score: number;
+  /**
+   * 'hero' is the full dial: minors every 5, numbered majors, needle and hub,
+   * the reading on its own line beneath. 'card' is the same instrument at the
+   * garage grid's 56px slot — see the note on the variant below.
+   */
+  variant?: 'hero' | 'card';
   /** Hold the sweep until the caller's own reveal has finished. */
   active?: boolean;
-  /** Rendered size in px. The viewBox is fixed, so this only scales. */
+  /** Rendered width in px; height follows the viewBox ratio. */
   size?: number;
 }
 
-export function ClusterGauge({ score, active = true, size = 188 }: ClusterGaugeProps) {
-  const swept = useIgnitionSweep(score, active);
+export function ClusterGauge({
+  score,
+  variant = 'hero',
+  active = true,
+  size = 196,
+}: ClusterGaugeProps) {
+  const isCard = variant === 'card';
+
+  /*
+    The card dial is deliberately still — no sweep, no count-up. VehicleCard's
+    ring comment already settled this: those were single-card moments, and
+    three of them side by side in the garage grid read as noise while the band
+    colour already carries severity. Adopting the ticked dial there does not
+    reopen it.
+  */
+  const swept = useIgnitionSweep(score, active && !isCard);
+  const value = isCard ? score : swept;
 
   // Band comes from the *target*, never the swept value: the face must not
-  // cycle amber → cyan → green on its way to a reading. Same rule the ring
-  // this replaces already followed.
+  // cycle amber → cyan → green on its way to a reading.
   const band = useHealthBand(score);
 
-  const settled = Math.abs(swept - score) < 0.5;
-  const shown = Math.round(swept);
+  const settled = isCard || Math.abs(swept - score) < 0.5;
+  const clamped = Math.max(0, Math.min(100, value));
+
+  /*
+    Two viewBoxes, one geometry.
+
+    The hero crops to 178 tall because the 26 units below the arc are the
+    readout's line. The card has no readout line — its number sits in the well —
+    so that crop would hang 11 units of dead space under the dial and push the
+    numeral visibly off-centre: measured 3px low in a 56px slot, which is a lot
+    at that size. The card gets a square box centred on the pivot instead, wide
+    enough for the major ticks at r=84.
+
+    Nothing else changes. Same centre, same radius, same angle expression — only
+    the window onto them.
+  */
+  const viewBox = isCard ? '14 14 172 172' : `0 0 ${VIEW_W} ${VIEW_H}`;
+  const height = isCard ? size : (size * VIEW_H) / VIEW_W;
+
+  /*
+    At 56px the minors would be sub-pixel and six numbers illegible, so the
+    card keeps only what survives: the boundary majors, the arc, and a marker
+    in place of needle-and-hub. A hub plus a centred numeral collide at any
+    size — the needle would cross the digits — and the card has nowhere else to
+    put its reading, so the pointer stops short there and the hub goes. The
+    hero has the room and keeps both.
+  */
+  const tickR = { minorFrom: 76, minorTo: 79.5, majorFrom: 76, majorTo: 84 };
 
   return (
     <div
-      className="relative flex-shrink-0"
-      style={{ width: size, height: size }}
+      className={isCard ? 'flex flex-col items-center gap-1 flex-shrink-0' : 'flex-shrink-0'}
       role="img"
       aria-label={`Health score ${Math.round(score)} out of 100 — ${band.label}`}
     >
-      <svg viewBox="0 0 200 200" width={size} height={size} aria-hidden="true">
-        {/* The unlit track. */}
+      <svg
+        viewBox={viewBox}
+        width={size}
+        height={height}
+        aria-hidden="true"
+        overflow="visible"
+      >
         <path
           className="gauge-track"
           d={TRACK}
           fill="none"
-          stroke="rgb(255 255 255 / 0.08)"
+          stroke={isCard ? `rgba(${band.rgb},0.10)` : 'rgb(255 255 255 / 0.08)'}
           strokeWidth="6"
-          strokeLinecap="round"
+          strokeLinecap="butt"
         />
 
-        {/*
-          The lit portion. `pathLength="100"` restates the curve as 100 units
-          long, so the dasharray is literally the score.
-
-          The glow is one soft drop-shadow and it is deliberately restrained —
-          in this reference the light *is* the data, so a heavy bloom reads as
-          chrome. It also only appears once the needle has settled, so the
-          sweep itself stays crisp.
-        */}
         <path
           className="gauge-arc"
           d={TRACK}
           fill="none"
           stroke={band.color}
           strokeWidth="6"
-          strokeLinecap="round"
+          strokeLinecap="butt"
           pathLength={100}
-          strokeDasharray={`${Math.max(0, Math.min(100, swept))} 100`}
+          strokeDasharray={`${clamped} 100`}
           style={{
+            // The light is the data; a heavy bloom reads as chrome. Held back
+            // until the needle settles so the sweep itself stays crisp.
             filter: settled ? `drop-shadow(0 0 4px rgba(${band.rgb},0.28))` : 'none',
           }}
         />
 
-        {/* Ticks, on the same angle expression as everything else. */}
-        {TICKS.map((tick) => (
+        {/* Minors — hairlines, every 5, hero only. */}
+        {!isCard &&
+          MINORS.map((tick) => (
+            <line
+              key={`m${tick}`}
+              className="gauge-tick"
+              x1={CX}
+              y1={CY - tickR.minorTo}
+              x2={CX}
+              y2={CY - tickR.minorFrom}
+              stroke="rgb(255 255 255 / 0.14)"
+              strokeWidth="1"
+              transform={`rotate(${angleFor(tick)} ${CX} ${CY})`}
+            />
+          ))}
+
+        {/* Majors. On the card only the three band boundaries survive. */}
+        {(isCard ? [40, 60, 80] : MAJORS).map((tick) => (
           <line
-            key={tick}
+            key={`M${tick}`}
             className="gauge-tick"
             x1={CX}
-            y1={24}
+            y1={CY - (isCard ? 80 : tickR.majorTo)}
             x2={CX}
-            y2={30}
-            stroke={BOUNDARIES.has(tick) ? 'rgb(255 255 255 / 0.45)' : 'rgb(255 255 255 / 0.18)'}
+            y2={CY - tickR.majorFrom}
+            stroke={
+              BOUNDARIES.has(tick) ? 'rgb(255 255 255 / 0.5)' : 'rgb(255 255 255 / 0.26)'
+            }
             strokeWidth={BOUNDARIES.has(tick) ? 2 : 1.5}
-            strokeLinecap="round"
             transform={`rotate(${angleFor(tick)} ${CX} ${CY})`}
           />
         ))}
 
-        {/* Boundary numerals — upright, never rotated with their tick. */}
-        {[40, 60, 80].map((tick) => {
-          const { x, y } = labelPoint(tick);
-          return (
-            <text
-              key={tick}
-              x={x}
-              y={y}
-              className="num gauge-label"
-              textAnchor="middle"
-              dominantBaseline="central"
-              fill="rgb(255 255 255 / 0.32)"
-              fontSize="11"
-              fontWeight="500"
-            >
-              {tick}
-            </text>
-          );
-        })}
+        {/* The numbers, on the majors. Upright — never rotated with the tick. */}
+        {!isCard &&
+          MAJORS.map((tick) => {
+            const { x, y } = pointAt(tick, 90);
+            return (
+              <text
+                key={`L${tick}`}
+                x={x}
+                y={y}
+                className="num gauge-label"
+                textAnchor="middle"
+                dominantBaseline="central"
+                fill={
+                  BOUNDARIES.has(tick) ? 'rgb(255 255 255 / 0.42)' : 'rgb(255 255 255 / 0.24)'
+                }
+                fontSize="10"
+                fontWeight="500"
+              >
+                {tick}
+              </text>
+            );
+          })}
 
-        {/*
-          The needle, and the one place the spec had to give.
-
-          It was drawn as (100,42) → (100,95): a full pointer running from just
-          inside the track almost to the centre, with a hub at the pivot. That
-          assumes the centre is empty. It is not — the reading sits in the well,
-          which is where a cluster puts it, so a needle reaching r=5 crosses the
-          numeral. At 68 it drew a line through the 8.
-
-          Shortened to r=58 → r=38, clear of the numeral's r≈26, and the hub
-          goes with it: a pivot with no needle touching it is just a dot. What
-          is left reads as the marker on a digital cluster rather than a
-          mechanical pointer, which is the closer reference anyway.
-        */}
-        <g transform={`rotate(${angleFor(Math.max(0, Math.min(100, swept)))} ${CX} ${CY})`}>
+        {/* Needle. Hero runs it to the pivot and caps it with a hub; the card
+            stops it short, because its reading sits in the well. */}
+        <g transform={`rotate(${angleFor(clamped)} ${CX} ${CY})`}>
           <line
             className="gauge-needle"
             x1={CX}
             y1={42}
             x2={CX}
-            y2={62}
+            y2={isCard ? 62 : CY}
             stroke={band.color}
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            opacity={0.95}
+            strokeWidth={isCard ? 3 : 2.5}
+            strokeLinecap={isCard ? 'round' : 'butt'}
           />
         </g>
+        {!isCard && (
+          <circle
+            className="gauge-hub"
+            cx={CX}
+            cy={CY}
+            r="5"
+            fill="rgb(12 11 10)"
+            stroke={band.color}
+            strokeWidth="1.5"
+          />
+        )}
+
+        {/*
+          The reading. Inter tabular via `.num`, per the type rule — a cluster
+          face is mechanical, and a number that animates digit by digit must not
+          reflow while it does.
+
+          On the hero it sits on the line the 178-tall viewBox exists to make,
+          below the hub and between the 0 and 100 labels, exactly where a tach
+          puts its digital readout. Centring it in the well is not available
+          once there is a hub: the needle would cross the digits, which is what
+          it did before the hub came back.
+
+          No "/100". No instrument prints its own denominator when the scale is
+          drawn around it and both ends are numbered. The full reading is in the
+          container's aria-label, where the dial cannot be seen.
+        */}
+        <text
+          x={CX}
+          y={isCard ? CY : 150}
+          className="num gauge-reading"
+          textAnchor="middle"
+          dominantBaseline="central"
+          fill={isCard ? '#FFFFFF' : band.color}
+          // 60, not 64: tabular figures make "100" exactly 1.5x the width of
+          // "88", and at 64 a perfect score measured 40.4px inside a 43.6px
+          // well. It fit, with 1.6px a side. 60 buys the margin back.
+          fontSize={isCard ? 60 : 30}
+          fontWeight="700"
+        >
+          {Math.round(value)}
+        </text>
       </svg>
 
       {/*
-        The readout, in the well of the arc. Inter with tabular figures rather
-        than the display serif: real clusters use a mechanical face, and a
-        number that animates digit by digit must not reflow while it does.
+        Band label. Mounted rather than faded from opacity 0 — an invisible
+        label is still in the accessibility tree, and hero-photo-fallback
+        asserts it is absent during the reveal so it cannot describe a
+        placeholder. Gated on the caller's reveal, not on the sweep finishing:
+        the band derives from the target score, so it is known the moment the
+        score is, and gating on the animation would make it depend on
+        requestAnimationFrame — which does not run under fake timers or in a
+        background tab.
 
-        Sized against the *well*, not the box. The arc's inner edge is at
-        r=67 in viewBox units — radius 70 less half the 6-unit stroke — so the
-        usable width is 134/200 of whatever `size` is, and the readout has to
-        fit inside that or it collides with the track. It did.
-
-        "/100" is gone, and not for space. No instrument prints its own
-        denominator: the scale is the arc, and it is already labelled at 40, 60
-        and 80 with both ends visible. Printing "/100" inside a dial that shows
-        you where 100 is says the same thing twice and crowds the one number
-        that matters — which is how it came to overlap the track at three
-        digits. The full reading survives for screen readers in the container's
-        aria-label, where the arc cannot be seen.
+        `short` on the card: "Needs attention" does not fit under 56px in a
+        three-up grid. Same band, abbreviated; never a different judgement.
       */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+      {(isCard || active) && (
         <span
-          className="num font-bold leading-none tabular-nums"
-          style={{ fontSize: size * 0.2, color: band.color, marginTop: size * 0.05 }}
+          className={
+            isCard
+              ? 'text-[11px] font-semibold leading-none'
+              : 'block text-center font-semibold leading-none animate-fade-in'
+          }
+          style={{
+            color: band.color,
+            ...(isCard ? {} : { fontSize: size * 0.07, marginTop: size * 0.02 }),
+          }}
         >
-          {shown}
+          {isCard ? band.short : band.label}
         </span>
-        {/*
-          Mounted rather than rendered invisible: an `opacity: 0` label is
-          still in the document and still in the accessibility tree, and
-          `hero-photo-fallback.test.tsx` asserts the label is absent during the
-          reveal precisely so it cannot describe a placeholder.
-
-          Gated on `active` — the caller's reveal — and deliberately not on the
-          sweep finishing. The band is derived from the target score, so it is
-          known the moment the score is, and it is the same instant the label
-          appeared before this component existed. Gating it on the animation
-          instead would also make it depend on requestAnimationFrame, which
-          does not run under fake timers or in a background tab; the label
-          would simply never arrive.
-        */}
-        {active && (
-          <span
-            className="font-semibold leading-none animate-fade-in"
-            style={{
-              fontSize: size * 0.068,
-              marginTop: size * 0.045,
-              color: band.color,
-            }}
-          >
-            {band.label}
-          </span>
-        )}
-      </div>
+      )}
     </div>
   );
 }

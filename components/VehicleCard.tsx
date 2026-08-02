@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { usageProfileChip } from '@crewchief/core/usage-profile';
-import { useHealthBand } from '@/hooks/use-health-band';
 import { useVehicleImage } from '@/hooks/useSignedUrl';
 import { VehicleIdentity } from '@/components/VehicleIdentity';
+import { ClusterGauge } from '@/components/ClusterGauge';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -107,37 +107,20 @@ interface VehicleCardProps {
  * garage grid read as noise, and the band colour already carries severity.
  */
 function HealthRing({ score }: { score: number }) {
-  const radius = 25.5;
-  const circumference = 2 * Math.PI * radius;
-  const fill = (score / 100) * circumference;
-  const band = useHealthBand(score);
-  const color = band.color;
-  const trackColor = `rgba(${band.rgb},0.10)`;
-
-  return (
-    <div className="flex flex-col items-center gap-1 flex-shrink-0">
-      <div className="relative flex items-center justify-center w-14 h-14">
-        <svg width="56" height="56" viewBox="0 0 56 56" className="-rotate-90">
-          <circle cx="28" cy="28" r={radius} fill="none" stroke={trackColor} strokeWidth="5" />
-          <circle
-            cx="28" cy="28" r={radius}
-            fill="none"
-            stroke={color}
-            strokeWidth="5"
-            strokeDasharray={`${fill} ${circumference}`}
-            strokeLinecap="round"
-            style={{ filter: `drop-shadow(0 0 4px ${color}50)` }}
-          />
-        </svg>
-        <span className="num absolute text-lg font-bold text-white">{score}</span>
-      </div>
-      {/* `short`, not `label` — "Needs attention" does not fit under 56px in a
-          three-up grid. Same band, abbreviated; never a different judgement. */}
-      <span className="text-[11px] font-semibold leading-none" style={{ color }}>
-        {band.short}
-      </span>
-    </div>
-  );
+  /*
+   * The garage grid adopts the same instrument as the dashboard hero — the
+   * ticked 270° dial, at the 56px slot this card has always used. Roadmap
+   * item 7 sequences it this way: hero first, card after, so the two surfaces
+   * stop describing one score with two different shapes.
+   *
+   * `variant="card"` is what survives the size rather than a second design.
+   * Minors every 5 would be sub-pixel here and six numbers illegible, so it
+   * keeps the arc, the three band boundaries, a marker, and the reading in the
+   * well. It also stays still: no count-up, no pulse — both were single-card
+   * moments, and three of them side by side in this grid read as noise while
+   * the band colour already carries severity.
+   */
+  return <ClusterGauge score={score} variant="card" size={56} />;
 }
 
 export function VehicleCard({ vehicle, activeRecalls, healthSummary, alerts }: VehicleCardProps) {

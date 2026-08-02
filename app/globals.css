@@ -294,8 +294,13 @@ nav {
     .gauge-tick {
       stroke: CanvasText;
     }
-    .gauge-label {
+    .gauge-label,
+    .gauge-reading {
       fill: CanvasText;
+    }
+    .gauge-hub {
+      fill: Canvas;
+      stroke: Highlight;
     }
     /* The bloom is decoration and reads as a smear once colours are forced. */
     .gauge-arc {
