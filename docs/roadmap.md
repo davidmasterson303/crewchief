@@ -6,15 +6,20 @@ Source: `Live-Site Audit.dc.html` (2 Aug 2026), grounded in repo `davidmasterson
 
 ## Status — 2 Aug 2026, afternoon session
 
-**Live on production.** `crewchief-demo.davidmasterson.co` is serving `e729ee96`
-(the `demo-live` merge), promoted from `main` at `d3aae46` through
+**Live on production.** `crewchief-demo.davidmasterson.co` is serving `f09a0ef6`
+(the `demo-live` merge), promoted from `main` at `3a246fa2` through
 `scripts/promote-demo.mjs`. All gate checks passed; `verify-demo.mjs` green
-against prod afterwards.
+against prod afterwards, with the two standing warnings.
 
-**Not yet on production: everything from the afternoon session** — RP1, R4, R8,
-the three Phase 2.95 cost items, and all four findings from Cowork's QA run.
-Fourteen commits on `main`, none promoted. Promotion is a separate deliberate
-step.
+**The whole afternoon is live.** RP1, R4, R8, Phase 2.95 a/b/c and all four of
+Cowork's QA findings.
+
+**Verified on prod after the promote, at the widths that could not be reached
+locally:** `/` at 375 — horizontal overflow 0 and `textUnder12px` **0**, down
+from the baseline's 1, exactly as Cowork predicted when it identified that node
+as the banner link. `/` at 700 — two 314px columns, against the single 652px
+column it measured on `e729ee96`. `/consultant` at 375 — composer on screen,
+thread scrolling, zero overflow in either axis.
 
 | | Items | |
 |---|---|---|
@@ -751,9 +756,12 @@ will not fire and it will not stall mid-run.
 
 ## What I would pick up first, in order
 
-1. **Promote, or decide not to.** Six commits sit unpromoted, including a
-   consultant behaviour change. The round-trip gate passes locally; running it
-   against the candidate is the thing that should gate the promote.
+1. ~~**Promote, or decide not to.**~~ **Done — `f09a0ef6`.** The gate blocked the
+   first attempt on four 502s from `verify-demo`; they were cold-start edge
+   function failures on a fresh deploy, not a regression, and cleared on a
+   re-run once the functions were warm. Worth knowing: **a first gate run
+   against a just-built candidate can fail for reasons that are not yours.**
+   Re-run before diagnosing.
 2. ~~**2.95c — per-account metering.**~~ **Done (`bb83782`)** — all ten call
    sites record. Waiting only on the migration above, then two weeks of data
    before **D2 (price point)** can be taken as a decision rather than a guess.
