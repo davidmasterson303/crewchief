@@ -7,6 +7,7 @@ import {
   flashConfig,
   proStructuredConfig,
   classificationConfig,
+  withThinking,
 } from '@/lib/gemini';
 import { VEHICLE_RESEARCH_PROMPT, POWERTRAIN_OPTIONS_PROMPT, CONSULTANT_SYSTEM_PROMPT, CONSULTANT_DOCUMENT_VALIDATION_PROMPT } from '@crewchief/core/prompts';
 import { logger } from '@crewchief/core/logger';
@@ -756,7 +757,11 @@ export async function fetchPowertrainOptions(
     const response = await genAI.models.generateContent({
       model: LITE_MODEL,
       contents: prompt,
-      config: classificationConfig,
+      // Measured at zero thinking tokens on `LITE_MODEL` already, so this
+      // saves nothing today. It is set anyway: the next model swap here would
+      // otherwise inherit whatever that model's default policy is, and this is
+      // a yes/no classification that has no use for reasoning at any price.
+      config: withThinking(classificationConfig, LITE_MODEL, 'MINIMAL'),
     });
 
     const text = response.text || '';
@@ -1125,7 +1130,12 @@ export async function sendConsultantMessage(params: {
     const result = await genAI.models.generateContent({
       model: FLASH_MODEL,
       contents,
-      config: flashConfig,
+      // The consultant, and the call this application makes most often.
+      // Measured at 861 thinking tokens against 168 of answer with no level
+      // set; LOW halves that for an answer of the same length. It is the
+      // largest single cost lever in the app, and the one whose quality has
+      // to be gated rather than assumed — see the round-trip gate.
+      config: withThinking(flashConfig, FLASH_MODEL, 'LOW'),
     });
     let response = result.text || '';
 
@@ -1775,7 +1785,7 @@ Format as valid JSON only, no markdown.`;
     const result = await genAI.models.generateContent({
       model: FLASH_MODEL,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      config: flashStructuredConfig,
+      config: withThinking(flashStructuredConfig, FLASH_MODEL, 'LOW'),
     });
 
     const responseText = result.text || '';
@@ -1968,7 +1978,7 @@ Format as valid JSON only, no markdown or explanations.`;
     const result = await genAI.models.generateContent({
       model: FLASH_MODEL,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      config: flashStructuredConfig,
+      config: withThinking(flashStructuredConfig, FLASH_MODEL, 'LOW'),
     });
 
     const responseText = result.text || '';
@@ -3009,6 +3019,16 @@ Return ONLY valid JSON, no markdown code blocks, no explanations.`;
       const result = await genAI.models.generateContent({
         model: FLASH_VISION_MODEL,
         contents: [{ role: 'user', parts: contentParts }],
+        // DELIBERATELY LEFT AT THE DEFAULT — the one 3.x site without a level.
+        //
+        // Invoice extraction is the path this file already calls out as the
+        // one whose regressions are invisible: a model that reads fewer line
+        // items still returns valid JSON and still passes every gate. Cutting
+        // its thinking would save real money and there is no instrument here
+        // that would notice if it also cost accuracy.
+        //
+        // The corpus to settle it exists (`COWORK_PROMPT_invoice_vision_
+        // corpus_2026-07-30.md`). Run a level against it, then set one.
         config: flashStructuredConfig,
       });
 
@@ -5326,7 +5346,7 @@ Respond with ONLY valid JSON, no markdown:
     const result = await genAI.models.generateContent({
       model: FLASH_MODEL,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      config: flashStructuredConfig,
+      config: withThinking(flashStructuredConfig, FLASH_MODEL, 'LOW'),
     });
 
     const responseText = result.text || '';
@@ -5549,7 +5569,7 @@ Respond with ONLY valid JSON:
         const result = await genAI.models.generateContent({
           model: FLASH_MODEL,
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          config: flashStructuredConfig,
+          config: withThinking(flashStructuredConfig, FLASH_MODEL, 'LOW'),
         });
 
         const responseText = result.text || '';

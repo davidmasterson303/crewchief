@@ -1,4 +1,5 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel, type GenerateContentConfig } from '@google/genai';
+import { acceptsThinkingLevel, type ThinkingLevelName } from '@crewchief/core/ai/models';
 
 const apiKey = process.env.GEMINI_API_KEY || '';
 
@@ -73,3 +74,37 @@ export const classificationConfig = {
   topP: 0.1,
   maxOutputTokens: 512,
 };
+
+/**
+ * Attach a thinking level to a generation config, when the model takes one.
+ *
+ * ── Why this is a function and not four more exported objects ───────────────
+ *
+ * The obvious version of 2.95a is to add `thinkingConfig` to `flashConfig` and
+ * be done in ten minutes. That breaks production. These configs are shared
+ * across model families — `flashConfig` is used with `FLASH_MODEL` *and* with
+ * 2.5 Flash on the health route — and 2.5 answers a thinking level with a
+ * 400, not with an ignore. Baking the level into the config would have taken
+ * out the consultant canary and the performance-stats path together, and the
+ * typecheck would have been perfectly happy about it.
+ *
+ * So the level is applied where the model is known, and `acceptsThinkingLevel`
+ * decides. A call site that later moves to a 2.5 model degrades to the default
+ * instead of failing.
+ *
+ * The base config is never mutated: these are module-level singletons shared
+ * by every call, and one `Object.assign` into `flashConfig` would silently
+ * re-tune every other caller.
+ *
+ * The level crosses from a plain name to the SDK's enum here, and only here.
+ * `@crewchief/core` states the *policy* — which job gets how much thinking —
+ * and must not take a dependency on Google's client to do it.
+ */
+export function withThinking<T extends GenerateContentConfig>(
+  base: T,
+  model: string,
+  level: ThinkingLevelName
+): T {
+  if (!acceptsThinkingLevel(model)) return base;
+  return { ...base, thinkingConfig: { thinkingLevel: ThinkingLevel[level] } };
+}
