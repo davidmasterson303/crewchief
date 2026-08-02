@@ -12,6 +12,8 @@ import { toast } from 'sonner';
 import InvoiceProcessingLoader from './InvoiceProcessingLoader';
 import { invalidateDashboardCache } from '@crewchief/core/query-invalidation';
 import { generateVehicleHealthSummary } from '@/app/actions';
+import { downscaleImage } from '@/lib/image-downscale';
+import { DOC_MAX_EDGE, DOC_TARGET_BYTES, isDownscalableImage } from '@crewchief/core/image-resize';
 
 interface DocumentUploadDialogProps {
   vehicleId: string;
@@ -32,6 +34,33 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
   const [currentProcessingFile, setCurrentProcessingFile] = useState<string>('');
   const [isDragging, setIsDragging] = useState(false);
   const dragCounterRef = useRef(0);
+
+  /**
+   * Reduce a photographed invoice before it goes to the extractor.
+   *
+   * A phone camera hands us 4032x3024 and 2-3 MB, and every one of those pixels
+   * is billed on the way into the vision model. The dimensions the model needs
+   * are set by the smallest text on the page, not by the sensor.
+   *
+   * Document bounds, not the photo ones — see `DOC_MAX_EDGE`. PDFs and anything
+   * else non-raster pass through untouched.
+   *
+   * It never fails the upload. `downscaleImage` returns the original on every
+   * error path, and the `catch` here covers the rest: a large invoice that
+   * reaches the extractor costs money, and one that does not reach it at all
+   * costs the feature.
+   */
+  const prepareForUpload = async (file: File): Promise<File> => {
+    if (!isDownscalableImage(file.type)) return file;
+    try {
+      return await downscaleImage(file, {
+        maxEdge: DOC_MAX_EDGE,
+        targetBytes: DOC_TARGET_BYTES,
+      });
+    } catch {
+      return file;
+    }
+  };
 
   const validateAndAddFiles = (files: File[]) => {
     const validFiles = files.filter(file => {
@@ -93,8 +122,14 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
       let successCount = 0;
 
       for (let i = 0; i < selectedFiles.length; i++) {
-        const file = selectedFiles[i];
-        setCurrentProcessingFile(file.name);
+        // The name the user recognises stays the original's throughout — the
+        // reduced copy carries the encoder's extension, and telling someone
+        // their `invoice.jpg` failed as `invoice.webp` is a small lie in the
+        // one message they are reading closely.
+        const original = selectedFiles[i];
+        setCurrentProcessingFile(original.name);
+
+        const file = await prepareForUpload(original);
         const formData = new FormData();
         formData.append('file', file);
         formData.append('vehicleId', vehicleId);
@@ -111,7 +146,7 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
         if (!result.success) {
           if (result.error === 'NOT_AUTOMOTIVE_INVOICE') {
             setError(result.message || 'This document does not appear to be an automotive service invoice.');
-            toast.error(`${file.name}: Not an automotive invoice`);
+            toast.error(`${original.name}: Not an automotive invoice`);
             setUploading(false);
             return;
           }
@@ -121,6 +156,9 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
               extractedVehicle: result.extractedVehicle || 'Unknown vehicle',
               expectedVehicle: result.expectedVehicle || 'Unknown vehicle'
             });
+            // The prepared copy, not the original — "Continue anyway" re-uploads
+            // this, and it should not pay the reduction twice or send the full
+            // 3 MB on the retry path specifically.
             setCurrentFileForMismatch(file);
             setRemainingFiles(selectedFiles.slice(i + 1));
             setShowVehicleMismatchDialog(true);
@@ -129,7 +167,7 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
           }
 
           setError(result.error || result.message || 'Upload failed');
-          toast.error(`Failed to process ${file.name}: ${result.error || result.message}`);
+          toast.error(`Failed to process ${original.name}: ${result.error || result.message}`);
           setUploading(false);
           return;
         }

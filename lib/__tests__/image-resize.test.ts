@@ -13,9 +13,12 @@ import {
   isWorthKeeping,
   shouldAcceptEncoding,
   downscaledFileName,
+  isDownscalableImage,
   MAX_EDGE,
   TARGET_BYTES,
   QUALITY_LADDER,
+  DOC_MAX_EDGE,
+  DOC_TARGET_BYTES,
 } from '@crewchief/core/image-resize';
 
 describe('fitWithin', () => {
@@ -127,5 +130,68 @@ describe('downscaledFileName', () => {
   it('never returns a bare extension for a nameless file', () => {
     expect(downscaledFileName('', 'image/webp')).toBe('photo.webp');
     expect(downscaledFileName('.jpg', 'image/webp')).toBe('photo.webp');
+  });
+});
+
+describe('isDownscalableImage', () => {
+  it('accepts the formats a phone camera actually produces', () => {
+    expect(isDownscalableImage('image/jpeg')).toBe(true);
+    expect(isDownscalableImage('image/png')).toBe(true);
+    expect(isDownscalableImage('image/heic')).toBe(true);
+    expect(isDownscalableImage('image/webp')).toBe(true);
+  });
+
+  it('refuses a PDF', () => {
+    // The document path accepts these, and rasterising one would destroy it.
+    // `downscaleImage` would also fail to decode it and hand the original back,
+    // but that is a failure path holding up a requirement.
+    expect(isDownscalableImage('application/pdf')).toBe(false);
+  });
+
+  it('refuses SVG, which decodes fine and must still be left alone', () => {
+    // The one case that would pass a naive `startsWith('image/')` and be wrong:
+    // rasterising a vector discards the property that made it small.
+    expect(isDownscalableImage('image/svg+xml')).toBe(false);
+  });
+
+  it('refuses an absent or unrecognised type', () => {
+    // Browsers hand back '' for a file they cannot type, and a drag-drop from
+    // some clients gives 'application/octet-stream' for a perfectly good JPEG.
+    // Both are left alone: the cost of skipping a reduction is money, and the
+    // cost of feeding an unknown blob to a canvas is the upload.
+    expect(isDownscalableImage('')).toBe(false);
+    expect(isDownscalableImage('application/octet-stream')).toBe(false);
+  });
+});
+
+describe('document bounds', () => {
+  it('gives a document more pixels than a photograph', () => {
+    // This relationship *is* the requirement. A photo is bounded by the box it
+    // is displayed in; a document is bounded by the smallest glyph the
+    // extractor has to resolve. If someone ever collapses these to one
+    // constant, that is the decision being reversed.
+    expect(DOC_MAX_EDGE).toBeGreaterThan(MAX_EDGE);
+  });
+
+  it('still reduces a standard phone capture substantially', () => {
+    // 4032x3024 in, 2048x1536 out — a 4x cut in pixel count, which is what the
+    // token bill is charged against.
+    expect(fitWithin({ width: 4032, height: 3024 }, DOC_MAX_EDGE)).toEqual({
+      width: 2048,
+      height: 1536,
+    });
+  });
+
+  it('lets an ordinary invoice stop on the first quality rung', () => {
+    // The point of the larger byte budget: a 2048px invoice at 0.82 lands
+    // around 300-450 KB, and must be accepted there rather than walking down
+    // the ladder into the range where JPEG starts eating thin strokes.
+    expect(shouldAcceptEncoding(450 * 1024, 0, DOC_TARGET_BYTES)).toBe(true);
+    expect(DOC_TARGET_BYTES).toBeGreaterThan(TARGET_BYTES);
+  });
+
+  it('still descends for a document that genuinely overshoots', () => {
+    // The budget is generous, not absent.
+    expect(shouldAcceptEncoding(900 * 1024, 0, DOC_TARGET_BYTES)).toBe(false);
   });
 });
