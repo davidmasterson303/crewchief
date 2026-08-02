@@ -3,6 +3,16 @@
 For an agent or a person testing the live demo. Written 2 Aug 2026 against
 `demo-live @ e729ee96` (promoted from `main @ d3aae46`).
 
+> **⚠ Every expected value in this document is pinned to `e729ee96`, and `main`
+> has moved a long way past it.** R4, R6, R9, R10, R15, NEW-01 and NEW-02 all
+> landed the same afternoon this was written and none of them is promoted. Run
+> against the **candidate** rather than prod until a promote happens, or you
+> will spend the run re-confirming findings that are already closed — which is
+> what happened to the first run of this script.
+>
+> Sections corrected since: §0 (R9/R10/R15 now fixed), §2's baseline table and
+> its `/garage` row, B2 (the check was the defect), B8 (now a build check).
+
 **Read §0 and §6 before you start.** §0 tells you what is already known to be
 broken, and re-reporting it costs everyone a review cycle. §6 is the format the
 report has to come back in — a finding without a measured value and a
@@ -24,17 +34,26 @@ behaviour is **worse** than described, or if you have a concrete fix.
 
 ### Responsive findings still open (Work stream B)
 
-`R4, R6, R7, R8, R9, R10, R11, R12, R13, R14, R15` — eleven of the audit's
-fifteen. The ones you will notice first while testing:
+**Open on `main`: `R7, R8, R11, R12, R13, R14`** — six of the audit's fifteen.
+
+**Closed since this document was written, and closed on `main` only.** They are
+all still live on prod, so you will see them there and they are not findings:
+
+| ID | Closed by | Was |
+|---|---|---|
+| R4 | `4947512` | Consultant a fixed 520px box inside a scrolling page |
+| R6 | `8456afe` | Four nested containers each taking 24px a side |
+| R9 | `8456afe` | Tab links ~36px tall, under the 44px floor |
+| R10 | `8456afe` | 54 uses of 10–11px type carrying real data (the audit said ~30) |
+| R15 | `3dd9743` | 640–767px rendering one enormous column |
+
+The ones you will still notice while testing:
 
 | ID | What you will see | Where |
 |---|---|---|
-| R4 | Consultant is a fixed 520px box inside a scrolling page | `/consultant/*` |
-| R6 | Four nested containers each take 24px a side; 375px yields ~199px of content | everywhere |
-| R9 | Tab links ~36px tall, under the 44px floor | dashboard nav |
-| R10 | ~30 uses of 10–11px type carrying real data | maintenance, chat, tables |
+| R8 | A five-column cost table in 231px, inside `overflow-hidden` | `/consultant/*` estimates |
+| R12 | The breadcrumb — and the way back — hidden below 640px | every dashboard route |
 | R13 | Maintenance/cost tables cramped below `sm` | `/documents/*` |
-| R15 | **640–767px renders one enormous column** — the worst width in the product | `/`, `/garage` |
 
 R7 is folded into roadmap item 14 (onboarding template), not a separate ticket.
 
@@ -119,7 +138,7 @@ viewports are where `dvh` and fixed heights break.
 | `/dashboard/a2000000-0000-0000-0000-000000000002` | yes (demo) |
 | `/vehicle-info/a2000000-0000-0000-0000-000000000002` | yes |
 | `/consultant/a2000000-0000-0000-0000-000000000002` | yes |
-| `/garage` | redirects anonymous → `/` |
+| `/garage` | redirects anonymous → **`/login?redirect=/garage`**, not `/`. Corrected 2 Aug from Cowork's run — 8 loads out of 8. It also needs a longer settle than the other routes: a matrix pass sampling at 2.2s catches it before the auth check resolves and records `/garage` |
 
 Demo vehicle ids: WRX `a2000000-…0002`, Accord `a1000000-…0001`,
 M3 (no photo) `a3000000-…0003`.
@@ -162,12 +181,18 @@ so results are comparable between testers.
 Taken live on 2 Aug 2026. These are the *current, known* numbers. Report a
 **delta**, not the absolute value.
 
+> **⚠ This baseline is stale as of 2 Aug afternoon, and three of its cells were
+> wrong when written.** `e729ee96` predates R4, R6, R9, R10, R15 and both
+> NEW-01 and NEW-02. Every row below will show a delta on the current `main`,
+> and that delta is the fix landing, not a regression. **Re-take the whole table
+> against a build of `main` before using it again.** Corrections marked inline.
+
 | Route | Width | h-overflow | text <12px | targets <44px | note |
 |---|---|---|---|---|---|
-| `/` | 375 | false | 1 | 15 | |
-| `/` | 700 | false | 1 | 15 | **R15: grid is one 652px column, cards 650px** |
-| `/` | 768 | false | 1 | 15 | grid `346px 346px` — `md` applies, so 768 is *not* the bad width |
-| `/dashboard/…0002` | 375 | false | 7 | 25 | **R9: tab links 36px** · R10 |
+| `/` | 375 | ~~false~~ **true, scrollWidth 379** | 1 | 15 | **Cell was wrong.** NEW-01 — and this row's `text <12px: 1` *is* that banner's link, so both cells describe the same element. Fixed |
+| `/` | 700 | false | 1 | 15 | **R15: grid is one 652px column, cards 650px** — fixed, now two columns |
+| `/` | 768 | false | 1 | 15 | grid `346px 346px` (Cowork measured `348px`; 2px of scrollbar) — `md` applies, so 768 is *not* the bad width |
+| `/dashboard/…0002` | 375 | false | 7 | ~~25~~ **16** | **R9: tab links 36px** · R10. Both fixed. The 25 is not reachable — the page carries 20 interactive elements in the anonymous demo state, and the count over-reports besides: it measures bounding boxes, so the six controls carrying `.tap-target-44` read as undersized while their `::after` supplies a compliant 44×44 hit area |
 | `/vehicle-info/…0002` | 375 | false | — | — | R3 fixed: tiles 227px, one column |
 | `/login` | 375 | false | — | — | 2 inputs, both covered by the R2 touch rule |
 | `/signup` | 375 | false | — | — | 3 inputs |
@@ -209,13 +234,25 @@ hero. That is a ~10× payload difference and it is invisible on desktop wifi.
 | # | Check | Expected |
 |---|---|---|
 | B1 | **R2** — stylesheet contains `@media (hover: none) and (pointer: coarse)` with `font-size: 16px` on `.field, .field-sm, textarea, select, input[...]` | present |
-| B2 | **R2** — any `<input>`/`<textarea>` carrying a real `text-xs/sm/base/lg` utility | **none** (`file:text-*` is a variant on `::file-selector-button` and is fine) |
+| B2 | **R2** — the *computed* `font-size` of every field under `(hover: none) and (pointer: coarse)` | **16px** on all of them. Read `getComputedStyle`, do not grep for the class — see below |
 | B3 | **R2** — with touch emulation on, focus each field | `visualViewport.scale` stays `1`; pinch-zoom still works |
 | B4 | **R1** — open any dialog at 375×812 | width ~326px, ≥16px backdrop each side, `max-height` ≈ `690px` (85dvh), `overflow-y: auto`, radius 16px, title **and** submit both reachable |
 | B5 | **R1** — grep the tree | **no** `max-h-[90vh]` / `max-h-[80vh]` on any `DialogContent` |
 | B6 | **R3** — `/vehicle-info/*` spec tiles at 375 | one column, ~227px per tile |
 | B7 | **R5** — emulate `hover: none` | card photo overlay, card ⋮ menu, maintenance delete all **visible and tappable** |
-| B8 | **R5** — grep the tree | no `group-hover:opacity-100` / `group-hover/image:opacity-100` remaining |
+| B8 | **R5** — ~~grep the tree~~ | **Retired as a manual check — it is now `lib/__tests__/touch-parity.test.ts` and the build runs it.** Skip it here; a failing build is the report |
+
+> **B2 was rewritten 2 Aug after Cowork's run, and the old version was the
+> defect rather than the code.** It asked for no field carrying a `text-*`
+> utility, and one does — `ConsultantChat.tsx:647`, the "Search chats..." input.
+> Its computed size is 16px anyway: the §B1 rule selects `input[type='text']` at
+> specificity (0,1,1), which outranks `.text-xs` at (0,1,0). The prediction in
+> `globals.css` that "a Tailwind utility like `text-sm` still beats these" holds
+> only for bare `textarea`/`select` at (0,0,1).
+>
+> So the class was never what determined the outcome, and a check that greps for
+> it reports a failure on a field that is fine — and would report a pass on a
+> bare `textarea` that is not. Assert the computed value.
 
 **B3 and B7 are the two that need real emulation** and are the two most likely to
 be skipped. DevTools → Rendering → *Emulate CSS media feature* for `hover`/
