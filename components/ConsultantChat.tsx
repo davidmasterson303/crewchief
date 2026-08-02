@@ -606,7 +606,23 @@ export default function ConsultantChat({
   );
 
   return (
-    <div className="relative h-[calc(100vh-320px)] min-h-[520px] max-h-[760px] border border-white/10 rounded-2xl overflow-hidden flex bg-slate-950/90 shadow-xl shadow-black/40 animate-consultant-fade">
+    /*
+      R4. This was `h-[calc(100vh-320px)] min-h-[520px] max-h-[760px]` at every
+      width. On a 375x667 phone the calc yields 347px, `min-h` wins, and a
+      520px panel sits inside a page that has already spent ~400px on banner,
+      nav, tab strip, title and meta row. Measured before the fix: the composer
+      began 860px down a 692px viewport.
+
+      Below `md` the panel now takes the height the shell gives it — see
+      `mobileLayout="app-shell"` in DashboardLayout — and the thread inside is
+      the only thing that scrolls. `h-full` rather than a second `100dvh`,
+      because the shell has already subtracted the nav.
+
+      From `md` up the original clamp is untouched, and `100dvh` replaces
+      `100vh` there too: same number on a desktop, correct on a tablet with a
+      collapsing browser chrome.
+    */
+    <div className="relative h-full md:h-[calc(100dvh-320px)] md:min-h-[520px] md:max-h-[760px] border-0 md:border md:border-white/10 rounded-none md:rounded-2xl overflow-hidden flex bg-slate-950/90 md:shadow-xl md:shadow-black/40 animate-consultant-fade">
       {/*
         Below md the sidebar becomes a drawer. As a permanent flex child it
         took 256px of a 375px viewport, leaving ~119px for the thread — the
@@ -696,7 +712,12 @@ export default function ConsultantChat({
             Conversations
           </button>
         </div>
-        <div ref={messagesContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 space-y-5">
+        {/* `min-h-0` is load-bearing, not defensive. A flex child's default
+            `min-height: auto` refuses to shrink below its content, so without
+            it `flex-1` grows the thread to fit every message and pushes the
+            composer out of the shell — the same symptom R4 set out to fix,
+            arriving by a different route. */}
+        <div ref={messagesContainerRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 sm:p-6 space-y-5">
           {messages.length === 0 ? (
             <div className="h-full flex items-center justify-center">
               <div className="text-center max-w-md animate-fade-in">
@@ -943,7 +964,11 @@ export default function ConsultantChat({
           )}
         </div>
 
-        <div className="border-t border-white/8 bg-black/30 p-4">
+        {/* `shrink-0` so the composer keeps its height as the thread grows —
+            the whole point of the shell. The safe-area padding is for phones
+            with a home indicator, where the last 34px of the viewport is not
+            reliably tappable and the send button was landing in it. */}
+        <div className="shrink-0 border-t border-white/8 bg-black/30 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:pb-4">
           {selectedFiles.length > 0 && (
             <div className="mb-3 space-y-1.5">
               {selectedFiles.map((file, idx) => (

@@ -134,12 +134,14 @@ export default function ConsultantPage({ params }: { params: { vehicleId: string
 
   return (
     <ErrorBoundary context="CONSULTANT_PAGE">
-      <DashboardLayout vehicle={vehicle} knowledge={knowledge} currentPage="consultant" vehicleImage={vehicleImage}>
+      <DashboardLayout vehicle={vehicle} knowledge={knowledge} currentPage="consultant" vehicleImage={vehicleImage} mobileLayout="app-shell">
         {/*
           The advisor's context is loaded server-side from the vehicle id, so
           none of it is passed here any more. What remains is what the chat UI
           itself draws.
         */}
+        {/* R4 — the one screen that is an app rather than a page below `md`.
+            See the prop's docblock in DashboardLayout. */}
         <ConsultantChat
           vehicleId={params.vehicleId}
           vehicle={vehicle}
