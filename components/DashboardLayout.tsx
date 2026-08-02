@@ -22,6 +22,25 @@ interface DashboardLayoutProps {
   children: React.ReactNode;
   vehicleImage?: string;
   healthSummary?: { health_score?: number } | null;
+  /**
+   * How the page behaves below `md`. R4.
+   *
+   * `'page'` — the default and what every screen but one wants: a document
+   * that scrolls, with a title, a meta row and a footer.
+   *
+   * `'app-shell'` — the viewport is the frame. Nothing outside the child
+   * scrolls, and the child gets the height left over after the nav. Only the
+   * consultant asks for this, and only because a chat has two axes of content
+   * that cannot both live in a scrolling document: a thread that scrolls and a
+   * composer that must stay put. Stacking those inside a page produced two
+   * scroll contexts on the flagship feature, with the composer 210px below the
+   * fold on a 375x667 phone — measured, before this existed.
+   *
+   * A prop rather than a check on `currentPage`, because the next screen that
+   * wants this will not be called 'consultant', and a page-name special case
+   * is how a layout stops being a layout.
+   */
+  mobileLayout?: 'page' | 'app-shell';
 }
 
 const tabs = [
@@ -31,7 +50,8 @@ const tabs = [
   { key: 'vehicle-info', label: 'Vehicle Info', icon: Info, href: (id: string) => `/vehicle-info/${id}` },
 ] as const;
 
-export default function DashboardLayout({ vehicle, knowledge, currentPage, children, vehicleImage, healthSummary }: DashboardLayoutProps) {
+export default function DashboardLayout({ vehicle, knowledge, currentPage, children, vehicleImage, healthSummary, mobileLayout = 'page' }: DashboardLayoutProps) {
+  const appShell = mobileLayout === 'app-shell';
   const router = useRouter();
   const homeHref = useHomeHref();
   const activeBreadcrumb = tabs.find(({ key }) => key === currentPage)?.label ?? '';
@@ -171,7 +191,25 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
     on the surfaces that already took it.
   */
   return (
-    <div className="min-h-screen cockpit-belt">
+    /*
+      In app-shell mode the root *is* the viewport below `md`: a fixed-height
+      flex column that cannot scroll, so the only thing that scrolls is the
+      thread inside the child.
+
+      `100dvh`, not `100vh`. `vh` on mobile Safari measures the viewport with
+      the URL bar collapsed, so a `100vh` shell is taller than what you can
+      actually see on first paint — which is half of how the composer ended up
+      off-screen in the first place. `dvh` tracks the bar.
+
+      From `md` up both branches are the same document they always were.
+    */
+    <div
+      className={
+        appShell
+          ? 'flex-1 min-h-0 overflow-hidden flex flex-col md:flex-none md:min-h-screen md:block md:overflow-visible cockpit-belt'
+          : 'min-h-screen cockpit-belt'
+      }
+    >
       {/*
         `bay-batten` is the one ambient accent per screen — the same luminous
         hairline the public garage carries on its nav, so the signed-in app and
@@ -179,8 +217,11 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
         it doubles as the service bay's light fixture, which is where the shape
         came from.
       */}
-      <nav className={`sticky top-0 z-40 bay-batten backdrop-blur-xl transition-all duration-200 ${scrolled ? 'bg-black/98 border-b border-white/10 shadow-lg shadow-black/50' : 'bg-black/90 border-b border-white/8'}`}>
-        <div className="max-w-7xl mx-auto px-6 lg:px-12">
+      {/* `shrink-0` so the nav keeps its height when it is a flex child of the
+          shell; `sticky` is inert inside a non-scrolling column but stays for
+          the `md`+ document, where it is doing real work. */}
+      <nav className={`${appShell ? 'shrink-0 ' : ''}sticky top-0 z-40 bay-batten backdrop-blur-xl transition-all duration-200 ${scrolled ? 'bg-black/98 border-b border-white/10 shadow-lg shadow-black/50' : 'bg-black/90 border-b border-white/8'}`}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12">
           <div className={`flex items-center justify-between transition-all duration-200 ${scrolled ? 'py-3' : 'py-4'}`}>
             <div className="flex items-center gap-3">
               <Link href={homeHref} className="flex items-center space-x-2.5 group">
@@ -199,7 +240,7 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                 <ChevronRight className="h-3.5 w-3.5" />
                 <span className="text-white/70 px-1">{vehicle.year} {vehicle.make} {vehicle.model}</span>
                 {scrolled && healthSummary?.health_score != null && (
-                  <span className={`ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                  <span className={`ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
                     healthSummary.health_score >= 80
                       ? 'bg-green-500/15 text-green-300 border border-green-400/25'
                       : healthSummary.health_score >= 60
@@ -265,7 +306,15 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                   <Link
                     key={key}
                     href={href(vehicle.id)}
-                    className={`relative flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium whitespace-nowrap transition-colors duration-150 ${
+                    /*
+                      RB0 rule 3. This was `py-2.5 text-xs` — about 36px tall,
+                      under the 44px floor, on the primary navigation: the one
+                      control every signed-in session touches. `py-3` plus an
+                      explicit `min-h` clears it, and 13px carries the label
+                      rather than 12, which is the R10 site this closes at the
+                      same time. Visual weight is unchanged.
+                    */
+                    className={`relative flex items-center gap-1.5 px-4 py-3 min-h-[44px] text-[13px] font-medium whitespace-nowrap transition-colors duration-150 ${
                       isActive ? 'text-cyan-400 bg-cyan-400/5' : 'text-white/50 hover:text-white/80 hover:bg-white/5'
                     }`}
                   >
@@ -279,8 +328,18 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
         </div>
       </nav>
 
-      <div className="max-w-7xl mx-auto px-6 lg:px-12 pt-10 pb-6">
-        <div className="mb-8">
+      <div
+        className={
+          appShell
+            ? 'flex-1 min-h-0 flex flex-col w-full max-w-7xl mx-auto md:block md:px-6 lg:px-12 md:pt-10 md:pb-6'
+            : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 pt-10 pb-6'
+        }
+      >
+        {/* Title and meta row are page furniture. On a phone running the chat
+            as an app they are ~400px of scenery above the thread, and this
+            screen's own header already names the vehicle. Hidden below `md`,
+            unchanged above it. */}
+        <div className={appShell ? 'hidden md:block md:mb-8' : 'mb-8'}>
           <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
             <div>
               <h1 className="text-4xl lg:text-5xl font-bold text-white tracking-tight mb-1.5">
@@ -314,12 +373,12 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                 ) : (
                   <button
                     onClick={() => setIsEditingCurrentMileage(true)}
-                    className="flex items-center gap-1.5 group/edit"
+                    className="meta-row flex items-center gap-1.5 group/edit"
                     aria-label="Edit mileage"
                   >
                     <span className="text-2xl font-bold text-white tabular-nums tracking-tight">{displayVehicle.current_mileage?.toLocaleString() || '—'}</span>
                     <span className="text-sm text-white/30 font-normal">mi</span>
-                    <Edit2 className="h-3.5 w-3.5 text-white/30 group-hover/edit:text-cyan-400 transition-colors opacity-0 group-hover/edit:opacity-100" />
+                    <Edit2 className="meta-edit h-3.5 w-3.5 text-white/30 group-hover/edit:text-cyan-400 transition-colors" />
                   </button>
                 )}
               </div>
@@ -346,12 +405,12 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                 ) : (
                   <button
                     onClick={() => setIsEditingAvgMileage(true)}
-                    className="flex items-center gap-1.5 group/edit"
+                    className="meta-row flex items-center gap-1.5 group/edit"
                     aria-label="Edit average monthly miles"
                   >
                     <span className="text-2xl font-bold text-white tabular-nums tracking-tight">{displayVehicle.avg_miles_per_month || '—'}</span>
                     <span className="text-sm text-white/30 font-normal">mi/mo</span>
-                    <Edit2 className="h-3.5 w-3.5 text-white/30 group-hover/edit:text-cyan-400 transition-colors opacity-0 group-hover/edit:opacity-100" />
+                    <Edit2 className="meta-edit h-3.5 w-3.5 text-white/30 group-hover/edit:text-cyan-400 transition-colors" />
                   </button>
                 )}
               </div>
@@ -413,11 +472,20 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
         {/* The body copy of the tab strip lived here. It is gone — see the
             note on the strip in the sticky header above. */}
 
-        <div className="glass-panel rounded-2xl p-6">
+        {/* The panel's padding, border and radius are what make it read as a
+            card on a page. In app-shell mode there is no page for it to sit
+            on, so below `md` it is just the remaining height. */}
+        <div
+          className={
+            appShell
+              ? 'flex-1 min-h-0 flex flex-col md:block md:glass-panel md:rounded-2xl md:p-6'
+              : 'glass-panel rounded-2xl p-4 sm:p-6'
+          }
+        >
           {children}
         </div>
 
-        <footer className="mt-10 pt-6 border-t border-white/6 flex items-center justify-between text-xs text-white/25">
+        <footer className={`${appShell ? 'hidden md:flex ' : 'flex '}mt-10 pt-6 border-t border-white/6 items-center justify-between text-xs text-white/25`}>
           <span>CrewChief &copy; {new Date().getFullYear()}</span>
           <div className="flex items-center gap-4">
             <a href="mailto:feedback@crewchief.app" className="hover:text-white/50 transition-colors">Feedback</a>

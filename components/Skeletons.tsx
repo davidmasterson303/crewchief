@@ -16,7 +16,7 @@ export function textLineWidth(index: number): string {
 
 export function VehicleCardSkeleton() {
   return (
-    <Card className="p-6 space-y-4">
+    <Card className="p-4 sm:p-6 space-y-4">
       <div className="flex items-start justify-between">
         <div className="space-y-2 flex-1">
           <Skeleton className="h-6 w-40" />
@@ -35,7 +35,7 @@ export function VehicleCardSkeleton() {
 
 export function ServiceItemsSkeleton() {
   return (
-    <Card className="p-6 space-y-4">
+    <Card className="p-4 sm:p-6 space-y-4">
       <Skeleton className="h-6 w-48" />
       <div className="space-y-3">
         {Array.from({ length: 3 }).map((_, i) => (
@@ -55,7 +55,7 @@ export function ServiceItemsSkeleton() {
 
 export function MaintenanceHistorySkeleton() {
   return (
-    <Card className="p-6 space-y-4">
+    <Card className="p-4 sm:p-6 space-y-4">
       <Skeleton className="h-6 w-48" />
       <div className="space-y-3">
         {Array.from({ length: 5 }).map((_, i) => (

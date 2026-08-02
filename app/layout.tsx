@@ -98,7 +98,30 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={inter.className}>
+      {/*
+        A flex column so a page can ask for "the rest of the viewport" and get
+        it. `DemoBanner` renders here, outside the route tree, and the
+        consultant's app-shell (R4) was sizing itself to `100dvh` *below* that
+        banner — 53px taller than the space available, so the page scrolled by
+        exactly the banner's height and the shell's whole promise leaked.
+
+        Every other page is `min-h-screen` and sizes to its content, which is
+        unchanged by being a flex item.
+      */}
+      {/*
+        `h-[100dvh]`, not `min-h-`. A `flex-1` child divides its parent's
+        *definite* height, and a min-height is not definite — body grew to fit
+        the thread, the thread grew to fit the messages, and the shell's
+        "remaining space" resolved to all of it. The first version of this
+        change did exactly that: 749px of page scroll and the composer further
+        off-screen than before it was fixed.
+
+        Ordinary pages are unaffected. They are `min-h-screen` flex items with
+        the default `flex: 0 1 auto`, so content taller than the viewport
+        overflows body — whose overflow is visible — and the document scrolls
+        exactly as it always has.
+      */}
+      <body className={`${inter.className} h-[100dvh] flex flex-col`}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           <AuthProvider>
           <QueryProvider>

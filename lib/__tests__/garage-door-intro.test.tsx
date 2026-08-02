@@ -184,3 +184,88 @@ describe('a second load in the same session', () => {
     expect(container.querySelectorAll('main')).toHaveLength(1);
   });
 });
+
+describe('the garage behind a closed door is out of reach, not merely out of sight', () => {
+  /*
+    Found by Cowork's QA run, 2 Aug. Four of the first ten Tab stops on `/`
+    landed on controls at effective opacity 0 — "Add a photo of this car",
+    "Update mileage", "Vehicle options", "View Dashboard" — with the focus ring
+    invisible along with them. `document.querySelectorAll('[inert]').length`
+    was 0.
+
+    The curtain is opaque, so this was invisible to anyone using a mouse and
+    total for anyone using a keyboard. WCAG 2.4.3 (Focus Order) and 2.4.7
+    (Focus Visible). It matters more here than it would elsewhere because the
+    door deliberately waits to be opened, so "closed" is a state a first-time
+    visitor sits in for as long as they like rather than a moment in an
+    animation.
+
+    `aria-hidden` was already used in ten places in this tree and does not fix
+    it: it hides things from the accessibility tree and leaves them in the tab
+    order, which is precisely the half that was not the problem.
+  */
+  function renderWithFocusableGarage() {
+    return render(
+      <GarageDoor
+        panel={(enter) => (
+          <button type="button" onClick={enter}>
+            Enter Garage
+          </button>
+        )}
+      >
+        <main>
+          <button type="button">View Dashboard</button>
+        </main>
+      </GarageDoor>
+    );
+  }
+
+  it('marks the page inert while the door is closed', () => {
+    const { container } = renderWithFocusableGarage();
+
+    expect(container.querySelector('main')!.closest('[inert]')).not.toBeNull();
+  });
+
+  it('leaves the opener on the door reachable', () => {
+    /*
+      The failure mode of the fix, and the reason this assertion exists: inert
+      the wrong subtree and the only control that can open the door goes with
+      it. The door would then be genuinely unopenable by keyboard rather than
+      merely unhelpful.
+    */
+    renderWithFocusableGarage();
+
+    expect(screen.getByRole('button', { name: 'Enter Garage' }).closest('[inert]')).toBeNull();
+  });
+
+  it('releases the page once the door is opening', () => {
+    // `revealed` is true from 'lifting', not from 'gone' — the content is
+    // visible and usable while the curtain travels, which is the beat the
+    // door exists to set up.
+    const { container } = renderWithFocusableGarage();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enter Garage' }));
+
+    expect(container.querySelector('main')!.closest('[inert]')).toBeNull();
+  });
+
+  it('never marks the page inert when the intro is skipped', () => {
+    // A returning visitor sees no curtain at all, so nothing may be withheld.
+    sessionStorage.setItem(INTRO_PLAYED_KEY, INTRO_PLAYED_VALUE);
+    const { container } = renderWithFocusableGarage();
+
+    expect(container.querySelector('main')!.closest('[inert]')).toBeNull();
+  });
+
+  it('does not disturb the layout it wraps', () => {
+    /*
+      `display: contents` is load-bearing, not cosmetic. The page root has to
+      stay a direct flex child of `body` for the R4 app shell to get its
+      height, and an ordinary wrapper div would sit between them.
+    */
+    const { container } = renderWithFocusableGarage();
+    const wrapper = container.querySelector('[inert]') as HTMLElement;
+
+    expect(wrapper.style.display).toBe('contents');
+  });
+});

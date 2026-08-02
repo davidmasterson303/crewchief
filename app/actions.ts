@@ -7,10 +7,12 @@ import {
   flashConfig,
   proStructuredConfig,
   classificationConfig,
+  withThinking,
 } from '@/lib/gemini';
 import { VEHICLE_RESEARCH_PROMPT, POWERTRAIN_OPTIONS_PROMPT, CONSULTANT_SYSTEM_PROMPT, CONSULTANT_DOCUMENT_VALIDATION_PROMPT } from '@crewchief/core/prompts';
 import { logger } from '@crewchief/core/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { recordAiUsageInBackground } from '@/lib/ai-usage';
 import { downloadStoredFile } from '@/lib/storage-objects';
 import { loadConsultantContext, loadedContextKinds } from '@/lib/consultant-context';
 import { authorizeVehicleAccess, authorizeVehicleScopedRow, requireSession } from '@/lib/api-auth';
@@ -506,6 +508,14 @@ export async function generateVehicleDossier(vehicleId: string, vehicleData?: an
           RESEARCH_TIMEOUT_MS,
           'vehicle research'
         );
+        // Recorded per attempt, not per dossier. A retried research call is
+        // billed every time it runs, so a per-dossier row would under-report
+        // exactly the calls that cost the most — and D6 (eager vs lazy dossier
+        // generation) is decided on this number.
+        recordAiUsageInBackground(
+          { purpose: 'vehicle_dossier', model: PRO_MODEL, userId: access.userId, vehicleId },
+          response.usageMetadata
+        );
         const text = response.text || '';
 
         console.log(`[Research Attempt ${attempt + 1}] Response length: ${text.length} chars`);
@@ -756,8 +766,17 @@ export async function fetchPowertrainOptions(
     const response = await genAI.models.generateContent({
       model: LITE_MODEL,
       contents: prompt,
-      config: classificationConfig,
+      // Measured at zero thinking tokens on `LITE_MODEL` already, so this
+      // saves nothing today. It is set anyway: the next model swap here would
+      // otherwise inherit whatever that model's default policy is, and this is
+      // a yes/no classification that has no use for reasoning at any price.
+      config: withThinking(classificationConfig, LITE_MODEL, 'MINIMAL'),
     });
+    // No vehicle: this runs during onboarding, before one exists.
+    recordAiUsageInBackground(
+      { purpose: 'powertrain_options', model: LITE_MODEL, userId: session.userId },
+      response.usageMetadata
+    );
 
     const text = response.text || '';
     const jsonData = extractJSON(text);
@@ -1125,8 +1144,19 @@ export async function sendConsultantMessage(params: {
     const result = await genAI.models.generateContent({
       model: FLASH_MODEL,
       contents,
-      config: flashConfig,
+      // The consultant, and the call this application makes most often.
+      // Measured at 861 thinking tokens against 168 of answer with no level
+      // set; LOW halves that for an answer of the same length. It is the
+      // largest single cost lever in the app, and the one whose quality has
+      // to be gated rather than assumed — see the round-trip gate.
+      config: withThinking(flashConfig, FLASH_MODEL, 'LOW'),
     });
+    // `access.userId` is null on the demo path, which is deliberate: that
+    // traffic is anonymous, it is a real bill, and it has never been measured.
+    recordAiUsageInBackground(
+      { purpose: 'consultant', model: FLASH_MODEL, userId: access.userId, vehicleId },
+      result.usageMetadata
+    );
     let response = result.text || '';
 
     const wishlistParse = parseWishlistCommands(response);
@@ -1775,8 +1805,12 @@ Format as valid JSON only, no markdown.`;
     const result = await genAI.models.generateContent({
       model: FLASH_MODEL,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      config: flashStructuredConfig,
+      config: withThinking(flashStructuredConfig, FLASH_MODEL, 'LOW'),
     });
+    recordAiUsageInBackground(
+      { purpose: 'vehicle_health_summary', model: FLASH_MODEL, userId: access.userId, vehicleId },
+      result.usageMetadata
+    );
 
     const responseText = result.text || '';
 
@@ -1968,8 +2002,12 @@ Format as valid JSON only, no markdown or explanations.`;
     const result = await genAI.models.generateContent({
       model: FLASH_MODEL,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      config: flashStructuredConfig,
+      config: withThinking(flashStructuredConfig, FLASH_MODEL, 'LOW'),
     });
+    recordAiUsageInBackground(
+      { purpose: 'modification_details', model: FLASH_MODEL, userId: access.userId, vehicleId },
+      result.usageMetadata
+    );
 
     const responseText = result.text || '';
     let details = {
@@ -3009,8 +3047,29 @@ Return ONLY valid JSON, no markdown code blocks, no explanations.`;
       const result = await genAI.models.generateContent({
         model: FLASH_VISION_MODEL,
         contents: [{ role: 'user', parts: contentParts }],
+        // DELIBERATELY LEFT AT THE DEFAULT — the one 3.x site without a level.
+        //
+        // Invoice extraction is the path this file already calls out as the
+        // one whose regressions are invisible: a model that reads fewer line
+        // items still returns valid JSON and still passes every gate. Cutting
+        // its thinking would save real money and there is no instrument here
+        // that would notice if it also cost accuracy.
+        //
+        // The corpus to settle it exists (`COWORK_PROMPT_invoice_vision_
+        // corpus_2026-07-30.md`). Run a level against it, then set one.
         config: flashStructuredConfig,
       });
+      // The one path still running at the default thinking level, which makes
+      // it the one whose measurements decide whether that stays true.
+      recordAiUsageInBackground(
+        {
+          purpose: 'invoice_extraction',
+          model: FLASH_VISION_MODEL,
+          userId: access.userId,
+          vehicleId,
+        },
+        result.usageMetadata
+      );
 
       const responseText = result.text || '{}';
       const parsed = extractJSON(responseText);
@@ -5326,8 +5385,12 @@ Respond with ONLY valid JSON, no markdown:
     const result = await genAI.models.generateContent({
       model: FLASH_MODEL,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      config: flashStructuredConfig,
+      config: withThinking(flashStructuredConfig, FLASH_MODEL, 'LOW'),
     });
+    recordAiUsageInBackground(
+      { purpose: 'modification_backfill', model: FLASH_MODEL, userId: access.userId, vehicleId },
+      result.usageMetadata
+    );
 
     const responseText = result.text || '';
     let parsed: any = null;
@@ -5549,8 +5612,14 @@ Respond with ONLY valid JSON:
         const result = await genAI.models.generateContent({
           model: FLASH_MODEL,
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          config: flashStructuredConfig,
+          config: withThinking(flashStructuredConfig, FLASH_MODEL, 'LOW'),
         });
+        // Inside a loop — one row per generated mod, which is the point. This
+        // is the path most likely to surprise on cost.
+        recordAiUsageInBackground(
+          { purpose: 'modification_backfill', model: FLASH_MODEL, userId: access.userId, vehicleId },
+          result.usageMetadata
+        );
 
         const responseText = result.text || '';
         const parsed = extractJSON(responseText);

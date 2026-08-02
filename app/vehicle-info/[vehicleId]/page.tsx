@@ -140,8 +140,8 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
     }
     return (
       <div className="min-h-screen bg-[#080808] flex items-center justify-center">
-        <div className="max-w-md w-full mx-auto px-6">
-          <div className="bg-red-500/10 border border-red-400/25 rounded-2xl p-6">
+        <div className="max-w-md w-full mx-auto px-4 sm:px-6">
+          <div className="bg-red-500/10 border border-red-400/25 rounded-2xl p-4 sm:p-6">
             <h2 className="text-red-300 font-semibold mb-2">Error Loading Vehicle Info</h2>
             <p className="text-red-200/60 mb-5 text-sm">{error.message}</p>
             <Button onClick={() => router.push('/garage')} variant="outline" className="border-white/15 text-white/70 hover:bg-white/8">
@@ -216,7 +216,7 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
               <button
                 onClick={() => fetchPerformanceStats(true)}
                 disabled={perfLoading}
-                className="w-8 h-8 flex items-center justify-center rounded-lg text-white/35 hover:text-cyan-400 hover:bg-cyan-400/8 transition-colors disabled:opacity-40"
+                className="tap-target-44 w-8 h-8 flex items-center justify-center rounded-lg text-white/35 hover:text-cyan-400 hover:bg-cyan-400/8 transition-colors disabled:opacity-40"
                 aria-label="Refresh performance stats"
               >
                 <RefreshCw className={`h-4 w-4 ${perfLoading ? 'animate-spin' : ''}`} />

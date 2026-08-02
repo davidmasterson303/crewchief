@@ -905,6 +905,14 @@ nav {
   .reveal-on-hover:focus-within,
   .meta-row:hover .meta-edit,
   .meta-edit:focus-visible,
+  /*
+    The pencil is decoration inside a labelled button, so it never takes focus
+    itself and `.meta-edit:focus-visible` above can never fire for it. Without
+    this, tabbing to "Edit mileage" on the dashboard lands on a control whose
+    only affordance is invisible. `:focus-within` on the row is the version of
+    that rule which actually reaches the markup we have.
+  */
+  .meta-row:focus-within .meta-edit,
   .turn:hover .turn-actions,
   .turn-actions:focus-within {
     opacity: 1;

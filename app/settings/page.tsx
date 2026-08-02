@@ -51,7 +51,7 @@ function SettingsSection({
   return (
     <section
       ref={ref}
-      className="scroll-reveal rounded-lg border bg-card p-6 edge-light"
+      className="scroll-reveal rounded-lg border bg-card p-4 sm:p-6 edge-light"
       style={{
         ...revealDelay(index),
         borderColor: isCritical ? 'var(--critical-red-border)' : undefined,
@@ -150,7 +150,7 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-background">
       <nav className="border-b border-border bg-surface-nav">
-        <div className="mx-auto flex max-w-3xl items-center gap-3 px-6 py-4">
+        <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 sm:px-6 py-4">
           <Link
             href="/garage"
             className="tap-target-44 flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
@@ -161,7 +161,7 @@ export default function SettingsPage() {
         </div>
       </nav>
 
-      <main className="mx-auto max-w-3xl px-6 py-10">
+      <main className="mx-auto max-w-3xl px-4 sm:px-6 py-10">
         {/* The single display-serif element on this screen. */}
         <h1 className="display-serif mb-8 text-3xl text-foreground">Settings</h1>
 

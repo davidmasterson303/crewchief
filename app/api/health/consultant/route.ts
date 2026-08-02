@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { genAI, flashConfig } from '@/lib/gemini';
+import { genAI, flashConfig, withThinking } from '@/lib/gemini';
+import { CONSULTANT_HEALTH_MODEL } from '@crewchief/core/ai/models';
+import { recordAiUsageInBackground } from '@/lib/ai-usage';
 import { getServerClient } from '@/lib/supabase';
 import { logger } from '@crewchief/core/logger';
 import { withTimeout, TimeoutError } from '@crewchief/core/retry';
@@ -103,12 +105,25 @@ async function attemptRoundTrip(): Promise<ConsultantHealth> {
     const response = await withTimeout(
       () =>
         genAI.models.generateContent({
-          model: 'gemini-2.5-flash',
+          // The consultant's model and the consultant's thinking level, both.
+          // This read `'gemini-2.5-flash'` with the bare config, so the canary
+          // was answering "is some model reachable" while claiming to answer
+          // "is the consultant working".
+          model: CONSULTANT_HEALTH_MODEL,
           contents: prompt,
-          config: flashConfig,
+          config: withThinking(flashConfig, CONSULTANT_HEALTH_MODEL, 'LOW'),
         }),
       ROUND_TRIP_TIMEOUT_MS,
       'consultant round trip'
+    );
+
+    // The canary is not free, and it runs on a schedule. Metered under its own
+    // purpose so its spend is separable from the consultant's — otherwise a
+    // cost-per-user figure quietly includes a robot asking the same question
+    // every few minutes.
+    recordAiUsageInBackground(
+      { purpose: 'health_check', model: CONSULTANT_HEALTH_MODEL, userId: null },
+      response.usageMetadata
     );
 
     return classifyRoundTrip(

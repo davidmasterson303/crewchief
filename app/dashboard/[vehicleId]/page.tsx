@@ -95,7 +95,7 @@ export default function DashboardPage({ params }: { params: { vehicleId: string 
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-black p-6">
+      <div className="min-h-screen bg-black p-4 sm:p-6">
         <DashboardSkeleton />
       </div>
     );
@@ -103,7 +103,7 @@ export default function DashboardPage({ params }: { params: { vehicleId: string 
 
   if (error) {
     return (
-      <div className="min-h-screen bg-black p-6 flex items-center justify-center">
+      <div className="min-h-screen bg-black p-4 sm:p-6 flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-white mb-4">Error Loading Vehicle</h1>
           <p className="text-gray-400 mb-6">{error.message}</p>

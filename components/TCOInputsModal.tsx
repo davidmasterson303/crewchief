@@ -102,7 +102,7 @@ export default function TCOInputsModal({ open, onOpenChange, vehicleId, vehicle,
                   className={`bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-cyan-400/50 h-10 ${prefix ? 'pl-7' : ''}`}
                 />
               </div>
-              <p className="text-[11px] text-white/25 leading-none">{hint}</p>
+              <p className="text-xs text-white/25 leading-none">{hint}</p>
             </div>
           ))}
         </div>

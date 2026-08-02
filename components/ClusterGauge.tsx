@@ -365,7 +365,7 @@ export function ClusterGauge({
         <span
           className={
             isCard
-              ? 'text-[11px] font-semibold leading-none'
+              ? 'text-xs font-semibold leading-none'
               : 'block text-center font-semibold leading-none animate-fade-in'
           }
           style={{

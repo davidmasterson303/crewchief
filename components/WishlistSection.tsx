@@ -145,7 +145,7 @@ export function WishlistSection({ vehicleId }: WishlistSectionProps) {
 
   if (loading) {
     return (
-      <div className="bg-slate-900/60 border border-white/10 rounded-2xl p-6">
+      <div className="bg-slate-900/60 border border-white/10 rounded-2xl p-4 sm:p-6">
         <div className="flex items-center justify-between mb-5">
           <div className="h-6 w-24 bg-white/8 rounded-lg animate-pulse" />
           <div className="h-8 w-24 bg-white/5 rounded-lg animate-pulse" />
@@ -162,7 +162,7 @@ export function WishlistSection({ vehicleId }: WishlistSectionProps) {
   return (
     <>
       <div className="bg-slate-900/60 border border-white/10 rounded-2xl overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-5 border-b border-white/8">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-5 border-b border-white/8">
           <div className="flex items-center gap-3">
             <ListChecks className="h-5 w-5 text-info" />
             <div>
@@ -198,7 +198,7 @@ export function WishlistSection({ vehicleId }: WishlistSectionProps) {
         </div>
 
         {wishlistItems.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-14 px-6 text-center">
+          <div className="flex flex-col items-center justify-center py-14 px-4 sm:px-6 text-center">
             <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-4">
               <ListChecks className="h-6 w-6 text-white/25" />
             </div>
@@ -224,7 +224,7 @@ export function WishlistSection({ vehicleId }: WishlistSectionProps) {
                 return (
                   <div
                     key={item.id}
-                    className="px-6 py-4 hover:bg-white/3 transition-colors group/item"
+                    className="px-4 sm:px-6 py-4 hover:bg-white/3 transition-colors group/item"
                   >
                     <div className="flex items-start gap-4">
                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${
@@ -257,7 +257,17 @@ export function WishlistSection({ vehicleId }: WishlistSectionProps) {
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-1.5 flex-shrink-0 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                      {/* RB0 rule 4. `opacity-0` is dropped rather than kept
+                          alongside `.reveal-on-hover`: the touch pin is
+                          `@media (hover: none) { .reveal-on-hover { opacity: 1 } }`
+                          at (0,1,0), and a Tailwind `.opacity-0` is also
+                          (0,1,0) — a specificity tie decided by source order,
+                          which is not something to leave to a build. The named
+                          group still reveals it on hover at (0,2,0).
+
+                          These are Mark complete and delete on a wishlist row,
+                          and on a phone they were the only path to either. */}
+                      <div className="reveal-on-hover flex items-center gap-1.5 flex-shrink-0 group-hover/item:opacity-100 transition-opacity">
                         <Button
                           size="sm"
                           onClick={() => handleMarkComplete(item)}
@@ -269,7 +279,7 @@ export function WishlistSection({ vehicleId }: WishlistSectionProps) {
                         <button
                           onClick={() => handleDelete(item.id)}
                           disabled={deletingId === item.id}
-                          className="w-7 h-7 flex items-center justify-center rounded-lg text-white/25 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                          className="tap-target-44 w-7 h-7 flex items-center justify-center rounded-lg text-white/25 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
                           aria-label="Remove item"
                         >
                           {deletingId === item.id ? (
@@ -285,7 +295,7 @@ export function WishlistSection({ vehicleId }: WishlistSectionProps) {
               })}
             </div>
 
-            <div className="px-6 py-4 border-t border-white/8 sticky bottom-0 bg-[#0d1117]/95 backdrop-blur-sm z-10">
+            <div className="px-4 sm:px-6 py-4 border-t border-white/8 sticky bottom-0 bg-[#0d1117]/95 backdrop-blur-sm z-10">
               <Button
                 onClick={() => setShowQuoteDialog(true)}
                 className="w-full bg-cyan-600 hover:bg-cyan-500 text-white h-11 rounded-xl text-sm font-semibold gap-2 transition-all hover:scale-[1.005] shadow-lg shadow-cyan-900/30"
@@ -371,7 +381,7 @@ export function WishlistSection({ vehicleId }: WishlistSectionProps) {
                           </p>
                         )}
                       </div>
-                      <button className="w-8 h-8 flex items-center justify-center rounded-lg text-white/30 hover:text-cyan-400 hover:bg-cyan-400/8 transition-colors flex-shrink-0">
+                      <button className="tap-target-44 w-8 h-8 flex items-center justify-center rounded-lg text-white/30 hover:text-cyan-400 hover:bg-cyan-400/8 transition-colors flex-shrink-0">
                         <Eye className="h-4 w-4" />
                       </button>
                     </div>

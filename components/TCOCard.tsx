@@ -128,7 +128,7 @@ function formatCurrency(value: number): string {
 function KPICard({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: string }) {
   return (
     <div className="flex flex-col gap-0.5 p-4 bg-white/4 rounded-xl border border-white/8">
-      <span className="text-[10px] font-semibold uppercase tracking-widest text-white/40">{label}</span>
+      <span className="text-xs font-semibold uppercase tracking-widest text-white/40">{label}</span>
       <span className={`text-2xl font-bold tabular-nums ${accent || 'text-white'}`}>{value}</span>
       {sub && <span className="text-xs text-white/40">{sub}</span>}
     </div>
@@ -219,7 +219,7 @@ export default function TCOCard({ vehicle, vehicleId, onEditInputs }: TCOCardPro
             {onEditInputs && (
               <button
                 onClick={onEditInputs}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-white/20 bg-white/10 hover:bg-white/16 hover:border-white/30 text-white/70 hover:text-white transition-all duration-200"
+                className="tap-target-44 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-white/20 bg-white/10 hover:bg-white/16 hover:border-white/30 text-white/70 hover:text-white transition-all duration-200"
               >
                 <SlidersHorizontal className="h-3.5 w-3.5" />
                 Edit Inputs
@@ -228,7 +228,7 @@ export default function TCOCard({ vehicle, vehicleId, onEditInputs }: TCOCardPro
             {hasEnoughData && (
               <button
                 onClick={() => setWhatIfMode(m => m === 'now' ? 'keep2' : 'now')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all duration-200 select-none"
+                className="tap-target-44 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all duration-200 select-none"
                 style={{
                   background: whatIfMode === 'keep2' ? 'rgba(251,191,36,0.15)' : 'rgba(255,255,255,0.10)',
                   borderColor: whatIfMode === 'keep2' ? 'rgba(251,191,36,0.45)' : 'rgba(255,255,255,0.20)',
@@ -330,7 +330,7 @@ export default function TCOCard({ vehicle, vehicleId, onEditInputs }: TCOCardPro
                             />
                           </div>
                         </div>
-                        <span className="text-[10px] text-white/35 w-10 text-right tabular-nums">{pct}%</span>
+                        <span className="text-xs text-white/35 w-10 text-right tabular-nums">{pct}%</span>
                       </div>
                     );
                   })}

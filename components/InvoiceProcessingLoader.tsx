@@ -32,7 +32,7 @@ export default function InvoiceProcessingLoader({ isProcessing, fileName }: Invo
   }, [isProcessing, currentStep]);
 
   return (
-    <div className="flex flex-col items-center justify-center py-12 px-6">
+    <div className="flex flex-col items-center justify-center py-12 px-4 sm:px-6">
       <div className="mb-8">
         <div className="relative w-24 h-24 mx-auto">
           <div className="absolute inset-0 bg-gradient-to-r from-cyan-400/20 to-blue-400/20 rounded-full animate-pulse blur-xl" />

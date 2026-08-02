@@ -14,6 +14,49 @@ export const MAX_EDGE = 1600;
 export const TARGET_BYTES = 150 * 1024;
 
 /**
+ * Long edge for a *document* — an invoice photographed to be read, not a car
+ * photographed to be looked at.
+ *
+ * Deliberately larger than `MAX_EDGE`, and the gap is the whole point of having
+ * two numbers. The photo bound is set by the ~400px box the result is displayed
+ * in; nobody inspects a car's paint at 1:1. A document is read by the vision
+ * model, and what it has to resolve is 8-point line-item text, part numbers and
+ * prices. Those are exactly the characters that go first, and an extraction
+ * reading `$1,180` as `$180` produces a service record that is wrong and
+ * well-formed — the failure mode nothing downstream notices.
+ */
+export const DOC_MAX_EDGE = 2048;
+
+/**
+ * What a re-encoded document should come in under.
+ *
+ * Set high on purpose, so an ordinary invoice clears it on the ladder's *first*
+ * rung and never walks down into the range where JPEG starts eating thin
+ * strokes. `TARGET_BYTES` is small because a photo is served to a browser over
+ * and over; a document is uploaded once, read once, and never sent back down.
+ * The bill it drives is tokens, and tokens follow dimensions, not bytes — so
+ * spending bytes to keep the glyphs intact costs nothing that matters.
+ */
+export const DOC_TARGET_BYTES = 500 * 1024;
+
+/**
+ * Whether an upload is a raster image this pipeline can usefully re-encode.
+ *
+ * The document path accepts PDFs as well as photographs. `downscaleImage` would
+ * fail to decode a PDF and hand the original straight back, so the outcome is
+ * the same without this check — but "the same either way" is a property of a
+ * failure path, and a failure path is a poor place to keep a requirement that
+ * matters. Ask the question where a reader can see it being asked.
+ *
+ * SVG is excluded for a different reason: it decodes perfectly well, and
+ * rasterising it discards the one property that made it small.
+ */
+export function isDownscalableImage(mimeType: string): boolean {
+  if (!mimeType.startsWith('image/')) return false;
+  return mimeType !== 'image/svg+xml';
+}
+
+/**
  * Quality ladder for the encoder, tried in order.
  *
  * Descending, and it stops at 0.5 rather than continuing down. Below that the

@@ -98,7 +98,7 @@ export default function VehicleIllustrationGallery() {
             >
               <Illustration size={200} tint={tinted ? SAMPLE_TINT : null} />
               <p className="text-xs font-semibold capitalize">{BODY_STYLE_LABEL[style]}</p>
-              <code className="text-[10px] text-muted-foreground">{style}</code>
+              <code className="text-xs text-muted-foreground">{style}</code>
             </section>
           );
         })}

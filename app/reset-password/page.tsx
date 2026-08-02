@@ -130,7 +130,7 @@ export default function ResetPasswordPage() {
               This link is invalid or has already been used. Request a new one below.
             </p>
             <Link href="/forgot-password">
-              <Button className="bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl h-10 px-6">
+              <Button className="bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl h-10 px-4 sm:px-6">
                 Request New Link
               </Button>
             </Link>

@@ -606,7 +606,23 @@ export default function ConsultantChat({
   );
 
   return (
-    <div className="relative h-[calc(100vh-320px)] min-h-[520px] max-h-[760px] border border-white/10 rounded-2xl overflow-hidden flex bg-slate-950/90 shadow-xl shadow-black/40 animate-consultant-fade">
+    /*
+      R4. This was `h-[calc(100vh-320px)] min-h-[520px] max-h-[760px]` at every
+      width. On a 375x667 phone the calc yields 347px, `min-h` wins, and a
+      520px panel sits inside a page that has already spent ~400px on banner,
+      nav, tab strip, title and meta row. Measured before the fix: the composer
+      began 860px down a 692px viewport.
+
+      Below `md` the panel now takes the height the shell gives it — see
+      `mobileLayout="app-shell"` in DashboardLayout — and the thread inside is
+      the only thing that scrolls. `h-full` rather than a second `100dvh`,
+      because the shell has already subtracted the nav.
+
+      From `md` up the original clamp is untouched, and `100dvh` replaces
+      `100vh` there too: same number on a desktop, correct on a tablet with a
+      collapsing browser chrome.
+    */
+    <div className="relative h-full md:h-[calc(100dvh-320px)] md:min-h-[520px] md:max-h-[760px] border-0 md:border md:border-white/10 rounded-none md:rounded-2xl overflow-hidden flex bg-slate-950/90 md:shadow-xl md:shadow-black/40 animate-consultant-fade">
       {/*
         Below md the sidebar becomes a drawer. As a permanent flex child it
         took 256px of a 375px viewport, leaving ~119px for the thread — the
@@ -674,7 +690,7 @@ export default function ConsultantChat({
                   }`}>
                     {session.title}
                   </p>
-                  <p className="text-[10px] text-white/30 mt-1">
+                  <p className="text-xs text-white/30 mt-1">
                     {new Date(session.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </p>
                 </button>
@@ -696,7 +712,12 @@ export default function ConsultantChat({
             Conversations
           </button>
         </div>
-        <div ref={messagesContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden p-6 space-y-5">
+        {/* `min-h-0` is load-bearing, not defensive. A flex child's default
+            `min-height: auto` refuses to shrink below its content, so without
+            it `flex-1` grows the thread to fit every message and pushes the
+            composer out of the shell — the same symptom R4 set out to fix,
+            arriving by a different route. */}
+        <div ref={messagesContainerRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 sm:p-6 space-y-5">
           {messages.length === 0 ? (
             <div className="h-full flex items-center justify-center">
               <div className="text-center max-w-md animate-fade-in">
@@ -741,8 +762,8 @@ export default function ConsultantChat({
                   {msg.role === 'assistant' && (
                     <div className="flex items-center gap-1.5 mb-1.5">
                       <Sparkles className="h-[13px] w-[13px] flex-shrink-0" style={{ color: 'var(--info)' }} />
-                      <span className="text-[11px] font-semibold uppercase tracking-widest text-white/45">CrewChief</span>
-                      <span className="text-[10px] text-white/25">
+                      <span className="text-xs font-semibold uppercase tracking-widest text-white/45">CrewChief</span>
+                      <span className="text-xs text-white/25">
                         {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
@@ -811,7 +832,7 @@ export default function ConsultantChat({
                                 <Heart className="h-3.5 w-3.5 flex-shrink-0" />
                               )}
                               <span className="flex-1 font-medium text-xs">{action.name}</span>
-                              <span className="text-[10px] opacity-50 capitalize">{action.type}</span>
+                              <span className="text-xs opacity-50 capitalize">{action.type}</span>
                               {!isAdded && !isAdding && <span className="text-xs text-cyan-400 font-semibold">+ Add</span>}
                             </button>
                           );
@@ -828,11 +849,11 @@ export default function ConsultantChat({
                   */}
                   {msg.role === 'assistant' && msg.sources?.length > 0 && (
                     <div className="measure flex flex-wrap items-center gap-1.5 mt-2.5">
-                      <span className="text-[10px] text-white/30 font-medium">Based on</span>
+                      <span className="text-xs text-white/30 font-medium">Based on</span>
                       {msg.sources.map((kind: ContextKind) => (
                         <span
                           key={kind}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/6 border border-white/10 text-[10px] text-white/45 font-medium"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/6 border border-white/10 text-xs text-white/45 font-medium"
                         >
                           {contextIcon(kind)}
                           {CONTEXT_LABELS[kind]}
@@ -851,7 +872,7 @@ export default function ConsultantChat({
                     <div className="turn-actions flex items-center gap-1 mt-1.5">
                       <button
                         onClick={() => handleCopyTurn(msg.content, index)}
-                        className="tap-target-44 flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-white/35 hover:text-white/70 transition-colors"
+                        className="tap-target-44 flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium text-white/35 hover:text-white/70 transition-colors"
                         aria-label="Copy this answer"
                       >
                         {copiedTurn === index ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
@@ -862,7 +883,7 @@ export default function ConsultantChat({
 
                   {/* The user bubble keeps its timestamp, below and right. */}
                   {msg.role === 'user' && (
-                    <div className="text-[10px] text-white/30 mt-1">
+                    <div className="text-xs text-white/30 mt-1">
                       {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </div>
                   )}
@@ -876,7 +897,7 @@ export default function ConsultantChat({
                 <div className="animate-fade-in flex flex-col items-start">
                   <div className="flex items-center gap-1.5 mb-1.5">
                     <Sparkles className="h-[13px] w-[13px] flex-shrink-0" style={{ color: 'var(--info)' }} />
-                    <span className="text-[11px] font-semibold uppercase tracking-widest text-white/45">CrewChief</span>
+                    <span className="text-xs font-semibold uppercase tracking-widest text-white/45">CrewChief</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Loader2 className="h-3.5 w-3.5 animate-spin text-info flex-shrink-0" />
@@ -893,7 +914,17 @@ export default function ConsultantChat({
                       <button
                         key={i}
                         onClick={() => handleFollowUpClick(suggestion)}
-                        className="text-left px-3 py-1.5 bg-white/5 hover:bg-cyan-400/10 border border-white/10 hover:border-cyan-400/30 rounded-full text-xs text-white/60 hover:text-white transition-all"
+                        /*
+                          RB0 rule 3, and deliberately NOT `.tap-target-44`.
+                          That utility centres a 44px ::after on the element,
+                          which on a ~30px chip overhangs ~7px top and bottom.
+                          These chips wrap at `gap-2` — 8px — so two rows of
+                          them would have overlapping hit areas and the tap
+                          would land on whichever ::after paints last. A
+                          control that answers the wrong tap is worse than one
+                          that is slightly too small, so this grows for real.
+                        */
+                        className="text-left px-3 py-2.5 min-h-[44px] bg-white/5 hover:bg-cyan-400/10 border border-white/10 hover:border-cyan-400/30 rounded-full text-xs text-white/60 hover:text-white transition-all"
                       >
                         {suggestion}
                       </button>
@@ -915,11 +946,11 @@ export default function ConsultantChat({
                         <p className="text-xs font-semibold text-amber-300">
                           {highPriorityWishlist.length} item{highPriorityWishlist.length > 1 ? 's' : ''} need attention
                         </p>
-                        <p className="text-[10px] text-white/40 mt-0.5">Get quotes from local shops</p>
+                        <p className="text-xs text-white/40 mt-0.5">Get quotes from local shops</p>
                       </div>
                       <a
                         href={`/dashboard/${vehicleId}?tab=wishlist`}
-                        className="flex-shrink-0 px-2.5 py-1 bg-amber-400/15 hover:bg-amber-400/25 border border-amber-400/30 rounded-lg text-[11px] font-semibold text-amber-300 transition-colors"
+                        className="flex-shrink-0 px-2.5 py-1 bg-amber-400/15 hover:bg-amber-400/25 border border-amber-400/30 rounded-lg text-xs font-semibold text-amber-300 transition-colors"
                       >
                         Get Quote
                       </a>
@@ -933,7 +964,11 @@ export default function ConsultantChat({
           )}
         </div>
 
-        <div className="border-t border-white/8 bg-black/30 p-4">
+        {/* `shrink-0` so the composer keeps its height as the thread grows —
+            the whole point of the shell. The safe-area padding is for phones
+            with a home indicator, where the last 34px of the viewport is not
+            reliably tappable and the send button was landing in it. */}
+        <div className="shrink-0 border-t border-white/8 bg-black/30 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:pb-4">
           {selectedFiles.length > 0 && (
             <div className="mb-3 space-y-1.5">
               {selectedFiles.map((file, idx) => (
@@ -1001,7 +1036,7 @@ export default function ConsultantChat({
                 Truncates, never wraps — a second line here pushes the controls
                 around as mileage changes.
               */}
-              <span className="flex-1 min-w-0 truncate text-[11px] text-white/30">
+              <span className="flex-1 min-w-0 truncate text-xs text-white/30">
                 {vehicle.year} {vehicle.make} {vehicle.model}
                 {` · ${displayMileage.toLocaleString()} mi`}
                 {openItemCount > 0 && ` · ${openItemCount} open item${openItemCount === 1 ? '' : 's'}`}

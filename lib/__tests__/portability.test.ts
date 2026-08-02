@@ -120,6 +120,15 @@ const NOT_PORTABLE: Record<string, string> = {
   'lib/account-data.ts': 'reaches Supabase through lib/supabase',
   'lib/performance-stats.ts': 'Supabase types, and calls Gemini',
   'lib/rate-limit.ts': 'reaches Supabase through lib/supabase',
+  /*
+    Same split as image-downscale.ts and vehicle-photo.ts, and made on purpose:
+    the arithmetic — which usage fields to read, whether a reading is worth
+    recording, what a call bills at — is in `packages/core/src/ai/usage.ts` and
+    is portable. Only the write needs a service-role client, and it needs one
+    specifically because a client that could write here could under-report its
+    own usage.
+  */
+  'lib/ai-usage.ts': 'writes with the service role — reaches Supabase through lib/supabase',
   'lib/sign-out.ts': 'Supabase types',
   /*
     The precedence rule — owner photo over stock, the unphotographed-demo

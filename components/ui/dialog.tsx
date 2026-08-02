@@ -39,7 +39,7 @@ const DialogContent = React.forwardRef<
       ref={ref}
       className={cn(
         /*
-          R1 — this was stock shadcn: `w-full max-w-lg`, -50% centring, `p-6`,
+          R1 — this was stock shadcn: `w-full max-w-lg`, -50% centring, `p-4 sm:p-6`,
           and **no max-height and no overflow**. Any dialog taller than the
           viewport overflowed past the top *and* the bottom with no way to
           reach either end — clipped, not scrolled. Ten dialogs inherit this,
