@@ -115,7 +115,11 @@ function GarageContents() {
           </div>
         </nav>
 
-        <main className="max-w-7xl mx-auto px-6 lg:px-12 py-14">
+        {/* RB0 rule 1 pairs four-up at `2xl` with a wider shell, and the pair is
+            not optional: four columns inside `max-w-7xl` yields ~290px cards,
+            narrower than the 338px the same card gets at 700px in two-up. The
+            shell has to widen or the fourth column is a regression. */}
+        <main className="max-w-7xl 2xl:max-w-[96rem] mx-auto px-6 lg:px-12 py-14">
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
             <div>
               {/*
@@ -160,7 +164,12 @@ function GarageContents() {
             </div>
           )}
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* One grid, shared with /garage — RB0 rule 1. Two-up arrives at
+              `sm`, not `md`: skipping it rendered a single 600px-wide card
+              across 640-767px, where a landscape phone and a small tablet both
+              land. `2xl` takes the fourth column that `max-w-7xl` was
+              otherwise leaving as gutter. */}
+          <div className="grid gap-5 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             {isLoading ? (
               [1, 2, 3].map((i) => <VehicleCardSkeleton key={i} />)
             ) : vehicles.length > 0 ? (

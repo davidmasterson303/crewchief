@@ -70,7 +70,8 @@ export default function GaragePage() {
         </div>
       </nav>
 
-      <main className="relative z-20 max-w-7xl mx-auto px-6 lg:px-12 py-16">
+      {/* Widened at `2xl` to match the dashboard — see app/page.tsx. */}
+      <main className="relative z-20 max-w-7xl 2xl:max-w-[96rem] mx-auto px-6 lg:px-12 py-16">
         <div className="mb-12">
           <h1 className="text-4xl lg:text-5xl font-bold text-white mb-3 tracking-tight">
             My Garage
@@ -125,7 +126,10 @@ export default function GaragePage() {
             </div>
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          // Identical to the dashboard's grid on purpose — these disagreed
+          // about their gap (8 here, 6 there) as well as skipping `sm`. See
+          // app/page.tsx.
+          <div className="grid gap-5 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             {vehicles.map((vehicle, i) => (
               // Index is per-grid, so the stagger restarts here rather than
               // continuing a count from elsewhere on the page.
