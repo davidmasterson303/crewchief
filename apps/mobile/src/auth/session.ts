@@ -71,6 +71,56 @@ export async function signIn(email: string, password: string): Promise<SignInRes
 }
 
 /**
+ * Send the confirmation email again.
+ *
+ * ── The trap this exists to stay ahead of ───────────────────────────────────
+ *
+ * `signIn` collapses every credential failure into one message, deliberately.
+ * One of the messages it collapses is "Email not confirmed", which today cannot
+ * occur: email confirmation is **off** on this Supabase project — checked in
+ * the dashboard on 1 Aug, Authentication → Sign In / Providers → Confirm email,
+ * disabled. Nobody can be in an unconfirmed state, so nobody is being told
+ * their password is wrong with no way forward.
+ *
+ * That is one toggle away from being false, and it is a plausible toggle:
+ * enabling confirmation is standard pre-launch hardening and App Store review
+ * is exactly what prompts it. The moment it flips, a user who signed up and did
+ * not confirm gets "that email and password did not match" and no path out.
+ *
+ * The dependency is a dashboard fact no file in this repo can observe, which is
+ * why it is written down here rather than left to be rediscovered. Same class
+ * as the SQL Editor modal.
+ *
+ * ── Why this is unconditional, and must stay unconditional ──────────────────
+ *
+ * The obvious fix is to detect the unconfirmed case and offer a resend button
+ * for it. **That reintroduces the oracle the collapsed message exists to
+ * close.** A button that appears only for registered-but-unconfirmed addresses
+ * announces exactly which addresses those are — the leak simply moves from the
+ * message text into the UI.
+ *
+ * So resending is always available, offered to everyone, and reports the same
+ * outcome whatever the address. Its presence says nothing, and its result says
+ * nothing. `signIn` deliberately returns no "needs confirmation" flag: a flag
+ * would exist only to be rendered conditionally, which is the leak again.
+ *
+ * The caller shows one message regardless — "If that address needs confirming,
+ * we have sent a new link." True for a registered address, true for an
+ * unregistered one, and useful to the only person who legitimately cares.
+ */
+export async function resendConfirmation(email: string): Promise<void> {
+  /*
+    The result is discarded on purpose, errors included. A caller that surfaced
+    "user not found" here would undo the whole point, and there is nothing the
+    user could do with it — the one actionable case, a genuinely unconfirmed
+    account, is the case that succeeds.
+  */
+  await supabase.auth
+    .resend({ type: 'signup', email: email.trim() })
+    .catch(() => undefined);
+}
+
+/**
  * End the session.
  *
  * The web has `lib/sign-out.ts` because two sign-out paths drifted and left one

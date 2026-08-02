@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { scrollBehavior } from '@/hooks/use-reduced-motion';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -20,23 +21,36 @@ import {
 import { toast } from 'sonner';
 import { invalidateDashboardCache } from '@crewchief/core/query-invalidation';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
+import type { ContextKind } from '@/lib/consultant-context';
 
+/*
+ * These are the four collections this component *renders*, and no longer the
+ * fifteen it used to forward to the advisor. `knowledge`, `completedItems`,
+ * `maintenanceLineItems`, `issueTracking`, `modTracking`, `nhtsaData`,
+ * `healthSummary` and `modWishlistItems` were props for one reason — to be
+ * posted straight back to `sendConsultantMessage` — and the server has loaded
+ * its own copy of all of them since `a0e9894`.
+ *
+ * The page still reads several of them for other consumers (DashboardLayout
+ * takes `knowledge`), so this narrows the component's surface, not the page's
+ * query. Narrowing the query is a separate job with different blast radius.
+ */
 interface ConsultantChatProps {
   vehicleId: string;
   vehicle: any;
-  knowledge: any;
+  /** Outstanding `service_items` — the high-priority strip in the empty state. */
   wishlistItems: any[];
+  /** All `service_items`, for the open-item count in the header. */
   allServiceItems: any[];
-  completedItems: any[];
-  maintenanceLineItems: any[];
-  documents: any[];
-  issueTracking: any[];
-  modTracking?: any[];
+  /*
+    No `documents`. There was one, it was destructured and never read, and it
+    was the last client-side reason to query `vehicle_documents` at all — which
+    is what let 20260801140000 give that table an owner-only policy with no demo
+    arm. Attachments shown in the transcript come from `msg.documents`, recorded
+    on the turn, not from this prop.
+  */
   sessions: any[];
   initialSessionId?: string;
-  nhtsaData?: any;
-  healthSummary?: any;
-  modWishlistItems?: any[];
 }
 
 /**
@@ -126,38 +140,39 @@ function renderMarkdownLine(line: string, key: number) {
 /*
  * What the model was actually given.
  *
- * ── The bug this replaces ───────────────────────────────────────────────────
+ * ── Two bugs, in order ──────────────────────────────────────────────────────
  *
- * This function used to lowercase the assistant's own reply and keyword-match
- * it: `content.includes('oil')` produced a "Service records" chip,
+ * First version lowercased the assistant's own reply and keyword-matched it:
+ * `content.includes('oil')` produced a "Service records" chip,
  * `includes('recall')` produced "Issue history". The chips asserted what the
  * system had read, and nothing about them was connected to what it read. A
  * reply that merely said the word "recall" claimed issue history had been
- * consulted whether or not a single row existed.
+ * consulted whether or not a single row existed. Worse, `includes('mod')`
+ * matches "model", "modern", "moderate" and "modify", so a reply mentioning
+ * "the 2019 model" earned a "Mod profile" badge — that fires on ordinary copy,
+ * not edge cases.
  *
- * Two details made it worse than a rough heuristic. It was handed `knowledge`
- * as its second argument and never referenced it — the real grounding data was
- * already at the call site and was discarded in favour of guessing from the
- * output. And `includes('mod')` matches "model", "modern", "moderate" and
- * "modify", so a reply mentioning "the 2019 model" earned a "Mod profile"
- * badge. That fires on ordinary copy, not edge cases.
+ * Second version fixed that by computing the chips from the context collections
+ * this component posted to `sendConsultantMessage`. Honest at the time. Then
+ * the context moved server-side into `loadConsultantContext`, the server began
+ * ignoring what was posted and loading its own — and these chips went on
+ * describing the discarded payload. A provenance claim whose evidence had been
+ * cut away underneath it, which is the same failure as the "AI Extracted"
+ * badge removed in `9597869`.
  *
- * ── What it claims now, and what it deliberately does not ───────────────────
+ * ── What it claims now ──────────────────────────────────────────────────────
  *
- * These are the context collections that were non-empty at the moment the
- * question was sent — the same values handed to `sendConsultantMessage` a few
- * lines later. So the claim is "this was supplied to the model", which is
- * checkable, rather than "the model used this", which no client can know. That
- * is why the row is prefixed "Based on" and not "Sources".
+ * The server returns `contextKinds` from the context it actually loaded. The
+ * claim is "this was loaded and put in front of the model" — checkable where it
+ * is made, and no longer checkable here, which is precisely why it moved. It is
+ * still not "the model used this", so the row stays prefixed "Based on".
  *
- * Computed at send time and stored on the message, because context is a
- * property of the turn, not of the transcript. Messages replayed from a saved
- * session carry no `sources` and therefore show no chips: the honest rendering
- * of "we no longer know" is to claim nothing, not to recompute from today's
- * garage and backdate it onto an old answer.
+ * Stored on the message at send time, because context is a property of the
+ * turn, not of the transcript. Messages replayed from a saved session carry no
+ * `sources` and therefore show no chips: the honest rendering of "we no longer
+ * know" is to claim nothing, not to recompute from today's garage and backdate
+ * it onto an old answer.
  */
-type ContextKind = 'knowledge' | 'service' | 'issues' | 'mods' | 'wishlist' | 'recalls';
-
 const CONTEXT_LABELS: Record<ContextKind, string> = {
   knowledge: 'Knowledge base',
   service: 'Service records',
@@ -174,58 +189,13 @@ function contextIcon(kind: ContextKind) {
   return <Wrench className="h-2.5 w-2.5" />;
 }
 
-function nonEmpty(v: any): boolean {
-  if (!v) return false;
-  if (Array.isArray(v)) return v.length > 0;
-  if (typeof v === 'object') return Object.keys(v).length > 0;
-  return true;
-}
-
-function suppliedContext(ctx: {
-  knowledge?: any;
-  completedItems?: any[];
-  maintenanceLineItems?: any[];
-  issueTracking?: any[];
-  modTracking?: any[];
-  modWishlistItems?: any[];
-  nhtsaData?: any;
-}): ContextKind[] {
-  const kinds: ContextKind[] = [];
-  if (nonEmpty(ctx.knowledge)) kinds.push('knowledge');
-  if (nonEmpty(ctx.completedItems) || nonEmpty(ctx.maintenanceLineItems)) kinds.push('service');
-  if (nonEmpty(ctx.issueTracking)) kinds.push('issues');
-  /*
-   * `modTracking` and `modWishlistItems` are two different things and were
-   * briefly collapsed into one "Mod profile" chip. They must not be:
-   * `modWishlistItems` is loaded from the `wishlist_items` table (see
-   * app/consultant/[vehicleId]/page.tsx), and on the demo Accord that table
-   * holds an oil-dilution check, a brake fluid flush and a CVT fluid flush —
-   * maintenance, not modifications. The chip claimed a mod profile the car does
-   * not have, which is the same overclaim this whole function exists to remove.
-   * The upstream prop name is what misleads; the label here tells the truth.
-   */
-  if (nonEmpty(ctx.modTracking)) kinds.push('mods');
-  if (nonEmpty(ctx.modWishlistItems)) kinds.push('wishlist');
-  if (nonEmpty(ctx.nhtsaData?.recalls)) kinds.push('recalls');
-  return kinds;
-}
-
 export default function ConsultantChat({
   vehicleId,
   vehicle,
-  knowledge,
   wishlistItems,
   allServiceItems,
-  completedItems,
-  maintenanceLineItems,
-  documents,
-  issueTracking,
-  modTracking = [],
   sessions: initialSessions,
   initialSessionId,
-  nhtsaData,
-  healthSummary,
-  modWishlistItems = [],
 }: ConsultantChatProps) {
   const router = useRouter();
   const [sessions, setSessions] = useState(initialSessions);
@@ -341,7 +311,13 @@ export default function ConsultantChat({
     if (!messagesContainerRef.current) return;
     const container = messagesContainerRef.current;
     requestAnimationFrame(() => {
-      container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+      /*
+        `behavior` is specified to win over the `scroll-behavior` property, so
+        the blanket reduced-motion rule in globals.css does not reach this —
+        it is the one case where the CSS looks like it has motion covered and
+        does not. Asked explicitly instead.
+      */
+      container.scrollTo({ top: container.scrollHeight, behavior: scrollBehavior() });
     });
   };
 
@@ -521,25 +497,21 @@ export default function ConsultantChat({
     setMessages(optimisticMessages);
     scrollToBottom();
 
+    /*
+      Only the question, the thread, and the files attached to this turn.
+
+      The vehicle's entire context used to be posted alongside — twelve fields,
+      loaded by app/consultant/[vehicleId]/page.tsx and shipped back on every
+      message. `loadConsultantContext` now derives all of it from `vehicleId`
+      server-side, so sending it was pure upload cost against a payload the
+      server discarded.
+    */
     const result = await sendConsultantMessage({
       vehicleId,
       sessionId: currentSessionId || 'demo-session',
       message: userMessage || 'Please review the attached document(s).',
       messageHistory: messages,
-      vehicle,
-      knowledge,
-      wishlistItems,
-      allServiceItems,
-      completedItems,
-      maintenanceLineItems,
-      documents,
-      issueTracking,
-      modTracking,
       attachedDocuments: uploadedDocs,
-      nhtsaData,
-      healthSummary,
-      modWishlistItems,
-      isDemo: demo,
     });
 
     stopThinkingAnimation();
@@ -551,18 +523,11 @@ export default function ConsultantChat({
         content: result.response,
         timestamp: new Date().toISOString(),
         wishlistActions: result.wishlistActions,
-        /* Recorded from the same values sent above, at the moment they were
-         * sent. See suppliedContext — this is what was supplied, not what was
-         * used, and it is deliberately absent on replayed history. */
-        sources: suppliedContext({
-          knowledge,
-          completedItems,
-          maintenanceLineItems,
-          issueTracking,
-          modTracking,
-          modWishlistItems,
-          nhtsaData,
-        }),
+        /* Reported by the server from the context it loaded for this turn —
+         * see the note above CONTEXT_LABELS. What was put in front of the
+         * model, not what the model used, and deliberately absent on replayed
+         * history. */
+        sources: result.contextKinds ?? [],
       };
       setMessages([...optimisticMessages, assistantMsg]);
       setCurrentFollowUps(getFollowUps(result.response || ''));

@@ -16,7 +16,10 @@ import { secureStorage } from './secure-storage';
  * shipped an unauthorized delete, fixed on 30 Jul.
  *
  * So there is no `.from()` anywhere in this app, and that is enforced by
- * `src/__tests__/no-direct-table-access.test.ts` rather than remembered.
+ * `lib/__tests__/mobile-api-only.test.ts` rather than remembered. (This line
+ * previously named `src/__tests__/no-direct-table-access.test.ts`, which has
+ * never existed — a citation of a guard that was not there, which is worse than
+ * no citation at all.)
  *
  * What it *is* for: minting and refreshing a session. The server's bearer path
  * (`resolveCaller`) validates tokens against the Supabase auth server, so the

@@ -128,6 +128,65 @@ try {
   bad(`/api/version unreachable (${e.message}) — deploy this route before promoting`);
 }
 
+/* 3b ── the share card resolves to somewhere real -------------------------- */
+/*
+  The audit's F1, made un-repeatable.
+
+  `openGraph.images` was a relative URL with no `metadataBase`, so Next 13.5
+  silently resolved it against http://localhost:3000 — no warning, no build
+  failure, and a deployed page that asked every scraper to fetch the preview
+  from its own machine. The demo domain is linked from David's portfolio, so
+  the one artefact that had to work was the one that never had.
+
+  Checked here rather than in a unit test because it is a property of the
+  *built and deployed* HTML: metadataBase resolves at render time and reads an
+  env var, so a green local build proves nothing about what Netlify serves.
+  This is the same reasoning that put the /api/version check above it.
+*/
+console.log('\nShare card (against the candidate)');
+try {
+  const html = await (await fetch(`${CANDIDATE}/`, { cache: 'no-store' })).text();
+  const image = html.match(/property="og:image"\s+content="([^"]+)"/)?.[1];
+
+  if (!image) {
+    bad('no og:image in the deployed HTML — app/opengraph-image.tsx did not render');
+  } else if (!/^https:\/\//.test(image)) {
+    bad(`og:image is not absolute https (${image}) — metadataBase is unset or wrong`);
+  } else if (/localhost|127\.0\.0\.1/.test(image)) {
+    bad(`og:image points at ${image} — this is F1 returning`);
+  } else {
+    ok(`og:image declared absolute — ${image.replace(/\?.*$/, '')}`);
+
+    /*
+      The HEAD goes to the *candidate's* origin, not to the URL in the tag.
+
+      metadataBase is the production literal, so a candidate build correctly
+      advertises the production domain — fetching that URL would test the
+      currently-promoted demo, which is the build we are trying to replace. On
+      a first deploy of this route that is a guaranteed 404, and the first run
+      of this gate produced exactly that: a red check describing prod while the
+      candidate was fine.
+
+      Swapping the origin keeps both halves honest: the tag is checked for what
+      it claims, and the route is checked where the claim will be true once
+      this build is promoted.
+    */
+    const path = new URL(image).pathname + new URL(image).search;
+    const head = await fetch(`${CANDIDATE}${path}`, { method: 'HEAD' });
+    const type = head.headers.get('content-type') || '';
+
+    if (!head.ok) {
+      bad(`${path} → ${head.status} on the candidate — the route is not in this build`);
+    } else if (!type.startsWith('image/')) {
+      bad(`${path} served ${type || 'no content-type'} — not an image`);
+    } else {
+      ok(`${path} → ${head.status} ${type} on the candidate`);
+    }
+  }
+} catch (e) {
+  bad(`share card unverifiable (${e.message})`);
+}
+
 /* 4 ── the demo contract, against the candidate ---------------------------- */
 console.log('\nDemo contract (against the candidate)');
 try {

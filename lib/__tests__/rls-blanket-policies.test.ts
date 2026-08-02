@@ -178,25 +178,91 @@ export function key(policy: Policy): string {
  * Removing an entry requires a migration that drops it. Adding one is not a
  * way to make a failing build pass.
  *
- * **Was sixteen; is ten.** `20260731030000` closed `maintenance_line_items`
- * and `20260731040000` closed `service_items` ×4, `known_issue_tracking` and
- * `modification_tracking`. Both are absent below because the replay sees their
- * drops — and the honesty assertion is what forced this list to be updated
- * rather than left stale, which is the ratchet working as designed.
+ * **Was sixteen, then ten; is eight.** `20260731030000` closed
+ * `maintenance_line_items` and `20260731040000` closed `service_items` ×4,
+ * `known_issue_tracking` and `modification_tracking`. `20260801140000` closed
+ * the last two that hold user content: `vehicle_documents` and
+ * `consultant_conversations`. All are absent below because the replay sees
+ * their drops — and the honesty assertion is what forced this list to be
+ * updated rather than left stale, which is the ratchet working as designed. It
+ * fired on exactly those two entries when that migration landed.
  *
- * Ten remain, across ten tables. Two of them — `vehicle_documents` and
- * `consultant_conversations` — hold real invoices and real chat history and
- * need policies written deliberately rather than this pattern applied again.
+ * Eight remain. What a rebuild from these files would expose, by kind — and
+ * note the framing, which is "a rebuild would", not "the database does":
+ *
+ *   - `consultant_documents`, `quote_requests`, `labor_bundles` — empty.
+ *   - `location_zones`, `modification_details` — shared reference data, the
+ *     same rows for everybody.
+ *   - `vehicle_knowledge_base`, `vehicle_health_summary`, `nhtsa_data` — per
+ *     vehicle, and therefore per user. Derived rather than authored — a
+ *     research profile, a computed health band, NHTSA recall lookups — so none
+ *     of it is a document or transcript someone wrote.
+ *
+ * ── Measured live, 1 Aug, by scripts/audit-remaining-blanket-tables.sql ──────
+ *
+ * **Seven of these eight are already scoped in the database.** A schema-wide
+ * sweep for unconditional permissive policies returned exactly one row in all
+ * of `public`:
+ *
+ *     location_zones | "Anyone can read location zones" | SELECT | {public}
+ *
+ * and that one is defensible — `anon` holds no SELECT grant on it (42501 from
+ * outside), and it covers 16 rows of shared reference data with no vehicle_id.
+ * The name reads as intent.
+ *
+ * **A correction to the paragraph above, which was mine.** It said the three
+ * per-vehicle tables still meant "a signed-in user can see rows about another
+ * user's car". Measured, all three carry both arms —
+ * `EXISTS (… WHERE user_id = auth.uid() OR is_demo)` — so a signed-in caller
+ * reaches their own rows and the demo rows and nobody else's. That paragraph
+ * was written *as* a correction to an earlier overclaim, and was itself more
+ * pessimistic than the database. Fifth corpus-versus-live gap; second in the
+ * safe direction.
+ *
+ * The proof is also the first non-vacuous RLS test this project has run.
+ * `nhtsa_data`, `vehicle_health_summary` and `vehicle_knowledge_base` each hold
+ * four rows — three demo, one real — so an anonymous read *could* have returned
+ * the real one and did not, on all three. Every earlier anon check ran against
+ * tables where every row was a demo row and could not have failed.
+ *
+ * ── So why is this list still eight ─────────────────────────────────────────
+ *
+ * Because it measures the corpus, and the corpus is unchanged. Lowering it to
+ * one was tried: the replay still finds the other seven, so
+ * "introduces no NEW blanket policy" fails and names them. The baseline cannot
+ * drop ahead of migrations that actually drop the policies — which is the
+ * ratchet refusing to let a live measurement be recorded as repo progress, and
+ * is correct.
+ *
+ * What live's state does change is the *urgency*, not the status. No security
+ * migration is needed. A rebuild from these files still gets an open database,
+ * and the remaining work is to codify what live already does — now writable
+ * from measurement rather than from guesswork, which is the whole reason the
+ * audit script exists.
+ *
+ * **What this list is, restated because it was just misread — by the person
+ * editing it.** These entries describe what a rebuild from these files would
+ * declare. They are not a report of live exposure, and the two have now been
+ * measured apart four times.
+ *
+ * `20260801140000` was written and committed on the premise that the
+ * `vehicle_documents` and `consultant_conversations` entries below meant a
+ * signed-in user could read another user's invoices and transcripts. A live
+ * catalog read on 1 Aug found both already scoped with owner and demo arms,
+ * RLS enabled, and no unconditional policy on either. Live was *tighter* than
+ * this list implies — the first drift in that direction.
+ *
+ * So: an entry here is a rebuild hazard and a reason to write a migration. It
+ * is never, on its own, evidence that the database is open. That takes a
+ * catalog read, and the header above has said so since the file was written.
  */
 const BLANKET_BASELINE = new Set<string>([
-  'consultant_conversations:Allow all operations on consultant_conversations',
   'consultant_documents:Allow all operations on consultant_documents',
   'labor_bundles:Allow all operations on labor_bundles',
   'location_zones:Allow all operations on location_zones',
   'modification_details:Allow all operations on modification_details',
   'nhtsa_data:Allow all operations on nhtsa_data',
   'quote_requests:Allow all operations on quote_requests',
-  'vehicle_documents:Allow all operations on vehicle_documents',
   'vehicle_health_summary:Allow all operations on vehicle_health_summary',
   'vehicle_knowledge_base:Allow all operations on vehicle_knowledge_base',
 ]);
@@ -239,7 +305,9 @@ describe('blanket RLS policies, as a rebuild would declare them', () => {
     // Lower this as migrations close them. It must never be raised.
     // 16 → 10 on 31 Jul, when 20260731040000 closed service_items ×4,
     // known_issue_tracking and modification_tracking.
-    expect(BLANKET_BASELINE.size).toBeLessThanOrEqual(10);
+    // 10 → 8 on 1 Aug, when 20260801140000 closed vehicle_documents and
+    // consultant_conversations — the last two holding user content.
+    expect(BLANKET_BASELINE.size).toBeLessThanOrEqual(8);
   });
 
   it('leaves maintenance_line_items closed', () => {

@@ -1,9 +1,19 @@
 /*
   # Close the blanket policies on the three remaining advisor tables, then let the demo read them
 
-  DRAFT — not yet placed in supabase/migrations/. Intended filename:
-    20260731040000_close_blanket_policies_advisor_tables.sql
-  Must run AFTER 20260731030000_close_blanket_policy_then_grant_anon_read.sql.
+  Applied and verified against the live database on 1 Aug 2026 — catalog read as
+  `postgres`: no unconditional policy survives on the three tables, each carries
+  one SELECT policy with both the ownership and demo arms, and `anon` holds
+  SELECT on all three.
+
+  Ran AFTER 20260731030000_close_blanket_policy_then_grant_anon_read.sql, which
+  is its prerequisite and is also applied.
+
+  This header said "DRAFT — not yet placed in supabase/migrations/" for a day
+  after the file was committed, placed, and run. Left as a note rather than
+  silently deleted: a stale status line on an applied migration is how a reader
+  mis-scopes their next move, and this file's own subject is drift between what
+  the repository says and what the database does.
 
   ## Scope, and what is deliberately excluded
 
@@ -41,6 +51,20 @@
     modification_tracking
       20260101231015  "Allow all operations on modification_tracking"  FOR ALL USING (true)
       never dropped
+
+  **The three blocks above describe this repository, and live does not match
+  them.** Read as `postgres` on 1 Aug: `known_issue_tracking` carries scoped
+  `user_owns_vehicle(vehicle_id)` policies on DELETE and UPDATE that no
+  migration in this corpus authors, and it carried a second SELECT policy —
+  "Users can view own issue tracking" — byte-identical to the one created below
+  and named nowhere in the drop list (removed by 20260801130000).
+
+  That is a second data point for the standing constraint: the migration corpus
+  does not reproduce the live database, and any claim about "what the database
+  does" needs a live check rather than a file read. It is also the reason the
+  sweep below introspects the catalog instead of dropping by name — a
+  name-driven version of this migration would have missed policies it has never
+  heard of, and reported success.
 
   So the sweep below removes everything and the scoped policy is newly authored.
   If a copy of 20260731030000 were used instead, its step-2 "recreate" would find

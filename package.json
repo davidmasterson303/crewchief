@@ -21,7 +21,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "verify:mobile": "node scripts/verify-mobile-contract.mjs"
+    "verify:mobile": "node scripts/verify-mobile-contract.mjs",
+    "build:images": "node scripts/build-image-derivatives.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.34.0",
@@ -96,6 +97,7 @@
     "jest": "^30.2.0",
     "jest-environment-jsdom": "^30.2.0",
     "postcss": "^8.4.30",
+    "sharp": "^0.35.3",
     "tailwindcss": "^3.3.3",
     "typescript": "^5.2.2"
   }

@@ -7,7 +7,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getClientSupabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { useVehicleImage } from '@/hooks/useSignedUrl';
-import { FLASH_VISION_MODEL } from '@crewchief/core/ai/models';
 
 /**
  * Service history, read from what was actually extracted.
@@ -51,6 +50,12 @@ interface LineItem {
   part_number: string | null;
   total_cost: number | null;
   category: string | null;
+  /**
+   * Which writer produced this row — see `20260801120000`. `'vision'` is the
+   * invoice-extraction path and the only one a provenance claim is true of.
+   * `null` means the row predates the column and its origin is unknown.
+   */
+  source: 'vision' | 'manual' | 'seed' | null;
 }
 
 interface ServiceRecord {
@@ -59,6 +64,17 @@ interface ServiceRecord {
   vendor: string;
   items: LineItem[];
   total: number;
+  /**
+   * Every line in this visit came from the vision path.
+   *
+   * A visit is a grouping of rows, and the rows can disagree: add a forgotten
+   * item to a shop visit through the completion form and that date/shop pair
+   * now holds one extracted row and one typed one. The badge sits on the visit,
+   * so it may only claim what is true of all of them — "all" and not "any",
+   * because a badge on a partly hand-entered visit is the same overclaim in
+   * miniature.
+   */
+  allVision: boolean;
 }
 
 /**
@@ -73,9 +89,13 @@ function groupIntoVisits(rows: LineItem[]): ServiceRecord[] {
     const vendor = row.shop_name?.trim() || 'Unknown shop';
     const key = `${row.service_date ?? 'undated'}::${vendor}`;
 
-    const visit = visits.get(key) ?? { key, date: row.service_date, vendor, items: [], total: 0 };
+    const visit = visits.get(key)
+      ?? { key, date: row.service_date, vendor, items: [], total: 0, allVision: true };
     visit.items.push(row);
     visit.total += Number(row.total_cost ?? 0);
+    // Seeded and unknown-provenance rows both fail this, which is intended:
+    // neither was read off an invoice by a model.
+    visit.allVision = visit.allVision && row.source === 'vision';
     visits.set(key, visit);
   }
 
@@ -124,7 +144,7 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
       const supabase = getClientSupabase();
       const { data, error } = await supabase
         .from('maintenance_line_items')
-        .select('id, service_date, shop_name, item_description, part_number, total_cost, category')
+        .select('id, service_date, shop_name, item_description, part_number, total_cost, category, source')
         .eq('vehicle_id', params.vehicleId)
         .order('service_date', { ascending: false });
       if (error) throw error;
@@ -155,11 +175,23 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
         <div className="flex justify-between items-center mb-8">
           <div>
             <h2 className="text-2xl font-bold text-white">Service History</h2>
-            {/* Named from the constant, so it cannot describe a model this app
-                does not call. The literal here read "Gemini 2.0 Flash Vision"
-                through two model generations without anyone noticing. */}
+            {/*
+              This read "Digitized by <the vision model>" whenever any
+              history existed. Naming the model from the constant fixed one
+              problem — the literal had said "Gemini 2.0 Flash Vision" through
+              two model generations — but left a larger one: the sentence is
+              false unless a model actually digitised these rows.
+
+              It did not, for two of the three writers of this table, and it
+              never has for any demo car. Same defect as the per-row badge
+              below, at page scale: the claim was attached to the *page* rather
+              than to any record on it.
+
+              Says what is true instead. When rows carry provenance, this can
+              name the model again for the ones that earned it.
+            */}
             <p className="text-white/50 text-sm mt-1">
-              {hasHistory ? `Digitized by ${FLASH_VISION_MODEL}` : 'Upload an invoice to build your history'}
+              {hasHistory ? 'Every visit on file' : 'Upload an invoice to build your history'}
             </p>
           </div>
           <Button
@@ -213,13 +245,32 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
                   <div>
                     <h3 className="text-base font-semibold text-white flex items-center gap-2 flex-wrap">
                       {visit.vendor}
-                      {/* Honest here in a way it was not before: the only writer
-                          of this table is the vision extraction path, so every
-                          row on this page really was read by a model. */}
-                      <span className="text-[10px] uppercase tracking-wider bg-info-wash text-info px-2 py-0.5 rounded-full flex items-center gap-1 font-medium">
-                        <CheckCircle2 className="w-3 h-3" />
-                        AI Extracted
-                      </span>
+                      {/*
+                        The badge, back — and gated on data this time.
+
+                        It shipped unconditionally until `9597869`, on the
+                        argument that "the only writer of this table is the
+                        vision extraction path". There were three. A user
+                        marking a service item complete had their own typing
+                        labelled machine-extracted, and every row on all three
+                        demo cars — the recruiter-facing surface — came from an
+                        INSERT in the seed migration.
+
+                        It was removed rather than gated because nothing
+                        recorded where a row came from, and the commit was
+                        explicit that guessing from which fields happen to be
+                        populated "would be a guess wearing a badge".
+                        `20260801120000` adds the column, both write sites set
+                        it, and this reads it. Rows predating the column carry
+                        NULL and stay unbadged, which is the honest answer to a
+                        question the database cannot retroactively answer.
+                      */}
+                      {visit.allVision && (
+                        <span className="text-[10px] uppercase tracking-wider bg-info-wash text-info px-2 py-0.5 rounded-full flex items-center gap-1 font-medium">
+                          <CheckCircle2 className="w-3 h-3" />
+                          AI Extracted
+                        </span>
+                      )}
                     </h3>
                     {visit.date && (
                       <div className="flex items-center gap-4 text-sm text-white/50 mt-1">

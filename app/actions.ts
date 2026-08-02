@@ -9,11 +9,10 @@ import {
   classificationConfig,
 } from '@/lib/gemini';
 import { VEHICLE_RESEARCH_PROMPT, POWERTRAIN_OPTIONS_PROMPT, CONSULTANT_SYSTEM_PROMPT, CONSULTANT_DOCUMENT_VALIDATION_PROMPT } from '@crewchief/core/prompts';
-import { getVehicleImage } from '@/lib/vehicle-images';
 import { logger } from '@crewchief/core/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { downloadStoredFile } from '@/lib/storage-objects';
-import { loadConsultantContext } from '@/lib/consultant-context';
+import { loadConsultantContext, loadedContextKinds } from '@/lib/consultant-context';
 import { authorizeVehicleAccess, authorizeVehicleScopedRow, requireSession } from '@/lib/api-auth';
 import { isDemoVehicleId } from '@crewchief/core/demo';
 import {
@@ -402,17 +401,29 @@ export async function enrichVehicle(vehicleId: string) {
     return { success: false, error: 'Vehicle not found' };
   }
 
-  // Best-effort and bounded. A missing photo must never fail enrichment —
-  // and as of 28 Jul GOOGLE_SEARCH_API_KEY is expired, so this currently
-  // always falls back.
-  try {
-    await getVehicleImage(vehicleId, vehicle);
-  } catch (error) {
-    logger.warn('ENRICH:IMAGE_FAILED', 'Vehicle image lookup failed', {
-      vehicleId,
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
+  /*
+    Enrichment no longer looks for a photograph, and `lib/vehicle-images.ts` is
+    gone with it.
+
+    It hotlinked whatever Google Custom Search returned for "2019 BMW M3 car
+    photo" and wrote that third-party URL onto the vehicle row. Every part of
+    that was a liability. The licence of an arbitrary indexed image is unknown
+    and unknowable at that scale — the filter list it carried (`-poster -art
+    -print`, plus a deny-list of etsy/redbubble/zazzle) is an admission that it
+    could not tell what it was fetching. Hotlinks rot, so a car that had a
+    photo in March is a broken hero in August. And the key expired on 28 Jul,
+    which means every vehicle created since already took this path to nothing.
+
+    Nothing replaces it because a replacement already exists and is better:
+    `VehicleIdentity`'s make-derived plate, which its own docblock now calls
+    "the primary design, not the fallback", plus owner upload with downscale
+    and EXIF orientation via `lib/image-downscale.ts`. A drawn plate is always
+    the right car, always the right licence, and always loads.
+
+    `image_url` stays on the row and is still read as a fallback by
+    `planVehiclePhoto` — the seeded demo vehicles use it. Nothing writes it
+    from a search any more.
+  */
 
   const dossier = await generateVehicleDossier(vehicleId);
   if (!dossier.success) {
@@ -876,45 +887,22 @@ export async function sendConsultantMessage(params: {
    * with the service role.
    */
   attachedDocuments?: any[];
-  /* ── Superseded. Accepted, ignored, and safe to stop sending. ────────────
+  /*
+   * There is deliberately no vehicle, knowledge, wishlist, service history,
+   * document, issue, mod, recall or health parameter here, and no `isDemo`.
    *
-   * All of it is now loaded from the database by `loadConsultantContext`, for
-   * the reasons written out in that module: a phone cannot post a vehicle's
+   * All of it is loaded from the database by `loadConsultantContext`, for the
+   * reasons written out in that module: a phone cannot post a vehicle's
    * history on every message, and caller-supplied context is caller-supplied
-   * input to a model prompt.
+   * input to a model prompt. `isDemo` is derived from the vehicle id — see the
+   * note in the body on why trusting the caller for it is unsafe in both
+   * directions.
    *
-   * Kept in the signature so the web client keeps compiling while it is
-   * updated to stop assembling them. Delete this block once ConsultantChat.tsx
-   * no longer sends them.
+   * These were briefly kept as ignored optional fields so the web client would
+   * keep compiling. It no longer sends them, so the door is closed rather than
+   * left ajar: an optional field that is silently discarded reads, to the next
+   * caller, like one that works.
    */
-  /** @deprecated Ignored — derived server-side from `vehicleId`. */
-  vehicle?: any;
-  /** @deprecated Ignored — derived server-side from `vehicleId`. */
-  knowledge?: any;
-  /** @deprecated Ignored — derived server-side from `vehicleId`. */
-  wishlistItems?: any[];
-  /** @deprecated Ignored, and was already unread before that. */
-  allServiceItems?: any[];
-  /** @deprecated Ignored — derived server-side from `vehicleId`. */
-  completedItems?: any[];
-  /** @deprecated Ignored — derived server-side from `vehicleId`. */
-  maintenanceLineItems?: any[];
-  /** @deprecated Ignored — derived server-side from `vehicleId`. */
-  documents?: any[];
-  /** @deprecated Ignored — derived server-side from `vehicleId`. */
-  issueTracking?: any[];
-  /** @deprecated Ignored — derived server-side from `vehicleId`. */
-  modTracking?: any[];
-  /** @deprecated Ignored — derived server-side from `vehicleId`. */
-  nhtsaData?: any;
-  /** @deprecated Ignored — derived server-side from `vehicleId`. */
-  healthSummary?: any;
-  /** @deprecated Ignored — derived server-side from `vehicleId`. */
-  modWishlistItems?: any[];
-  /** @deprecated Client-supplied and ignored. Demo status is derived from the
-   *  vehicle id server-side — see the note in the body. Callers may still pass
-   *  it; nothing reads it. */
-  isDemo?: boolean;
 }) {
   // Cost control: server actions are publicly invokable POST endpoints
   // and demo mode has no auth, so every Gemini-backed path is rate limited.
@@ -1002,6 +990,8 @@ export async function sendConsultantMessage(params: {
       healthSummary,
       modWishlistItems,
     } = contextResult.context;
+
+    const contextKinds = loadedContextKinds(contextResult.context);
 
     const knownIssues = (knowledge?.known_issues || [])
       .map((issue: any) => `${issue.part} (${issue.mileage_range}) - ${issue.severity}: ${issue.description}`);
@@ -1250,7 +1240,14 @@ export async function sendConsultantMessage(params: {
         .eq('id', sessionId);
     }
 
-    return { success: true, response, wishlistActions, performanceUpdated, invoiceProcessed, invoiceItemsProcessed, issueUpdates, modUpdates };
+    /*
+      `contextKinds` is computed from the context this function actually
+      loaded, and travels back with the answer so the client can render the
+      "Based on" chips without knowing anything about the garage. It used to be
+      derived in ConsultantChat.tsx from the values it posted — which stopped
+      being the model's context the moment that context moved server-side.
+    */
+    return { success: true, response, contextKinds, wishlistActions, performanceUpdated, invoiceProcessed, invoiceItemsProcessed, issueUpdates, modUpdates };
   } catch (error) {
     console.error('Consultant message error:', error);
     return { success: false, error: 'Failed to get response from consultant' };
@@ -3155,6 +3152,13 @@ Return ONLY valid JSON, no markdown code blocks, no explanations.`;
       category: item.original_category || item.category,
       original_category: item.original_category || item.category,
       invoice_url: invoiceUrl,
+      /*
+        The one writer of this table where a model genuinely read the record.
+        This is what earns the "AI Extracted" badge on the maintenance page —
+        see the column comment in 20260801120000. The badge was unconditional
+        until `9597869` and false for the other two writers.
+      */
+      source: 'vision',
     }));
 
     if (maintenanceItemsToInsert.length > 0) {
@@ -3947,6 +3951,13 @@ export async function moveServiceItemToHistory(
       total_cost: completionDetails.totalCost || (serviceItem.cost_parts + serviceItem.cost_labor) || 0,
       notes: completionDetails.notes || null,
       invoice_url: completionDetails.invoiceUrl || null,
+      /*
+        Typed by the owner into the completion form. No model reads anything on
+        this path, which is half of why the unconditional badge was false — a
+        user marking a service item complete had their own data labelled as
+        machine-extracted.
+      */
+      source: 'manual',
     };
 
     const { data: maintenanceItem, error: insertError } = await client

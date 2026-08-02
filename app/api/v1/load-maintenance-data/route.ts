@@ -13,20 +13,40 @@ export const dynamic = 'force-dynamic';
  * hand-rolled copy of the ownership check identical to the one that was in
  * `load-vehicle` — two more implementations of the rule `lib/api-auth.ts` owns.
  *
- * **A demo vehicle will fail here, and that is the honest answer rather than a
- * bug.** Measured against the live project on 27 Jul: the `anon` role is
- * granted SELECT on `vehicles` and `vehicle_knowledge_base`, and is refused —
- * "permission denied for table" — on all four tables this route reads. So an
- * anonymous caller genuinely cannot see this data.
+ * ── What a demo caller gets, and why it is not everything ───────────────────
  *
- * The tempting fix is to use the service-role client for demo vehicles the way
- * this route used to. Do not. `authorizeVehicleAccess` returns the anon client
- * for demo reads deliberately, so that RLS scopes them; reaching past it for
- * shared public data is how a demo-shaped hole gets opened in a boundary that
- * currently holds. If the demo should expose maintenance history, that is a
- * deliberate grant on those four tables, not a client swap here.
+ * This used to 500 for demo vehicles, on the reasoning that `anon` was refused
+ * on all four tables so the failure was the honest answer. That was measured on
+ * 27 Jul and **two of the four have changed since**: `20260731030000` and
+ * `20260731040000` granted `anon` scoped SELECT on `maintenance_line_items` and
+ * `service_items`. A demo caller can now legitimately read half of this.
  *
- * Nothing displays this today — see the note on the hooks below.
+ * The other half stays shut, deliberately and permanently:
+ *
+ *   - `vehicle_documents` — scoped to owners with no demo arm by
+ *     `20260801140000`. That was a decision, not an omission: the demo's five
+ *     rows are `demo-placeholder.local` paths pointing at no file, and every
+ *     other row is a real invoice. Granting anon here would undo it.
+ *   - `invoice_line_items` — never in scope for the demo.
+ *
+ * So the route asks a demo caller's client only for what that caller may read,
+ * and reports the rest as **omitted rather than empty**. That distinction is the
+ * same one the failure handling below exists to make: `documents: []` would tell
+ * a maintenance screen "this car has no invoices", which is false — the honest
+ * statement is "you may not see them".
+ *
+ * Roadmap Rev. D asked for this decision before Phase 3.3, framed as "either the
+ * route narrows to what the demo may legitimately show, or two more grants get
+ * written". Narrowing, for the reason above: one of the two grants was just
+ * deliberately refused.
+ *
+ * The tempting alternative is the service-role client for demo vehicles, the
+ * way this route used to work. Still do not. `authorizeVehicleAccess` returns
+ * the anon client for demo reads so that RLS scopes them; reaching past it is
+ * how a demo-shaped hole opens in a boundary that currently holds.
+ *
+ * Nothing displays this today — Phase 3.3's maintenance screen is the caller
+ * this is being made ready for.
  */
 
 export async function GET(request: NextRequest): Promise<Response> {
@@ -54,17 +74,39 @@ export async function GET(request: NextRequest): Promise<Response> {
 
     const supabase = access.client;
 
-    logger.debug('API:LOAD_MAINTENANCE', 'Fetching all maintenance data in parallel');
+    /*
+      The two datasets a demo caller may not read. Named here rather than
+      inferred from which queries happened to fail, because "we did not ask" and
+      "we asked and were refused" must not be the same branch — the second is
+      still a real failure and must still 500.
+    */
+    const OWNER_ONLY = ['documents', 'lineItems'] as const;
+    const omitted: string[] = access.isDemo ? [...OWNER_ONLY] : [];
+
+    logger.debug('API:LOAD_MAINTENANCE', 'Fetching maintenance data in parallel', {
+      isDemo: access.isDemo,
+      omitted,
+    });
+
+    /*
+      `null` for a query not issued, distinct from a result that came back
+      empty. Skipping them also saves a demo caller two round trips that could
+      only ever have been refused.
+    */
     const [docsResult, lineItemsResult, serviceItemsResult, maintenanceItemsResult] = await Promise.all([
-      supabase
-        .from('vehicle_documents')
-        .select('*')
-        .eq('vehicle_id', vehicleId)
-        .order('upload_date', { ascending: false }),
-      supabase
-        .from('invoice_line_items')
-        .select('*')
-        .eq('vehicle_id', vehicleId),
+      access.isDemo
+        ? Promise.resolve(null)
+        : supabase
+            .from('vehicle_documents')
+            .select('*')
+            .eq('vehicle_id', vehicleId)
+            .order('upload_date', { ascending: false }),
+      access.isDemo
+        ? Promise.resolve(null)
+        : supabase
+            .from('invoice_line_items')
+            .select('*')
+            .eq('vehicle_id', vehicleId),
       supabase
         .from('service_items')
         .select('*')
@@ -97,9 +139,14 @@ export async function GET(request: NextRequest): Promise<Response> {
       four datasets, told it succeeded, will render "no maintenance records"
       and be wrong.
     */
+    /*
+      A skipped query has no error and contributes nothing here. Only queries
+      that were actually issued can fail, which keeps the loud-failure property
+      exactly as strong for real callers as it was before demo narrowing.
+    */
     const failures = [
-      ['documents', docsResult.error],
-      ['invoice line items', lineItemsResult.error],
+      ['documents', docsResult?.error],
+      ['invoice line items', lineItemsResult?.error],
       ['completed service items', serviceItemsResult.error],
       ['maintenance line items', maintenanceItemsResult.error],
     ].filter(([, error]) => error) as Array<[string, { message: string }]>;
@@ -115,18 +162,30 @@ export async function GET(request: NextRequest): Promise<Response> {
     }
 
     logger.info('API:LOAD_MAINTENANCE', 'Maintenance data loaded successfully', {
-      docsCount: docsResult.data?.length || 0,
-      lineItemsCount: lineItemsResult.data?.length || 0,
+      docsCount: docsResult?.data?.length ?? null,
+      lineItemsCount: lineItemsResult?.data?.length ?? null,
       serviceItemsCount: serviceItemsResult.data?.length || 0,
       maintenanceItemsCount: maintenanceItemsResult.data?.length || 0,
+      omitted,
     });
 
+    /*
+      `omitted` names what this caller was not shown, so a client can say "not
+      available on the demo" instead of "no invoices on file". Sending `[]` for
+      a dataset the caller may not read is the same lie as the `|| []` flatten
+      above, one layer up.
+
+      The two keys are still present and still arrays, so a client that ignores
+      `omitted` renders an empty section rather than crashing. Wrong, but wrong
+      in the direction that fails visibly.
+    */
     return Response.json({
       success: true,
-      documents: docsResult.data || [],
-      lineItems: lineItemsResult.data || [],
+      documents: docsResult?.data || [],
+      lineItems: lineItemsResult?.data || [],
       completedServiceItems: serviceItemsResult.data || [],
       maintenanceLineItems: maintenanceItemsResult.data || [],
+      omitted,
     } as ApiResponse);
   } catch (error) {
     logger.error('API:LOAD_MAINTENANCE', error as Error);

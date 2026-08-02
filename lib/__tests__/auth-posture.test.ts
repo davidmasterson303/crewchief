@@ -163,6 +163,14 @@ function exportedActions(source: string): Fn[] {
  */
 const ROUTE_POSTURE: Record<string, 'vehicle-scoped' | 'session' | 'public' | 'secret-gated'> = {
   'app/api/v1/vehicles/route.ts': 'session',
+  /*
+    Account deletion, App Store 5.1.1(v). 'session' rather than
+    'vehicle-scoped': the resource is the caller themselves, so there is no
+    vehicle to authorize and `requireSession` inside `deleteAccount` is the
+    whole check. It resolves bearer tokens as well as cookies, which is why the
+    route needs no auth code of its own.
+  */
+  'app/api/v1/account/route.ts': 'session',
   'app/api/v1/load-vehicle/route.ts': 'vehicle-scoped',
   'app/api/v1/load-maintenance-data/route.ts': 'vehicle-scoped',
   'app/api/v1/wishlist/route.ts': 'vehicle-scoped',

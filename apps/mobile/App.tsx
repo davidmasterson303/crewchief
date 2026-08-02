@@ -3,10 +3,10 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import type { Session } from '@supabase/supabase-js';
 
-import { onSessionChange, startSessionAutoRefresh } from './src/auth/session';
+import { onSessionChange, signOut, startSessionAutoRefresh } from './src/auth/session';
 import { supabase } from './src/auth/supabase';
 import { SignInScreen } from './src/screens/SignInScreen';
-import { SignedInScreen } from './src/screens/SignedInScreen';
+import { GarageScreen } from './src/screens/GarageScreen';
 
 /**
  * The session gate.
@@ -45,7 +45,13 @@ export default function App() {
           <ActivityIndicator color="rgba(255,255,255,0.5)" />
         </View>
       ) : session ? (
-        <SignedInScreen session={session} />
+        /*
+          Phase 3.2 replaces the 3.1 proof screen. `SignedInScreen` existed to
+          answer one question — does a token minted on this device open the API
+          — and it did, on the simulator, 1 Aug. The garage makes the same call
+          and shows the answer as a product rather than as a diagnostic.
+        */
+        <GarageScreen accessToken={session.access_token} onSignOut={() => void signOut()} />
       ) : (
         <SignInScreen />
       )}

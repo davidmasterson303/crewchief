@@ -70,6 +70,54 @@ export type ConsultantContextResult =
   | { ok: false; error: string };
 
 /**
+ * The collections the advisor can be grounded in, named for the chips the web
+ * client renders under an answer.
+ *
+ * These live here rather than in the component because the claim they make is
+ * now a server-side fact. While `ConsultantChat.tsx` assembled the context and
+ * posted it, it could honestly say "this is what I supplied". Once the context
+ * moved into `loadConsultantContext`, the client no longer knew — it was still
+ * computing chips from values it sent and the server discarded. Same shape as
+ * the "AI Extracted" badge removed in `9597869`: a provenance claim the data
+ * behind it no longer substantiated.
+ */
+export type ContextKind = 'knowledge' | 'service' | 'issues' | 'mods' | 'wishlist' | 'recalls';
+
+function nonEmpty(v: any): boolean {
+  if (!v) return false;
+  if (Array.isArray(v)) return v.length > 0;
+  if (typeof v === 'object') return Object.keys(v).length > 0;
+  return true;
+}
+
+/**
+ * Which collections were non-empty in the context that built this prompt.
+ *
+ * The claim is "this was loaded and put in front of the model", which is
+ * checkable from here and was not checkable from the browser. It is still not
+ * "the model used this" — no caller can know that — so the client keeps
+ * prefixing the row "Based on" rather than "Sources".
+ *
+ * `wishlistItems` is deliberately absent: it is outstanding `service_items`,
+ * and the "Wishlist" chip means `modWishlistItems` — the `wishlist_items`
+ * table, which is mods the owner wants. The two were collapsed into one chip
+ * once already, and the chip claimed a mod profile the demo Accord does not
+ * have. The field names are what mislead; these labels tell the truth.
+ */
+export function loadedContextKinds(context: ConsultantContext): ContextKind[] {
+  const kinds: ContextKind[] = [];
+  if (nonEmpty(context.knowledge)) kinds.push('knowledge');
+  if (nonEmpty(context.completedItems) || nonEmpty(context.maintenanceLineItems)) {
+    kinds.push('service');
+  }
+  if (nonEmpty(context.issueTracking)) kinds.push('issues');
+  if (nonEmpty(context.modTracking)) kinds.push('mods');
+  if (nonEmpty(context.modWishlistItems)) kinds.push('wishlist');
+  if (nonEmpty(context.nhtsaData?.recalls)) kinds.push('recalls');
+  return kinds;
+}
+
+/**
  * Load the advisor's view of a vehicle.
  *
  * `client` must already be authorized for `vehicleId` — this function checks

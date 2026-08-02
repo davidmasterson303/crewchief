@@ -159,9 +159,27 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
     setIsEditingCurrentMileage(false);
   };
 
+  /*
+    The beltline (1c) — the dashboard's half of the rhyme with the public
+    garage's service bay (1a). Same vocabulary, quieter: this is where the work
+    happens and the page is dense with real content, so the band sits low and
+    dim and the ambient strip runs at a third of the batten's intensity.
+    See `.cockpit-belt` in globals.css.
+
+    It replaces a flat `bg-black`, which is why nothing needed re-layering: the
+    plate composites under everything as a background, exactly as the bay does
+    on the surfaces that already took it.
+  */
   return (
-    <div className="min-h-screen bg-black">
-      <nav className={`sticky top-0 z-40 backdrop-blur-xl transition-all duration-200 ${scrolled ? 'bg-black/98 border-b border-white/10 shadow-lg shadow-black/50' : 'bg-black/90 border-b border-white/8'}`}>
+    <div className="min-h-screen cockpit-belt">
+      {/*
+        `bay-batten` is the one ambient accent per screen — the same luminous
+        hairline the public garage carries on its nav, so the signed-in app and
+        the demo read as one product rather than two. See globals.css; on `/`
+        it doubles as the service bay's light fixture, which is where the shape
+        came from.
+      */}
+      <nav className={`sticky top-0 z-40 bay-batten backdrop-blur-xl transition-all duration-200 ${scrolled ? 'bg-black/98 border-b border-white/10 shadow-lg shadow-black/50' : 'bg-black/90 border-b border-white/8'}`}>
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           <div className={`flex items-center justify-between transition-all duration-200 ${scrolled ? 'py-3' : 'py-4'}`}>
             <div className="flex items-center gap-3">

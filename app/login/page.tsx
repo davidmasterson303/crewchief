@@ -126,12 +126,7 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-4"
-      style={{
-        backgroundImage: `linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.85)), url('/dark-roomb.jpeg')`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-      }}
+      className="min-h-screen flex items-center justify-center p-4 service-bay service-bay-dim"
     >
       <div className="w-full max-w-md">
         <div className="text-center mb-8">

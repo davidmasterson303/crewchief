@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Car } from 'lucide-react';
 import { vehicleField } from '@crewchief/core/vehicle-identity';
+import { vehicleBlurData } from '@crewchief/core/vehicle-blur';
 
 /**
  * What a vehicle looks like — one component, two variants.
@@ -64,6 +65,42 @@ interface VehicleIdentityProps {
   className?: string;
 }
 
+/**
+ * The AVIF and WebP siblings of a demo photograph, if it has any.
+ *
+ * Only the files under `public/vehicles/` are built into three formats — by
+ * `scripts/build-image-derivatives.mjs`, which commits its output next to the
+ * JPEG. Everything else reaching this component is an owner upload arriving as
+ * a Supabase signed URL, which has exactly one representation and must be
+ * offered as-is: the signature covers a specific object, so inventing a
+ * sibling path would produce a 403 rather than a photograph.
+ *
+ * Returns `null` for those, and every caller then falls back to the plain URL.
+ */
+function photoFormats(src: string | null): { avif: string; webp: string } | null {
+  if (!src || !src.startsWith('/vehicles/') || !/\.jpe?g$/i.test(src)) return null;
+  const stem = src.replace(/\.jpe?g$/i, '');
+  return { avif: `${stem}.avif`, webp: `${stem}.webp` };
+}
+
+/**
+ * The two custom properties `.photo-layer` reads: a plain `url()` every browser
+ * understands, and an `image-set()` only newer ones are shown. See the class in
+ * globals.css for why both have to exist.
+ */
+function photoLayerVars(
+  src: string,
+  formats: { avif: string; webp: string } | null
+): React.CSSProperties {
+  const fallback = `url(${JSON.stringify(src)})`;
+  const set = formats
+    ? `image-set(url(${JSON.stringify(formats.avif)}) type("image/avif"), ` +
+      `url(${JSON.stringify(formats.webp)}) type("image/webp"), ` +
+      `${fallback} type("image/jpeg"))`
+    : fallback;
+  return { '--photo-fallback': fallback, '--photo-set': set } as React.CSSProperties;
+}
+
 export function VehicleIdentity({
   variant,
   photo,
@@ -86,6 +123,48 @@ export function VehicleIdentity({
   */
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const src = photo && photo !== failedUrl ? photo : null;
+  const formats = photoFormats(src);
+  const blurSrc = vehicleBlurData(src);
+
+  /*
+    The photo fades in over the plate instead of appearing between frames.
+
+    Owner photos arrive as signed URLs, so `useSignedUrl` returns undefined
+    while the exchange is in flight and the plate is what renders underneath —
+    the layout never moves, which is why this reads as a pop rather than a
+    jump. A 200ms fade is enough to make the arrival deliberate.
+
+    Keyed on the URL so a re-minted signed URL fades its replacement in rather
+    than flashing the plate: `loadedUrl` is compared to the current `src`, the
+    same shape as `failedUrl` directly above and for the same reason.
+
+    A cached image fires `load` before paint, so this costs nothing on a repeat
+    view — the fade runs from an already-opaque start.
+  */
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
+  const photoReady = src !== null && loadedUrl === src;
+
+  /*
+    `onLoad` alone would leave the photograph invisible forever on the exact
+    case that is meant to be fastest.
+
+    This is a client component, so Next still renders it to HTML on the server;
+    the probe is in that HTML and the browser can finish fetching it — from
+    cache, most of the time — before hydration attaches any handler. The load
+    event has then already fired, nothing is listening, `loadedUrl` never
+    updates, and both layers stay at `opacity: 0` over the plate. A fade-in
+    that fails closed on a cache hit is worse than no fade-in at all.
+
+    So the element is asked directly on mount rather than waited on.
+    `naturalWidth` is what separates a finished load from a finished failure —
+    `complete` is true for both, and treating an error as a load would fade in
+    an empty box over the plate the error handler had just chosen.
+  */
+  const probeRef = useRef<HTMLImageElement>(null);
+  useEffect(() => {
+    const probe = probeRef.current;
+    if (probe?.complete && probe.naturalWidth > 0) setLoadedUrl(src);
+  }, [src]);
 
   const field = vehicleField(make);
   const isBand = variant === 'band';
@@ -120,46 +199,97 @@ export function VehicleIdentity({
           */}
           <div
             aria-hidden="true"
-            className="absolute pointer-events-none"
+            className={blurSrc ? 'absolute pointer-events-none' : 'absolute pointer-events-none photo-layer'}
             style={{
               inset: '-6%',
-              backgroundImage: `url(${JSON.stringify(src)})`,
+              /*
+                The fill takes a 32px placeholder when one exists, not the
+                photograph. This is F7: the two layers decoded the same
+                full-size file, on mobile, for a layer immediately blurred by
+                34px — pixels bought and thrown away. `packages/core/src/
+                vehicle-blur.ts` is generated beside the derivatives.
+
+                It also paints *before* the sharp copy rather than with it. The
+                placeholder is a data URI, so it needs no request at all: the
+                fill is up on first paint and the photograph resolves over it,
+                which is the blur-up the roadmap asks for and not merely a
+                cheaper decode.
+
+                No placeholder means an owner upload behind a signed URL, and
+                the old behaviour is right there — the plate underneath is
+                already the design for a photo that has not arrived.
+              */
+              ...(blurSrc
+                ? { backgroundImage: `url(${JSON.stringify(blurSrc)})` }
+                : photoLayerVars(src, formats)),
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               filter: 'blur(34px) saturate(.8) brightness(.52)',
               transform: 'scale(1.08)',
+              opacity: blurSrc || photoReady ? 1 : 0,
+              transition: 'opacity 200ms ease-out',
             }}
           />
           {/* The sharp copy. Contained — the whole vehicle, always. */}
           <div
-            className="absolute inset-0"
+            className="absolute inset-0 photo-layer"
             style={{
-              backgroundImage: `url(${JSON.stringify(src)})`,
+              ...photoLayerVars(src, formats),
               backgroundSize: 'contain',
               backgroundPosition: 'center',
               backgroundRepeat: 'no-repeat',
+              opacity: photoReady ? 1 : 0,
+              transition: 'opacity 200ms ease-out',
             }}
             role="img"
             aria-label={[lead, model].filter(Boolean).join(' ') || 'Vehicle photo'}
           />
           {/*
-            A CSS background cannot report a load failure, and the whole
-            no-broken-image rule depends on hearing about one. This probe is the
+            A CSS background can report neither a load failure nor a load, and
+            both are needed here — the no-broken-image rule depends on hearing
+            about the first, and the fade-in on the second. This probe is the
             only <img> in the component: zero-area, never painted, present
-            solely so `onError` has somewhere to fire.
+            solely so `onError` and `onLoad` have somewhere to fire.
+
+            It is wrapped in <picture> so it negotiates format the same way the
+            two background layers do. Without that it would request the JPEG
+            while the backgrounds requested the AVIF — two downloads of the same
+            photograph, and the larger one is the wasted one, which would have
+            made the whole derivative exercise a net loss. Matching sources put
+            both on the same cache entry: one fetch, as before.
           */}
-          <img
-            src={src}
-            alt=""
-            aria-hidden="true"
-            className="absolute w-0 h-0 opacity-0 pointer-events-none"
-            onError={() => setFailedUrl(src)}
-          />
-          {/* Top highlight — the band's only decoration, and it is not over the photo. */}
+          <picture>
+            {formats && <source srcSet={formats.avif} type="image/avif" />}
+            {formats && <source srcSet={formats.webp} type="image/webp" />}
+            <img
+              ref={probeRef}
+              src={src}
+              alt=""
+              aria-hidden="true"
+              /*
+                The probe is what actually issues the request — the two CSS
+                layers ride its cache entry — so this is where priority has to
+                be set. On the band variant that request is the page's LCP, and
+                a zero-area `aria-hidden` image is exactly what a browser's
+                heuristics deprioritise.
+
+                Spelled lowercase and cast: React 18.2 has no `fetchPriority`
+                prop, and passes unrecognised lowercase attributes straight
+                through. React 19 adds the camelCase one — change it then, not
+                before, or it silently stops being emitted.
+              */
+              {...({ fetchpriority: isBand ? 'high' : 'auto' } as Record<string, string>)}
+              className="absolute w-0 h-0 opacity-0 pointer-events-none"
+              onLoad={() => setLoadedUrl(src)}
+              onError={() => setFailedUrl(src)}
+            />
+          </picture>
+          {/* The machined top edge (2c) — the band's only decoration, and it is
+              not over the photo. Was an inline 1px catch-light here and again
+              below; `.machined` is that, plus the falloff the spec asks for. */}
           <div
             aria-hidden="true"
-            className="absolute inset-0 pointer-events-none"
-            style={{ boxShadow: 'inset 0 1px 0 rgb(255 255 255 / .06)' }}
+            className="absolute inset-0 pointer-events-none machined"
           />
         </>
       ) : (
@@ -210,8 +340,7 @@ export function VehicleIdentity({
 
           <div
             aria-hidden="true"
-            className="absolute inset-0 pointer-events-none"
-            style={{ boxShadow: 'inset 0 1px 0 rgb(255 255 255 / .06)' }}
+            className="absolute inset-0 pointer-events-none machined"
           />
         </>
       )}

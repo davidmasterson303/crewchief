@@ -9,20 +9,6 @@ import LandingHero from '@/components/LandingHero';
 import { useAuth } from '@/components/AuthProvider';
 import { useDemoVehicles, type GarageVehicle } from '@/hooks/useVehicles';
 
-/*
- * Self-hosted (was hot-linked from Unsplash — a third-party outage or rate
- * limit would grey out the landing visual).
- *
- * Points at the 1920-wide derivative rather than the 3333×2000 master: this is
- * a full-bleed background, so it was serving about three times the pixels any
- * viewport asked for. 480 KB → 142 KB.
- *
- * `public/CREDITS.md` records what is known about this file, and — unlike every
- * other image on the site — that includes not knowing its photographer or
- * licence. Worth reading before it appears in a store capture.
- */
-const INTERIOR_URL = '/garage-interior-1920.jpg';
-
 function VehicleCardSkeleton() {
   return (
     <div className="border border-white/8 rounded-2xl overflow-hidden bg-slate-950/80">
@@ -105,33 +91,19 @@ function GarageContents() {
   return (
     <div className="relative w-full min-h-screen">
       {/*
-        The scrim was rgba(15,23,42,0.85) → 0.95, which let 5–15% of the
-        photograph through. It read as flat near-black with a couple of faint
-        smudges, and the garage it is a photograph *of* was not legible at any
-        point — 480 KB doing almost no visual work, which is the exact fault
-        DiagnosticHero's comment records ("roughly a tenth of each 700 KB
-        photograph did any visual work").
+        The room is built, not photographed — see `.service-bay` in
+        globals.css for why, and public/CREDITS.md for what it replaced.
 
-        Opened up to 0.58 → 0.88. Still a dark room, still comfortably behind
-        white text, but now a room. The gradient stays top-heavier at the bottom
-        so the cards keep their contrast where they actually sit.
+        The scrim went with the photograph. It existed to stop a picture of a
+        garage from fighting the type, and there is no longer a picture: every
+        value in the plate was chosen against white text on this page. Its own
+        vignette layer also makes the separate `.vignette-frame` overlay
+        redundant, so two fixed divs collapse into one.
       */}
-      <div
-        className="fixed inset-0 z-0"
-        style={{
-          backgroundImage: `linear-gradient(rgba(15,23,42,0.58), rgba(15,23,42,0.88)), url('${INTERIOR_URL}')`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        }}
-      />
-
-      {/* The signature photography treatment, as every other photo surface
-          gets it. This one was hand-rolling a scrim and skipping the vignette,
-          which is the drift `.vignette-frame` exists to stop. */}
-      <div className="fixed inset-0 z-0 vignette-frame pointer-events-none" aria-hidden="true" />
+      <div className="fixed inset-0 z-0 service-bay" aria-hidden="true" />
 
       <div className="relative z-10">
-        <nav className="border-b border-white/8 bg-black/80 backdrop-blur-xl">
+        <nav className="relative bay-batten border-b border-white/8 bg-black/80 backdrop-blur-xl">
           <div className="max-w-7xl mx-auto px-6 lg:px-12 py-4">
             <div className="flex items-center justify-between">
               <Link href="/" className="flex items-center space-x-2.5 group">

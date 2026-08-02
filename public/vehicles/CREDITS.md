@@ -134,9 +134,50 @@ Never use these for marketing. Never retouch them.
 
 ## Regenerating
 
+### Modern formats — `scripts/build-image-derivatives.mjs`
+
 ```
-cd photography && python3 build_assets.py     # needs pillow
+node scripts/build-image-derivatives.mjs        # needs the sharp devDependency
 ```
 
-Crop anchors, focal-Y values and plate-blur boxes all live in the `VEHICLES` dict at the
-top of `build_assets.py`. Adjust there rather than editing images by hand.
+Writes an `.avif` and a `.webp` beside every JPEG in this directory. Same frame, same crop,
+same pixels — only the container changes, so nothing here needs re-deciding when it runs.
+Idempotent; pass `--force` to rebuild anyway. The outputs are committed, exactly as the JPEG
+derivatives are, and Netlify never runs this.
+
+| | JPEG | AVIF | WebP |
+|---|---|---|---|
+| All 12 files | 5.31 MB | 1.46 MB (73% smaller) | 1.52 MB (71% smaller) |
+| WRX hero, the worst case | 861 KB | 278 KB | 319 KB |
+
+Quality is AVIF 58 / WebP 76, chosen by measurement rather than by the encoders' defaults —
+AVIF 50 reaches 204 KB on the WRX hero but bands the sky, which is the failure mode to watch
+for on these photographs. Re-encoding the **JPEGs** was tried first and is a dead end: they
+are already tight, and `sips -s formatOptions 72` on that same 861 KB file produces 878 KB.
+
+`VehicleIdentity` serves these through `image-set()` behind an `@supports` guard, with the
+JPEG as the fallback for browsers without it. The JPEGs are therefore not redundant and must
+not be deleted — they are both the fallback and the file this manifest records provenance for.
+
+### Crops and sizes — `photography/build_assets.py` is **missing**
+
+This section used to read `cd photography && python3 build_assets.py`, and said the crop
+anchors, focal-Y values and plate-blur boxes lived in a `VEHICLES` dict at the top of it.
+
+**That script is not in this repository and never has been.** It is absent from the working
+tree, absent from the whole of `git log --all --diff-filter=A`, and not covered by
+`.gitignore` — so it was never committed rather than deliberately excluded. An audit on
+2 Aug 2026 took this section at face value and proposed adding AVIF output "to
+`build_assets.py`, which already regenerates all derivatives from masters"; there was nothing
+to add it to, which is how the gap surfaced.
+
+What that costs: `card-800`, `hero-3x2`, `portrait-3x4` and `detail-4x3` cannot currently be
+regenerated from the masters, and the crop anchors and focal-Y values behind them exist only
+inside the committed JPEGs. The images themselves are fine — this is a reproducibility gap,
+not a broken build, and it does not affect anything at runtime.
+
+**To close it:** if the script still exists on David's machine, commit it. If it does not,
+either recreate it from the sizes and anchors visible in the existing derivatives, or delete
+this section and state plainly that the JPEGs are hand-made artefacts. The one thing not to
+do is leave the instruction standing — it is the reason a careful reader already reached a
+wrong conclusion once.

@@ -49,6 +49,11 @@ const STATIC_ANALYSIS_SUITES = [
   // declare. There is nothing to import: the subject is the SQL on disk, and
   // the live database is a different question this deliberately does not ask.
   'rls-blanket-policies.test.ts',
+  // Reads the maintenance page and app/actions.ts to prove no provenance claim
+  // is rendered that nothing on the row substantiates. The badge it pins had
+  // no condition anywhere near it, so absence in the source is the signal;
+  // rendering the page would test the claim's styling, not its truth.
+  'provenance-claims.test.ts',
   'portability.test.ts',
   'ws-optional-deps.test.ts',
   'illustration-tokens.test.ts',
@@ -79,6 +84,14 @@ const STATIC_ANALYSIS_SUITES = [
   // — swapping the CSS slats for a 1.4 MB JPEG — renders correctly, so no
   // runtime assertion can see it. Only the source can.
   'garage-door-cost.test.ts',
+  // Reads components/, hooks/ and app/ to prove every requestAnimationFrame
+  // loop and every smooth scroll asks about prefers-reduced-motion. There is
+  // nothing to import: the subject is the *absence* of a check across the
+  // whole tree, and the two gaps it was written after — TCOCard's rAF ring and
+  // ConsultantChat's smooth scroll — both animate correctly and would pass any
+  // behavioural assertion. jsdom also reports no media-query match, so a
+  // rendered test cannot tell a component that asked from one that did not.
+  'reduced-motion.test.ts',
 ];
 
 /**
