@@ -257,7 +257,17 @@ export function WishlistSection({ vehicleId }: WishlistSectionProps) {
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-1.5 flex-shrink-0 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                      {/* RB0 rule 4. `opacity-0` is dropped rather than kept
+                          alongside `.reveal-on-hover`: the touch pin is
+                          `@media (hover: none) { .reveal-on-hover { opacity: 1 } }`
+                          at (0,1,0), and a Tailwind `.opacity-0` is also
+                          (0,1,0) — a specificity tie decided by source order,
+                          which is not something to leave to a build. The named
+                          group still reveals it on hover at (0,2,0).
+
+                          These are Mark complete and delete on a wishlist row,
+                          and on a phone they were the only path to either. */}
+                      <div className="reveal-on-hover flex items-center gap-1.5 flex-shrink-0 group-hover/item:opacity-100 transition-opacity">
                         <Button
                           size="sm"
                           onClick={() => handleMarkComplete(item)}

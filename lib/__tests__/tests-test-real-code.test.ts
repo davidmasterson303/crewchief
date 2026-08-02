@@ -54,6 +54,12 @@ const STATIC_ANALYSIS_SUITES = [
   // no condition anywhere near it, so absence in the source is the signal;
   // rendering the page would test the claim's styling, not its truth.
   'provenance-claims.test.ts',
+  // Reads every .tsx off disk for hover-only reveals written as raw Tailwind.
+  // The subject is a class name in the markup and a media query in
+  // globals.css — rendering a component would prove its opacity under jsdom,
+  // which implements neither `(hover: none)` nor the cascade that decides it.
+  // Absence of an unpaired `group-hover:opacity-100` is the whole signal.
+  'touch-parity.test.ts',
   'portability.test.ts',
   'ws-optional-deps.test.ts',
   'illustration-tokens.test.ts',
