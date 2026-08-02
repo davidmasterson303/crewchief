@@ -11,21 +11,22 @@ Source: `Live-Site Audit.dc.html` (2 Aug 2026), grounded in repo `davidmasterson
 `scripts/promote-demo.mjs`. All gate checks passed; `verify-demo.mjs` green
 against prod afterwards.
 
-**Not yet on production: everything from the afternoon session** — RP1, R4, the
-three Phase 2.95 cost items, and two fixes from Cowork's QA run. Ten commits on
-`main`, none promoted. Promotion is a separate deliberate step.
+**Not yet on production: everything from the afternoon session** — RP1, R4, R8,
+the three Phase 2.95 cost items, and all four findings from Cowork's QA run.
+Fourteen commits on `main`, none promoted. Promotion is a separate deliberate
+step.
 
 | | Items | |
 |---|---|---|
 | **Done** | 1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 16, 17 | 12 |
 | **Partial** | 13, 15 | 2 |
 | **Open** | 5, 12, 14, 18 | 4 |
-| **Done (work stream B)** | RB0, R1, R2, R3, R5, R6, R9, R10, R15, **R4** | 10 |
-| **Open (work stream B)** | R7, R8, R11, R12, R13, R14 | 6 |
+| **Done (work stream B)** | RB0, R1, R2, R3, R5, R6, R9, R10, R15, R4, **R8** | 11 |
+| **Open (work stream B)** | R7, R11, R12, R13, R14 | 5 |
 
-**RP0 and RP1 are closed, and R4 — RP2's one CRITICAL — is closed with them.**
-What remains in work stream B is the rest of RP2, which needs design rather than
-a prefix, plus R7, which folds into item 14.
+**RP0 and RP1 are closed, and both of RP2's heaviest items went with them** —
+R4, its one CRITICAL, and R8. What remains is R11, R12, R13 and R14, plus R7,
+which folds into item 14.
 
 Every item below carries a status line. **Handoff notes are at the bottom of
 this file** — read those first if you are picking this up cold.
@@ -619,10 +620,10 @@ RB0/RP0 at 11:12, both after it was written.
 
 ## Where things stand
 
-- `main` = `2a315cc`. Working tree clean. **Nothing from this session is
+- `main` = `1a691e7`. Working tree clean. **Nothing from this session is
   pushed or promoted** — production still serves `e729ee96`, which is the
   morning's work.
-- 59 suites, 1035 tests, green. `npm run typecheck` clean.
+- 61 suites, 1055 tests, green. `npm run typecheck` clean.
 - **Two stale worktrees** under `.claude/worktrees/` (`confident-shtern`,
   `friendly-lewin`). Both are *behind* `main` with nothing ahead — checked, no
   stranded work. Prunable whenever.
@@ -642,6 +643,9 @@ is the one that changes the unit economics.
 | `bb83782` | **2.95c** — every Gemini call metered, per account |
 | `4947512` | **R4** + **NEW-01** — consultant app shell; banner stops widening the page |
 | `2a315cc` | **NEW-02** — the closed garage door is inert, not just opaque |
+| `fec351b` | **NEW-04** — last four hover-only reveals, plus a build check |
+| `9b8cf8f` | **NEW-03** — QA script corrected against the tree it will next be run on |
+| `1a691e7` | **R8** — cost breakdown becomes cards below `md` |
 
 ## Cowork's QA report — triaged
 
@@ -654,8 +658,13 @@ suites) is the morning tree; this one is 1035/59.
 | R9, R10, R15 "reproduce exactly as described" | **Already closed here** by `8456afe` and `3dd9743`. True of that tree, not this one |
 | **NEW-01** banner overflows at 320/360/375 | **Fixed** (`4947512`). Verified 0 overflow at 320 |
 | **NEW-02** focus enters the garage behind the closed door | **Fixed** (`2a315cc`) |
-| **NEW-03** B2 fails as written | **Open, and Cowork is right that the check is the defect.** The field computes 16px; `input[type='text']` at specificity (0,1,1) outranks `.text-xs` at (0,1,0). Rewrite B2 to assert computed size, not the class |
-| **NEW-04** four hover-only reveals never migrated | **Open.** LOW — none is the only path to its action. The `WishlistSection` one is the only one worth a real-device check |
+| **NEW-03** B2 fails as written | **Closed** (`9b8cf8f`). Cowork was right that the check is the defect: the field computes 16px because `input[type='text']` at (0,1,1) outranks `.text-xs` at (0,1,0). B2 now asserts computed size |
+| **NEW-04** four hover-only reveals never migrated | **Closed** (`fec351b`), and B8 with it — that grep is now `touch-parity.test.ts` and the build runs it |
+
+**All four are closed.** `docs/qa-script.md` has been corrected in the same
+pass: its §0 now separates open from closed-on-main, its §2 baseline is marked
+stale wholesale with the three wrong cells named, and the header says to run
+against the candidate rather than prod until a promote happens.
 
 **One correction to fold back into `docs/qa-script.md`:** its §2 baseline records
 `/` @375 `horizontalOverflow: false`, and that cell was wrong when written —
