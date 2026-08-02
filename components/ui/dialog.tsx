@@ -38,7 +38,27 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        'fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg',
+        /*
+          R1 — this was stock shadcn: `w-full max-w-lg`, -50% centring, `p-6`,
+          and **no max-height and no overflow**. Any dialog taller than the
+          viewport overflowed past the top *and* the bottom with no way to
+          reach either end — clipped, not scrolled. Ten dialogs inherit this,
+          including the two longest flows in the product.
+
+          `w-[calc(100%-2rem)]` keeps 16px of backdrop on each side; at 375px
+          the panel used to be exactly 375px, flush to both edges.
+
+          `85dvh`, not `vh`. On iOS `vh` is the *largest* viewport — the one
+          with the URL bar retracted — so `max-h-[90vh]` still runs underneath
+          it. Six dialogs had reached for `90vh`/`80vh` locally, the right
+          instinct in the wrong unit; those overrides are deleted, because
+          leaving them would re-introduce exactly the bug this line fixes.
+
+          `rounded-2xl` unconditionally: `sm:rounded-lg` meant square corners
+          below 640px, which is the only width where a dialog fills the screen
+          and most needs to look like a panel.
+        */
+        'fixed left-[50%] top-[50%] z-50 grid w-[calc(100%-2rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-5 sm:p-6 shadow-lg duration-200 max-h-[85dvh] overflow-y-auto overscroll-contain data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] rounded-2xl',
         className
       )}
       {...props}

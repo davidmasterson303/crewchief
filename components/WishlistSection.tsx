@@ -330,7 +330,7 @@ export function WishlistSection({ vehicleId }: WishlistSectionProps) {
       />
 
       <Dialog open={showQuoteHistoryDialog} onOpenChange={setShowQuoteHistoryDialog}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-slate-950 border-white/15">
+        <DialogContent className="max-w-2xl bg-slate-950 border-white/15">
           <DialogHeader>
             <DialogTitle className="text-white">Past Quotes</DialogTitle>
           </DialogHeader>

@@ -115,7 +115,7 @@ export function QuoteDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] lg:max-w-3xl max-h-[90vh] overflow-y-auto bg-slate-950 border-info-border">
+      <DialogContent className="max-w-[95vw] lg:max-w-3xl bg-slate-950 border-info-border">
         <DialogHeader>
           <DialogTitle className="text-info text-2xl">
             {quote.name || 'Unnamed Quote'}

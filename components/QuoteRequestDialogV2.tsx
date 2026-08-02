@@ -267,7 +267,7 @@ export function QuoteRequestDialogV2({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-[#0d1117] border-white/12 p-0">
+      <DialogContent className="max-w-2xl bg-[#0d1117] border-white/12 p-0">
         <div className="px-6 pt-6 pb-5 border-b border-white/8">
           <div className="flex items-center gap-3 mb-1">
             <div className="w-8 h-8 rounded-lg bg-info-wash border border-info-border flex items-center justify-center">

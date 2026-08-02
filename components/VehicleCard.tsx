@@ -314,7 +314,7 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary, alerts }: V
           trim={vehicle.trim}
         />
 
-        <div className="above-stretch absolute inset-0 bg-black/50 opacity-0 group-hover/image:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+        <div className="above-stretch absolute inset-0 bg-black/50 reveal-on-hover flex items-center justify-center">
           <button
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowPhotoDialog(true); }}
             className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full text-white text-xs font-medium transition-all backdrop-blur-sm"
@@ -415,7 +415,7 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary, alerts }: V
             <DropdownMenu>
               <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                 <button
-                  className="w-8 h-8 flex items-center justify-center bg-black/60 hover:bg-black/80 border border-white/15 rounded-full text-white/60 hover:text-white transition-all backdrop-blur-sm opacity-0 group-hover:opacity-100"
+                  className="tap-target-44 w-8 h-8 flex items-center justify-center bg-black/60 hover:bg-black/80 border border-white/15 rounded-full text-white/60 hover:text-white transition-all backdrop-blur-sm reveal-on-hover"
                   aria-label="Vehicle options"
                 >
                   <MoreVertical className="h-4 w-4" />
