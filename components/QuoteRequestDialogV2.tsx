@@ -268,7 +268,7 @@ export function QuoteRequestDialogV2({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl bg-[#0d1117] border-white/12 p-0">
-        <div className="px-6 pt-6 pb-5 border-b border-white/8">
+        <div className="px-4 sm:px-6 pt-6 pb-5 border-b border-white/8">
           <div className="flex items-center gap-3 mb-1">
             <div className="w-8 h-8 rounded-lg bg-info-wash border border-info-border flex items-center justify-center">
               <FileText className="h-4 w-4 text-info" />
@@ -278,7 +278,7 @@ export function QuoteRequestDialogV2({
           <div className="flex items-center gap-2 mt-3 ml-11">
             {[1, 2, 3].map((s) => (
               <div key={s} className="flex items-center gap-2">
-                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-all ${
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                   s < state.step ? 'bg-cyan-500 text-white' :
                   s === state.step ? 'bg-cyan-400/10 border border-cyan-400/50 text-cyan-400' :
                   'bg-white/6 border border-white/12 text-white/25'
@@ -301,7 +301,7 @@ export function QuoteRequestDialogV2({
           </div>
         )}
 
-        <div className="px-6 py-5 space-y-5">
+        <div className="px-4 sm:px-6 py-5 space-y-5">
           {state.step === 1 && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -437,7 +437,7 @@ export function QuoteRequestDialogV2({
         </div>
 
         {!state.isGenerating && (
-          <div className="px-6 pb-6 pt-2 border-t border-white/6 flex items-center justify-between gap-3">
+          <div className="px-4 sm:px-6 pb-6 pt-2 border-t border-white/6 flex items-center justify-between gap-3">
             <div>
               {state.step > 1 && state.step < 3 && (
                 <button

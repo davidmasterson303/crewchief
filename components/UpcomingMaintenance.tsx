@@ -153,7 +153,7 @@ function ForecastCard({
                 </span>
               )}
             </div>
-            <span className={`inline-flex items-center gap-1 mt-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${cfg.badge}`}>
+            <span className={`inline-flex items-center gap-1 mt-0.5 text-xs font-semibold px-1.5 py-0.5 rounded-full border ${cfg.badge}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
               {cfg.label}
             </span>
@@ -166,7 +166,7 @@ function ForecastCard({
           <div className="space-y-1.5">
             <div className="flex items-center gap-1.5">
               <Layers className="h-3.5 w-3.5 text-amber-400 flex-shrink-0" />
-              <span className="text-[11px] font-semibold text-amber-400 uppercase tracking-wide">Establish Baseline</span>
+              <span className="text-xs font-semibold text-amber-400 uppercase tracking-wide">Establish Baseline</span>
             </div>
             <p className="text-xs text-white/45 leading-relaxed">
               No recent records found. Prioritize verifying fluid health or replacing preemptively to protect {engineLabel}.
@@ -200,7 +200,7 @@ function ForecastCard({
       {bundleHints.length > 0 && (
         <div className="flex items-start gap-1.5 bg-info-wash border border-info-border rounded-xl px-2.5 py-2">
           <CheckCircle className="h-3 w-3 text-info flex-shrink-0 mt-0.5" />
-          <p className="text-[10px] text-info/80 leading-snug">{bundleHints[0]}</p>
+          <p className="text-xs text-info/80 leading-snug">{bundleHints[0]}</p>
         </div>
       )}
 
@@ -365,22 +365,22 @@ export default function UpcomingMaintenance({ vehicle, knowledge, maintenanceLin
             {collapsed ? (
               <>
                 {overdueCount > 0 && (
-                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/25">
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/25">
                     {overdueCount} overdue
                   </span>
                 )}
                 {baselineCount > 0 && (
-                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/12 text-amber-400 border border-amber-500/20">
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/12 text-amber-400 border border-amber-500/20">
                     {baselineCount} unverified
                   </span>
                 )}
                 {soonCount > 0 && (
-                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-400/12 text-amber-400 border border-amber-400/20">
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-400/12 text-amber-400 border border-amber-400/20">
                     {soonCount} due soon
                   </span>
                 )}
                 {overdueCount === 0 && soonCount === 0 && baselineCount === 0 && (
-                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-info-wash text-info border border-info-border">
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-info-wash text-info border border-info-border">
                     All on track
                   </span>
                 )}
@@ -388,17 +388,17 @@ export default function UpcomingMaintenance({ vehicle, knowledge, maintenanceLin
             ) : (
               <>
                 {overdueCount > 0 && (
-                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/25">
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/25">
                     {overdueCount} overdue
                   </span>
                 )}
                 {baselineCount > 0 && (
-                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/12 text-amber-400 border border-amber-500/20">
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/12 text-amber-400 border border-amber-500/20">
                     {baselineCount} unverified
                   </span>
                 )}
                 {soonCount > 0 && !overdueCount && (
-                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-400/12 text-amber-400 border border-amber-400/20">
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-400/12 text-amber-400 border border-amber-400/20">
                     {soonCount} due soon
                   </span>
                 )}

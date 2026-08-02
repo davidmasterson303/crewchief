@@ -242,7 +242,7 @@ export default function GarageDoor({ panel, children }: GarageDoorProps) {
           onAnimationEnd={handleAnimationEnd}
         >
           {panel && (
-            <div className="garage-door-content relative z-10 flex w-full flex-col items-center px-6 text-center">
+            <div className="garage-door-content relative z-10 flex w-full flex-col items-center px-4 sm:px-6 text-center">
               {panel(lift)}
             </div>
           )}

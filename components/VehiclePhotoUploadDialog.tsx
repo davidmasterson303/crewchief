@@ -387,7 +387,7 @@ export function VehiclePhotoUploadDialog({
 
                 <div className="absolute top-2 right-2 flex items-center gap-1.5 bg-black/65 backdrop-blur-sm rounded-lg px-2 py-1 border border-white/10 pointer-events-none">
                   <Move className="h-3 w-3 text-info" />
-                  <span className="text-[10px] font-mono text-white/55">
+                  <span className="text-xs font-mono text-white/55">
                     {focalX.toFixed(0)}% {focalY.toFixed(0)}%
                   </span>
                 </div>
@@ -396,14 +396,14 @@ export function VehiclePhotoUploadDialog({
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <div className="flex items-center gap-1.5 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1.5 border border-white/15 opacity-70">
                       <Move className="h-3.5 w-3.5 text-white/70" />
-                      <span className="text-[11px] text-white/60 font-medium">Drag to reposition</span>
+                      <span className="text-xs text-white/60 font-medium">Drag to reposition</span>
                     </div>
                   </div>
                 )}
               </div>
 
               <div className="space-y-2">
-                <p className="text-[11px] text-white/30 font-medium uppercase tracking-wider">Banner preview</p>
+                <p className="text-xs text-white/30 font-medium uppercase tracking-wider">Banner preview</p>
                 <div
                   className="w-full overflow-hidden rounded-lg border border-white/10"
                   style={{ height: '56px' }}
@@ -417,7 +417,7 @@ export function VehiclePhotoUploadDialog({
                     />
                   )}
                 </div>
-                <p className="text-[10px] text-white/25">This is the exact crop shown in the dashboard hero banner.</p>
+                <p className="text-xs text-white/25">This is the exact crop shown in the dashboard hero banner.</p>
               </div>
 
               <div className="flex gap-2 pt-1">

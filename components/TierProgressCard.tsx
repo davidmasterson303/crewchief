@@ -93,18 +93,18 @@ export default function TierProgressCard({ progress, loading }: TierProgressCard
           <div>
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-white">{config.label}</span>
-              <Badge className={`text-[10px] px-1.5 py-0 ${config.bgColor} ${config.color} border ${config.borderColor}`}>
+              <Badge className={`text-xs px-1.5 py-0 ${config.bgColor} ${config.color} border ${config.borderColor}`}>
                 EARNED
               </Badge>
             </div>
-            <p className="text-[11px] text-white/50 leading-tight">{config.description}</p>
+            <p className="text-xs text-white/50 leading-tight">{config.description}</p>
           </div>
         </div>
 
         {!isAggressive && (
           <div className="flex items-center gap-1 text-white/30">
             <Lock className="h-3 w-3" />
-            <span className="text-[10px]">{config.nextLabel}</span>
+            <span className="text-xs">{config.nextLabel}</span>
             <ChevronRight className="h-3 w-3" />
           </div>
         )}
@@ -115,15 +115,15 @@ export default function TierProgressCard({ progress, loading }: TierProgressCard
           <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
             <div className="h-full w-full bg-gradient-to-r from-red-500 to-orange-500 rounded-full animate-pulse" />
           </div>
-          <span className="text-[10px] text-white/40 whitespace-nowrap">Always evolving</span>
+          <span className="text-xs text-white/40 whitespace-nowrap">Always evolving</span>
         </div>
       ) : (
         <div className="mt-3 space-y-1.5">
           <div className="flex justify-between items-center">
-            <span className="text-[11px] text-white/50">
+            <span className="text-xs text-white/50">
               {actionableDone} of {progress.total} mods completed or accepted
             </span>
-            <span className={`text-[11px] font-medium ${pct === 100 ? config.color : 'text-white/50'}`}>
+            <span className={`text-xs font-medium ${pct === 100 ? config.color : 'text-white/50'}`}>
               {pct}%
             </span>
           </div>
@@ -139,7 +139,7 @@ export default function TierProgressCard({ progress, loading }: TierProgressCard
           </div>
 
           {hasPendingBackfills && (
-            <div className="flex items-center gap-1.5 text-[11px] text-amber-400/80 mt-1">
+            <div className="flex items-center gap-1.5 text-xs text-amber-400/80 mt-1">
               <Loader2 className="h-3 w-3 animate-spin" />
               <span>
                 Generating {progress.backfillsPending} replacement mod{progress.backfillsPending > 1 ? 's' : ''}
@@ -149,13 +149,13 @@ export default function TierProgressCard({ progress, loading }: TierProgressCard
           )}
 
           {progress.backfillsRequired > 0 && !hasPendingBackfills && (
-            <p className="text-[11px] text-amber-400/70">
+            <p className="text-xs text-amber-400/70">
               {progress.backfillsRequired} replacement mod{progress.backfillsRequired > 1 ? 's' : ''} required before advancing
             </p>
           )}
 
           {pct === 100 && !hasPendingBackfills && progress.backfillsRequired === 0 && (
-            <p className={`text-[11px] font-medium ${config.color} animate-pulse`}>
+            <p className={`text-xs font-medium ${config.color} animate-pulse`}>
               Tier complete — {config.nextLabel} unlocked!
             </p>
           )}

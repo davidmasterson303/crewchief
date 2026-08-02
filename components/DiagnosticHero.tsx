@@ -121,7 +121,7 @@ export default function DiagnosticHero({
         Beneath the band: the score, and the reason for it. The vehicle's name
         lives here now rather than on the photograph.
       */}
-      <div className="bg-[#0f1318]/90 px-6 sm:px-8 py-6">
+      <div className="bg-[#0f1318]/90 px-4 sm:px-6 sm:px-8 py-6">
         {/*
           The vehicle is not named again here.
 

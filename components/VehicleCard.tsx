@@ -317,7 +317,7 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary, alerts }: V
         <div className="above-stretch absolute inset-0 bg-black/50 reveal-on-hover flex items-center justify-center">
           <button
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowPhotoDialog(true); }}
-            className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full text-white text-xs font-medium transition-all backdrop-blur-sm"
+            className="tap-target-44 flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full text-white text-xs font-medium transition-all backdrop-blur-sm"
             aria-label={photoUrl ? 'Change vehicle photo' : 'Add a photo of this car'}
           >
             <Camera className="h-3.5 w-3.5" />

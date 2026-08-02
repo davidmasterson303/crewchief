@@ -47,7 +47,7 @@ function StepIndicator({ currentStep, totalSteps, labels }: { currentStep: numbe
                 {isCompleted ? <CheckCircle2 className="h-4 w-4" /> : stepNum}
               </div>
               {labels[i] && (
-                <span className={`text-[10px] mt-1.5 font-medium whitespace-nowrap ${
+                <span className={`text-xs mt-1.5 font-medium whitespace-nowrap ${
                   isActive ? 'text-white/80' : isCompleted ? 'text-info/70' : 'text-white/25'
                 }`}>
                   {labels[i]}

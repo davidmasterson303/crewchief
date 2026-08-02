@@ -122,7 +122,7 @@ export default function FeaturesDrawer({ open, onOpenChange }: FeaturesDrawerPro
         side="right"
         className="w-full sm:max-w-lg overflow-y-auto bg-gray-950 border-gray-800 text-white p-0"
       >
-        <div className="sticky top-0 z-10 bg-gray-950/95 backdrop-blur-sm border-b border-gray-800 px-6 py-5">
+        <div className="sticky top-0 z-10 bg-gray-950/95 backdrop-blur-sm border-b border-gray-800 px-4 sm:px-6 py-5">
           <SheetHeader>
             <SheetTitle className="text-white text-xl font-bold tracking-tight">
               What CrewChief Does
@@ -133,7 +133,7 @@ export default function FeaturesDrawer({ open, onOpenChange }: FeaturesDrawerPro
           </SheetHeader>
         </div>
 
-        <div className="px-6 py-6 space-y-6">
+        <div className="px-4 sm:px-6 py-6 space-y-6">
           {FEATURES.map(({ icon: Icon, label, badge, heading, body }) => (
             <div
               key={label}
@@ -149,7 +149,7 @@ export default function FeaturesDrawer({ open, onOpenChange }: FeaturesDrawerPro
                   <span className="text-sm font-semibold text-white">{label}</span>
                   <Badge
                     variant="outline"
-                    className="text-[10px] px-1.5 py-0 h-4 border-gray-700 text-gray-400 font-normal"
+                    className="text-xs px-1.5 py-0 h-4 border-gray-700 text-gray-400 font-normal"
                   >
                     {badge}
                   </Badge>

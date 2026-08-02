@@ -295,7 +295,7 @@ export default function MaintenanceHistory({ vehicleId, documents, lineItems = [
 
       <CardContent className="p-0">
         {allRecords.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+          <div className="flex flex-col items-center justify-center py-16 px-4 sm:px-6 text-center">
             <div className="relative mb-5">
               <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
                 <FileText className="h-8 w-8 text-white/20" />

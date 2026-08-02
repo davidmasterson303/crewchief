@@ -386,7 +386,7 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
                             </div>
                             <button
                               onClick={() => removeFile(idx)}
-                              className="ml-2 w-7 h-7 flex items-center justify-center rounded-lg text-white/30 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                              className="tap-target-44 ml-2 w-7 h-7 flex items-center justify-center rounded-lg text-white/30 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                               disabled={uploading}
                             >
                               <X className="h-4 w-4" />

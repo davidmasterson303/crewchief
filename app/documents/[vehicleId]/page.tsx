@@ -266,7 +266,7 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
                         question the database cannot retroactively answer.
                       */}
                       {visit.allVision && (
-                        <span className="text-[10px] uppercase tracking-wider bg-info-wash text-info px-2 py-0.5 rounded-full flex items-center gap-1 font-medium">
+                        <span className="text-xs uppercase tracking-wider bg-info-wash text-info px-2 py-0.5 rounded-full flex items-center gap-1 font-medium">
                           <CheckCircle2 className="w-3 h-3" />
                           AI Extracted
                         </span>

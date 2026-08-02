@@ -492,7 +492,7 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
                     >
                       <Icon className={`h-3.5 w-3.5 ${isActive ? 'text-cyan-400' : ''}`} />
                       <span className={`font-medium text-xs ${isActive ? 'text-white' : ''}`}>{label}</span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold tabular-nums ${isActive ? 'bg-cyan-400/10 text-cyan-300' : 'bg-white/8 text-white/35'}`}>
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold tabular-nums ${isActive ? 'bg-cyan-400/10 text-cyan-300' : 'bg-white/8 text-white/35'}`}>
                         {count}
                       </span>
                       {isActive && (

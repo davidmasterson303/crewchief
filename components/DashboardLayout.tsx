@@ -180,7 +180,7 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
         came from.
       */}
       <nav className={`sticky top-0 z-40 bay-batten backdrop-blur-xl transition-all duration-200 ${scrolled ? 'bg-black/98 border-b border-white/10 shadow-lg shadow-black/50' : 'bg-black/90 border-b border-white/8'}`}>
-        <div className="max-w-7xl mx-auto px-6 lg:px-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12">
           <div className={`flex items-center justify-between transition-all duration-200 ${scrolled ? 'py-3' : 'py-4'}`}>
             <div className="flex items-center gap-3">
               <Link href={homeHref} className="flex items-center space-x-2.5 group">
@@ -199,7 +199,7 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                 <ChevronRight className="h-3.5 w-3.5" />
                 <span className="text-white/70 px-1">{vehicle.year} {vehicle.make} {vehicle.model}</span>
                 {scrolled && healthSummary?.health_score != null && (
-                  <span className={`ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                  <span className={`ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
                     healthSummary.health_score >= 80
                       ? 'bg-green-500/15 text-green-300 border border-green-400/25'
                       : healthSummary.health_score >= 60
@@ -265,7 +265,15 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                   <Link
                     key={key}
                     href={href(vehicle.id)}
-                    className={`relative flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium whitespace-nowrap transition-colors duration-150 ${
+                    /*
+                      RB0 rule 3. This was `py-2.5 text-xs` — about 36px tall,
+                      under the 44px floor, on the primary navigation: the one
+                      control every signed-in session touches. `py-3` plus an
+                      explicit `min-h` clears it, and 13px carries the label
+                      rather than 12, which is the R10 site this closes at the
+                      same time. Visual weight is unchanged.
+                    */
+                    className={`relative flex items-center gap-1.5 px-4 py-3 min-h-[44px] text-[13px] font-medium whitespace-nowrap transition-colors duration-150 ${
                       isActive ? 'text-cyan-400 bg-cyan-400/5' : 'text-white/50 hover:text-white/80 hover:bg-white/5'
                     }`}
                   >
@@ -279,7 +287,7 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
         </div>
       </nav>
 
-      <div className="max-w-7xl mx-auto px-6 lg:px-12 pt-10 pb-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 pt-10 pb-6">
         <div className="mb-8">
           <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
             <div>
@@ -413,7 +421,7 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
         {/* The body copy of the tab strip lived here. It is gone — see the
             note on the strip in the sticky header above. */}
 
-        <div className="glass-panel rounded-2xl p-6">
+        <div className="glass-panel rounded-2xl p-4 sm:p-6">
           {children}
         </div>
 

@@ -101,7 +101,7 @@ export default function ConsultantPage({ params }: { params: { vehicleId: string
     if (shellVehicle) {
       return (
         <DashboardLayout vehicle={shellVehicle} currentPage="consultant" vehicleImage={vehicleImage}>
-          <div className="bg-red-500/10 border border-red-400/25 rounded-2xl p-6">
+          <div className="bg-red-500/10 border border-red-400/25 rounded-2xl p-4 sm:p-6">
             <h2 className="text-red-300 font-semibold mb-2">Error Loading Consultant</h2>
             <p className="text-red-200/60 mb-5 text-sm">{error.message}</p>
             <Button onClick={() => router.push('/garage')} variant="outline" className="border-white/15 text-white/70 hover:bg-white/8">
@@ -113,8 +113,8 @@ export default function ConsultantPage({ params }: { params: { vehicleId: string
     }
     return (
       <div className="min-h-screen bg-[#080808] flex items-center justify-center">
-        <div className="max-w-md w-full mx-auto px-6">
-          <div className="bg-red-500/10 border border-red-400/25 rounded-2xl p-6">
+        <div className="max-w-md w-full mx-auto px-4 sm:px-6">
+          <div className="bg-red-500/10 border border-red-400/25 rounded-2xl p-4 sm:p-6">
             <h2 className="text-red-300 font-semibold mb-2">Error Loading Consultant</h2>
             <p className="text-red-200/60 mb-5 text-sm">{error.message}</p>
             <Button onClick={() => router.push('/garage')} variant="outline" className="border-white/15 text-white/70 hover:bg-white/8">

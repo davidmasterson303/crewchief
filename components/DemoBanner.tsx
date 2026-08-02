@@ -3,7 +3,7 @@
 export default function DemoBanner() {
   return (
     <div className="relative z-50 w-full bg-[#0A0A0A] border-b border-white/10">
-      <div className="max-w-7xl mx-auto px-6 py-2.5 flex items-center justify-between gap-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <a
             href="https://davidmasterson.co/"
@@ -26,7 +26,7 @@ export default function DemoBanner() {
           href="https://davidmasterson.co/"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-[10px] tracking-[0.15em] uppercase font-medium text-[#C4845C]/50 hover:text-[#C4845C] transition-colors shrink-0"
+          className="text-xs tracking-[0.15em] uppercase font-medium text-[#C4845C]/50 hover:text-[#C4845C] transition-colors shrink-0"
         >
           View Portfolio &rarr;
         </a>

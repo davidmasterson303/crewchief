@@ -104,7 +104,7 @@ function GarageContents() {
 
       <div className="relative z-10">
         <nav className="relative bay-batten border-b border-white/8 bg-black/80 backdrop-blur-xl">
-          <div className="max-w-7xl mx-auto px-6 lg:px-12 py-4">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 py-4">
             <div className="flex items-center justify-between">
               <Link href="/" className="flex items-center space-x-2.5 group">
                 <Car className="h-6 w-6 text-white transition-transform group-hover:scale-105" />
@@ -119,7 +119,7 @@ function GarageContents() {
             not optional: four columns inside `max-w-7xl` yields ~290px cards,
             narrower than the 338px the same card gets at 700px in two-up. The
             shell has to widen or the fourth column is a regression. */}
-        <main className="max-w-7xl 2xl:max-w-[96rem] mx-auto px-6 lg:px-12 py-14">
+        <main className="max-w-7xl 2xl:max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-12 py-14">
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
             <div>
               {/*

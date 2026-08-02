@@ -56,11 +56,11 @@ export function CostBreakdownTable({ costBreakdown }: CostBreakdownTableProps) {
           <Table>
             <TableHeader>
               <TableRow className="border-info-border hover:bg-cyan-400/5">
-                <TableHead className="text-info-strong text-[11px] uppercase tracking-[0.04em] font-semibold">Item</TableHead>
-                <TableHead className="text-info-strong text-[11px] uppercase tracking-[0.04em] font-semibold text-right">Parts</TableHead>
-                <TableHead className="text-info-strong text-[11px] uppercase tracking-[0.04em] font-semibold text-right">Labor Hrs</TableHead>
-                <TableHead className="text-info-strong text-[11px] uppercase tracking-[0.04em] font-semibold text-right">Labor Cost</TableHead>
-                <TableHead className="text-info-strong text-[11px] uppercase tracking-[0.04em] font-semibold text-right">Total</TableHead>
+                <TableHead className="text-info-strong text-xs uppercase tracking-[0.04em] font-semibold">Item</TableHead>
+                <TableHead className="text-info-strong text-xs uppercase tracking-[0.04em] font-semibold text-right">Parts</TableHead>
+                <TableHead className="text-info-strong text-xs uppercase tracking-[0.04em] font-semibold text-right">Labor Hrs</TableHead>
+                <TableHead className="text-info-strong text-xs uppercase tracking-[0.04em] font-semibold text-right">Labor Cost</TableHead>
+                <TableHead className="text-info-strong text-xs uppercase tracking-[0.04em] font-semibold text-right">Total</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
