@@ -11,20 +11,21 @@ Source: `Live-Site Audit.dc.html` (2 Aug 2026), grounded in repo `davidmasterson
 `scripts/promote-demo.mjs`. All gate checks passed; `verify-demo.mjs` green
 against prod afterwards.
 
-**Not yet on production: everything from the afternoon session** — RP1, and the
-three Phase 2.95 cost items (a, b, c). All committed on `main`, none promoted. Promotion is
-a separate deliberate step.
+**Not yet on production: everything from the afternoon session** — RP1, R4, the
+three Phase 2.95 cost items, and two fixes from Cowork's QA run. Ten commits on
+`main`, none promoted. Promotion is a separate deliberate step.
 
 | | Items | |
 |---|---|---|
 | **Done** | 1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 16, 17 | 12 |
 | **Partial** | 13, 15 | 2 |
 | **Open** | 5, 12, 14, 18 | 4 |
-| **Done (work stream B)** | RB0, R1, R2, R3, R5, **R6, R9, R10, R15** | 9 |
-| **Open (work stream B)** | R4, R7, R8, R11, R12, R13, R14 | 7 |
+| **Done (work stream B)** | RB0, R1, R2, R3, R5, R6, R9, R10, R15, **R4** | 10 |
+| **Open (work stream B)** | R7, R8, R11, R12, R13, R14 | 6 |
 
-**RP0 and RP1 are both closed.** What remains in work stream B is RP2 — the six
-that need design rather than a prefix — plus R7, which folds into item 14.
+**RP0 and RP1 are closed, and R4 — RP2's one CRITICAL — is closed with them.**
+What remains in work stream B is the rest of RP2, which needs design rather than
+a prefix, plus R7, which folds into item 14.
 
 Every item below carries a status line. **Handoff notes are at the bottom of
 this file** — read those first if you are picking this up cold.
@@ -618,10 +619,10 @@ RB0/RP0 at 11:12, both after it was written.
 
 ## Where things stand
 
-- `main` = `bb83782`. Working tree clean. **Nothing from this session is
+- `main` = `2a315cc`. Working tree clean. **Nothing from this session is
   pushed or promoted** — production still serves `e729ee96`, which is the
   morning's work.
-- 59 suites, 1030 tests, green. `npm run typecheck` clean.
+- 59 suites, 1035 tests, green. `npm run typecheck` clean.
 - **Two stale worktrees** under `.claude/worktrees/` (`confident-shtern`,
   `friendly-lewin`). Both are *behind* `main` with nothing ahead — checked, no
   stranded work. Prunable whenever.
@@ -639,6 +640,35 @@ is the one that changes the unit economics.
 | `02c78cf` | A return-type fix, and a correction to `b5d1c53`'s own claim |
 | `8456afe` | **RP1** — R6, R9, R10 in one pass |
 | `bb83782` | **2.95c** — every Gemini call metered, per account |
+| `4947512` | **R4** + **NEW-01** — consultant app shell; banner stops widening the page |
+| `2a315cc` | **NEW-02** — the closed garage door is inert, not just opaque |
+
+## Cowork's QA report — triaged
+
+**Read this before acting on that report: it was run against `main 7630d42`,
+which predates every commit in the table above.** Its jest count (979/979, 57
+suites) is the morning tree; this one is 1035/59.
+
+| Finding | State |
+|---|---|
+| R9, R10, R15 "reproduce exactly as described" | **Already closed here** by `8456afe` and `3dd9743`. True of that tree, not this one |
+| **NEW-01** banner overflows at 320/360/375 | **Fixed** (`4947512`). Verified 0 overflow at 320 |
+| **NEW-02** focus enters the garage behind the closed door | **Fixed** (`2a315cc`) |
+| **NEW-03** B2 fails as written | **Open, and Cowork is right that the check is the defect.** The field computes 16px; `input[type='text']` at specificity (0,1,1) outranks `.text-xs` at (0,1,0). Rewrite B2 to assert computed size, not the class |
+| **NEW-04** four hover-only reveals never migrated | **Open.** LOW — none is the only path to its action. The `WishlistSection` one is the only one worth a real-device check |
+
+**One correction to fold back into `docs/qa-script.md`:** its §2 baseline records
+`/` @375 `horizontalOverflow: false`, and that cell was wrong when written —
+NEW-01 was present at the time, and the same row's `textUnder12px: 1` *is* that
+banner's link. The other two baseline deltas Cowork lists (25 vs 16 sub-44px
+targets, 346 vs 348px grid) are theirs to re-derive.
+
+**And a finding against my own work, worth keeping:** RP1's 12px type floor made
+NEW-01 *worse* before it was fixed. Cowork measured the overflowing link at
+126px against `text-[10px]`; at `text-xs` it is 147px, so the 4px overflow it
+reported at 375 would have become ~14px. The floor was right and stays. Two
+correct rules can still collide, and the collision showed up in a QA run rather
+than in either change.
 
 ### The two findings worth carrying, whatever you pick up next
 
