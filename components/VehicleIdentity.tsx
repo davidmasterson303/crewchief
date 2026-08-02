@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Car } from 'lucide-react';
 import { vehicleField } from '@crewchief/core/vehicle-identity';
 import { vehicleBlurData } from '@crewchief/core/vehicle-blur';
+import { cardSlotSource } from '@crewchief/core/photo-slots';
 
 /**
  * What a vehicle looks like — one component, two variants.
@@ -122,7 +123,27 @@ export function VehicleIdentity({
     without a remount, and a transient failure heals itself.
   */
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
-  const src = photo && photo !== failedUrl ? photo : null;
+  const requested = photo && photo !== failedUrl ? photo : null;
+  const isBand = variant === 'band';
+
+  /*
+    A card asks for the card-sized file. This is what made `DEMO_IMAGES`
+    deletable.
+
+    That map existed because the database column holds the page-width hero and
+    a card is ~400px wide, so falling through to `image_url` put three
+    650–861 KB heroes in the garage grid. VehicleCard's comment set the
+    condition for retiring it: "the card asking for a card-sized source,
+    whether through a second column, a naming convention or `srcset`". This is
+    the naming convention, and it is the same one the AVIF/WebP siblings
+    already rely on — one rule, applied where the variant is actually known,
+    rather than a lookup table that has to be kept in step with the seed data.
+
+    Only rewrites our own demo files. An owner upload is a signed URL against a
+    private bucket: the signature covers one object, so inventing a sibling
+    path would produce a 403 rather than a smaller photograph.
+  */
+  const src = isBand ? requested : cardSlotSource(requested);
   const formats = photoFormats(src);
   const blurSrc = vehicleBlurData(src);
 
@@ -167,7 +188,6 @@ export function VehicleIdentity({
   }, [src]);
 
   const field = vehicleField(make);
-  const isBand = variant === 'band';
 
   // `{year} {make} · {trim}` — each part optional, and the separator only
   // earns its place when there is something on both sides of it.
@@ -281,7 +301,14 @@ export function VehicleIdentity({
               {...({ fetchpriority: isBand ? 'high' : 'auto' } as Record<string, string>)}
               className="absolute w-0 h-0 opacity-0 pointer-events-none"
               onLoad={() => setLoadedUrl(src)}
-              onError={() => setFailedUrl(src)}
+              /*
+                Marks the *prop*, not the rendered URL. `src` may be a
+                card-scoped rewrite of it, and the guard above compares
+                `photo !== failedUrl` — so storing the derived path would never
+                match, and a card whose photograph 404s would retry it on every
+                render instead of falling back to the plate.
+              */
+              onError={() => setFailedUrl(photo ?? null)}
             />
           </picture>
           {/* The machined top edge (2c) — the band's only decoration, and it is

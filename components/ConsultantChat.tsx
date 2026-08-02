@@ -975,7 +975,11 @@ export default function ConsultantChat({
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyPress}
               rows={1}
-              className="resize-none border-0 bg-transparent text-white placeholder:text-white/30 text-sm px-3 pt-2.5 pb-1 min-h-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none"
+              /* No `text-sm` here. A Tailwind utility outranks the bare `textarea`
+                 selector in globals.css, so it would have kept this one control at
+                 14px and left the iOS zoom in the single most-tapped field in the
+                 product. R2 — the composer inherits the field scale. */
+              className="resize-none border-0 bg-transparent text-white placeholder:text-white/30 px-3 pt-2.5 pb-1 min-h-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none"
               disabled={loading || uploadingFiles}
             />
             <div className="flex items-center gap-2 px-2 pb-2">

@@ -186,7 +186,7 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
 
         <Card className="bg-slate-900/60 border-white/10">
           <CardContent className="pt-5 pb-5">
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
               {[
                 { icon: Cog, label: 'Engine', value: cleanPowertrain(knowledge?.engine_type) },
                 { icon: Activity, label: 'Transmission', value: cleanPowertrain(knowledge?.transmission_type) },
@@ -231,7 +231,7 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                   {[
                     {
                       icon: Gauge,

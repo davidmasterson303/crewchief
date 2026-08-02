@@ -379,7 +379,7 @@ export default function MaintenanceHistory({ vehicleId, documents, lineItems = [
                   <button
                     onClick={(e) => { e.stopPropagation(); handleDeleteClick(record); }}
                     disabled={loading}
-                    className="flex-shrink-0 w-9 h-9 mx-2 flex items-center justify-center rounded-lg text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-30"
+                    className="tap-target-44 flex-shrink-0 w-9 h-9 mx-2 flex items-center justify-center rounded-lg text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-colors reveal-on-hover disabled:opacity-30"
                     aria-label="Delete record"
                   >
                     <Trash2 className="h-3.5 w-3.5" />

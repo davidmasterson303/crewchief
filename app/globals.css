@@ -227,6 +227,50 @@ nav {
 }
 
 @layer utilities {
+  /* ══ RB0 — the four responsive rules ═══════════════════════════════════
+   *
+   * From `docs/roadmap.md` Work stream B. The audit's diagnosis was that this
+   * app is not unresponsive, it is *desktop-authored and reflowed by
+   * accident*: 18 breakpoint decisions in ~5,300 lines of the screens people
+   * actually use, four screens with none at all. The mobile work that did
+   * exist was all correct and all applied to exactly the one element that
+   * reported the bug.
+   *
+   * So these are named, and reviews cite them by name. Fifteen patches without
+   * them produces a sixteenth finding next month.
+   *
+   * ── 1. The ladder ──
+   * Four widths, named by what changes rather than by device:
+   *   base   one column, 16px gutter
+   *   sm 640 two-up cards, full chrome
+   *   lg 1024 three-up, sidebars appear
+   *   2xl 1536 four-up, wider shell
+   * `md` is a transition, not a design target — nothing may *first* appear at
+   * `md`. A `md:` with no `sm:` sibling is the smell.
+   *
+   * ── 2. The container scale ──
+   * Every nesting level steps down exactly once below `sm`:
+   *   page  px-4 sm:px-6 lg:px-12
+   *   panel p-4  sm:p-6
+   *   card  p-4  sm:p-5
+   *   tile  p-3  sm:p-4
+   * Four nested containers each taking 24px a side is how 375px became 199px
+   * of content — 53% of the device spent on nested gutter (R6).
+   *
+   * ── 3. Three floors ──
+   *   16px  any focusable input at ≤640 — enforced below, see R2
+   *   12px  any rendered text; the DS has no smaller token
+   *   44px  any interactive target; `.tap-target-44` expands hit area, not glyph
+   *
+   * ── 4. Touch parity ──
+   * A control revealed by hover must have a non-hover path. One utility,
+   * `.reveal-on-hover` — and never `display:none` on an action, which takes it
+   * out of the tab order as well as out of reach.
+   *
+   * Rules 3 and 4 are enforced in CSS below. Rules 1 and 2 are conventions the
+   * markup has to carry, and RP1 (R6, R9, R10) is the pass that applies them.
+   * ═════════════════════════════════════════════════════════════════════ */
+
   /* Reserved signature glow — health ring and the primary CTA ONLY.
    * Do not add to card hovers, chips or nav: spending it everywhere is what
    * made it read as decoration rather than emphasis. */
@@ -817,16 +861,58 @@ nav {
    * Pair with `.tap-target-44` in the markup — the visual glyph is ~14px and
    * needs the hit area regardless of whether it is currently painted.
    */
-  .meta-edit {
+  /*
+   * ── RB0 rule 4 — touch parity ──────────────────────────────────────────
+   *
+   * A control revealed by hover must have a non-hover path. `.reveal-on-hover`
+   * is the one utility for it; `.meta-edit` and `.turn-actions` are the two
+   * that already existed and now share its declarations rather than repeating
+   * them.
+   *
+   * The audit found three controls that did not: the garage card's photo
+   * overlay and ⋮ menu, and the maintenance delete button, all written as
+   * Tailwind `opacity-0 group-hover:opacity-100`. On a phone that is not a
+   * subtle affordance, it is nothing — delete vehicle, change photo and update
+   * mileage had no mobile entry point at all, and adding the photograph the
+   * whole identity-plate design depends on was impossible from the garage.
+   *
+   * The rules the two originals established, kept verbatim:
+   *
+   *   - `opacity`, never `display:none` or `visibility` — the control must
+   *     stay in the tab order. A keyboard user cannot hover to discover it.
+   *   - `:focus-visible` / `:focus-within` reveals it, so tabbing to it shows
+   *     you where you are.
+   *   - `@media (hover: none)` pins it visible, because a touch device has no
+   *     hover to reveal anything with.
+   *
+   * Pair with `.tap-target-44` in the markup — these glyphs are 14–16px and
+   * need the hit area whether or not they are currently painted.
+   *
+   * The `.group\/image` selector is not redundant. Tailwind's *named* groups
+   * emit only `group/image`, not `group`, so a bare `.group:hover` misses the
+   * card's photo overlay entirely — which is the one control of the three that
+   * matters most on a phone.
+   */
+  .reveal-on-hover,
+  .meta-edit,
+  .turn-actions {
     opacity: 0;
     transition: opacity var(--duration-fast) var(--ease-standard);
   }
+  .group:hover .reveal-on-hover,
+  .group\/image:hover .reveal-on-hover,
+  .reveal-on-hover:focus-visible,
+  .reveal-on-hover:focus-within,
   .meta-row:hover .meta-edit,
-  .meta-edit:focus-visible {
+  .meta-edit:focus-visible,
+  .turn:hover .turn-actions,
+  .turn-actions:focus-within {
     opacity: 1;
   }
   @media (hover: none) {
-    .meta-edit {
+    .reveal-on-hover,
+    .meta-edit,
+    .turn-actions {
       opacity: 1;
     }
   }
@@ -932,6 +1018,52 @@ nav {
   }
 
   /*
+   * ── R2 — the iOS zoom trap ─────────────────────────────────────────────
+   *
+   * Mobile Safari zooms the viewport when a focused input is under 16px, and
+   * does **not** restore the scale on blur. Tapping the chat composer, a
+   * conversation search, a mileage edit or any onboarding field jerked the
+   * layout and left the user on a horizontally-scrolled page for the rest of
+   * the session. `.field` is 14px and `.field-sm` 13px, so every text control
+   * in the app triggered it.
+   *
+   * Scoped to the *pointer*, not to a width. A 500px desktop window has no
+   * zoom rule to satisfy and keeps its 14px density; a 1024px tablet does have
+   * one and gets 16px. `max-width` gets both of those backwards.
+   *
+   * **Not** fixed with `maximum-scale=1` or `user-scalable=no`. Both stop the
+   * zoom by disabling pinch-zoom entirely, which fails WCAG 1.4.4 and would
+   * undo the forced-colors and reduced-motion work in item 17. The viewport
+   * meta Next emits — `width=device-width, initial-scale=1` — is correct and
+   * stays. The field scale is the fix.
+   *
+   * The comment above `.field`'s 14px predicted this exact bug and deferred
+   * the call: "16 has an argument… belongs to whoever wants it, not to a
+   * primitive refactor." Design owns it now, and this is the narrowest form of
+   * yes — touch pointers only.
+   *
+   * Bare element selectors, so a control that never adopted `.field` is caught
+   * too. A Tailwind utility like `text-sm` still beats these on specificity;
+   * where that happens the utility is removed at the call site rather than
+   * this rule being marked `!important`.
+   */
+  @media (hover: none) and (pointer: coarse) {
+    .field,
+    .field-sm,
+    textarea,
+    select,
+    input[type='text'],
+    input[type='email'],
+    input[type='number'],
+    input[type='search'],
+    input[type='tel'],
+    input[type='url'],
+    input[type='password'] {
+      font-size: 16px;
+    }
+  }
+
+  /*
    * Textareas size from `rows`, not a fixed min-height, so a caller picks a
    * height without reaching for a className — which is what `min-h-[80px]`
    * forced them to do.
@@ -1008,19 +1140,10 @@ nav {
    * rather than one data row — and collapsing them into one class would tie
    * the transcript's hover behaviour to the garage card's.
    */
-  .turn-actions {
-    opacity: 0;
-    transition: opacity var(--duration-fast) var(--ease-standard);
-  }
-  .turn:hover .turn-actions,
-  .turn-actions:focus-within {
-    opacity: 1;
-  }
-  @media (hover: none) {
-    .turn-actions {
-      opacity: 1;
-    }
-  }
+  /* Declarations live with `.reveal-on-hover` above — this class is kept as a
+   * distinct name because its trigger is a whole turn rather than one data
+   * row, and collapsing the names would tie the transcript's hover behaviour
+   * to the garage card's. */
 
   /* Scroll-linked section entrance. Larger and slower than the mount
    * stagger, so the two entrances read as different gestures.

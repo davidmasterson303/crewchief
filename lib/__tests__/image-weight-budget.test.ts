@@ -31,11 +31,40 @@
 
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { DEMO_IMAGES } from '@crewchief/core/demo';
+import { DEMO_UNPHOTOGRAPHED_VEHICLE_IDS } from '@crewchief/core/demo';
+import { cardSlotSource } from '@crewchief/core/photo-slots';
 import { VEHICLE_BLUR_DATA } from '@crewchief/core/vehicle-blur';
 
 const ROOT = join(__dirname, '..', '..');
 const PUBLIC = join(ROOT, 'public');
+
+/*
+  What the garage grid fetches, derived rather than listed.
+
+  `DEMO_IMAGES` was the list and is gone — the database is the only source of
+  truth for which photograph a demo car has. `demo-image-budget.test.ts` carries
+  the full explanation and the id-keyed parse; this suite only needs the paths,
+  so it reads the same migration and applies the same shipped derivation.
+*/
+function gridCardSources(): string[] {
+  const sql = readFileSync(
+    join(ROOT, 'supabase', 'migrations', '20260726230000_local_demo_photos_and_focal_points.sql'),
+    'utf8'
+  );
+  const ids = new Map<string, string>();
+  const idRe = /(\w+)\s+uuid\s*:=\s*'([0-9a-f-]+)'/gi;
+  for (let m = idRe.exec(sql); m; m = idRe.exec(sql)) ids.set(m[1], m[2]);
+
+  const out: string[] = [];
+  const rowRe = /image_url\s*=\s*'([^']+)'[\s\S]*?WHERE\s+id\s*=\s*(\w+)/gi;
+  for (let m = rowRe.exec(sql); m; m = rowRe.exec(sql)) {
+    const uuid = ids.get(m[2]);
+    if (uuid && !DEMO_UNPHOTOGRAPHED_VEHICLE_IDS.some((u) => u === uuid)) {
+      out.push(cardSlotSource(m[1]) as string);
+    }
+  }
+  return out;
+}
 
 /** Every surface that must ship no photograph at all. */
 const IMAGE_FREE_PAGES = [
@@ -84,15 +113,16 @@ describe('image weight budgets', () => {
   });
 
   it('the garage grid stays under 250 KB as actually delivered', () => {
-    const total = Object.values(DEMO_IMAGES).reduce((sum, p) => sum + deliveredBytes(p), 0);
+    const total = gridCardSources().reduce((sum, p) => sum + deliveredBytes(p), 0);
 
     expect(total).toBeGreaterThan(0);
     expect(total).toBeLessThan(250 * 1024);
   });
 
   it('the grid is materially lighter in AVIF than the JPEG fallback', () => {
-    const avif = Object.values(DEMO_IMAGES).reduce((s, p) => s + deliveredBytes(p), 0);
-    const jpeg = Object.values(DEMO_IMAGES).reduce((s, p) => s + bytes(p), 0);
+    const cards = gridCardSources();
+    const avif = cards.reduce((s, p) => s + deliveredBytes(p), 0);
+    const jpeg = cards.reduce((s, p) => s + bytes(p), 0);
 
     /*
       Guards the derivatives silently disappearing: `deliveredBytes` falls back
