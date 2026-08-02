@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Car } from 'lucide-react';
 import { vehicleField } from '@crewchief/core/vehicle-identity';
 
@@ -124,6 +124,46 @@ export function VehicleIdentity({
   const src = photo && photo !== failedUrl ? photo : null;
   const formats = photoFormats(src);
 
+  /*
+    The photo fades in over the plate instead of appearing between frames.
+
+    Owner photos arrive as signed URLs, so `useSignedUrl` returns undefined
+    while the exchange is in flight and the plate is what renders underneath —
+    the layout never moves, which is why this reads as a pop rather than a
+    jump. A 200ms fade is enough to make the arrival deliberate.
+
+    Keyed on the URL so a re-minted signed URL fades its replacement in rather
+    than flashing the plate: `loadedUrl` is compared to the current `src`, the
+    same shape as `failedUrl` directly above and for the same reason.
+
+    A cached image fires `load` before paint, so this costs nothing on a repeat
+    view — the fade runs from an already-opaque start.
+  */
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
+  const photoReady = src !== null && loadedUrl === src;
+
+  /*
+    `onLoad` alone would leave the photograph invisible forever on the exact
+    case that is meant to be fastest.
+
+    This is a client component, so Next still renders it to HTML on the server;
+    the probe is in that HTML and the browser can finish fetching it — from
+    cache, most of the time — before hydration attaches any handler. The load
+    event has then already fired, nothing is listening, `loadedUrl` never
+    updates, and both layers stay at `opacity: 0` over the plate. A fade-in
+    that fails closed on a cache hit is worse than no fade-in at all.
+
+    So the element is asked directly on mount rather than waited on.
+    `naturalWidth` is what separates a finished load from a finished failure —
+    `complete` is true for both, and treating an error as a load would fade in
+    an empty box over the plate the error handler had just chosen.
+  */
+  const probeRef = useRef<HTMLImageElement>(null);
+  useEffect(() => {
+    const probe = probeRef.current;
+    if (probe?.complete && probe.naturalWidth > 0) setLoadedUrl(src);
+  }, [src]);
+
   const field = vehicleField(make);
   const isBand = variant === 'band';
 
@@ -165,6 +205,8 @@ export function VehicleIdentity({
               backgroundPosition: 'center',
               filter: 'blur(34px) saturate(.8) brightness(.52)',
               transform: 'scale(1.08)',
+              opacity: photoReady ? 1 : 0,
+              transition: 'opacity 200ms ease-out',
             }}
           />
           {/* The sharp copy. Contained — the whole vehicle, always. */}
@@ -175,15 +217,18 @@ export function VehicleIdentity({
               backgroundSize: 'contain',
               backgroundPosition: 'center',
               backgroundRepeat: 'no-repeat',
+              opacity: photoReady ? 1 : 0,
+              transition: 'opacity 200ms ease-out',
             }}
             role="img"
             aria-label={[lead, model].filter(Boolean).join(' ') || 'Vehicle photo'}
           />
           {/*
-            A CSS background cannot report a load failure, and the whole
-            no-broken-image rule depends on hearing about one. This probe is the
+            A CSS background can report neither a load failure nor a load, and
+            both are needed here — the no-broken-image rule depends on hearing
+            about the first, and the fade-in on the second. This probe is the
             only <img> in the component: zero-area, never painted, present
-            solely so `onError` has somewhere to fire.
+            solely so `onError` and `onLoad` have somewhere to fire.
 
             It is wrapped in <picture> so it negotiates format the same way the
             two background layers do. Without that it would request the JPEG
@@ -196,10 +241,12 @@ export function VehicleIdentity({
             {formats && <source srcSet={formats.avif} type="image/avif" />}
             {formats && <source srcSet={formats.webp} type="image/webp" />}
             <img
+              ref={probeRef}
               src={src}
               alt=""
               aria-hidden="true"
               className="absolute w-0 h-0 opacity-0 pointer-events-none"
+              onLoad={() => setLoadedUrl(src)}
               onError={() => setFailedUrl(src)}
             />
           </picture>
