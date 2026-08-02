@@ -76,7 +76,31 @@ function first<T>(value: T | T[] | null | undefined): T | undefined {
 
 const miles = new Intl.NumberFormat('en-US');
 
-/** How long a photo may stay unresolved before the card gives up on it. */
+/**
+ * How long a photo may stay unresolved before the card gives up on it.
+ *
+ * This is a safety net, not the fix. `/api/v1/vehicles` signs a URL to the
+ * **original** upload, and the one on this account is 3000×4000 at 2.3 MB —
+ * roughly 48 MB decoded to RGBA, to fill a 172pt-tall card. It never renders
+ * here and never errors, so without a timeout the plate below is unreachable.
+ *
+ * Measured 1 Aug, in this order, because the first three readings were wrong:
+ *
+ *   - `fetch` of the URL from inside the app did not resolve in 8s, while a
+ *     control fetch to the API host returned 200. **That comparison was
+ *     invalid** — React Native's `fetch` runs on XMLHttpRequest and buffers the
+ *     whole body, so it measured 2.3 MB against a few hundred bytes of JSON,
+ *     not reachability.
+ *   - Cowork fetched the same signed URL from the host: 200, image/jpeg, all
+ *     2.3 MB in 1.23s. The object and the URL are fine.
+ *   - 90s timeout: still nothing. So it is not slow, it is stuck.
+ *   - A tiny inline PNG beside it rendered immediately. So `Image` is fine and
+ *     this file specifically is not decodable here.
+ *
+ * The real fix is server-side: sign a *transformed* URL sized for a list rather
+ * than the original. That fixes a real phone too, where this is 2.3 MB of
+ * someone's data allowance per vehicle — the simulator just made it visible.
+ */
 const PHOTO_TIMEOUT_MS = 6000;
 
 /**
