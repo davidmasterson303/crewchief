@@ -265,6 +265,44 @@ nav {
     transition: transform 80ms var(--ease-standard);
   }
 
+  /* The cluster gauge in forced-colors mode (Windows High Contrast and
+   * friends). See components/ClusterGauge.tsx.
+   *
+   * Forced colors overrides SVG `fill` and `stroke` along with the usual text
+   * and background properties, so every part of the dial — unlit track, lit
+   * arc, needle, ticks — resolves to the same CanvasText. The gauge does not
+   * break, it does something worse: it still looks like a gauge while showing
+   * a full ring at every score. The needle is then the only honest thing on it.
+   *
+   * The fix is to re-state the parts in *system* colours rather than to opt
+   * out with `forced-color-adjust: none`. Opting out would keep the health
+   * ramp, which is the point of the ramp — but it also overrides a palette the
+   * user chose for a reason, and this is a component whose whole job is to be
+   * readable at a glance. Highlight against GrayText keeps the reading legible
+   * in the user's own colours, which is the better trade for a dial.
+   *
+   * The score survives regardless: the container carries the full reading in
+   * its aria-label, and the numeral in the well is real text. */
+  @media (forced-colors: active) {
+    .gauge-track {
+      stroke: GrayText;
+    }
+    .gauge-arc,
+    .gauge-needle {
+      stroke: Highlight;
+    }
+    .gauge-tick {
+      stroke: CanvasText;
+    }
+    .gauge-label {
+      fill: CanvasText;
+    }
+    /* The bloom is decoration and reads as a smear once colours are forced. */
+    .gauge-arc {
+      filter: none !important;
+    }
+  }
+
   /* A photograph painted as a background, in the best format the browser takes.
    *
    * The demo photographs have AVIF and WebP siblings built by

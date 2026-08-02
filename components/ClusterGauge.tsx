@@ -157,6 +157,7 @@ export function ClusterGauge({ score, active = true, size = 188 }: ClusterGaugeP
       <svg viewBox="0 0 200 200" width={size} height={size} aria-hidden="true">
         {/* The unlit track. */}
         <path
+          className="gauge-track"
           d={TRACK}
           fill="none"
           stroke="rgb(255 255 255 / 0.08)"
@@ -174,6 +175,7 @@ export function ClusterGauge({ score, active = true, size = 188 }: ClusterGaugeP
           sweep itself stays crisp.
         */}
         <path
+          className="gauge-arc"
           d={TRACK}
           fill="none"
           stroke={band.color}
@@ -190,6 +192,7 @@ export function ClusterGauge({ score, active = true, size = 188 }: ClusterGaugeP
         {TICKS.map((tick) => (
           <line
             key={tick}
+            className="gauge-tick"
             x1={CX}
             y1={24}
             x2={CX}
@@ -209,7 +212,7 @@ export function ClusterGauge({ score, active = true, size = 188 }: ClusterGaugeP
               key={tick}
               x={x}
               y={y}
-              className="num"
+              className="num gauge-label"
               textAnchor="middle"
               dominantBaseline="central"
               fill="rgb(255 255 255 / 0.32)"
@@ -237,6 +240,7 @@ export function ClusterGauge({ score, active = true, size = 188 }: ClusterGaugeP
         */}
         <g transform={`rotate(${angleFor(Math.max(0, Math.min(100, swept)))} ${CX} ${CY})`}>
           <line
+            className="gauge-needle"
             x1={CX}
             y1={42}
             x2={CX}
