@@ -4,20 +4,27 @@ Source: `Live-Site Audit.dc.html` (2 Aug 2026), grounded in repo `davidmasterson
 
 ---
 
-## Status — 2 Aug 2026, morning session
+## Status — 2 Aug 2026, afternoon session
 
-**Live on production.** `crewchief-demo.davidmasterson.co` is serving `16c5d752`
-(the `demo-live` merge), promoted from `main` at `17b932e9` through
+**Live on production.** `crewchief-demo.davidmasterson.co` is serving `e729ee96`
+(the `demo-live` merge), promoted from `main` at `d3aae46` through
 `scripts/promote-demo.mjs`. All gate checks passed; `verify-demo.mjs` green
 against prod afterwards.
+
+**Not yet on production: everything from the afternoon session** — RP1, and the
+two Phase 2.95 cost items. All committed on `main`, none promoted. Promotion is
+a separate deliberate step.
 
 | | Items | |
 |---|---|---|
 | **Done** | 1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 16, 17 | 12 |
 | **Partial** | 13, 15 | 2 |
 | **Open** | 5, 12, 14, 18 | 4 |
-| **Done (work stream B)** | RB0, R1, R2, R3, R5 | 5 |
-| **Open (work stream B)** | R4, R6–R15 | 11 |
+| **Done (work stream B)** | RB0, R1, R2, R3, R5, **R6, R9, R10, R15** | 9 |
+| **Open (work stream B)** | R4, R7, R8, R11, R12, R13, R14 | 7 |
+
+**RP0 and RP1 are both closed.** What remains in work stream B is RP2 — the six
+that need design rather than a prefix — plus R7, which folds into item 14.
 
 Every item below carries a status line. **Handoff notes are at the bottom of
 this file** — read those first if you are picking this up cold.
@@ -396,24 +403,90 @@ Add to `app/globals.css` and to the DS spec, then reference by name in review.
 
 ## RP1 — next (~2 days, mechanical once RB0 exists; do it in one pass, not per screen)
 
+> **DONE — 2 Aug 2026, afternoon (`8456afe`).** All four, in one pass as asked.
+> Came in nearer two hours than two days, because RB0 had already done the
+> deciding. Details on each below; two things were left undone deliberately and
+> both say so.
+
 ### R6. No container in the chain gets smaller below `sm` — HIGH
+> **DONE.** RB0 rule 2 across 7 page shells (`px-4 sm:px-6 lg:px-12`) and 20
+> panels (`p-4 sm:p-6`). Measured on the public garage: `main` padding 24px →
+> 16px below `sm`, still 24px at and above it, no horizontal overflow at either.
+>
+> **The 199px → 271px claim is not re-verified.** That chain is on the
+> dashboard, which is behind auth and could not be measured from a session with
+> no credentials. The rule is applied everywhere the grep finds; the number is
+> still the audit's, not a fresh measurement.
 - **Problem:** four nested containers each take 24px a side and none steps down — `DashboardLayout.tsx:281` (`px-6 lg:px-12`), `:404` (`glass-panel p-6`), every `Card` (`p-6`), inner tiles (`p-4`). At 375px: **375 → 327 → 279 → 231 → 199**. 53% of the device is nested gutter. R3, R8 and R13 are all this finding wearing a different component.
 - **Change:** apply RB0 rule 2 everywhere. 375px then yields **271px** of content instead of 199px (+36%).
 - **Verify:** grep for `\bp-6\b` and `px-6` with no `sm:` sibling; the count should reach zero outside desktop-only blocks.
 - **Effort:** ~2 hours.
 
 ### R9. The 44px utility exists and is used six times — HIGH
+> **DONE.** Nav tabs → `py-3 min-h-[44px]` at 13px, which closes an R10 site in
+> the same edit. Nine icon and pill controls gained `.tap-target-44`; adoption
+> 12 → 22. The ⋮ vehicle menu was already fixed by RP0's R5 work.
+>
+> **One control deliberately did not get the utility, and the reason
+> generalises.** The consultant's follow-up chips wrap at `gap-2`.
+> `.tap-target-44` centres a 44px `::after` on its element, so on a ~30px chip
+> it overhangs ~7px top and bottom — into an 8px gap, from both sides. Two rows
+> of chips would have had *overlapping hit areas*, and the tap goes to whichever
+> pseudo-element paints last. A control that answers the wrong tap is worse than
+> one slightly too small, so those grew for real (`py-2.5 min-h-[44px]`).
+>
+> **Read the utility's docblock as binding:** "any small chip that is a real
+> standalone tap target". A wrapped row is what that qualifier excludes, and it
+> is worth checking before the next application.
+>
+> **Still open:** the lint rule. `_adherence.oxlintrc.json` is in the DS repo and
+> was not touchable from here, so this is still a review comment rather than a
+> check — the exact shape of decay this file keeps warning about.
+
 - **Problem:** `.tap-target-44` (`globals.css:791`) is correct and barely adopted. The **primary navigation misses the floor**: tab links are `px-4 py-2.5 text-xs` ≈ 36px tall (`DashboardLayout.tsx:268`), on the one control every signed-in session touches. Also under 44px: ⋮ vehicle menu 32px (`VehicleCard.tsx:417`), performance refresh 32px (`vehicle-info:219`), maintenance delete 36px, chat "New" 28px, composer attach + send.
 - **Change:** tabs → `px-4 py-3 text-[13px] min-h-[44px]` (visual weight unchanged, and it fixes an R10 site at the same time). Icon buttons → add `.tap-target-44`; it expands the hit area, not the glyph.
 - **Then:** add it to the lint set — an interactive element under 44px with no `.tap-target-44` is a review comment, not a taste question. `_adherence.oxlintrc.json` in the DS is the place.
 - **Effort:** ~2 hours.
 
 ### R10. Thirty uses of 10 and 11px type, none of them decorative — HIGH
+> **DONE, to the 12px floor.** All of it to `text-xs`.
+>
+> **It was 54, not thirty** — across seventeen files, not five. The audit named
+> the five worst (`ConsultantChat` ×12, `UpcomingMaintenance` ×10,
+> `TierProgressCard` ×9, `CostBreakdownTable` ×5, `DemoBanner`) and those were
+> right; the tail was twice as long. 54 is the number to carry forward.
+>
+> **Still open: the second half of the change line.** "Data and labels on mobile
+> → 13px" is not a mechanical pass — it needs a judgement per site about what
+> counts as data. Only the hard floor landed. `ClusterGauge`'s band label went
+> to 12px with the rest and is worth a look on a card, since it is a verdict
+> rendered in an abbreviated form to fit.
+
 - **Problem:** `UpcomingMaintenance` ×10, `ConsultantChat` ×12, `CostBreakdownTable` ×5, `DemoBanner`, `TierProgressCard`. The DS's smallest token is `--text-body-xs: 12px`, so all of it is off-scale — and it carries due dates, cost estimates, conversation timestamps, table headers and the "Get Quote" action. At 10px on a dark surface at arm's length it is not quiet, it is unreadable, and it contradicts a brand voice where the numbers carry the argument.
 - **Change:** `text-[10px]` / `text-[11px]` → `text-xs` (12px) as a hard floor; data and labels on mobile → 13px. **Contrast, not size, makes a label recede** — `text-muted-40` at 12px reads quieter than white at 10px and stays legible.
 - **Effort:** ~2 hours.
 
 ### R15. One 600px-wide card at tablet width; three at 1440 — MEDIUM
+> **DONE (`3dd9743`), and the change line as written was incomplete.**
+>
+> Measured before, at 700px: `grid-template-columns` computed to `none` — one
+> card, exactly as described. After: two 314px cards on the live garage.
+>
+> **The `2xl` column needed the shell widened, which the change line does not
+> say.** Adding `2xl:grid-cols-4` alone puts four columns inside `max-w-7xl`,
+> which does not grow past 1280px — the cards come out ~290px, *narrower than
+> the 338px the same card gets at 700px in two-up*. A fourth column that shrinks
+> every card below its tablet size is a regression wearing a fix's clothes. RB0
+> rule 1 already says the answer — "2xl 1536 four-up, **wider shell**" — so the
+> two `<main>` elements take `2xl:max-w-[96rem]`. Measured at 1600: 1536px
+> shell, four 342px cards.
+>
+> Scoped to the two routes' own `<main>`, not `DashboardLayout`'s container, so
+> nothing else inherits a width change it was not audited for.
+>
+> Verified at four widths: 375 one column · 700 two · 1440 three, shell still
+> 1280, no horizontal overflow · 1600 four.
+
 - **Problem:** `app/page.tsx:158` (`gap-6`) and `app/garage/page.tsx:128` (`gap-8`) both run `md:grid-cols-2 lg:grid-cols-3` and **skip `sm` entirely**, so 640–767px renders a single column of enormous cards — the worst-looking width in the product, and where a landscape phone and a small tablet both land. Above 1280px `max-w-7xl` caps the row at three, leaving gutters where a fourth column belongs. The two grids also disagree about their gap.
 - **Change:** one grid, both routes — `grid gap-5 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4`.
 - **Effort:** 20 minutes.
@@ -537,9 +610,119 @@ Nine deliberate pieces of responsive work are already in the codebase. The recom
 
 ---
 
-# Handoff — 2 Aug 2026, ~08:00
+# Handoff — 2 Aug 2026, ~14:30 (afternoon session)
 
-Written at the end of the morning session. Read this before touching anything.
+Read this one. The morning's handoff is kept below it for the record, and its
+"what I would pick up first" list is **spent** — item 10 shipped at 11:03 and
+RB0/RP0 at 11:12, both after it was written.
+
+## Where things stand
+
+- `main` = `8456afe`. Working tree clean. **Nothing from this session is
+  pushed or promoted** — production still serves `e729ee96`, which is the
+  morning's work.
+- 58 suites, 1001 tests, green. `npm run typecheck` clean.
+- **Two stale worktrees** under `.claude/worktrees/` (`confident-shtern`,
+  `friendly-lewin`). Both are *behind* `main` with nothing ahead — checked, no
+  stranded work. Prunable whenever.
+
+## What landed this afternoon
+
+Four commits, two tracks. The design track was the visible half; the cost track
+is the one that changes the unit economics.
+
+| Commit | What |
+|---|---|
+| `92f56e2` | **2.95b** — invoices are reduced before the extractor sees them |
+| `3dd9743` | **R15** — two-up at `sm`, and a wider shell at `2xl` |
+| `b5d1c53` | **2.95a** — an explicit thinking level, and the gate that proves it |
+| `02c78cf` | A return-type fix, and a correction to `b5d1c53`'s own claim |
+| `8456afe` | **RP1** — R6, R9, R10 in one pass |
+
+### The two findings worth carrying, whatever you pick up next
+
+**1. The consultant health check was testing the wrong model.**
+`/api/health/consultant` hardcoded `'gemini-2.5-flash'` while the consultant ran
+`FLASH_MODEL` (3.6). The canary answered "is some model reachable" while
+reporting "is the consultant working" — it would have stayed green straight
+through a 3.6 outage. Fixed in `b5d1c53`, and `ai-thinking-level.test.ts` now
+fails the build if a literal comes back. **This is the `cc-product-0003` lesson
+landing on an instrument, and it is the third time.**
+
+**2. A thinking level is a 400, not a hint.** Sending one to a 2.5 model returns
+`INVALID_ARGUMENT — "Thinking level is not supported for this model."` The
+generation configs are shared across model families, so the obvious version of
+2.95a — adding `thinkingConfig` to `flashConfig` — takes out every 2.5 call site
+at once, and `tsc` is perfectly happy about it. Always go through
+`withThinking`; never write `thinkingConfig` by hand.
+
+## Measured, not assumed
+
+- **Thinking tokens, `gemini-3.6-flash`, same prompt each time:** unset **861** ·
+  HIGH 726 · LOW 424 · MINIMAL 0, against ~150 tokens of visible answer. Thinking
+  bills at the output rate. `unset` costing more than `HIGH` is not a typo.
+- **Through the shipped code path:** consultant 743 → 449 thinking tokens, answer
+  the same length. The guard emits no `thinkingConfig` key at all for 2.5.
+- **The round-trip gate passed against the real model:** *"The consultant
+  answered with vehicle-specific facts: 41,200, Stage 1, Stage 1 tune"*, 3.5s.
+- **R15 at four widths:** 375 one column · 700 two (was **one** — measured
+  `grid-template-columns: none` before the change) · 1440 three, shell still
+  1280, no overflow · 1600 four at 342px.
+- **R6:** `main` padding 24px → 16px below `sm`, 24px at and above.
+
+## Gotchas this session added
+
+1. **`.tap-target-44` is not safe on a wrapped row.** It centres a 44px
+   `::after`, so on a ~30px chip it overhangs ~7px each side — into an 8px
+   `gap-2`, from both directions. Two rows get overlapping hit areas and the tap
+   goes to whichever paints last. Grow the control for real instead. The
+   consultant's follow-up chips are the worked example.
+2. **Four-up at `2xl` needs the shell widened or it is a regression.**
+   `max-w-7xl` stops at 1280px, so a fourth column just makes every card ~290px
+   — narrower than at 700px in two-up. RB0 rule 1 says "wider shell" and means it.
+3. **Documents are not photos.** `downscaleImage` at its photo defaults (1600px,
+   quality floor 0.5) is tuned for a car in a 400px card. An invoice is read, not
+   looked at; it gets `DOC_MAX_EDGE` 2048 and a byte budget sized so it stops on
+   the first quality rung. Do not collapse the two constants.
+4. **Vision is the one 3.x path with no thinking level, on purpose.** Invoice
+   extraction is where a regression is invisible — fewer line items still returns
+   valid JSON and still passes every gate. The corpus to settle it exists
+   (`COWORK_PROMPT_invoice_vision_corpus_2026-07-30.md`). Measure, then set one.
+
+## What I would pick up first, in order
+
+1. **Promote, or decide not to.** Five commits sit unpromoted, including a
+   consultant behaviour change. The round-trip gate passes locally; running it
+   against the candidate is the thing that should gate the promote.
+2. **2.95c — per-account metering.** It is the substrate for tier limits, and
+   **decision D2 (price point) should not be taken until it has two weeks of
+   data.** Everything downstream of Path A waits on this.
+3. **David: 5.0.** Entity, terms, privacy policy. Still the only genuine blocker
+   on revenue and the only one whose duration nobody controls.
+4. **The R10 tail** — data and labels to 13px on mobile. Needs a judgement per
+   site, which is why only the 12px floor landed.
+5. **Item 17's contrast finding** — `white/30` and `white/40` body text at
+   2.71:1 and 3.78:1, both failing AA. Unchanged from this morning: app-wide
+   tokens, so it is a Design call, and still a real defect on a portfolio piece.
+6. **The R9 lint rule** in `_adherence.oxlintrc.json`. It is in the DS repo, so
+   the 44px floor is still a review comment rather than a check.
+
+## Environment gaps that are not code
+
+- `MOBILE_TEST_TOKEN` in `.env` **expired 02:58 UTC 2 Aug**. Three bearer checks
+  in `verify-mobile-contract` fail against any target until it is refreshed off
+  the simulator.
+- `CONSULTANT_HEALTH_SECRET` is not set on prod, so `/api/health/consultant`
+  returns 503 there and the canary cannot check prod. The candidate has it.
+
+---
+---
+
+# Handoff — 2 Aug 2026, ~08:00 (morning session, superseded)
+
+Written at the end of the morning session. **Superseded by the entry above** —
+its "what I would pick up first" list is spent. Kept because its gotchas and its
+production verification still hold.
 
 ## Where things stand
 
