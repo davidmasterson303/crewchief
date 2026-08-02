@@ -26,6 +26,7 @@
  */
 
 import { genAI, flashStructuredConfig } from '@/lib/gemini';
+import { recordAiUsageInBackground } from '@/lib/ai-usage';
 import { logger } from '@crewchief/core/logger';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -152,6 +153,28 @@ export async function recomputePerformanceStats({
     contents: prompt,
     config: flashStructuredConfig,
   });
+  /*
+    The owner comes off the vehicle row rather than the signature. This function
+    takes no `userId` — its docblock is explicit that the caller proved access
+    before reaching here — and threading one through purely for the meter would
+    put a metering concern into an authorization contract that is deliberately
+    narrow. `select('*')` already has the row.
+
+    Note the model here is a hardcoded 2.5 literal, which is why it takes no
+    thinking level. `model-tiering.test.ts` only forbids literals in
+    `app/actions.ts`, so this one is outside the ratchet — worth pulling into a
+    tier constant, but that changes which model serves this path and is not a
+    metering change.
+  */
+  recordAiUsageInBackground(
+    {
+      purpose: 'performance_stats',
+      model: 'gemini-2.5-flash',
+      userId: (vehicle as { user_id?: string | null }).user_id ?? null,
+      vehicleId,
+    },
+    result.usageMetadata
+  );
 
   const text = result.text || '';
   const parsed = extractJSON(text) as any;

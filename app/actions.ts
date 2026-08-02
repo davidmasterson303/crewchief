@@ -12,6 +12,7 @@ import {
 import { VEHICLE_RESEARCH_PROMPT, POWERTRAIN_OPTIONS_PROMPT, CONSULTANT_SYSTEM_PROMPT, CONSULTANT_DOCUMENT_VALIDATION_PROMPT } from '@crewchief/core/prompts';
 import { logger } from '@crewchief/core/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { recordAiUsageInBackground } from '@/lib/ai-usage';
 import { downloadStoredFile } from '@/lib/storage-objects';
 import { loadConsultantContext, loadedContextKinds } from '@/lib/consultant-context';
 import { authorizeVehicleAccess, authorizeVehicleScopedRow, requireSession } from '@/lib/api-auth';
@@ -507,6 +508,14 @@ export async function generateVehicleDossier(vehicleId: string, vehicleData?: an
           RESEARCH_TIMEOUT_MS,
           'vehicle research'
         );
+        // Recorded per attempt, not per dossier. A retried research call is
+        // billed every time it runs, so a per-dossier row would under-report
+        // exactly the calls that cost the most — and D6 (eager vs lazy dossier
+        // generation) is decided on this number.
+        recordAiUsageInBackground(
+          { purpose: 'vehicle_dossier', model: PRO_MODEL, userId: access.userId, vehicleId },
+          response.usageMetadata
+        );
         const text = response.text || '';
 
         console.log(`[Research Attempt ${attempt + 1}] Response length: ${text.length} chars`);
@@ -763,6 +772,11 @@ export async function fetchPowertrainOptions(
       // a yes/no classification that has no use for reasoning at any price.
       config: withThinking(classificationConfig, LITE_MODEL, 'MINIMAL'),
     });
+    // No vehicle: this runs during onboarding, before one exists.
+    recordAiUsageInBackground(
+      { purpose: 'powertrain_options', model: LITE_MODEL, userId: session.userId },
+      response.usageMetadata
+    );
 
     const text = response.text || '';
     const jsonData = extractJSON(text);
@@ -1137,6 +1151,12 @@ export async function sendConsultantMessage(params: {
       // to be gated rather than assumed — see the round-trip gate.
       config: withThinking(flashConfig, FLASH_MODEL, 'LOW'),
     });
+    // `access.userId` is null on the demo path, which is deliberate: that
+    // traffic is anonymous, it is a real bill, and it has never been measured.
+    recordAiUsageInBackground(
+      { purpose: 'consultant', model: FLASH_MODEL, userId: access.userId, vehicleId },
+      result.usageMetadata
+    );
     let response = result.text || '';
 
     const wishlistParse = parseWishlistCommands(response);
@@ -1787,6 +1807,10 @@ Format as valid JSON only, no markdown.`;
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: withThinking(flashStructuredConfig, FLASH_MODEL, 'LOW'),
     });
+    recordAiUsageInBackground(
+      { purpose: 'vehicle_health_summary', model: FLASH_MODEL, userId: access.userId, vehicleId },
+      result.usageMetadata
+    );
 
     const responseText = result.text || '';
 
@@ -1980,6 +2004,10 @@ Format as valid JSON only, no markdown or explanations.`;
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: withThinking(flashStructuredConfig, FLASH_MODEL, 'LOW'),
     });
+    recordAiUsageInBackground(
+      { purpose: 'modification_details', model: FLASH_MODEL, userId: access.userId, vehicleId },
+      result.usageMetadata
+    );
 
     const responseText = result.text || '';
     let details = {
@@ -3031,6 +3059,17 @@ Return ONLY valid JSON, no markdown code blocks, no explanations.`;
         // corpus_2026-07-30.md`). Run a level against it, then set one.
         config: flashStructuredConfig,
       });
+      // The one path still running at the default thinking level, which makes
+      // it the one whose measurements decide whether that stays true.
+      recordAiUsageInBackground(
+        {
+          purpose: 'invoice_extraction',
+          model: FLASH_VISION_MODEL,
+          userId: access.userId,
+          vehicleId,
+        },
+        result.usageMetadata
+      );
 
       const responseText = result.text || '{}';
       const parsed = extractJSON(responseText);
@@ -5348,6 +5387,10 @@ Respond with ONLY valid JSON, no markdown:
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: withThinking(flashStructuredConfig, FLASH_MODEL, 'LOW'),
     });
+    recordAiUsageInBackground(
+      { purpose: 'modification_backfill', model: FLASH_MODEL, userId: access.userId, vehicleId },
+      result.usageMetadata
+    );
 
     const responseText = result.text || '';
     let parsed: any = null;
@@ -5571,6 +5614,12 @@ Respond with ONLY valid JSON:
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
           config: withThinking(flashStructuredConfig, FLASH_MODEL, 'LOW'),
         });
+        // Inside a loop — one row per generated mod, which is the point. This
+        // is the path most likely to surprise on cost.
+        recordAiUsageInBackground(
+          { purpose: 'modification_backfill', model: FLASH_MODEL, userId: access.userId, vehicleId },
+          result.usageMetadata
+        );
 
         const responseText = result.text || '';
         const parsed = extractJSON(responseText);
