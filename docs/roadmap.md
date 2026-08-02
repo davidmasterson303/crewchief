@@ -16,7 +16,8 @@ against prod afterwards.
 | **Done** | 1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 16, 17 | 12 |
 | **Partial** | 13, 15 | 2 |
 | **Open** | 5, 12, 14, 18 | 4 |
-| **Open (work stream B)** | R1–R15 + RB0 | 16 |
+| **Done (work stream B)** | RB0, R1, R2, R3, R5 | 5 |
+| **Open (work stream B)** | R4, R6–R15 | 11 |
 
 Every item below carries a status line. **Handoff notes are at the bottom of
 this file** — read those first if you are picking this up cold.
@@ -306,6 +307,10 @@ Source: `Responsive Audit.dc.html`, 2 Aug 2026, read against `main`. Every route
 **Do RB0 first.** Fifteen patches without the shared rules produces a sixteenth finding next month, and most of R1–R15 collapse into one-line edits once the rules exist.
 
 ## RB0 — the four rules to adopt before the patches
+> **DONE — 2 Aug 2026.** All four written into `app/globals.css` by name so reviews can
+> cite them. Rules 3 and 4 are enforced in CSS there; rules 1 (the ladder) and 2 (the
+> container scale) are conventions the markup carries, and RP1 is the pass that applies them.
+
 
 Add to `app/globals.css` and to the DS spec, then reference by name in review.
 
@@ -321,6 +326,11 @@ Add to `app/globals.css` and to the DS spec, then reference by name in review.
 ## RP0 — this week (~1 day, all four are edits to shared code)
 
 ### R2. Every text field zooms the page on iOS and never zooms back — CRITICAL
+> **DONE.** Pointer-scoped exactly as specified. The composer's `text-sm` was removed at the
+> call site rather than the rule marked `!important` — verified it now carries no size utility
+> and resolves through `.field`. The "do not use `maximum-scale`" warning is written beside
+> the rule in the stylesheet, not only here.
+
 > Highest visible-impact-to-effort ratio in the whole audit. Do it first.
 
 - **Problem:** mobile Safari zooms the viewport when a focused input is under 16px and does **not** restore scale on blur. `.field` is 14px (`globals.css:876`), `.field-sm` 13px (`:931`), and the chat composer passes `text-sm` as a utility (`ConsultantChat.tsx:975`). Tapping the composer, conversation search, a mileage edit or any onboarding field jerks the layout and leaves the user on a horizontally-scrolled page for the rest of the session.
@@ -341,6 +351,10 @@ Add to `app/globals.css` and to the DS spec, then reference by name in review.
 - **Effort:** 20 minutes.
 
 ### R1. Dialogs cannot scroll and touch both edges of the phone — CRITICAL
+> **DONE.** Primitive fixed once; all six local `vh` overrides deleted. Measured at 375×812:
+> 326px wide, 25px backdrop each side, `max-height: 690.2px` (85dvh), `overflow-y: auto`,
+> 16px radius.
+
 - **Problem:** `components/ui/dialog.tsx:41` is stock shadcn — `w-full max-w-lg`, −50% translate centring, `p-6`, **no `max-height`, no `overflow`**. Any dialog taller than the viewport overflows past the top *and* bottom with no way to reach either end: clipped, not scrolled. At 375px the panel is exactly 375px wide, flush to both edges, and `sm:rounded-lg` means square corners below 640px. **Ten** dialogs inherit it unguarded, including the two longest flows in the product (`DocumentUploadDialog:257`, `VehiclePhotoUploadDialog:245`). Six others set `max-h-[90vh]` locally — right instinct, wrong unit: `vh` is the *largest* viewport on iOS, so 90vh still runs under the URL bar.
 - **Change:** in the primitive, once —
   ```diff
@@ -353,11 +367,19 @@ Add to `app/globals.css` and to the DS spec, then reference by name in review.
 - **Effort:** ~1 hour for all ten.
 
 ### R3. Vehicle-info spec tiles collapse to a column of single letters — CRITICAL
+> **DONE.** Both sites. Measured at 375px: one column, 227px per tile, against the ~0 the
+> text column used to resolve to.
+
 - **Problem:** `app/vehicle-info/[vehicleId]/page.tsx:189` and `:234` are a bare `grid grid-cols-3` with no breakpoint. From the 231px a card gets at 375px (see R6): each column is 66px, of which a 32px icon, a 12px gap and 32px of tile padding are already spent. The text column resolves to ~0 and "8-speed automatic" wraps one character per line.
 - **Change:** `- grid grid-cols-3 gap-4` → `+ grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4`, both sites.
 - **Effort:** 10 minutes.
 
 ### R5. Three controls a touch user can never reveal — CRITICAL
+> **DONE.** `.reveal-on-hover` added and `.meta-edit` / `.turn-actions` now share its
+> declarations. The named-group warning was real — the selector carries `.group\/image:hover`
+> as well, or the card's photo overlay would have been missed. Verified: 18 controls, none
+> still on a `group-hover` utility, all pinned under `(hover: none)`.
+
 - **Problem:** `VehicleCard.tsx:316` (photo overlay), `:417` (⋮ menu) and `MaintenanceHistory.tsx:382` (delete record) are `opacity-0 group-hover:opacity-100`. No hover on a phone, so **delete vehicle, change photo and update mileage have no mobile entry point at all** — and adding the photo the whole identity-plate design depends on is impossible from the garage.
 - **Change:** the system already solved this — `.meta-edit` (`globals.css:828`) and `.turn-actions` (`:1019`) both pin visible under `@media (hover: none)`, with the reasoning written down. Generalise it instead of adding a third copy:
   ```css
