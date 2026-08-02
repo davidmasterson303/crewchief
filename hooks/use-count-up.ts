@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { prefersReducedMotion } from './use-reduced-motion';
 
 /**
  * Animates a number from 0 to `target` on mount.
@@ -80,7 +81,3 @@ export function useCountUp(
   return value;
 }
 
-function prefersReducedMotion(): boolean {
-  if (typeof window === 'undefined' || !window.matchMedia) return false;
-  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { prefersReducedMotion } from '@/hooks/use-reduced-motion';
 import { useHealthBand } from '@/hooks/use-health-band';
 
 /*
@@ -74,10 +75,6 @@ const MAJORS = [0, 20, 40, 60, 80, 100];
 const BOUNDARIES = new Set([40, 60, 80]);
 const MINORS = Array.from({ length: 21 }, (_, i) => i * 5).filter((t) => !MAJORS.includes(t));
 
-function prefersReducedMotion(): boolean {
-  if (typeof window === 'undefined' || !window.matchMedia) return false;
-  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-}
 
 /**
  * The ignition sweep: 0 → 100 → settle on the score, ~900ms.

@@ -84,6 +84,14 @@ const STATIC_ANALYSIS_SUITES = [
   // — swapping the CSS slats for a 1.4 MB JPEG — renders correctly, so no
   // runtime assertion can see it. Only the source can.
   'garage-door-cost.test.ts',
+  // Reads components/, hooks/ and app/ to prove every requestAnimationFrame
+  // loop and every smooth scroll asks about prefers-reduced-motion. There is
+  // nothing to import: the subject is the *absence* of a check across the
+  // whole tree, and the two gaps it was written after — TCOCard's rAF ring and
+  // ConsultantChat's smooth scroll — both animate correctly and would pass any
+  // behavioural assertion. jsdom also reports no media-query match, so a
+  // rendered test cannot tell a component that asked from one that did not.
+  'reduced-motion.test.ts',
 ];
 
 /**

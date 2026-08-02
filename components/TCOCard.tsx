@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { prefersReducedMotion } from '@/hooks/use-reduced-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DollarSign, TrendingDown, Fuel, Wrench, ShieldCheck, ChevronRight, ToggleLeft, ToggleRight, Info, SlidersHorizontal } from 'lucide-react';
@@ -44,6 +45,20 @@ function DonutChart({ segments, total }: { segments: DonutSegment[]; total: numb
   const DURATION = 1200;
 
   useEffect(() => {
+    /*
+      The blanket CSS rule in globals.css cannot see a requestAnimationFrame
+      loop, so this ring drew itself over 1200ms for everyone — including
+      visitors who asked for reduced motion. Found by the item-17 audit rather
+      than by anyone reporting it, which is the point of auditing as a list.
+
+      Landing on the final value rather than skipping the effect: the end state
+      is never optional, only the travel to it.
+    */
+    if (prefersReducedMotion()) {
+      setProgress(1);
+      return;
+    }
+
     setProgress(0);
     startRef.current = null;
     const animate = (now: number) => {
