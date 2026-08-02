@@ -159,8 +159,19 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
     setIsEditingCurrentMileage(false);
   };
 
+  /*
+    The beltline (1c) — the dashboard's half of the rhyme with the public
+    garage's service bay (1a). Same vocabulary, quieter: this is where the work
+    happens and the page is dense with real content, so the band sits low and
+    dim and the ambient strip runs at a third of the batten's intensity.
+    See `.cockpit-belt` in globals.css.
+
+    It replaces a flat `bg-black`, which is why nothing needed re-layering: the
+    plate composites under everything as a background, exactly as the bay does
+    on the surfaces that already took it.
+  */
   return (
-    <div className="min-h-screen bg-black">
+    <div className="min-h-screen cockpit-belt">
       {/*
         `bay-batten` is the one ambient accent per screen — the same luminous
         hairline the public garage carries on its nav, so the signed-in app and

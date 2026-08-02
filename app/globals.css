@@ -265,6 +265,27 @@ nav {
     transition: transform 80ms var(--ease-standard);
   }
 
+  /* A machined top edge — concept 2c.
+   *
+   * One 1px catch-light along the top, then a ~30px falloff, as if a milled
+   * surface were picking up the light above it. Everything else stays matte;
+   * this is the only place a highlight is allowed on a well, and there is no
+   * glassmorphism anywhere near it.
+   *
+   * Both effects are background/box-shadow rather than a pseudo-element, so
+   * this composites *under* the element's content and can be dropped on a
+   * container that already has children — the same constraint `.service-bay`
+   * ran into. `background-image` also layers over whatever
+   * `background-color` the well already has, so a surface-3 well keeps its
+   * value and only gains the falloff. No new tokens, per the spec.
+   *
+   * `VehicleIdentity` had been hand-rolling the catch-light inline, in two
+   * places, with no falloff. That is what this replaces. */
+  .machined {
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06);
+    background-image: linear-gradient(180deg, rgb(255 255 255 / 0.045), transparent 30px);
+  }
+
   /* The cluster gauge in forced-colors mode (Windows High Contrast and
    * friends). See components/ClusterGauge.tsx.
    *
@@ -408,6 +429,71 @@ nav {
     background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, repeat-x, no-repeat;
     background-size: 100% 100%, 100% 100%, 100% 100%, 100% 36%, 100% 1px, 100% 64%, 100% 100%;
     background-position: 0 0, 0 0, 0 0, 0 100%, 0 64%, 0 0, 0 0;
+  }
+
+  /* The cockpit beltline — concept 1c, and the dashboard's half of the rhyme.
+   *
+   * The public garage stands in a room (1a). The signed-in dashboard stands in
+   * a car: a brushed-metal band across the middle distance with one ambient
+   * strip along its top edge, the way a flagship interior draws its dash at
+   * night. Same vocabulary — near-black ground, one cyan line, machined
+   * texture, no photograph — so moving between the two surfaces reads as one
+   * product rather than two.
+   *
+   * Quieter than the bay on purpose. The dashboard is where the work happens
+   * and it is dense with real content; the garage is a landing page with three
+   * cards on it. So the beltline sits low and dim, and the ambient strip is a
+   * third of the batten's intensity — atmosphere, not a feature.
+   *
+   * Same single-element construction as `.service-bay`, and for the same
+   * reason: this goes on a container that already has children, so every layer
+   * has to composite underneath them.
+   *
+   * `--belt-y` is where the band sits. It is a percentage of a page that
+   * scrolls, so it deliberately does *not* track the viewport — the band is
+   * part of the page's ground, not a fixed overlay, and pinning it would make
+   * it swim against the content on the way down. */
+  .cockpit-belt {
+    --belt-y: 58%;
+    --belt-led: 1;
+
+    background-color: #0a0a0b;
+    background-image:
+      /* the ambient strip, and its bloom */
+      linear-gradient(
+        90deg,
+        transparent 0%,
+        rgb(34 211 238 / calc(0.5 * var(--belt-led))) 18%,
+        rgb(150 238 250 / calc(0.62 * var(--belt-led))) 50%,
+        rgb(34 211 238 / calc(0.5 * var(--belt-led))) 82%,
+        transparent 100%
+      ),
+      radial-gradient(
+        ellipse 70% 26% at 50% var(--belt-y),
+        rgb(34 211 238 / calc(0.05 * var(--belt-led))),
+        transparent 65%
+      ),
+      /* brushed metal — 1px on, 2px off, so it reads as grain not stripes */
+      repeating-linear-gradient(
+        90deg,
+        rgb(255 255 255 / 0.03) 0 1px,
+        rgb(255 255 255 / 0.012) 1px 2px,
+        transparent 2px 3px
+      ),
+      /* the band's own shading, darker at both ends so it turns away */
+      linear-gradient(90deg, rgb(0 0 0 / 0.55), transparent 18%, transparent 82%, rgb(0 0 0 / 0.55)),
+      /* floor sheen below the belt */
+      linear-gradient(180deg, rgb(255 255 255 / 0.016), transparent 55%),
+      /* the ground */
+      linear-gradient(180deg, #0a0a0b 0%, #100f0d 46%, #0b0a09 100%);
+    /* repeat-x, not repeat, on the brushed layer. `repeat` tiles it down the
+     * page as well as across, so the grain climbed out of its 11% band and
+     * textured the entire background — visible behind the page title, which is
+     * nowhere near the beltline. */
+    background-repeat: no-repeat, no-repeat, repeat-x, no-repeat, no-repeat, no-repeat;
+    background-size: 92% 1px, 100% 100%, 100% 11%, 100% 11%, 100% 34%, 100% 100%;
+    background-position: 50% var(--belt-y), 0 0, 0 var(--belt-y), 0 var(--belt-y), 0 100%, 0 0;
+    background-attachment: scroll;
   }
 
   /* Auth screens. The room is scenery there, not the subject — the form is —

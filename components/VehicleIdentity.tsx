@@ -284,11 +284,12 @@ export function VehicleIdentity({
               onError={() => setFailedUrl(src)}
             />
           </picture>
-          {/* Top highlight — the band's only decoration, and it is not over the photo. */}
+          {/* The machined top edge (2c) — the band's only decoration, and it is
+              not over the photo. Was an inline 1px catch-light here and again
+              below; `.machined` is that, plus the falloff the spec asks for. */}
           <div
             aria-hidden="true"
-            className="absolute inset-0 pointer-events-none"
-            style={{ boxShadow: 'inset 0 1px 0 rgb(255 255 255 / .06)' }}
+            className="absolute inset-0 pointer-events-none machined"
           />
         </>
       ) : (
@@ -339,8 +340,7 @@ export function VehicleIdentity({
 
           <div
             aria-hidden="true"
-            className="absolute inset-0 pointer-events-none"
-            style={{ boxShadow: 'inset 0 1px 0 rgb(255 255 255 / .06)' }}
+            className="absolute inset-0 pointer-events-none machined"
           />
         </>
       )}
