@@ -16,10 +16,14 @@
  */
 
 import {
+  dayStart,
   decideBudget,
+  decideDemoBudget,
+  demoBudgetMessage,
   monthStart,
   budgetMessage,
   resolveTier,
+  DEMO_BUDGET,
   TIERS,
   WARN_AT,
 } from '@crewchief/core/ai/budget';
@@ -177,5 +181,97 @@ describe('budgetMessage', () => {
     const message = budgetMessage(decideBudget(usage(LIMIT), tier));
 
     expect(message.toLowerCase()).not.toMatch(/upgrade|subscribe|plan|pricing/);
+  });
+});
+
+describe('the demo has a ceiling too, and it degrades rather than breaking', () => {
+  /*
+    The demo is the only unauthenticated path to a model in this application.
+    The per-minute limit is ten calls per vehicle against three demo vehicles,
+    so the theoretical monthly ceiling was around 1.3 million calls — a number,
+    not a ceiling. An earlier version left it uncapped on the grounds that a
+    fuse blowing on the recruiter-facing demo was worse than the bill; that
+    protects the wrong thing.
+  */
+  const budget = DEMO_BUDGET;
+
+  it('allows an ordinary day', () => {
+    const d = decideDemoBudget(1_000, 20_000, budget);
+
+    expect(d.allowed).toBe(true);
+    expect(d.exhausted).toBeNull();
+  });
+
+  it('stops the day without stopping the month', () => {
+    const d = decideDemoBudget(budget.dailyOutputTokens, budget.dailyOutputTokens, budget);
+
+    expect(d.allowed).toBe(false);
+    expect(d.exhausted).toBe('day');
+    expect(demoBudgetMessage(d)).toContain('tomorrow');
+  });
+
+  it('reports the month when the month is what ran out', () => {
+    /*
+      Order matters. If the month is gone, "back tomorrow" is a lie, and a
+      wrong horizon is worse than none — someone returns tomorrow to the same
+      message and concludes the demo is broken rather than budgeted.
+    */
+    /*
+      Both windows are spent here, deliberately. The first version of this
+      assertion passed `usedToday: 0`, so the daily branch could never fire and
+      the test proved nothing about ordering — swapping the two checks left it
+      green. This is the case that distinguishes them.
+    */
+    const d = decideDemoBudget(budget.dailyOutputTokens, budget.monthlyOutputTokens, budget);
+
+    expect(d.exhausted).toBe('month');
+    expect(demoBudgetMessage(d)).toContain('next month');
+    expect(demoBudgetMessage(d)).not.toContain('tomorrow');
+  });
+
+  it('leaves the daily cap far above what a portfolio link produces', () => {
+    // ~600 output-equivalent tokens per consultant turn, measured 2 Aug. If
+    // this ever drops below a couple of hundred turns a day it has stopped
+    // being a fuse and started being a product limit.
+    expect(budget.dailyOutputTokens / 600).toBeGreaterThan(200);
+  });
+
+  it('keeps the month worth more than a single day, and bounded', () => {
+    expect(budget.monthlyOutputTokens).toBeGreaterThan(budget.dailyOutputTokens);
+    // A month of days at the daily cap would be ~4.5M. The monthly cap is the
+    // real bound, and it is the one that keeps the worst case near $11.
+    expect(budget.monthlyOutputTokens).toBeLessThan(31 * budget.dailyOutputTokens);
+  });
+
+  it('treats an unconfigured ceiling as no ceiling, never as silence', () => {
+    /*
+      The worst outcome this file can produce is a silent demo on a page
+      recruiters are sent to. A zero read literally would do exactly that,
+      instantly, from a typo.
+    */
+    const d = decideDemoBudget(999_999, 999_999, { dailyOutputTokens: 0, monthlyOutputTokens: 0 });
+
+    expect(d.allowed).toBe(true);
+  });
+
+  it('does not blame the visitor or sound broken', () => {
+    // A recruiter reads this. "Shared public demo with a cap" is a product
+    // decision; "error" or "sorry" reads as a fault.
+    const message = demoBudgetMessage(decideDemoBudget(budget.dailyOutputTokens, 0, budget));
+
+    expect(message).toMatch(/shared public demo/i);
+    expect(message).toMatch(/still works/i);
+    expect(message.toLowerCase()).not.toMatch(/error|sorry|failed|unavailable/);
+  });
+});
+
+describe('dayStart', () => {
+  it('is the first instant of the day in UTC', () => {
+    expect(dayStart(new Date('2026-08-02T21:30:00Z')).toISOString()).toBe('2026-08-02T00:00:00.000Z');
+  });
+
+  it('rolls at the UTC boundary, not the caller local one', () => {
+    expect(dayStart(new Date('2026-08-02T23:59:59Z')).toISOString()).toBe('2026-08-02T00:00:00.000Z');
+    expect(dayStart(new Date('2026-08-03T00:00:00Z')).toISOString()).toBe('2026-08-03T00:00:00.000Z');
   });
 });

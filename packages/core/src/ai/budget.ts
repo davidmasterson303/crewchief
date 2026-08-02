@@ -75,6 +75,46 @@ export function resolveTier(_userId: string | null): Tier {
   return TIERS.free;
 }
 
+/**
+ * The public demo's own ceiling.
+ *
+ * ── Why the demo needs one at all ───────────────────────────────────────────
+ *
+ * It is the only unauthenticated surface that calls Gemini. The per-minute
+ * limit is ten calls per vehicle and there are three demo vehicles, so the
+ * theoretical ceiling was around 1.3 million calls a month — which is not a
+ * ceiling, it is a number. An anonymous, publicly invokable model endpoint with
+ * no monthly bound is the largest uncontrolled cost in the application, and it
+ * was first left uncapped on the argument that capping it risked the portfolio
+ * piece. That argument protects the wrong thing: an unbounded bill is not safer
+ * than a quiet consultant.
+ *
+ * ── Two windows, and the daily one is the important half ────────────────────
+ *
+ * A monthly cap alone fails badly. One bad afternoon exhausts it and the demo's
+ * consultant is dead for three weeks — precisely the outcome worth avoiding on
+ * a page recruiters are sent to. A daily cap turns that into "quiet until
+ * tomorrow", which is survivable, and bounds the month anyway. Whichever binds
+ * first wins.
+ *
+ * ── The arithmetic behind the numbers ───────────────────────────────────────
+ *
+ * Measured 2 Aug: a consultant turn runs roughly 450 thinking + 150 output ≈
+ * 600 output-equivalent tokens, and Flash output bills around $7.50/M — about
+ * $0.0045 a turn.
+ *
+ *   daily      150,000 ≈   250 turns ≈  $1.13/day
+ *   monthly  1,500,000 ≈ 2,500 turns ≈ $11.25/month
+ *
+ * 250 consultant turns in a day is far more than a portfolio link produces, so
+ * an honest visitor never meets the limit. The worst case stops being unbounded
+ * and becomes about eleven dollars.
+ */
+export const DEMO_BUDGET = {
+  dailyOutputTokens: 150_000,
+  monthlyOutputTokens: 1_500_000,
+} as const;
+
 /** The fraction of the budget at which a user is told they are approaching it. */
 export const WARN_AT = 0.8;
 
@@ -132,6 +172,82 @@ export function decideBudget(usage: MonthlyUsage, tier: Tier): BudgetDecision {
     fractionUsed,
     remainingOutputTokens: remaining,
   };
+}
+
+/**
+ * Decide whether the shared demo may make another model call.
+ *
+ * Two windows against one pool. The tighter verdict wins, and the *reason* is
+ * carried back so the message can say "today" or "this month" — "the limit was
+ * reached" with no horizon reads as broken, where "quiet until tomorrow" reads
+ * as designed.
+ */
+export interface DemoBudgetDecision {
+  allowed: boolean;
+  /** Which window stopped it, or null when nothing did. */
+  exhausted: 'day' | 'month' | null;
+  usedToday: number;
+  usedThisMonth: number;
+}
+
+export function decideDemoBudget(
+  usedToday: number,
+  usedThisMonth: number,
+  budget: { dailyOutputTokens: number; monthlyOutputTokens: number } = DEMO_BUDGET
+): DemoBudgetDecision {
+  const today = Math.max(0, Math.round(usedToday || 0));
+  const month = Math.max(0, Math.round(usedThisMonth || 0));
+
+  /*
+    Same rule as `decideBudget`: a non-positive ceiling means "not configured",
+    never "spend nothing". A typo here would silence the consultant on the
+    public demo, which is the failure this whole design is trying to avoid.
+  */
+  const dailyLimit = budget.dailyOutputTokens > 0 ? budget.dailyOutputTokens : Infinity;
+  const monthlyLimit = budget.monthlyOutputTokens > 0 ? budget.monthlyOutputTokens : Infinity;
+
+  // Month checked first: if the month is gone, saying "try tomorrow" would be
+  // a lie, and a wrong horizon is worse than none.
+  if (month >= monthlyLimit) {
+    return { allowed: false, exhausted: 'month', usedToday: today, usedThisMonth: month };
+  }
+  if (today >= dailyLimit) {
+    return { allowed: false, exhausted: 'day', usedToday: today, usedThisMonth: month };
+  }
+
+  return { allowed: true, exhausted: null, usedToday: today, usedThisMonth: month };
+}
+
+/**
+ * What the demo says when its allowance is spent.
+ *
+ * Deliberately not an apology and not an error. This is a shared public demo
+ * with a spending cap, which is a true and faintly reassuring thing for a
+ * recruiter to read — and every other part of the page still works, because
+ * the garage, the dossiers, the service history and the cost tables are all
+ * real stored data that never touches a model.
+ */
+export function demoBudgetMessage(decision: DemoBudgetDecision): string {
+  const horizon = decision.exhausted === 'month' ? 'next month' : 'tomorrow';
+
+  return (
+    `This is a shared public demo, and its AI allowance for ${
+      decision.exhausted === 'month' ? 'this month' : 'today'
+    } has been used. ` +
+    `The consultant is back ${horizon}. Everything else on this page is real data and still works.`
+  );
+}
+
+/**
+ * The first instant of the current day, in UTC.
+ *
+ * UTC for the same reason as `monthStart` — it has to agree with the
+ * `created_at` values it is compared against, which Postgres wrote in UTC.
+ */
+export function dayStart(now: Date = new Date()): Date {
+  return new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0)
+  );
 }
 
 /**

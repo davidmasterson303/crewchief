@@ -1,28 +1,34 @@
 import { getServiceRoleClient } from './supabase';
 import { logger } from '@crewchief/core/logger';
 import {
+  dayStart,
   decideBudget,
+  decideDemoBudget,
   monthStart,
   resolveTier,
   type BudgetDecision,
+  type DemoBudgetDecision,
 } from '@crewchief/core/ai/budget';
 
 /**
  * Read what an account has spent this month and decide whether it may spend
  * more. Phase 5.1.
  *
- * ── The demo is never hard-stopped, and that is a decision ──────────────────
+ * ── The demo is capped too, and degrades rather than breaking ───────────────
  *
- * Anonymous demo traffic (`user_id IS NULL`) is real spend on a public,
- * unauthenticated surface, and it is exactly the traffic a budget exists to
- * bound. It is also `crewchief-demo.davidmasterson.co` — linked from a
- * portfolio, shown to recruiters during an active job search. A hard stop
- * there converts a cost problem into a blank page in front of the audience the
- * whole product is being shown to.
+ * Anonymous traffic (`user_id IS NULL`) is the only unauthenticated path to a
+ * model in this application, and it was the largest uncontrolled cost in it.
+ * An earlier version of this file left it uncapped, reasoning that a fuse
+ * blowing on the recruiter-facing demo was worse than the bill. That protects
+ * the wrong thing — an unbounded bill is not safer than a quiet consultant.
  *
- * So the demo is **measured and logged, never blocked**. If it ever runs hot
- * the log says so and the answer is a decision someone takes deliberately, not
- * a fuse that blows on a Tuesday afternoon while someone is reading the page.
+ * `checkDemoBudget` bounds it with two windows against one shared pool, and
+ * the design point is that **exhausting it does not break the page**. The
+ * garage, dossiers, service history, health scores and cost tables are all
+ * stored data that never touches a model; only live chat pauses, and it says
+ * why and when it returns. The daily window is what makes that survivable —
+ * a monthly cap alone would mean one bad afternoon silences the demo for three
+ * weeks.
  *
  * ── It fails open, and that is also a decision ──────────────────────────────
  *
@@ -36,7 +42,7 @@ import {
  * where it is.
  */
 
-export type { BudgetDecision };
+export type { BudgetDecision, DemoBudgetDecision };
 
 /** Allowed, with nothing measured. The shape returned on every bail-out path. */
 const UNMEASURED: BudgetDecision = {
@@ -48,9 +54,73 @@ const UNMEASURED: BudgetDecision = {
   remainingOutputTokens: Number.POSITIVE_INFINITY,
 };
 
+/**
+ * Whether the shared public demo may make another model call.
+ *
+ * Anonymous traffic is one pool — there is no account to key on and that is
+ * the point: the demo is a single shared resource with a single bill.
+ *
+ * One query, two windows. Today's rows are a subset of this month's, so
+ * fetching the month once and partitioning in memory costs one round trip
+ * instead of two. The row count is bounded by the cap itself, which is the
+ * pleasant kind of circular.
+ *
+ * Fails open, like the per-account check and for the same reason: what is being
+ * protected is a bill, not a security boundary, and the per-minute rate limit
+ * is still underneath it.
+ */
+export async function checkDemoBudget(): Promise<DemoBudgetDecision> {
+  try {
+    const client = getServiceRoleClient();
+    const since = monthStart().toISOString();
+
+    const { data, error } = await client
+      .from('ai_usage_events')
+      .select('output_tokens, thoughts_tokens, created_at')
+      .is('user_id', null)
+      .gte('created_at', since);
+
+    if (error) {
+      logger.warn('AI_BUDGET:DEMO_READ_FAILED', 'Could not read demo usage; allowing the call', {
+        message: error.message,
+      });
+      return { allowed: true, exhausted: null, usedToday: 0, usedThisMonth: 0 };
+    }
+
+    const dayBoundary = dayStart().getTime();
+    let usedToday = 0;
+    let usedThisMonth = 0;
+
+    for (const row of data ?? []) {
+      // Thinking counted with output — it bills at the output rate, and on the
+      // consultant it is the larger half.
+      const cost = (row.output_tokens ?? 0) + (row.thoughts_tokens ?? 0);
+      usedThisMonth += cost;
+      if (new Date(row.created_at as string).getTime() >= dayBoundary) usedToday += cost;
+    }
+
+    const decision = decideDemoBudget(usedToday, usedThisMonth);
+
+    if (!decision.allowed) {
+      logger.warn('AI_BUDGET:DEMO_EXHAUSTED', 'Demo AI allowance spent', {
+        exhausted: decision.exhausted,
+        usedToday: decision.usedToday,
+        usedThisMonth: decision.usedThisMonth,
+      });
+    }
+
+    return decision;
+  } catch (err) {
+    logger.warn('AI_BUDGET:DEMO_THREW', 'Demo budget check threw; allowing the call', {
+      message: err instanceof Error ? err.message : String(err),
+    });
+    return { allowed: true, exhausted: null, usedToday: 0, usedThisMonth: 0 };
+  }
+}
+
 export async function checkMonthlyBudget(userId: string | null): Promise<BudgetDecision> {
-  // The demo. Measured by `recordAiUsage` like everything else; simply not
-  // gated. See the note above.
+  // Anonymous traffic is not per-account and is gated by `checkDemoBudget`
+  // instead — one shared pool, two windows. See above.
   if (!userId) return UNMEASURED;
 
   try {

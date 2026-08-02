@@ -9,8 +9,8 @@ import {
   classificationConfig,
   withThinking,
 } from '@/lib/gemini';
-import { checkMonthlyBudget } from '@/lib/ai-budget';
-import { budgetMessage } from '@crewchief/core/ai/budget';
+import { checkDemoBudget, checkMonthlyBudget } from '@/lib/ai-budget';
+import { budgetMessage, demoBudgetMessage } from '@crewchief/core/ai/budget';
 import { VEHICLE_RESEARCH_PROMPT, POWERTRAIN_OPTIONS_PROMPT, CONSULTANT_SYSTEM_PROMPT, CONSULTANT_DOCUMENT_VALIDATION_PROMPT } from '@crewchief/core/prompts';
 import { logger } from '@crewchief/core/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
@@ -985,12 +985,29 @@ export async function sendConsultantMessage(params: {
       usage before establishing who they are would be a lookup on a
       caller-supplied id, and the budget read uses the service role.
 
-      `access.userId` is null on the demo path, and `checkMonthlyBudget`
-      deliberately does not gate that — see the note in `lib/ai-budget.ts`.
+      The demo has its own pool rather than no pool — see immediately below.
     */
-    const budget = await checkMonthlyBudget(access.userId);
-    if (!budget.allowed) {
-      return { success: false, error: budgetMessage(budget) };
+    if (isDemoVehicle) {
+      /*
+        Two windows against one shared pool. This is the only unauthenticated
+        path to a model in the application, so the per-minute limit on its own
+        left the largest uncontrolled cost in it uncontrolled.
+
+        It degrades rather than breaking. Everything else on the demo — the
+        garage, the dossiers, the service history, the health scores, the cost
+        tables — is stored data that never touches a model, so a spent
+        allowance pauses live chat and nothing else, and the message says when
+        it comes back.
+      */
+      const demo = await checkDemoBudget();
+      if (!demo.allowed) {
+        return { success: false, error: demoBudgetMessage(demo) };
+      }
+    } else {
+      const budget = await checkMonthlyBudget(access.userId);
+      if (!budget.allowed) {
+        return { success: false, error: budgetMessage(budget) };
+      }
     }
 
     const { vehicleId, sessionId, message, messageHistory, attachedDocuments } = params;
