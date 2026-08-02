@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { scrollBehavior } from '@/hooks/use-reduced-motion';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -310,7 +311,13 @@ export default function ConsultantChat({
     if (!messagesContainerRef.current) return;
     const container = messagesContainerRef.current;
     requestAnimationFrame(() => {
-      container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+      /*
+        `behavior` is specified to win over the `scroll-behavior` property, so
+        the blanket reduced-motion rule in globals.css does not reach this —
+        it is the one case where the CSS looks like it has motion covered and
+        does not. Asked explicitly instead.
+      */
+      container.scrollTo({ top: container.scrollHeight, behavior: scrollBehavior() });
     });
   };
 

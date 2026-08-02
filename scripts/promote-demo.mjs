@@ -128,6 +128,42 @@ try {
   bad(`/api/version unreachable (${e.message}) — deploy this route before promoting`);
 }
 
+/* 3b ── the share card resolves to somewhere real -------------------------- */
+/*
+  The audit's F1, made un-repeatable.
+
+  `openGraph.images` was a relative URL with no `metadataBase`, so Next 13.5
+  silently resolved it against http://localhost:3000 — no warning, no build
+  failure, and a deployed page that asked every scraper to fetch the preview
+  from its own machine. The demo domain is linked from David's portfolio, so
+  the one artefact that had to work was the one that never had.
+
+  Checked here rather than in a unit test because it is a property of the
+  *built and deployed* HTML: metadataBase resolves at render time and reads an
+  env var, so a green local build proves nothing about what Netlify serves.
+  This is the same reasoning that put the /api/version check above it.
+*/
+console.log('\nShare card (against the candidate)');
+try {
+  const html = await (await fetch(`${CANDIDATE}/`, { cache: 'no-store' })).text();
+  const image = html.match(/property="og:image"\s+content="([^"]+)"/)?.[1];
+
+  if (!image) {
+    bad('no og:image in the deployed HTML — app/opengraph-image.tsx did not render');
+  } else if (!/^https:\/\//.test(image)) {
+    bad(`og:image is not absolute https (${image}) — metadataBase is unset or wrong`);
+  } else if (/localhost|127\.0\.0\.1/.test(image)) {
+    bad(`og:image points at ${image} — this is F1 returning`);
+  } else {
+    const head = await fetch(image, { method: 'HEAD' });
+    head.ok
+      ? ok(`og:image ${new URL(image).pathname} → ${head.status}`)
+      : bad(`og:image ${image} → ${head.status}`);
+  }
+} catch (e) {
+  bad(`share card unverifiable (${e.message})`);
+}
+
 /* 4 ── the demo contract, against the candidate ---------------------------- */
 console.log('\nDemo contract (against the candidate)');
 try {

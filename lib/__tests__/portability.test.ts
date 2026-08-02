@@ -121,7 +121,6 @@ const NOT_PORTABLE: Record<string, string> = {
   'lib/performance-stats.ts': 'Supabase types, and calls Gemini',
   'lib/rate-limit.ts': 'reaches Supabase through lib/supabase',
   'lib/sign-out.ts': 'Supabase types',
-  'lib/vehicle-images.ts': 'reaches Supabase through lib/supabase',
   /*
     The precedence rule — owner photo over stock, the unphotographed-demo
     carve-out — is portable and duplicated in hooks/useSignedUrl.ts. What is
