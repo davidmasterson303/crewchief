@@ -825,6 +825,43 @@ will not fire and it will not stall mid-run.
 9. **The R9 lint rule** in `_adherence.oxlintrc.json`. It is in the DS repo, so
    the 44px floor is still a review comment rather than a check.
 
+## Phase 3.3 — account deletion, and how far it is verified
+
+**Built and bundled, not run.** `AccountScreen` is one tap from the garage and
+`DELETE /api/v1/account` is wired. What has actually been checked:
+
+- mobile `tsc` clean; web 62 suites / 1090 tests green
+- the confirmation rule, the inventory and the summary are shared from
+  `packages/core/src/account-deletion.ts` and unit-tested — the web dialog
+  imports them rather than keeping its own copy, because **Apple reviews the
+  mobile surface** and two implementations let the reviewed one drift weaker
+- `npx expo export --platform ios` bundles clean, 636 modules, and the shipped
+  `.hbc` contains "Delete my account", "Signed in as", "Every consultant
+  conversation" and "Your account has been deleted" — so the screen *and* the
+  cross-package core import are genuinely in the binary, not tree-shaken
+
+**Not verified: it has never been rendered.** No simulator run, no tap-through.
+Treat 5.1.1(v) as built-not-proven until someone launches it.
+
+> **Do not chase `xcode-select` on this Mac.** The simulator MCP tool reports
+> "Xcode is installed but not selected" and asks for
+> `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`. **The Mac
+> is already configured correctly** — Xcode → Settings → Locations shows
+> *Command Line Tools: Xcode 16.3 (16E140)*, `xcode-select -p` returns the
+> Xcode path, and `xcrun --find simctl` resolves into `Xcode.app`. The tool's
+> precondition check is what is wrong.
+>
+> Two signals that look like evidence and are not: `xcrun --show-sdk-path` with
+> no argument returns the default *macOS* SDK, which Command Line Tools
+> legitimately provides, and `/var/db/xcode_select_link` is absent on a machine
+> that is nonetheless correctly selected. I read both as faults and sent David
+> to fix something that was not broken. Check `xcrun --find simctl` instead.
+
+**When someone does run it, do not press the final delete.** There is one real
+account and no throwaway. Verify the screen renders, the button stays disabled
+until the phrase is typed, and stop there — item D already proved the cascade
+against a disposable account on 1 Aug.
+
 ## Environment gaps that are not code
 
 - `MOBILE_TEST_TOKEN` in `.env` **expired 02:58 UTC 2 Aug**. Three bearer checks
