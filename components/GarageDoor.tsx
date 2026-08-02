@@ -232,7 +232,34 @@ export default function GarageDoor({ panel, children }: GarageDoorProps) {
 
   return (
     <IntroRevealContext.Provider value={revealed}>
-      {children}
+      {/*
+        The garage is behind an opaque curtain while the door is closed, but
+        "behind" is only true for the eye. Tab moved straight through it: four
+        of the first ten stops landed on controls at effective opacity 0 — "Add
+        a photo of this car", "Update mileage", "Vehicle options", "View
+        Dashboard" — with the focus ring invisible along with them. WCAG 2.4.3
+        and 2.4.7, and the door deliberately waits for the visitor, so this is a
+        state a first-time keyboard user sits in for as long as they like.
+
+        `inert` rather than `aria-hidden`: the ten `aria-hidden`s already in
+        this tree hide things from the accessibility tree and leave them in the
+        tab order, which is exactly the half that was not the problem.
+
+        `display: contents` so the wrapper is invisible to layout — the page
+        root stays a direct flex child of `body`, which the R4 app shell relies
+        on.
+
+        Lowercase and cast because React 18.2 does not know `inert`; same
+        treatment, and same reason, as `fetchpriority` in `VehicleIdentity`.
+        `undefined` removes the attribute — an empty string would still be
+        present, and a present `inert` is an active one.
+      */}
+      <div
+        style={{ display: 'contents' }}
+        {...({ inert: revealed ? undefined : '' } as Record<string, unknown>)}
+      >
+        {children}
+      </div>
 
       {phase !== 'gone' && (
         <div
