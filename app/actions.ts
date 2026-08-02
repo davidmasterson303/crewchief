@@ -10,6 +10,7 @@ import {
   withThinking,
 } from '@/lib/gemini';
 import { checkDemoBudget, checkMonthlyBudget } from '@/lib/ai-budget';
+import { checkStoredPhotoSize } from '@crewchief/core/image-resize';
 import { budgetMessage, demoBudgetMessage } from '@crewchief/core/ai/budget';
 import { VEHICLE_RESEARCH_PROMPT, POWERTRAIN_OPTIONS_PROMPT, CONSULTANT_SYSTEM_PROMPT, CONSULTANT_DOCUMENT_VALIDATION_PROMPT } from '@crewchief/core/prompts';
 import { logger } from '@crewchief/core/logger';
@@ -3458,6 +3459,25 @@ export async function uploadVehiclePhoto(formData: FormData) {
     const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
     if (!access.ok) {
       return { success: false, error: access.error };
+    }
+
+    /*
+      The only server-side bound on what goes into the bucket, and until now
+      there was none. `downscaleImage` runs in the browser and is deliberately
+      allowed to give up — a photo that uploads large beats one that fails to
+      upload — so the sole guarantee about stored size lived in code that is
+      designed not to guarantee it.
+
+      Checked after authorization, not before: refusing an unauthorized caller
+      on file size would tell them their request reached something.
+    */
+    const sizeCheck = checkStoredPhotoSize(file.size);
+    if (!sizeCheck.ok) {
+      logger.warn('VEHICLE_PHOTO:TOO_LARGE', 'Refused an oversized vehicle photo', {
+        vehicleId,
+        bytes: file.size,
+      });
+      return { success: false, error: sizeCheck.reason };
     }
 
     const client = access.client;

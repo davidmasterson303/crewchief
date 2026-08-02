@@ -14,6 +14,8 @@ import {
   shouldAcceptEncoding,
   downscaledFileName,
   isDownscalableImage,
+  checkStoredPhotoSize,
+  MAX_STORED_PHOTO_BYTES,
   MAX_EDGE,
   TARGET_BYTES,
   QUALITY_LADDER,
@@ -193,5 +195,60 @@ describe('document bounds', () => {
   it('still descends for a document that genuinely overshoots', () => {
     // The budget is generous, not absent.
     expect(shouldAcceptEncoding(900 * 1024, 0, DOC_TARGET_BYTES)).toBe(false);
+  });
+});
+
+describe('checkStoredPhotoSize', () => {
+  /*
+    The bound that did not exist. `uploadVehiclePhoto` read a file and put it in
+    the bucket; the only thing keeping stored photos small was `downscaleImage`
+    running in the browser, which is explicitly allowed to give up and return
+    the original. The sole guarantee lived in code designed not to guarantee.
+
+    Measured against live storage on 2 Aug: the one real stored photo is
+    2,328,761 bytes, uploaded sixteen hours before the client downscale landed.
+    Every viewer of that car downloads all of it for a card 172 points tall.
+  */
+  it('accepts a photo the client actually processed', () => {
+    // TARGET_BYTES is 150 KB, so a successful downscale lands an order of
+    // magnitude inside the ceiling.
+    expect(checkStoredPhotoSize(TARGET_BYTES).ok).toBe(true);
+    expect(checkStoredPhotoSize(400 * 1024).ok).toBe(true);
+  });
+
+  it('refuses the file that is actually in the bucket today', () => {
+    const result = checkStoredPhotoSize(2_328_761);
+
+    expect(result.ok).toBe(false);
+  });
+
+  it('tells the user the number and what to do about it', () => {
+    /*
+      "Too large" with no figure produces a support conversation instead of a
+      retry. The message has to carry the size, the limit and a next step.
+    */
+    const result = checkStoredPhotoSize(2_328_761);
+
+    if (result.ok) throw new Error('expected a refusal');
+    expect(result.reason).toContain('2.2 MB');
+    expect(result.reason).toContain('1.5 MB');
+    expect(result.reason).toMatch(/try a different photo|smaller export/i);
+  });
+
+  it('accepts a file whose size is unknown', () => {
+    /*
+      Fails open on missing information, like every other guard added today. A
+      absent `size` is not evidence of the harm this bound exists to stop, and
+      refusing on it would break uploads for a reason nobody could diagnose.
+    */
+    expect(checkStoredPhotoSize(0).ok).toBe(true);
+    expect(checkStoredPhotoSize(NaN).ok).toBe(true);
+    expect(checkStoredPhotoSize(undefined as unknown as number).ok).toBe(true);
+  });
+
+  it('leaves an order of magnitude of headroom over a processed photo', () => {
+    // If this ratio ever collapses, the ceiling has stopped being a backstop
+    // against a broken downscale and started rejecting ordinary photos.
+    expect(MAX_STORED_PHOTO_BYTES / TARGET_BYTES).toBeGreaterThan(5);
   });
 });
