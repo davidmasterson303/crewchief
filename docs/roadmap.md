@@ -660,10 +660,10 @@ RB0/RP0 at 11:12, both after it was written.
 
 ## Where things stand
 
-- `main` = the R11/R12 commit. Working tree clean. **Nothing from this session is
+- `main` = `0fe7248`, pushed. Working tree clean. **Nothing from this session is
   pushed or promoted** — production still serves `e729ee96`, which is the
   morning's work.
-- 61 suites, 1055 tests, green. `npm run typecheck` clean.
+- 62 suites, 1075 tests, green. `npm run typecheck` clean.
 - **Two stale worktrees** under `.claude/worktrees/` (`confident-shtern`,
   `friendly-lewin`). Both are *behind* `main` with nothing ahead — checked, no
   stranded work. Prunable whenever.
@@ -800,14 +800,29 @@ will not fire and it will not stall mid-run.
 2. ~~**2.95c — per-account metering.**~~ **Done (`bb83782`)** — all ten call
    sites record. Waiting only on the migration above, then two weeks of data
    before **D2 (price point)** can be taken as a decision rather than a guess.
-3. **David: 5.0.** Entity, terms, privacy policy. Still the only genuine blocker
-   on revenue and the only one whose duration nobody controls.
-4. **The R10 tail** — data and labels to 13px on mobile. Needs a judgement per
+3. ~~**5.1 — tier limits and budget enforcement.**~~ **Enforcement half done
+   (`0fe7248`).** A monthly output-token ceiling read from the meter, wired into
+   the consultant and invoice paths. **The upgrade-prompt half is deliberately
+   not built** — D2 and D3 are open, the KB is silent on both, and a prompt
+   leading nowhere is worse than a plain limit. Two risk decisions are recorded
+   at their call sites: the demo is measured but never hard-stopped, and the
+   check fails open.
+4. **David: 5.0.** Entity, terms, privacy policy. Still the only genuine blocker
+   on revenue and the only one whose duration nobody controls. **Now the
+   binding constraint on the whole money track** — 2.95 and 5.1 are done, and
+   5.2 cannot ship to a real card without it.
+5. **R13/R14's dead components.** Delete `MaintenanceHistory.tsx` and
+   `UpcomingMaintenance.tsx`, or wire them up. A scope decision, not a fix.
+6. **2.95d — window the consultant context.** Waits on two weeks of meter data,
+   per Addendum A. The first three rows already say thinking runs 5–8× the
+   visible answer *at `LOW`*, which is an argument for re-testing `MINIMAL` on
+   the non-prose paths once there is a sample worth reading.
+7. **The R10 tail** — data and labels to 13px on mobile. Needs a judgement per
    site, which is why only the 12px floor landed.
-5. **Item 17's contrast finding** — `white/30` and `white/40` body text at
-   2.71:1 and 3.78:1, both failing AA. Unchanged from this morning: app-wide
-   tokens, so it is a Design call, and still a real defect on a portfolio piece.
-6. **The R9 lint rule** in `_adherence.oxlintrc.json`. It is in the DS repo, so
+8. **Item 17's contrast finding** — `white/30` and `white/40` body text at
+   2.71:1 and 3.78:1, both failing AA. Unchanged: app-wide tokens, so it is a
+   Design call, and still a real defect on a portfolio piece.
+9. **The R9 lint rule** in `_adherence.oxlintrc.json`. It is in the DS repo, so
    the 44px floor is still a review comment rather than a check.
 
 ## Environment gaps that are not code
