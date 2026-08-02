@@ -105,15 +105,9 @@ export default function ResetPasswordPage() {
     }
   }
 
-  const bgStyle = {
-    backgroundImage: `linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.85)), url('/dark-roomb.jpeg')`,
-    backgroundSize: 'cover',
-    backgroundPosition: 'center',
-  };
-
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4" style={bgStyle}>
+      <div className="min-h-screen flex items-center justify-center p-4 service-bay service-bay-dim">
         <div className="w-full max-w-md text-center">
           <div className="bg-white/5 border border-white/10 rounded-2xl p-10 backdrop-blur-xl">
             <CheckCircle2 className="h-14 w-14 text-emerald-400 mx-auto mb-5" />
@@ -127,7 +121,7 @@ export default function ResetPasswordPage() {
 
   if (invalidLink) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4" style={bgStyle}>
+      <div className="min-h-screen flex items-center justify-center p-4 service-bay service-bay-dim">
         <div className="w-full max-w-md text-center">
           <div className="bg-white/5 border border-white/10 rounded-2xl p-10 backdrop-blur-xl">
             <Car className="h-10 w-10 text-white mx-auto mb-5" />
@@ -148,7 +142,7 @@ export default function ResetPasswordPage() {
 
   if (!sessionReady) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4" style={bgStyle}>
+      <div className="min-h-screen flex items-center justify-center p-4 service-bay service-bay-dim">
         <div className="w-full max-w-md text-center">
           <div className="bg-white/5 border border-white/10 rounded-2xl p-10 backdrop-blur-xl">
             <Loader2 className="h-10 w-10 text-info mx-auto mb-5 animate-spin" />
@@ -166,7 +160,7 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={bgStyle}>
+    <div className="min-h-screen flex items-center justify-center p-4 service-bay service-bay-dim">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2.5 group mb-6">

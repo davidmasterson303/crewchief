@@ -272,6 +272,123 @@ nav {
     background: radial-gradient(120% 100% at 50% 30%, rgb(0 0 0 / 0) 45%, rgb(0 0 0 / 0.35) 100%);
   }
 
+  /* The service bay — the room, built out of light instead of pixels.
+   *
+   * This replaces `dark-roomb.jpeg` and its 1920 derivative on every surface
+   * that used them: `/` and the five auth screens. Three things were wrong
+   * with the photograph at once, and only one of them was fixable by picking
+   * a better photograph:
+   *
+   *   - Provenance. public/CREDITS.md could name neither the photographer nor
+   *     the source URL, and "believed Unsplash" cannot distinguish Unsplash
+   *     from Unsplash+ once EXIF is stripped. It was the only asset on the
+   *     site in that state, on the page a portfolio links to.
+   *   - Weight. The auth screens fetched the 480 KB master — not even the
+   *     142 KB derivative `/` used — and then buried it under a scrim at
+   *     0.6 → 0.85 alpha. Roughly a tenth of it did any visual work.
+   *   - Timing. It was a `background-image` in an inline style on a client
+   *     component, so the fetch could not start until hydration. On a
+   *     door-skip visit the room visibly arrived late.
+   *
+   * A gradient stack answers all three: nothing to licence, zero bytes, and
+   * it paints with the first stylesheet rather than a round-trip later.
+   *
+   * Deliberately one element, not the seven nested divs the concept was drawn
+   * with. The auth screens apply this to a container that already holds the
+   * card, and a pseudo-element or child overlay would paint on top of it —
+   * `.photo-plate::before` gets away with that only because its children are
+   * positioned. A background-layer stack composites underneath everything,
+   * so this class is safe to drop on any container.
+   *
+   * The light fixture is NOT here — it is `.bay-batten`, below, which mounts
+   * on a nav. This class is the room: ceiling wash, floor, seams, falloff.
+   * They were one thing in the concept and separating them is the single
+   * substantive change from it; the reasoning is on `.bay-batten`.
+   *
+   * The two knobs are the whole API. --bay-led scales every cyan alpha at
+   * once, so a variant is one number rather than six edits. --bay-vignette
+   * deepens the corners. Both are read through rgb()'s slash-alpha syntax
+   * with calc(), which is why the colours are written in space-separated
+   * form: the legacy rgba() comma syntax cannot take a calc() alpha.
+   *
+   * Geometry: wall to 64%, floor below it. That horizon is shared by three
+   * layers, so if it moves it moves in all of them. */
+  .service-bay {
+    --bay-led: 1;
+    --bay-vignette: 0.35;
+
+    background-color: #0b0a09;
+    background-image:
+      /* corner falloff */
+      radial-gradient(120% 100% at 50% 30%, rgb(0 0 0 / 0) 45%, rgb(0 0 0 / var(--bay-vignette)) 100%),
+      /* the wash the fixture throws across the ceiling */
+      radial-gradient(ellipse 92% 52% at 50% 13%, rgb(34 211 238 / calc(0.09 * var(--bay-led))), transparent 62%),
+      /* the floor catching it */
+      radial-gradient(ellipse 52% 9% at 50% 69%, rgb(34 211 238 / calc(0.06 * var(--bay-led))), transparent 72%),
+      linear-gradient(180deg, rgb(255 255 255 / 0.028), rgb(255 255 255 / 0.007) 45%, transparent),
+      /* wall/floor seam */
+      linear-gradient(rgb(255 255 255 / 0.045), rgb(255 255 255 / 0.045)),
+      /* panel joins, wall only */
+      repeating-linear-gradient(90deg, transparent 0 139px, rgb(255 255 255 / 0.02) 139px 140px),
+      /* the room */
+      linear-gradient(180deg, #0b0a09 0%, #131110 52%, #191713 64%, #15130f 100%);
+    background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, repeat-x, no-repeat;
+    background-size: 100% 100%, 100% 100%, 100% 100%, 100% 36%, 100% 1px, 100% 64%, 100% 100%;
+    background-position: 0 0, 0 0, 0 0, 0 100%, 0 64%, 0 0, 0 0;
+  }
+
+  /* Auth screens. The room is scenery there, not the subject — the form is —
+   * so the LED comes down to 40% and the corners go darker to hold it in.
+   * These pages have no nav, so they get no `.bay-batten` either: ambient
+   * light only, which is the right reading for a screen whose whole job is
+   * one form. */
+  .service-bay-dim {
+    --bay-led: 0.4;
+    --bay-vignette: 0.55;
+  }
+
+  /* The batten — the luminous fixture the room is lit by, mounted on the
+   * bottom edge of a nav.
+   *
+   * In the concept this was a layer of the plate, positioned at 12% from the
+   * top, and at the mockup's 440px height that put it exactly on the bottom
+   * edge of the nav drawn over it. That coincidence is the whole design: the
+   * nav *is* the ceiling, and the line is where the ceiling ends. A real
+   * viewport is 700–1100px tall, so 12% instead lands 86px down — inside an
+   * opaque nav (rgb(14,13,11), measured), where it is simply invisible. That
+   * is what shipping the concept literally would have produced: a plate whose
+   * signature element could not be seen on the one page it was drawn for.
+   *
+   * Anchoring it to the nav fixes that permanently and costs nothing. It
+   * cannot drift behind the chrome, it cannot strike through a headline, and
+   * it does not care how tall the viewport is or whether the demo banner is
+   * above it. It also collapses concept 2b — "one ambient hairline on the nav
+   * bottom edge, replacing the scattered glows" — into the same rule, because
+   * at the nav edge the two concepts were always the same line.
+   *
+   * ::after rather than a child so no nav markup changes; the host needs
+   * `relative`. It sits on top of the 1px border the navs already carry,
+   * which is why it is 2px — 1px of light over 1px of border reads thin and
+   * slightly grey. */
+  .bay-batten::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 2px;
+    pointer-events: none;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgb(34 211 238 / 0.55) 14%,
+      rgb(160 240 252 / 0.8) 50%,
+      rgb(34 211 238 / 0.55) 86%,
+      transparent 100%
+    );
+    box-shadow: 0 0 18px 2px rgb(34 211 238 / 0.28), 0 0 70px 16px rgb(34 211 238 / 0.08);
+  }
+
   /* The signature photography treatment, as one class.
    *
    * Vignette and scrim were two separate overlay divs that every photo

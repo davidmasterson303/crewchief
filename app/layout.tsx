@@ -22,6 +22,23 @@ const inter = Inter({ subsets: ['latin'] });
  */
 
 export const metadata: Metadata = {
+  /*
+     Without this, every relative URL in this object — the og:image most of all
+     — resolves against `http://localhost:3000`. Not a warning and not a build
+     failure: Next 13.5 substitutes localhost silently, so the deployed HTML
+     has been telling every scraper to fetch the preview image from its own
+     machine. That is the link David's portfolio shares, and it has never
+     produced a card.
+
+     NEXT_PUBLIC_SITE_URL lets deploy previews describe themselves rather than
+     claiming to be production, which matters because a preview's card would
+     otherwise point at the live site's image. The literal is the fallback so
+     production is right whether or not the variable is set — an unset
+     variable degrades to "correct for prod", never back to localhost.
+  */
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL || 'https://crewchief-demo.davidmasterson.co'
+  ),
   title: 'CrewChief — Your Personal Auto Ownership Consultant',
   description:
     'Track your vehicles, log service history, and get answers from an AI consultant that knows your car — its issues, schedule, and history.',
@@ -32,14 +49,11 @@ export const metadata: Metadata = {
     url: 'https://crewchief-demo.davidmasterson.co',
     siteName: 'CrewChief',
     /*
-       Points at the derivative, with its real dimensions.
-
-       It declared 1920×1280 against a file that is 3333×2000 — neither the
-       width, the height, nor the aspect ratio was right. Scrapers use these to
-       lay out a card before the image arrives, so a wrong ratio is a cropped or
-       letterboxed preview, and this is the link David's portfolio shares.
+       No `images` key. `app/opengraph-image.tsx` is the card now, and Next
+       emits its tags — absolute URL, real dimensions, correct content-type —
+       from the file itself. Declaring images here as well would override it
+       and put the old problem back.
     */
-    images: [{ url: '/garage-interior-1920.jpg', width: 1920, height: 1152 }],
     type: 'website',
   },
   twitter: { card: 'summary_large_image' },
