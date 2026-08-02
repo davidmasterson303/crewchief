@@ -40,6 +40,31 @@ export function CostBreakdownTable({ costBreakdown }: CostBreakdownTableProps) {
     return hours.toFixed(1);
   };
 
+  const range = (low: string, high: string) => (low === high ? low : `${low} – ${high}`);
+
+  /*
+    Computed once and rendered twice — as a table from `md` up and as a card per
+    item below it (R8). The two presentations are genuinely different layouts,
+    not one layout with a breakpoint, but they must never be different *numbers*,
+    so the arithmetic happens here and neither branch does any of its own.
+  */
+  const rows = costBreakdown.items.map((item) => ({
+    description: item.description,
+    notes: item.notes,
+    parts: range(formatCurrency(item.parts_cost_low), formatCurrency(item.parts_cost_high)),
+    hours: range(formatHours(item.labor_hours_low), formatHours(item.labor_hours_high)),
+    laborCost: range(formatCurrency(item.labor_cost_low), formatCurrency(item.labor_cost_high)),
+    total: range(
+      formatCurrency(item.parts_cost_low + item.labor_cost_low),
+      formatCurrency(item.parts_cost_high + item.labor_cost_high)
+    ),
+  }));
+
+  const estimatedTotal = range(
+    formatCurrency(costBreakdown.total_low),
+    formatCurrency(costBreakdown.total_high)
+  );
+
   return (
     <Card className="bg-slate-900/50 border-info-border">
       <CardHeader>
@@ -52,7 +77,61 @@ export function CostBreakdownTable({ costBreakdown }: CostBreakdownTableProps) {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="border border-info-border rounded-lg overflow-hidden">
+        {/*
+          R8 — below `md` this is a card per line item, not a table.
+
+          Five columns, each carrying a low *and* a high figure, inside a
+          wrapper whose 231px of content at 375px is already the product of four
+          nested gutters. The wrapper is `overflow-hidden`, so the usual escape
+          hatch is closed on purpose and stays closed: a sideways-scrolling
+          estimate is not an answer either. This is the artefact the consultant
+          produces to justify a number — it *is* the answer — and on a phone it
+          was a stack of clipped numerals.
+
+          Same data, same order, no horizontal scroll. The table returns at `md`
+          where scanning a column is the point.
+        */}
+        <div className="md:hidden space-y-3">
+          {rows.map((row, index) => (
+            <div key={index} className="border border-info-border rounded-lg p-3.5 bg-black/20">
+              <p className="text-[15px] font-medium text-foreground leading-snug">{row.description}</p>
+
+              {row.notes && (
+                /*
+                  A tooltip on touch is a hover affordance with no hover, so the
+                  note is simply shown here. It is one line of context on an
+                  estimate someone is about to spend money against — the desktop
+                  table can afford to tuck it away, a phone cannot.
+                */
+                <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">{row.notes}</p>
+              )}
+
+              <dl className="mt-3 space-y-1.5 text-sm">
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-muted-foreground">Parts</dt>
+                  <dd className="num text-right">{row.parts}</dd>
+                </div>
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-muted-foreground">Labor</dt>
+                  <dd className="num text-right">
+                    {row.hours} hr · {row.laborCost}
+                  </dd>
+                </div>
+                <div className="flex items-baseline justify-between gap-3 border-t border-info-border pt-1.5">
+                  <dt className="font-semibold text-foreground">Total</dt>
+                  <dd className="num text-right font-semibold text-info-strong">{row.total}</dd>
+                </div>
+              </dl>
+            </div>
+          ))}
+
+          <div className="flex items-center justify-between gap-3 border border-info-border rounded-lg bg-info-wash px-3.5 py-3">
+            <span className="font-bold text-info">Estimated Total</span>
+            <span className="num font-bold text-info-strong text-right">{estimatedTotal}</span>
+          </div>
+        </div>
+
+        <div className="hidden md:block border border-info-border rounded-lg overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow className="border-info-border hover:bg-cyan-400/5">
@@ -64,10 +143,7 @@ export function CostBreakdownTable({ costBreakdown }: CostBreakdownTableProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {costBreakdown.items.map((item, index) => {
-                const totalLow = item.parts_cost_low + item.labor_cost_low;
-                const totalHigh = item.parts_cost_high + item.labor_cost_high;
-
+              {rows.map((item, index) => {
                 return (
                   <TableRow key={index} className="border-info-border hover:bg-cyan-400/5">
                     <TableCell className="font-medium">
@@ -90,30 +166,10 @@ export function CostBreakdownTable({ costBreakdown }: CostBreakdownTableProps) {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex flex-col text-sm">
-                        <span>{formatCurrency(item.parts_cost_low)}</span>
-                        <span className="text-xs text-muted-foreground">to {formatCurrency(item.parts_cost_high)}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex flex-col text-sm">
-                        <span>{formatHours(item.labor_hours_low)}</span>
-                        <span className="text-xs text-muted-foreground">to {formatHours(item.labor_hours_high)}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex flex-col text-sm">
-                        <span>{formatCurrency(item.labor_cost_low)}</span>
-                        <span className="text-xs text-muted-foreground">to {formatCurrency(item.labor_cost_high)}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right font-semibold">
-                      <div className="flex flex-col">
-                        <span>{formatCurrency(totalLow)}</span>
-                        <span className="text-xs text-muted-foreground">to {formatCurrency(totalHigh)}</span>
-                      </div>
-                    </TableCell>
+                    <TableCell className="num text-right text-sm">{item.parts}</TableCell>
+                    <TableCell className="num text-right text-sm">{item.hours}</TableCell>
+                    <TableCell className="num text-right text-sm">{item.laborCost}</TableCell>
+                    <TableCell className="num text-right text-sm font-semibold">{item.total}</TableCell>
                   </TableRow>
                 );
               })}
@@ -124,7 +180,7 @@ export function CostBreakdownTable({ costBreakdown }: CostBreakdownTableProps) {
                 <TableCell className="text-right">
                   <div className="flex flex-col">
                     <Badge variant="outline" className="justify-center rounded-full border-transparent bg-info-wash text-info-strong px-3.5 py-1.5 font-bold tabular-nums">
-                      {formatCurrency(costBreakdown.total_low)} - {formatCurrency(costBreakdown.total_high)}
+                      {estimatedTotal}
                     </Badge>
                   </div>
                 </TableCell>
