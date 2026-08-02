@@ -1,4 +1,4 @@
-# CrewChief roadmap — image pipeline, backdrop, and cockpit direction
+# CrewChief roadmap — image pipeline, backdrop, cockpit direction, and responsive web
 
 Source: `Live-Site Audit.dc.html` (2 Aug 2026), grounded in repo `davidmasterson303/crewchief@main` (aa1d73f) and the live demo. Finding refs (F1–F8) and concept refs (1a–1c, 2a–2c) point into that report. Advisor KB was offline for the audit; reconcile against it when reconnected, and stage a `kb_propose` for the decisions below.
 
@@ -13,9 +13,10 @@ against prod afterwards.
 
 | | Items | |
 |---|---|---|
-| **Done** | 1, 2, 3, 4, 6, 7, 8, 9, 11, 16, 17 | 11 |
+| **Done** | 1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 16, 17 | 12 |
 | **Partial** | 13, 15 | 2 |
-| **Open** | 5, 10, 12, 14, 18 | 5 |
+| **Open** | 5, 12, 14, 18 | 4 |
+| **Open (work stream B)** | R1–R15 + RB0 | 16 |
 
 Every item below carries a status line. **Handoff notes are at the bottom of
 this file** — read those first if you are picking this up cold.
@@ -163,22 +164,24 @@ this file** — read those first if you are picking this up cold.
 - **Ignition sweep:** on dashboard load, once per session — needle sweeps 0 → 100 → settles on the score in ~900ms (ease-out return), arc draws in behind it, count-up in sync. Complements the scan line (scan = photo band, sweep = gauge; never both on one element). `prefers-reduced-motion` jumps to the settled state. Hooks exist in `use-count-up.ts` and the intro gate. (~half day total)
 
 ### 10. DEMO_IMAGES + migration deleted together (F8)
-> **OPEN — deliberately not done, and the item's premise is inverted.**
+> **DONE — 2 Aug 2026, and the item's premise was inverted.**
 >
-> Migration `20260726230000` sets `image_url` to **local** paths
-> (`/vehicles/accord/hero-3x2.jpg` and siblings). It is what *removes* the Pexels URLs, so
-> reverting it would restore them, not clear them.
+> Closed by asking the database instead of the migration file. All three demo rows hold
+> local paths — `/vehicles/{accord,wrx,m3}/hero-3x2.jpg` — and no Pexels URL survives in
+> the column, so the migration has been applied everywhere. That was the condition the map
+> was always waiting on. Reverting the migration, as this item asked, would have *restored*
+> the Pexels URLs rather than cleared them.
 >
-> The real hazard is the one `VehicleCard`'s own comment names: the map points cards at
-> `card-800` derivatives while the column holds the page-width hero, so deleting it makes
-> the grid fall back to three heroes — the payload the map exists to prevent, and a
-> straight failure of the budget test.
+> The real constraint was the map's own warning: do not simply fall back to `image_url`,
+> because the column holds the page-width hero. `packages/core/src/photo-slots.ts` derives
+> `card-800` from `hero-3x2` and `VehicleIdentity` applies it for the card variant only —
+> the naming convention the map itself proposed, and the one the AVIF/WebP siblings already
+> use. A rule rather than a table, because a table has to be kept in step with the seed
+> data and a rule cannot drift from it.
 >
-> **To close it properly:** check what the live database actually holds (not what the
-> migration file says), then give the card a card-sized source — a second column, a naming
-> convention, or `srcset` — and delete the map in the same change.
-
-- The `DEMO_IMAGES` override in `VehicleCard.tsx` and migration `20260726230000` must ship their deletions as one ticket — dropping the override first sends demo cards back to the Pexels CDN URLs still in the database. (bookkeeping)
+> Verified in the browser: the grid requests two `card-800` AVIFs and no hero; the dashboard
+> band requests the hero and no card. Both budget suites now exercise the shipped derivation
+> rather than importing a constant.
 
 ### 11. Blur-layer derivative (F7, optional)
 > **DONE**, and no longer optional — it shipped as part of item 16. The fill takes a 32px
@@ -291,6 +294,224 @@ this file** — read those first if you are picking this up cold.
 
 ## Sequencing logic
 P0 removes the two user-visible embarrassments on the highest-traffic paths and retires the licence risk. P1 makes every remaining image cheap and kills the unlicensed acquisition path. P2 is polish that needs P1's pieces. P3 spends real money (photography) only after the system it feeds is coherent. P4 locks the results in with automated proof before the App Store push.
+
+---
+
+# Work stream B — responsive web (R1–R15)
+
+Source: `Responsive Audit.dc.html`, 2 Aug 2026, read against `main`. Every route checked at 320 / 375 / 414 / 768 / 1024 / 1440. Line numbers are as-read on `main` — re-locate by the quoted class string, not the number, if the file has moved since.
+
+**The diagnosis, in one line:** the app is not unresponsive, it is desktop-authored and reflowed by accident. There are **18 breakpoint decisions in ~5,300 lines** of the screens users actually spend time in; four screens have zero. The mobile work that *does* exist (drawer, edge-fade tab strip, `.tap-target-44`, `@media (hover: none)`) is all correct and all applied to exactly the one element that reported the bug.
+
+**Do RB0 first.** Fifteen patches without the shared rules produces a sixteenth finding next month, and most of R1–R15 collapse into one-line edits once the rules exist.
+
+## RB0 — the four rules to adopt before the patches
+
+Add to `app/globals.css` and to the DS spec, then reference by name in review.
+
+1. **The ladder** — four widths, named by what changes, not by device:
+   `base` one column / 16px gutter · `sm 640` two-up cards, full chrome · `lg 1024` three-up, sidebars appear · `2xl 1536` four-up, wider shell. `md` is a transition, not a design target — nothing may *first* appear at `md`.
+2. **The container scale** — every nesting level steps down exactly once below `sm`:
+   page `px-4 sm:px-6 lg:px-12` · panel `p-4 sm:p-6` · card `p-4 sm:p-5` · tile `p-3 sm:p-4`.
+3. **Three floors**, lintable: **16px** any focusable input at ≤640 · **12px** any rendered text · **44px** any interactive target.
+4. **Touch parity** — a control revealed by hover must have a non-hover path. One utility (`.reveal-on-hover`), and never `display:none` on an action.
+
+---
+
+## RP0 — this week (~1 day, all four are edits to shared code)
+
+### R2. Every text field zooms the page on iOS and never zooms back — CRITICAL
+> Highest visible-impact-to-effort ratio in the whole audit. Do it first.
+
+- **Problem:** mobile Safari zooms the viewport when a focused input is under 16px and does **not** restore scale on blur. `.field` is 14px (`globals.css:876`), `.field-sm` 13px (`:931`), and the chat composer passes `text-sm` as a utility (`ConsultantChat.tsx:975`). Tapping the composer, conversation search, a mileage edit or any onboarding field jerks the layout and leaves the user on a horizontally-scrolled page for the rest of the session.
+- **Not the viewport meta.** Next emits `width=device-width, initial-scale=1`, which is correct and stays. And `globals.css:876` already **predicted this exact bug** and deferred the call ("16 has an argument… belongs to whoever wants it, not to a primitive refactor"). Design owns it now: **16px on touch pointers, 14px kept for mouse-driven desktop.**
+- **Change:** scope to the pointer, not the width —
+  ```css
+  /* iOS Safari zooms any focused input under 16px and never restores scale.
+   * Pointer-scoped so mouse-driven desktop keeps its 14px density: a 500px
+   * desktop window has no zoom rule to satisfy, a 1024px tablet does. */
+  @media (hover: none) and (pointer: coarse) {
+    .field, .field-sm, textarea, select, input[type="text"],
+    input[type="email"], input[type="number"], input[type="search"] { font-size: 16px; }
+  }
+  ```
+  The chat `Textarea` needs its `text-sm` class **removed** (a utility beats a bare selector), not the rule marked `!important`.
+- **Do NOT fix it with `maximum-scale=1` or `user-scalable=no`.** Both stop the zoom by disabling pinch-zoom entirely — fails WCAG 1.4.4 and undoes the accessibility work in item 17. The field scale is the fix.
+- **Verify:** iOS Safari, or Chrome device emulation with touch emulation on — focus each field, confirm `visualViewport.scale` stays 1; then confirm pinch-zoom still works.
+- **Effort:** 20 minutes.
+
+### R1. Dialogs cannot scroll and touch both edges of the phone — CRITICAL
+- **Problem:** `components/ui/dialog.tsx:41` is stock shadcn — `w-full max-w-lg`, −50% translate centring, `p-6`, **no `max-height`, no `overflow`**. Any dialog taller than the viewport overflows past the top *and* bottom with no way to reach either end: clipped, not scrolled. At 375px the panel is exactly 375px wide, flush to both edges, and `sm:rounded-lg` means square corners below 640px. **Ten** dialogs inherit it unguarded, including the two longest flows in the product (`DocumentUploadDialog:257`, `VehiclePhotoUploadDialog:245`). Six others set `max-h-[90vh]` locally — right instinct, wrong unit: `vh` is the *largest* viewport on iOS, so 90vh still runs under the URL bar.
+- **Change:** in the primitive, once —
+  ```diff
+  - 'fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg … p-6 … sm:rounded-lg'
+  + 'fixed left-[50%] top-[50%] z-50 grid w-[calc(100%-2rem)] max-w-lg
+  +  max-h-[85dvh] overflow-y-auto overscroll-contain … p-5 sm:p-6 rounded-2xl'
+  ```
+  Then **delete** the six local `max-h-[90vh]` / `[80vh]` overrides — the base handles it, and leaving them re-introduces the `vh` bug.
+- **Verify:** open the document-upload dialog at 375×667 with a long form; both the title and the submit button must be reachable, and 16px of backdrop must show on each side.
+- **Effort:** ~1 hour for all ten.
+
+### R3. Vehicle-info spec tiles collapse to a column of single letters — CRITICAL
+- **Problem:** `app/vehicle-info/[vehicleId]/page.tsx:189` and `:234` are a bare `grid grid-cols-3` with no breakpoint. From the 231px a card gets at 375px (see R6): each column is 66px, of which a 32px icon, a 12px gap and 32px of tile padding are already spent. The text column resolves to ~0 and "8-speed automatic" wraps one character per line.
+- **Change:** `- grid grid-cols-3 gap-4` → `+ grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4`, both sites.
+- **Effort:** 10 minutes.
+
+### R5. Three controls a touch user can never reveal — CRITICAL
+- **Problem:** `VehicleCard.tsx:316` (photo overlay), `:417` (⋮ menu) and `MaintenanceHistory.tsx:382` (delete record) are `opacity-0 group-hover:opacity-100`. No hover on a phone, so **delete vehicle, change photo and update mileage have no mobile entry point at all** — and adding the photo the whole identity-plate design depends on is impossible from the garage.
+- **Change:** the system already solved this — `.meta-edit` (`globals.css:828`) and `.turn-actions` (`:1019`) both pin visible under `@media (hover: none)`, with the reasoning written down. Generalise it instead of adding a third copy:
+  ```css
+  .reveal-on-hover { opacity: 0; transition: opacity var(--duration-fast); }
+  .group:hover .reveal-on-hover,
+  .reveal-on-hover:focus-visible { opacity: 1; }
+  @media (hover: none) { .reveal-on-hover { opacity: 1; } }
+  ```
+  Retire `.meta-edit` and `.turn-actions` into it so the next hover affordance inherits the touch behaviour rather than re-deriving it. Note `VehicleCard` uses the named group `group/image` — keep the name or the selector misses.
+- **Verify:** DevTools → Rendering → emulate `hover: none`; all three controls visible and tappable.
+- **Effort:** 20 minutes.
+
+---
+
+## RP1 — next (~2 days, mechanical once RB0 exists; do it in one pass, not per screen)
+
+### R6. No container in the chain gets smaller below `sm` — HIGH
+- **Problem:** four nested containers each take 24px a side and none steps down — `DashboardLayout.tsx:281` (`px-6 lg:px-12`), `:404` (`glass-panel p-6`), every `Card` (`p-6`), inner tiles (`p-4`). At 375px: **375 → 327 → 279 → 231 → 199**. 53% of the device is nested gutter. R3, R8 and R13 are all this finding wearing a different component.
+- **Change:** apply RB0 rule 2 everywhere. 375px then yields **271px** of content instead of 199px (+36%).
+- **Verify:** grep for `\bp-6\b` and `px-6` with no `sm:` sibling; the count should reach zero outside desktop-only blocks.
+- **Effort:** ~2 hours.
+
+### R9. The 44px utility exists and is used six times — HIGH
+- **Problem:** `.tap-target-44` (`globals.css:791`) is correct and barely adopted. The **primary navigation misses the floor**: tab links are `px-4 py-2.5 text-xs` ≈ 36px tall (`DashboardLayout.tsx:268`), on the one control every signed-in session touches. Also under 44px: ⋮ vehicle menu 32px (`VehicleCard.tsx:417`), performance refresh 32px (`vehicle-info:219`), maintenance delete 36px, chat "New" 28px, composer attach + send.
+- **Change:** tabs → `px-4 py-3 text-[13px] min-h-[44px]` (visual weight unchanged, and it fixes an R10 site at the same time). Icon buttons → add `.tap-target-44`; it expands the hit area, not the glyph.
+- **Then:** add it to the lint set — an interactive element under 44px with no `.tap-target-44` is a review comment, not a taste question. `_adherence.oxlintrc.json` in the DS is the place.
+- **Effort:** ~2 hours.
+
+### R10. Thirty uses of 10 and 11px type, none of them decorative — HIGH
+- **Problem:** `UpcomingMaintenance` ×10, `ConsultantChat` ×12, `CostBreakdownTable` ×5, `DemoBanner`, `TierProgressCard`. The DS's smallest token is `--text-body-xs: 12px`, so all of it is off-scale — and it carries due dates, cost estimates, conversation timestamps, table headers and the "Get Quote" action. At 10px on a dark surface at arm's length it is not quiet, it is unreadable, and it contradicts a brand voice where the numbers carry the argument.
+- **Change:** `text-[10px]` / `text-[11px]` → `text-xs` (12px) as a hard floor; data and labels on mobile → 13px. **Contrast, not size, makes a label recede** — `text-muted-40` at 12px reads quieter than white at 10px and stays legible.
+- **Effort:** ~2 hours.
+
+### R15. One 600px-wide card at tablet width; three at 1440 — MEDIUM
+- **Problem:** `app/page.tsx:158` (`gap-6`) and `app/garage/page.tsx:128` (`gap-8`) both run `md:grid-cols-2 lg:grid-cols-3` and **skip `sm` entirely**, so 640–767px renders a single column of enormous cards — the worst-looking width in the product, and where a landscape phone and a small tablet both land. Above 1280px `max-w-7xl` caps the row at three, leaving gutters where a fourth column belongs. The two grids also disagree about their gap.
+- **Change:** one grid, both routes — `grid gap-5 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4`.
+- **Effort:** 20 minutes.
+
+---
+
+## RP2 — after (~4 days; these need design, not a prefix)
+
+### R4. The consultant is a fixed 520px box inside a scrolling page — CRITICAL
+> Critical by impact, but scheduled here because it is a layout rebuild, not an edit.
+
+- **Problem:** `ConsultantChat.tsx:609` is `h-[calc(100vh-320px)] min-h-[520px] max-h-[760px]`. On a 667px phone the calc yields 347px, so `min-h` wins and the panel is 520px — inside a page whose demo banner, nav, tab strip, vehicle title and meta row have already eaten ~400px. **The composer sits below the fold: you scroll the page to type and the thread to read.** Two scroll contexts stacked on the flagship feature. `100vh` also measures the URL-bar-collapsed viewport, so the panel exceeds the visible area on first paint.
+- **Change:** below `md`, the consultant route becomes an app shell —
+  ```
+  shell    h-[100dvh] flex flex-col overflow-hidden
+  thread   flex-1 min-h-0 overflow-y-auto
+  composer shrink-0 pb-[env(safe-area-inset-bottom)]
+  panel    h-auto md:h-[calc(100dvh-320px)] md:min-h-[520px] md:max-h-[760px]
+  ```
+  The page title, meta row and surrounding `glass-panel` padding should **not render** below `md` — a chat screen on a phone is chrome + thread + composer. Keep the existing drawer behaviour (`:621`) untouched; it is already right.
+- **Verify:** 375×667 with the keyboard up — composer visible without page scroll, thread scrolls under it, no rubber-banding of the page behind.
+- **Effort:** ~half a day.
+
+### R8. A five-column cost table in 231px, inside `overflow-hidden` — HIGH
+- **Problem:** `CostBreakdownTable.tsx:55–63` — Item · Parts · Labor Hrs · Labor Cost · Total, `text-[11px]` headers, every cell carrying a low *and* a high figure. The wrapper is `overflow-hidden`, so the usual escape hatch (let it scroll sideways) is actively closed. This is the artefact the consultant produces to justify an estimate — it *is* the answer — and on a phone it is a stack of clipped numerals.
+- **Change:** a card per line item below `md`, the table above it. Same data, same order, no horizontal scroll:
+  ```
+  Brake pads & rotors, front          ← description, 15px
+  Parts     $180 – $240               ← label/value rows, right-aligned .num
+  Labor     2.0 – 2.5 hr · $260
+  Total     $440 – $500               ← band-weighted
+  ```
+  Keep `<table>` at `md`+ where the column scan is the point. Do not "fix" this by removing `overflow-hidden` — a sideways-scrolling estimate is not an answer either.
+- **Effort:** ~3 hours.
+
+### R11. A 36px page title over a four-up meta row — MEDIUM
+- **Problem:** `DashboardLayout.tsx:296` is `text-4xl lg:text-5xl`, so a phone gets 36px for "2018 Honda Accord" in 279px — three lines before the trim appears. `:303` puts Mileage / Avg monthly / Status / Reliability in `flex flex-wrap gap-8`, which wraps to a ragged 2 + 2 with 32px gutters.
+- **Change:** `h1` → `text-2xl sm:text-4xl lg:text-5xl`; meta row → `grid grid-cols-2 gap-x-6 gap-y-5 sm:flex sm:flex-wrap sm:gap-8`.
+- **Effort:** ~1 hour.
+
+### R12. The breadcrumb — and with it the way back — is hidden below 640px — MEDIUM
+- **Problem:** `DashboardLayout.tsx:236` is `hidden sm:flex`. Garage › vehicle › page plus the scrolled health-score pill all vanish on a phone; what remains is a logo that happens to be a link. The comment above it records that four separate routes back to the garage were consolidated into this one control — which is then `display:none` on the viewport where a back affordance matters most.
+- **Change:** below `sm`, one row — `‹ Garage · Accord · 61` (chevron-left + parent + short name + score pill, `min-h-[44px]`). Full breadcrumb returns at `sm`.
+- **Effort:** ~1 hour.
+
+### R13. Service rows drop the date and truncate the job — MEDIUM
+- **Problem:** `MaintenanceHistory.tsx:347–376` keeps one line and pays for it — date `hidden sm:flex`, part number `hidden sm:inline`, description `truncate`, beside a category badge and a right-aligned cost. A maintenance record with its date hidden has the second-most-important fact removed, on the screen whose whole job is "what was done, when, for how much."
+- **Change:** two lines below `sm`, one line above —
+  ```
+  Front brake pads & rotors              $486.20
+  Ken's Auto · 14 Mar 2026 · Brakes
+  ```
+- **Effort:** ~2 hours.
+
+### R14. A 260px carousel that fits neither phone nor desktop — MEDIUM
+- **Problem:** `UpcomingMaintenance.tsx:136`, `:415` — fixed `w-[260px]` cards in a snap scroller. At 375px that leaves a 19px sliver of the next card: too little to read as "more," too much to read as an edge. At 1440px the same strip scrolls through four items while 600px of row sits empty. It is the only horizontally-scrolling region in the app and it scrolls at *every* width.
+- **Change:** below `sm` → `w-[78vw] max-w-[300px] snap-start` (a legible next-card peek); `md`+ → `grid grid-cols-2 xl:grid-cols-3`, no scroller.
+- **Effort:** ~1 hour.
+
+---
+
+## RP3 — with onboarding (~1 day) — folds into item 14
+
+### R7. Onboarding has no responsive markup at all — HIGH
+- **Problem:** `components/OnboardingWizard.tsx` — **856 lines, zero breakpoints**, the least responsive file in the repo and the first screen a paying user meets. The step rail (`:50`) sets five 32px circles with `text-[10px] whitespace-nowrap` labels beneath; "Powertrain" and "Performance" are wider than their circles, so below ~420px the labels overlap. Year/Make is `grid-cols-2` (`:438`); mileage presets are `grid-cols-4` (`:586`) — four ~60px buttons carrying four-digit numbers.
+- **Change:** do **not** add prefixes to 856 lines. Build it from the DS onboarding template (item 14 / the DS's own flagged gap) with these decisions baked in:
+  ```
+  rail     below sm → "Step 3 of 5 · Mileage" + a 2px progress bar
+           the dotted rail is a desktop affordance, not a small one
+  fields   grid-cols-1 sm:grid-cols-2
+  presets  grid-cols-2 sm:grid-cols-4, min-h-[44px]
+  actions  full-width stacked buttons below sm
+  ```
+- **Dependency:** merge this item with item 14 rather than tracking both. Closing 14 closes R7.
+- **Effort:** ~1 day (inside item 14's estimate).
+
+---
+
+## RP4 — pre-launch (~half a day) — extends item 15
+
+### A viewport matrix in CI, beside the LCP/CLS budgets
+- 320 · 375 · 768 · 1440, asserting: **no horizontal overflow** (`scrollWidth <= clientWidth` on `body`), **no interactive target under 44px**, **no rendered text under 12px**, **no focusable input under 16px at ≤640**. Static analysis covers the last two cheaply — the same pattern as `image-weight-budget.test.ts`, and it registers in `STATIC_ANALYSIS_SUITES` the same way. The first two need a real browser, so they ride with item 15's Lighthouse CI owner.
+- Then this audit cannot happen twice.
+
+---
+
+## Already right — do not regress these
+
+Nine deliberate pieces of responsive work are already in the codebase. The recommendation above is to **generalise** them, not replace them.
+
+| What | Why it is right | Where |
+|---|---|---|
+| Consultant sidebar → drawer | Reclaims 256px of a 375px viewport; overlay + handle, static at `md` | `ConsultantChat:621` |
+| Scrollable tab strip + edge fade | Mask scoped to ≤640 so desktop tabs are not dimmed for nothing | `globals.css:1069` |
+| One tab strip, not two | Duplicate nav deleted rather than timed around | `DashboardLayout:261` |
+| `.tap-target-44` | Expands hit area without inflating the glyph | `globals.css:791` |
+| `@media (hover: none)` | Applied to `.meta-edit` / `.turn-actions`, reasoning written down | `globals.css:828`, `:1019` |
+| Photo hero reworked at ≤640 | Contain-not-crop, blur fill, tint dropped, content inset to 18px | `globals.css:691` |
+| Service visit rows | Genuine `flex-col md:flex-row` — the pattern the rest should copy | `documents:238` |
+| Collapsible dashboard sections | Folded sections with summaries — right answer to a long mobile page | `dashboard:166` |
+| Reduced-motion + forced-colors | Honoured at the token layer, ahead of most products this size | `globals.css:307`, `:1391` |
+
+---
+
+## Breakpoint matrix as found
+
+**Broken** = a task cannot be completed. **Degraded** = completable, visibly wrong.
+
+| Route | 320 | 375 | 414 | 768 | 1024 | 1440 |
+|---|---|---|---|---|---|---|
+| `/` landing | Degraded | OK | OK | OK | OK | OK |
+| `/garage` | Broken | Broken | Broken | Degraded | OK | Degraded |
+| `/dashboard/:id` | Broken | Degraded | Degraded | Degraded | OK | OK |
+| `/consultant/:id` | Broken | Broken | Broken | Degraded | OK | OK |
+| `/documents/:id` | Degraded | Degraded | Degraded | OK | OK | OK |
+| `/vehicle-info/:id` | Broken | Broken | Broken | Degraded | OK | OK |
+| `/onboard` | Broken | Broken | Degraded | OK | OK | OK |
+| Settings · auth | Degraded | Degraded | OK | OK | OK | OK |
+| Dialogs (10 of 16) | Broken | Broken | Broken | Degraded | OK | OK |
+
 
 ---
 
