@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Car } from 'lucide-react';
 import { vehicleField } from '@crewchief/core/vehicle-identity';
+import { vehicleBlurData } from '@crewchief/core/vehicle-blur';
 
 /**
  * What a vehicle looks like — one component, two variants.
@@ -123,6 +124,7 @@ export function VehicleIdentity({
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const src = photo && photo !== failedUrl ? photo : null;
   const formats = photoFormats(src);
+  const blurSrc = vehicleBlurData(src);
 
   /*
     The photo fades in over the plate instead of appearing between frames.
@@ -197,15 +199,34 @@ export function VehicleIdentity({
           */}
           <div
             aria-hidden="true"
-            className="absolute pointer-events-none photo-layer"
+            className={blurSrc ? 'absolute pointer-events-none' : 'absolute pointer-events-none photo-layer'}
             style={{
               inset: '-6%',
-              ...photoLayerVars(src, formats),
+              /*
+                The fill takes a 32px placeholder when one exists, not the
+                photograph. This is F7: the two layers decoded the same
+                full-size file, on mobile, for a layer immediately blurred by
+                34px — pixels bought and thrown away. `packages/core/src/
+                vehicle-blur.ts` is generated beside the derivatives.
+
+                It also paints *before* the sharp copy rather than with it. The
+                placeholder is a data URI, so it needs no request at all: the
+                fill is up on first paint and the photograph resolves over it,
+                which is the blur-up the roadmap asks for and not merely a
+                cheaper decode.
+
+                No placeholder means an owner upload behind a signed URL, and
+                the old behaviour is right there — the plate underneath is
+                already the design for a photo that has not arrived.
+              */
+              ...(blurSrc
+                ? { backgroundImage: `url(${JSON.stringify(blurSrc)})` }
+                : photoLayerVars(src, formats)),
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               filter: 'blur(34px) saturate(.8) brightness(.52)',
               transform: 'scale(1.08)',
-              opacity: photoReady ? 1 : 0,
+              opacity: blurSrc || photoReady ? 1 : 0,
               transition: 'opacity 200ms ease-out',
             }}
           />
@@ -245,6 +266,19 @@ export function VehicleIdentity({
               src={src}
               alt=""
               aria-hidden="true"
+              /*
+                The probe is what actually issues the request — the two CSS
+                layers ride its cache entry — so this is where priority has to
+                be set. On the band variant that request is the page's LCP, and
+                a zero-area `aria-hidden` image is exactly what a browser's
+                heuristics deprioritise.
+
+                Spelled lowercase and cast: React 18.2 has no `fetchPriority`
+                prop, and passes unrecognised lowercase attributes straight
+                through. React 19 adds the camelCase one — change it then, not
+                before, or it silently stops being emitted.
+              */
+              {...({ fetchpriority: isBand ? 'high' : 'auto' } as Record<string, string>)}
               className="absolute w-0 h-0 opacity-0 pointer-events-none"
               onLoad={() => setLoadedUrl(src)}
               onError={() => setFailedUrl(src)}

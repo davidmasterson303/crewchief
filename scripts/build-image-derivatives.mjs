@@ -31,7 +31,7 @@
   never runs this.
 */
 
-import { readdirSync, statSync, existsSync } from 'node:fs';
+import { readdirSync, statSync, existsSync, writeFileSync } from 'node:fs';
 import { join, dirname, basename, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
@@ -52,6 +52,25 @@ const FORCE = process.argv.includes('--force');
 */
 const AVIF = { quality: 58, effort: 6 };
 const WEBP = { quality: 76, effort: 5 };
+
+/*
+  The blur-up placeholder, emitted as base64 into a generated module rather
+  than as a file.
+
+  `VehicleIdentity` paints every photograph twice — an over-scanned blurred
+  fill under a contained sharp copy — which meant decoding the full-size image
+  twice, on mobile, for a layer that is then blurred by 34px. That is F7. The
+  fill only ever needed enough pixels to survive a 34px blur, and 32 of them
+  across is more than enough: upscaled ten times and blurred, a 32px source and
+  a 2400px source are indistinguishable.
+
+  Inlined as a data URI because a placeholder that needs its own request is not
+  a placeholder — it would arrive in the same round trip as the photo it exists
+  to stand in for. At this size the whole set costs a few KB of JS.
+*/
+const BLUR_WIDTH = 32;
+const BLUR = { quality: 60 };
+const BLUR_MODULE = join(ROOT, 'packages', 'core', 'src', 'vehicle-blur.ts');
 
 function walk(dir, out = []) {
   for (const entry of readdirSync(dir)) {
@@ -78,6 +97,8 @@ let totalAvif = 0;
 let totalWebp = 0;
 let built = 0;
 let skipped = 0;
+let totalBlur = 0;
+const blurData = {};
 
 for (const source of sources) {
   const stem = join(dirname(source), basename(source, extname(source)));
@@ -101,6 +122,10 @@ for (const source of sources) {
     else totalWebp += bytes;
   }
 
+  const lqip = await sharp(source).resize(BLUR_WIDTH).webp(BLUR).toBuffer();
+  blurData[`/${rel.replace(/^public\//, '')}`] = `data:image/webp;base64,${lqip.toString('base64')}`;
+  totalBlur += lqip.length;
+
   const kb = (n) => `${Math.round(n / 1024)} KB`;
   console.log(
     `${rel.padEnd(38)} jpeg ${kb(jpegBytes).padStart(7)}` +
@@ -109,10 +134,48 @@ for (const source of sources) {
   );
 }
 
+const entries = Object.keys(blurData)
+  .sort()
+  .map((k) => `  '${k}':\n    '${blurData[k]}',`)
+  .join('\n');
+
+writeFileSync(
+  BLUR_MODULE,
+  `/*
+  GENERATED — do not edit. Rebuild with \`npm run build:images\`.
+
+  A 32px WebP of each demo photograph, inlined as a data URI.
+
+  \`VehicleIdentity\` paints its photo twice: an over-scanned blurred fill under
+  a contained sharp copy. Before this, both layers decoded the same full-size
+  file — the audit's F7, and worst on the phones least able to afford it. The
+  fill is blurred by 34px, so it never needed those pixels; 32 across upscales
+  and blurs to something the eye cannot tell from the original.
+
+  Keyed by the JPEG's public path, which is what \`planVehiclePhoto\` returns
+  for a demo vehicle. Owner uploads arrive as signed URLs and have no entry —
+  callers fall back to the identity plate, which is already the design for a
+  photograph that has not arrived.
+*/
+
+export const VEHICLE_BLUR_DATA: Record<string, string> = {
+${entries}
+};
+
+/** The placeholder for a photo path, if one was built for it. */
+export function vehicleBlurData(src: string | null | undefined): string | null {
+  if (!src) return null;
+  return VEHICLE_BLUR_DATA[src] ?? null;
+}
+`,
+  'utf8'
+);
+
 const mb = (n) => `${(n / 1024 / 1024).toFixed(2)} MB`;
 const pct = (a, b) => `${Math.round(100 - (100 * a) / b)}%`;
 console.log(
   `\n${sources.length} sources — ${built} written, ${skipped} already current\n` +
     `jpeg ${mb(totalJpeg)}  avif ${mb(totalAvif)} (${pct(totalAvif, totalJpeg)} smaller)  ` +
-    `webp ${mb(totalWebp)} (${pct(totalWebp, totalJpeg)} smaller)`
+    `webp ${mb(totalWebp)} (${pct(totalWebp, totalJpeg)} smaller)\n` +
+    `blur-up placeholders: ${Math.round(totalBlur / 1024)} KB inlined across ${sources.length} images`
 );
