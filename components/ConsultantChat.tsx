@@ -669,7 +669,7 @@ export default function ConsultantChat({
           {filteredSessions.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center p-4 py-8">
               <MessageSquare className="h-8 w-8 text-white/15 mb-3" />
-              <p className="text-xs text-white/35 leading-relaxed">
+              <p className="text-xs text-white/50 leading-relaxed">
                 {searchQuery ? 'No matching conversations' : 'No conversations yet'}
               </p>
             </div>
@@ -690,7 +690,7 @@ export default function ConsultantChat({
                   }`}>
                     {session.title}
                   </p>
-                  <p className="text-xs text-white/30 mt-1">
+                  <p className="text-xs text-white/50 mt-1">
                     {new Date(session.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </p>
                 </button>
@@ -762,8 +762,8 @@ export default function ConsultantChat({
                   {msg.role === 'assistant' && (
                     <div className="flex items-center gap-1.5 mb-1.5">
                       <Sparkles className="h-[13px] w-[13px] flex-shrink-0" style={{ color: 'var(--info)' }} />
-                      <span className="text-xs font-semibold uppercase tracking-widest text-white/45">CrewChief</span>
-                      <span className="text-xs text-white/25">
+                      <span className="text-xs font-semibold uppercase tracking-widest text-white/50">CrewChief</span>
+                      <span className="text-xs text-white/50">
                         {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
@@ -849,11 +849,11 @@ export default function ConsultantChat({
                   */}
                   {msg.role === 'assistant' && msg.sources?.length > 0 && (
                     <div className="measure flex flex-wrap items-center gap-1.5 mt-2.5">
-                      <span className="text-xs text-white/30 font-medium">Based on</span>
+                      <span className="text-xs text-white/50 font-medium">Based on</span>
                       {msg.sources.map((kind: ContextKind) => (
                         <span
                           key={kind}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/6 border border-white/10 text-xs text-white/45 font-medium"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/6 border border-white/10 text-xs text-white/50 font-medium"
                         >
                           {contextIcon(kind)}
                           {CONTEXT_LABELS[kind]}
@@ -872,7 +872,7 @@ export default function ConsultantChat({
                     <div className="turn-actions flex items-center gap-1 mt-1.5">
                       <button
                         onClick={() => handleCopyTurn(msg.content, index)}
-                        className="tap-target-44 flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium text-white/35 hover:text-white/70 transition-colors"
+                        className="tap-target-44 flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium text-white/50 hover:text-white/70 transition-colors"
                         aria-label="Copy this answer"
                       >
                         {copiedTurn === index ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
@@ -883,7 +883,7 @@ export default function ConsultantChat({
 
                   {/* The user bubble keeps its timestamp, below and right. */}
                   {msg.role === 'user' && (
-                    <div className="text-xs text-white/30 mt-1">
+                    <div className="text-xs text-white/50 mt-1">
                       {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </div>
                   )}
@@ -897,7 +897,7 @@ export default function ConsultantChat({
                 <div className="animate-fade-in flex flex-col items-start">
                   <div className="flex items-center gap-1.5 mb-1.5">
                     <Sparkles className="h-[13px] w-[13px] flex-shrink-0" style={{ color: 'var(--info)' }} />
-                    <span className="text-xs font-semibold uppercase tracking-widest text-white/45">CrewChief</span>
+                    <span className="text-xs font-semibold uppercase tracking-widest text-white/50">CrewChief</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Loader2 className="h-3.5 w-3.5 animate-spin text-info flex-shrink-0" />
@@ -908,7 +908,7 @@ export default function ConsultantChat({
 
               {showFollowUps && !loading && currentFollowUps.length > 0 && (
                 <div className="flex flex-col gap-2 animate-slide-up">
-                  <p className="text-xs text-white/35 font-medium">Ask a follow-up</p>
+                  <p className="text-xs text-white/50 font-medium">Ask a follow-up</p>
                   <div className="flex flex-wrap gap-2">
                     {currentFollowUps.map((suggestion, i) => (
                       <button
@@ -946,7 +946,7 @@ export default function ConsultantChat({
                         <p className="text-xs font-semibold text-amber-300">
                           {highPriorityWishlist.length} item{highPriorityWishlist.length > 1 ? 's' : ''} need attention
                         </p>
-                        <p className="text-xs text-white/40 mt-0.5">Get quotes from local shops</p>
+                        <p className="text-xs text-white/50 mt-0.5">Get quotes from local shops</p>
                       </div>
                       <a
                         href={`/dashboard/${vehicleId}?tab=wishlist`}
@@ -980,7 +980,7 @@ export default function ConsultantChat({
                     <FileText className="h-4 w-4 text-info flex-shrink-0" />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium truncate text-white">{file.name}</p>
-                      <p className="text-xs text-white/40">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                      <p className="text-xs text-white/50">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
                     </div>
                   </div>
                   <button
@@ -1014,7 +1014,7 @@ export default function ConsultantChat({
                  selector in globals.css, so it would have kept this one control at
                  14px and left the iOS zoom in the single most-tapped field in the
                  product. R2 — the composer inherits the field scale. */
-              className="resize-none border-0 bg-transparent text-white placeholder:text-white/30 px-3 pt-2.5 pb-1 min-h-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none"
+              className="resize-none border-0 bg-transparent text-white placeholder:text-white/50 px-3 pt-2.5 pb-1 min-h-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none"
               disabled={loading || uploadingFiles}
             />
             <div className="flex items-center gap-2 px-2 pb-2">
@@ -1036,7 +1036,7 @@ export default function ConsultantChat({
                 Truncates, never wraps — a second line here pushes the controls
                 around as mileage changes.
               */}
-              <span className="flex-1 min-w-0 truncate text-xs text-white/30">
+              <span className="flex-1 min-w-0 truncate text-xs text-white/50">
                 {vehicle.year} {vehicle.make} {vehicle.model}
                 {` · ${displayMileage.toLocaleString()} mi`}
                 {openItemCount > 0 && ` · ${openItemCount} open item${openItemCount === 1 ? '' : 's'}`}
@@ -1065,7 +1065,7 @@ export default function ConsultantChat({
             onChange={handleFileSelect}
             className="hidden"
           />
-          <p className="text-xs text-white/25 mt-2">
+          <p className="text-xs text-white/50 mt-2">
             Enter to send &middot; Shift+Enter for new line &middot; Attach up to 3 files
           </p>
         </div>

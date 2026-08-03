@@ -251,7 +251,7 @@ export function VehiclePhotoUploadDialog({
               ? 'Change Vehicle Photo'
               : 'Upload Vehicle Photo'}
           </DialogTitle>
-          <DialogDescription className="text-white/45">
+          <DialogDescription className="text-white/50">
             {step === 'focal'
               ? 'Drag the image to position your car in the banner frame.'
               : `Add a personal photo of your ${vehicleName} for better customization.`}
@@ -278,9 +278,9 @@ export function VehiclePhotoUploadDialog({
                   </div>
                   <div>
                     <p className="text-sm font-medium text-white">Drag and drop your photo here</p>
-                    <p className="text-xs text-white/40 mt-1">or click to browse</p>
+                    <p className="text-xs text-white/50 mt-1">or click to browse</p>
                   </div>
-                  <p className="text-xs text-white/25">JPEG, PNG, WEBP — max 5MB</p>
+                  <p className="text-xs text-white/50">JPEG, PNG, WEBP — max 5MB</p>
                 </div>
                 <input
                   ref={fileInputRef}
@@ -296,7 +296,7 @@ export function VehiclePhotoUploadDialog({
 
               {hasCustomPhoto && (
                 <div className="pt-3 border-t border-white/8">
-                  <p className="text-xs text-white/35 mb-3">Remove your custom photo and revert to stock image</p>
+                  <p className="text-xs text-white/50 mb-3">Remove your custom photo and revert to stock image</p>
                   <Button
                     variant="destructive"
                     size="sm"
@@ -403,7 +403,7 @@ export function VehiclePhotoUploadDialog({
               </div>
 
               <div className="space-y-2">
-                <p className="text-xs text-white/30 font-medium uppercase tracking-wider">Banner preview</p>
+                <p className="text-xs text-white/50 font-medium uppercase tracking-wider">Banner preview</p>
                 <div
                   className="w-full overflow-hidden rounded-lg border border-white/10"
                   style={{ height: '56px' }}
@@ -417,7 +417,7 @@ export function VehiclePhotoUploadDialog({
                     />
                   )}
                 </div>
-                <p className="text-xs text-white/25">This is the exact crop shown in the dashboard hero banner.</p>
+                <p className="text-xs text-white/50">This is the exact crop shown in the dashboard hero banner.</p>
               </div>
 
               <div className="flex gap-2 pt-1">

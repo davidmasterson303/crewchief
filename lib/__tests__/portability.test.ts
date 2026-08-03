@@ -129,6 +129,15 @@ const NOT_PORTABLE: Record<string, string> = {
     own usage.
   */
   'lib/ai-usage.ts': 'writes with the service role — reaches Supabase through lib/supabase',
+  /*
+    Same split again, and for the same reason: the decision — tiers, the warn
+    threshold, the boundary, what an unconfigured limit means — is in
+    `packages/core/src/ai/budget.ts` and is portable. Only the read of what has
+    been spent needs a service-role client, and it needs one because a client
+    that could read another account's usage could also read its own around a
+    limit.
+  */
+  'lib/ai-budget.ts': 'reads usage with the service role — reaches Supabase through lib/supabase',
   'lib/sign-out.ts': 'Supabase types',
   /*
     The precedence rule — owner photo over stock, the unphotographed-demo

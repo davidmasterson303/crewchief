@@ -153,7 +153,7 @@ export default function CardStatesPage() {
         {states.map((s) => (
           <div key={s.title} className="flex flex-col h-full">
             <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-info">{s.title}</p>
-            <p className="mb-3 text-xs text-white/45 leading-relaxed min-h-[3rem]">{s.note}</p>
+            <p className="mb-3 text-xs text-white/50 leading-relaxed min-h-[3rem]">{s.note}</p>
             <div className="flex-1">
               <VehicleCard {...s.props} />
             </div>

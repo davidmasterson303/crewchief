@@ -75,7 +75,7 @@ export default function TCOInputsModal({ open, onOpenChange, vehicleId, vehicle,
             <DollarSign className="h-5 w-5 text-info" />
             Cost of Ownership Inputs
           </DialogTitle>
-          <p className="text-xs text-white/40 mt-1">
+          <p className="text-xs text-white/50 mt-1">
             These figures power your real-world cost-per-mile and TCO breakdown.
           </p>
         </DialogHeader>
@@ -89,7 +89,7 @@ export default function TCOInputsModal({ open, onOpenChange, vehicleId, vehicle,
               </div>
               <div className="relative">
                 {prefix && (
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-white/35 pointer-events-none select-none">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-white/50 pointer-events-none select-none">
                     {prefix}
                   </span>
                 )}
@@ -99,10 +99,10 @@ export default function TCOInputsModal({ open, onOpenChange, vehicleId, vehicle,
                   placeholder={placeholder}
                   value={fields[key as FieldKey]}
                   onChange={e => setFields(prev => ({ ...prev, [key]: e.target.value }))}
-                  className={`bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-cyan-400/50 h-10 ${prefix ? 'pl-7' : ''}`}
+                  className={`bg-white/5 border-white/10 text-white placeholder:text-white/50 focus:border-cyan-400/50 h-10 ${prefix ? 'pl-7' : ''}`}
                 />
               </div>
-              <p className="text-xs text-white/25 leading-none">{hint}</p>
+              <p className="text-xs text-white/50 leading-none">{hint}</p>
             </div>
           ))}
         </div>

@@ -9,6 +9,9 @@ import {
   classificationConfig,
   withThinking,
 } from '@/lib/gemini';
+import { checkDemoBudget, checkMonthlyBudget } from '@/lib/ai-budget';
+import { checkStoredPhotoSize } from '@crewchief/core/image-resize';
+import { budgetMessage, demoBudgetMessage } from '@crewchief/core/ai/budget';
 import { VEHICLE_RESEARCH_PROMPT, POWERTRAIN_OPTIONS_PROMPT, CONSULTANT_SYSTEM_PROMPT, CONSULTANT_DOCUMENT_VALIDATION_PROMPT } from '@crewchief/core/prompts';
 import { logger } from '@crewchief/core/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
@@ -971,6 +974,41 @@ export async function sendConsultantMessage(params: {
     });
     if (!access.ok) {
       return { success: false, error: access.error };
+    }
+
+    /*
+      5.1 — the monthly ceiling, checked after authorization and before the
+      model. The per-minute rate limit above bounds a burst; this bounds a
+      month, and until now nothing did: ten calls a minute per vehicle is a
+      ceiling of ~432,000 calls a month.
+
+      Ordered after `authorizeVehicleAccess` on purpose. Reading someone's
+      usage before establishing who they are would be a lookup on a
+      caller-supplied id, and the budget read uses the service role.
+
+      The demo has its own pool rather than no pool — see immediately below.
+    */
+    if (isDemoVehicle) {
+      /*
+        Two windows against one shared pool. This is the only unauthenticated
+        path to a model in the application, so the per-minute limit on its own
+        left the largest uncontrolled cost in it uncontrolled.
+
+        It degrades rather than breaking. Everything else on the demo — the
+        garage, the dossiers, the service history, the health scores, the cost
+        tables — is stored data that never touches a model, so a spent
+        allowance pauses live chat and nothing else, and the message says when
+        it comes back.
+      */
+      const demo = await checkDemoBudget();
+      if (!demo.allowed) {
+        return { success: false, error: demoBudgetMessage(demo) };
+      }
+    } else {
+      const budget = await checkMonthlyBudget(access.userId);
+      if (!budget.allowed) {
+        return { success: false, error: budgetMessage(budget) };
+      }
     }
 
     const { vehicleId, sessionId, message, messageHistory, attachedDocuments } = params;
@@ -2925,6 +2963,14 @@ export async function parseInvoiceLineItems(documentId: string, vehicleId: strin
       return { success: false, error: access.error };
     }
 
+    // 5.1 — the other path a user can drive repeatedly, and the one still
+    // running at the default thinking level. See the consultant for the note
+    // on ordering.
+    const budget = await checkMonthlyBudget(access.userId);
+    if (!budget.allowed) {
+      return { success: false, error: budgetMessage(budget) };
+    }
+
     const client = getServiceRoleClient();
 
     const { data: vehicle } = await client
@@ -3413,6 +3459,25 @@ export async function uploadVehiclePhoto(formData: FormData) {
     const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
     if (!access.ok) {
       return { success: false, error: access.error };
+    }
+
+    /*
+      The only server-side bound on what goes into the bucket, and until now
+      there was none. `downscaleImage` runs in the browser and is deliberately
+      allowed to give up — a photo that uploads large beats one that fails to
+      upload — so the sole guarantee about stored size lived in code that is
+      designed not to guarantee it.
+
+      Checked after authorization, not before: refusing an unauthorized caller
+      on file size would tell them their request reached something.
+    */
+    const sizeCheck = checkStoredPhotoSize(file.size);
+    if (!sizeCheck.ok) {
+      logger.warn('VEHICLE_PHOTO:TOO_LARGE', 'Refused an oversized vehicle photo', {
+        vehicleId,
+        bytes: file.size,
+      });
+      return { success: false, error: sizeCheck.reason };
     }
 
     const client = access.client;

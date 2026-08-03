@@ -73,7 +73,7 @@ export default function ConsultantPage({ params }: { params: { vehicleId: string
       <div className="min-h-screen bg-[#080808] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-2 border-info-border border-t-info rounded-full animate-spin" />
-          <p className="text-sm text-white/40">Loading consultant...</p>
+          <p className="text-sm text-white/50">Loading consultant...</p>
         </div>
       </div>
     );
@@ -85,7 +85,7 @@ export default function ConsultantPage({ params }: { params: { vehicleId: string
         <div className="flex items-center justify-center py-32">
           <div className="flex flex-col items-center gap-3">
             <div className="w-10 h-10 border-2 border-info-border border-t-info rounded-full animate-spin" />
-            <p className="text-sm text-white/40">Loading consultant...</p>
+            <p className="text-sm text-white/50">Loading consultant...</p>
           </div>
         </div>
       </DashboardLayout>

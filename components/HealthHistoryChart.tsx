@@ -117,18 +117,18 @@ export default function HealthHistoryChart({ history, currentScore }: HealthHist
           </div>
           <div className="flex gap-4 flex-shrink-0">
             <div className="text-center">
-              <p className="text-xs text-white/35 mb-1 uppercase tracking-widest font-semibold">Start</p>
+              <p className="text-xs text-white/50 mb-1 uppercase tracking-widest font-semibold">Start</p>
               <p className="text-lg font-bold text-white/60 tabular-nums">{firstScore}</p>
             </div>
             <div className="text-center">
-              <p className="text-xs text-white/35 mb-1 uppercase tracking-widest font-semibold">Current</p>
+              <p className="text-xs text-white/50 mb-1 uppercase tracking-widest font-semibold">Current</p>
               <p className={`text-lg font-bold tabular-nums ${
                 lastScore >= 80 ? 'text-green-400' : lastScore >= 60 ? 'text-info' : lastScore >= 40 ? 'text-orange-400' : 'text-red-400'
               }`}>{lastScore}</p>
             </div>
           </div>
         </div>
-        <p className="text-xs text-white/25 mt-3">
+        <p className="text-xs text-white/50 mt-3">
           Based on {history.length} data points over time
         </p>
       </CardContent>

@@ -182,7 +182,7 @@ export default function FeaturesDrawer({ open, onOpenChange }: FeaturesDrawerPro
             <button
               type="button"
               onClick={() => onOpenChange(false)}
-              className="text-xs text-white/40 hover:text-white/70 transition-colors"
+              className="text-xs text-white/50 hover:text-white/70 transition-colors"
             >
               Keep looking around the demo
             </button>

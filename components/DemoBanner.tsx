@@ -24,15 +24,15 @@ export default function DemoBanner() {
           >
             DAVID MASTERSON.
           </a>
-          <span className="text-[#2a2a2a] select-none shrink-0">|</span>
+          <span className="text-[#2a2a2a] select-none shrink-0" aria-hidden="true">|</span>
           {/* Hidden rather than truncated at the narrowest widths: "Portfolio
               Demo" clipped to "Portfo…" is worse than absent, and the byline
               beside it already carries the same signal. */}
-          <span className="hidden min-[380px]:inline text-xs tracking-[0.1em] uppercase text-[#EDE8DF]/40 font-medium whitespace-nowrap">
+          <span className="hidden min-[380px]:inline text-xs tracking-[0.1em] uppercase text-[#EDE8DF]/70 font-medium whitespace-nowrap">
             Portfolio Demo
           </span>
-          <span className="hidden sm:inline text-[#2a2a2a] select-none">·</span>
-          <span className="hidden sm:inline text-xs text-[#EDE8DF]/25 tracking-wide">
+          <span className="hidden sm:inline text-[#2a2a2a] select-none" aria-hidden="true">·</span>
+          <span className="hidden sm:inline text-xs text-[#EDE8DF]/60 tracking-wide">
             Shared demo garage &mdash; AI Consultant is fully live
           </span>
         </div>
@@ -40,7 +40,7 @@ export default function DemoBanner() {
           href="https://davidmasterson.co/"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-xs tracking-[0.15em] uppercase font-medium text-[#C4845C]/50 hover:text-[#C4845C] transition-colors shrink-0"
+          className="text-xs tracking-[0.15em] uppercase font-medium text-[#C4845C]/90 hover:text-[#C4845C] transition-colors shrink-0"
         >
           View Portfolio &rarr;
         </a>

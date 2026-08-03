@@ -109,7 +109,7 @@ function DonutChart({ segments, total }: { segments: DonutSegment[]; total: numb
         })}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-xs text-white/40 font-medium uppercase tracking-wider">Total Cost</span>
+        <span className="text-xs text-white/50 font-medium uppercase tracking-wider">Total Cost</span>
         <span className="text-2xl font-bold text-white mt-0.5">${formatK(total)}</span>
       </div>
     </div>
@@ -128,9 +128,9 @@ function formatCurrency(value: number): string {
 function KPICard({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: string }) {
   return (
     <div className="flex flex-col gap-0.5 p-4 bg-white/4 rounded-xl border border-white/8">
-      <span className="text-xs font-semibold uppercase tracking-widest text-white/40">{label}</span>
+      <span className="text-xs font-semibold uppercase tracking-widest text-white/50">{label}</span>
       <span className={`text-2xl font-bold tabular-nums ${accent || 'text-white'}`}>{value}</span>
-      {sub && <span className="text-xs text-white/40">{sub}</span>}
+      {sub && <span className="text-xs text-white/50">{sub}</span>}
     </div>
   );
 }
@@ -257,7 +257,7 @@ export default function TCOCard({ vehicle, vehicleId, onEditInputs }: TCOCardPro
             </div>
             <div>
               <p className="text-sm font-medium text-white/60 mb-1">Add purchase price to unlock TCO</p>
-              <p className="text-xs text-white/30 max-w-xs">
+              <p className="text-xs text-white/50 max-w-xs">
                 Enter your vehicle&apos;s purchase price, MPG, and fuel cost to see your real cost-per-mile.
               </p>
             </div>
@@ -330,7 +330,7 @@ export default function TCOCard({ vehicle, vehicleId, onEditInputs }: TCOCardPro
                             />
                           </div>
                         </div>
-                        <span className="text-xs text-white/35 w-10 text-right tabular-nums">{pct}%</span>
+                        <span className="text-xs text-white/50 w-10 text-right tabular-nums">{pct}%</span>
                       </div>
                     );
                   })}
@@ -341,7 +341,7 @@ export default function TCOCard({ vehicle, vehicleId, onEditInputs }: TCOCardPro
             {(avgMpg === 0 || fuelPrice === 0) && (
               <div className="flex items-center gap-2 px-3 py-2 bg-white/4 border border-white/8 rounded-lg">
                 <Info className="h-3.5 w-3.5 text-white/30 flex-shrink-0" />
-                <p className="text-xs text-white/40">
+                <p className="text-xs text-white/50">
                   Add avg MPG and fuel price{' '}
                   {onEditInputs ? (
                     <button onClick={onEditInputs} className="text-cyan-400 hover:underline">in Cost Inputs</button>

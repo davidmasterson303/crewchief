@@ -41,7 +41,7 @@ function CostRangeBar({ low, high, max }: { low: number; high: number; max: numb
           style={{ marginLeft: `${leftPct}%`, width: `${Math.max(widthPct, 4)}%` }}
         />
       </div>
-      <div className="flex justify-between mt-1.5 text-xs text-white/35 tabular-nums">
+      <div className="flex justify-between mt-1.5 text-xs text-white/50 tabular-nums">
         <span>$0</span>
         <span className="text-info font-medium">{fmt(low)} – {fmt(high)}</span>
         <span>{fmt(max)}</span>
@@ -67,13 +67,13 @@ export function CostEstimateBreakdown({ estimate }: CostEstimateBreakdownProps) 
             <div>
               <h4 className="font-semibold text-white text-sm">{item.description}</h4>
               {item.notes && (
-                <p className="text-xs text-white/45 mt-0.5 leading-relaxed">{item.notes}</p>
+                <p className="text-xs text-white/50 mt-0.5 leading-relaxed">{item.notes}</p>
               )}
             </div>
 
             <div className="grid grid-cols-2 gap-2.5">
               <div className="bg-white/3 border border-white/6 rounded-lg p-2.5">
-                <div className="flex items-center gap-1 text-white/40 mb-1">
+                <div className="flex items-center gap-1 text-white/50 mb-1">
                   <DollarSign className="h-3 w-3" />
                   <span className="text-xs font-medium">Parts</span>
                 </div>
@@ -82,14 +82,14 @@ export function CostEstimateBreakdown({ estimate }: CostEstimateBreakdownProps) 
                 </p>
               </div>
               <div className="bg-white/3 border border-white/6 rounded-lg p-2.5">
-                <div className="flex items-center gap-1 text-white/40 mb-1">
+                <div className="flex items-center gap-1 text-white/50 mb-1">
                   <Clock className="h-3 w-3" />
                   <span className="text-xs font-medium">Labor</span>
                 </div>
                 <p className="text-sm font-semibold text-info tabular-nums">
                   {fmt(item.labor_cost_low)} – {fmt(item.labor_cost_high)}
                 </p>
-                <p className="text-xs text-white/30 mt-0.5">
+                <p className="text-xs text-white/50 mt-0.5">
                   {item.labor_hours_low.toFixed(1)}–{item.labor_hours_high.toFixed(1)} hrs
                 </p>
               </div>
@@ -97,7 +97,7 @@ export function CostEstimateBreakdown({ estimate }: CostEstimateBreakdownProps) 
 
             <div className="pt-2 border-t border-white/6">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-white/40 font-medium">Item Estimate</span>
+                <span className="text-xs text-white/50 font-medium">Item Estimate</span>
                 <span className="text-sm font-bold text-info tabular-nums">{fmt(itemLow)} – {fmt(itemHigh)}</span>
               </div>
               <CostRangeBar low={itemLow} high={itemHigh} max={itemHigh * 1.4} />
@@ -115,7 +115,7 @@ export function CostEstimateBreakdown({ estimate }: CostEstimateBreakdownProps) 
             </p>
           </div>
           <div className="text-right">
-            <p className="text-xs text-white/35">Market avg</p>
+            <p className="text-xs text-white/50">Market avg</p>
             <p className="text-sm font-semibold text-info tabular-nums">
               {fmt(Math.round((estimate.total_low + estimate.total_high) / 2))}
             </p>
@@ -133,7 +133,7 @@ export function CostEstimateBreakdown({ estimate }: CostEstimateBreakdownProps) 
               }}
             />
           </div>
-          <div className="flex justify-between mt-2 text-xs text-white/30 tabular-nums">
+          <div className="flex justify-between mt-2 text-xs text-white/50 tabular-nums">
             <span>$0</span>
             <span className="text-info/80 font-medium">
               {fmt(estimate.total_low)} — {fmt(estimate.total_high)}
@@ -144,19 +144,19 @@ export function CostEstimateBreakdown({ estimate }: CostEstimateBreakdownProps) 
             className="absolute -top-0.5 w-px h-5 bg-white/25"
             style={{ left: `${((estimate.total_low + estimate.total_high) / 2 / maxPossible) * 100}%` }}
           >
-            <span className="absolute -top-5 -translate-x-1/2 text-xs text-white/40 whitespace-nowrap">avg</span>
+            <span className="absolute -top-5 -translate-x-1/2 text-xs text-white/50 whitespace-nowrap">avg</span>
           </div>
         </div>
 
         {estimate.regional_labor_rate && (
-          <p className="text-xs text-white/40 mt-4 flex items-start gap-1.5 leading-relaxed">
+          <p className="text-xs text-white/50 mt-4 flex items-start gap-1.5 leading-relaxed">
             <Info className="h-3.5 w-3.5 text-info/60 flex-shrink-0 mt-0.5" />
             {estimate.regional_labor_rate}
           </p>
         )}
       </div>
 
-      <div className="flex items-start gap-2 text-xs text-white/30 bg-white/3 border border-white/6 rounded-xl p-3.5 leading-relaxed">
+      <div className="flex items-start gap-2 text-xs text-white/50 bg-white/3 border border-white/6 rounded-xl p-3.5 leading-relaxed">
         <Info className="h-3.5 w-3.5 flex-shrink-0 mt-0.5 text-white/25" />
         <p>AI-generated estimates for comparison only. Actual costs vary based on shop rates, parts availability, and diagnostics.</p>
       </div>

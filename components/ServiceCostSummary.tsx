@@ -82,13 +82,13 @@ export default function ServiceCostSummary({ maintenanceLineItems = [] }: Servic
           <div className="p-4 bg-white/4 rounded-xl border border-white/8 text-center">
             <p className="label-uppercase mb-2">Total Spent</p>
             <p className="text-xl font-bold text-white tabular-nums">{fmt(stats.totalSpent)}</p>
-            <p className="text-xs text-white/30 mt-1">{stats.itemCount} records</p>
+            <p className="text-xs text-white/50 mt-1">{stats.itemCount} records</p>
           </div>
 
           <div className="p-4 bg-white/4 rounded-xl border border-white/8 text-center">
             <p className="label-uppercase mb-2">This Year</p>
             <p className="text-xl font-bold text-white tabular-nums">{fmt(stats.yearToDateTotal)}</p>
-            <p className="text-xs text-white/30 mt-1">YTD {new Date().getFullYear()}</p>
+            <p className="text-xs text-white/50 mt-1">YTD {new Date().getFullYear()}</p>
           </div>
 
           <div className="p-4 bg-white/4 rounded-xl border border-white/8 text-center">
@@ -96,7 +96,7 @@ export default function ServiceCostSummary({ maintenanceLineItems = [] }: Servic
             <p className="text-xl font-bold text-white tabular-nums">
               {stats.avgPerMonth ? fmt(stats.avgPerMonth) : '—'}
             </p>
-            <p className="text-xs text-white/30 mt-1">Estimated</p>
+            <p className="text-xs text-white/50 mt-1">Estimated</p>
           </div>
         </div>
 

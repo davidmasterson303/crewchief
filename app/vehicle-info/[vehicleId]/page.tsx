@@ -31,7 +31,7 @@ function EmptySpec({ label }: { label: string }) {
       <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/8 flex items-center justify-center mb-3">
         <Loader2 className="h-5 w-5 text-white/20" />
       </div>
-      <p className="text-sm text-white/35 leading-relaxed max-w-xs">
+      <p className="text-sm text-white/50 leading-relaxed max-w-xs">
         {label} will be available after vehicle research is complete.
       </p>
     </div>
@@ -117,7 +117,7 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
           <div className="flex items-center justify-center py-32">
             <div className="flex flex-col items-center gap-3">
               <div className="w-10 h-10 border-2 border-info-border border-t-info rounded-full animate-spin" />
-              <p className="text-sm text-white/40">Loading vehicle info...</p>
+              <p className="text-sm text-white/50">Loading vehicle info...</p>
             </div>
           </div>
         </DashboardLayout>
@@ -127,7 +127,7 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
       <div className="min-h-screen bg-[#080808] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-2 border-info-border border-t-info rounded-full animate-spin" />
-          <p className="text-sm text-white/40">Loading vehicle info...</p>
+          <p className="text-sm text-white/50">Loading vehicle info...</p>
         </div>
       </div>
     );
@@ -227,7 +227,7 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
             {perfLoading && !hasPerformanceData ? (
               <div className="flex flex-col items-center justify-center py-12">
                 <div className="w-8 h-8 border-2 border-info-border border-t-info rounded-full animate-spin mb-3" />
-                <p className="text-sm text-white/40">Analyzing performance specs...</p>
+                <p className="text-sm text-white/50">Analyzing performance specs...</p>
               </div>
             ) : (
               <>
@@ -264,7 +264,7 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
                           {value || '\u2014'}
                           {value && <span className="text-base font-normal text-white/50 ml-1">{unit}</span>}
                         </div>
-                        <p className="text-xs text-white/40 mt-1">{label}</p>
+                        <p className="text-xs text-white/50 mt-1">{label}</p>
                         {delta && (
                           <p className="text-xs text-green-400 font-medium mt-1">{delta}</p>
                         )}
@@ -274,7 +274,7 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
                 </div>
 
                 {perfLoading && hasPerformanceData && (
-                  <div className="flex items-center justify-center gap-2 mt-4 text-xs text-white/35">
+                  <div className="flex items-center justify-center gap-2 mt-4 text-xs text-white/50">
                     <Loader2 className="h-3.5 w-3.5 animate-spin text-info" />
                     Checking for updates...
                   </div>

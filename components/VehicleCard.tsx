@@ -393,7 +393,7 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary, alerts }: V
               </span>
               <button
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowMileageDialog(true); }}
-                className="meta-edit tap-target-44 text-white/40 hover:text-cyan-400 transition-colors"
+                className="meta-edit tap-target-44 text-white/50 hover:text-cyan-400 transition-colors"
                 aria-label={`Update mileage for ${vehicle.year} ${vehicle.make} ${vehicle.model}`}
               >
                 <Pencil className="h-3.5 w-3.5" />

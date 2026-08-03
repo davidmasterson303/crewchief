@@ -19,8 +19,19 @@ import { createBrowserSupabaseClient } from '@/lib/supabase';
 import { queryClient } from '@crewchief/core/query-client';
 import { signOutAndClearCache } from '@/lib/sign-out';
 import { toast } from 'sonner';
+import {
+  DELETION_CONFIRM_PHRASE,
+  describeDeletion,
+  isDeletionConfirmed,
+} from '@crewchief/core/account-deletion';
 
-const CONFIRM_PHRASE = 'DELETE';
+/*
+  Imported rather than declared. App Store 5.1.1(v) is reviewed against the
+  *mobile* flow, so two spellings of "has the user confirmed" would let the
+  reviewed surface quietly become the weaker one — and nothing would report it,
+  because both would still delete accounts and both would still look right.
+*/
+const CONFIRM_PHRASE = DELETION_CONFIRM_PHRASE;
 
 interface DeleteAccountDialogProps {
   open: boolean;
@@ -50,7 +61,7 @@ export function DeleteAccountDialog({
   const [confirmText, setConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
 
-  const confirmed = confirmText.trim().toUpperCase() === CONFIRM_PHRASE;
+  const confirmed = isDeletionConfirmed(confirmText);
 
   async function handleDelete() {
     if (!confirmed || deleting) return;
@@ -73,7 +84,9 @@ export function DeleteAccountDialog({
     await signOutAndClearCache(createBrowserSupabaseClient(), queryClient);
 
     // Apple requires confirmation that deletion actually happened.
-    toast.success('Your account and all its data have been deleted.');
+    // Names what went, rather than saying "done" — Apple asks for confirmation
+    // that deletion actually happened, and by now there is nothing left to check.
+    toast.success(describeDeletion(result.deleted));
     router.push('/');
     router.refresh();
   }

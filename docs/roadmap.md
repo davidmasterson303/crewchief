@@ -6,27 +6,35 @@ Source: `Live-Site Audit.dc.html` (2 Aug 2026), grounded in repo `davidmasterson
 
 ## Status — 2 Aug 2026, afternoon session
 
-**Live on production.** `crewchief-demo.davidmasterson.co` is serving `e729ee96`
-(the `demo-live` merge), promoted from `main` at `d3aae46` through
+**Live on production.** `crewchief-demo.davidmasterson.co` is serving `f09a0ef6`
+(the `demo-live` merge), promoted from `main` at `3a246fa2` through
 `scripts/promote-demo.mjs`. All gate checks passed; `verify-demo.mjs` green
-against prod afterwards.
+against prod afterwards, with the two standing warnings.
 
-**Not yet on production: everything from the afternoon session** — RP1, R4, R8,
-the three Phase 2.95 cost items, and all four findings from Cowork's QA run.
-Fourteen commits on `main`, none promoted. Promotion is a separate deliberate
-step.
+**The whole afternoon is live.** RP1, R4, R8, Phase 2.95 a/b/c and all four of
+Cowork's QA findings.
+
+**Verified on prod after the promote, at the widths that could not be reached
+locally:** `/` at 375 — horizontal overflow 0 and `textUnder12px` **0**, down
+from the baseline's 1, exactly as Cowork predicted when it identified that node
+as the banner link. `/` at 700 — two 314px columns, against the single 652px
+column it measured on `e729ee96`. `/consultant` at 375 — composer on screen,
+thread scrolling, zero overflow in either axis.
 
 | | Items | |
 |---|---|---|
 | **Done** | 1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 16, 17 | 12 |
 | **Partial** | 13, 15 | 2 |
 | **Open** | 5, 12, 14, 18 | 4 |
-| **Done (work stream B)** | RB0, R1, R2, R3, R5, R6, R9, R10, R15, R4, **R8** | 11 |
-| **Open (work stream B)** | R7, R11, R12, R13, R14 | 5 |
+| **Done (work stream B)** | RB0, R1, R2, R3, R5, R6, R9, R10, R15, R4, R8, **R11, R12** | 13 |
+| **Invalid (work stream B)** | **R13, R14** — both target components nothing renders | 2 |
+| **Open (work stream B)** | R7 — folds into item 14 | 1 |
 
-**RP0 and RP1 are closed, and both of RP2's heaviest items went with them** —
-R4, its one CRITICAL, and R8. What remains is R11, R12, R13 and R14, plus R7,
-which folds into item 14.
+**Work stream B is finished, except for a decision that is not a fix.** RB0,
+RP0, RP1 and RP2 are all closed — R4, R8, R11 and R12 landed this afternoon.
+**R13 and R14 are invalid**: both describe real defects in components that no
+route renders, and the live equivalents do not have those defects. Deleting or
+wiring those two components is David's call. R7 remains folded into item 14.
 
 Every item below carries a status line. **Handoff notes are at the bottom of
 this file** — read those first if you are picking this up cold.
@@ -535,6 +543,30 @@ Add to `app/globals.css` and to the DS spec, then reference by name in review.
 - **Effort:** ~1 hour.
 
 ### R13. Service rows drop the date and truncate the job — MEDIUM
+> **INVALID AS WRITTEN — `components/MaintenanceHistory.tsx` is not rendered
+> anywhere.** Nothing imports it: no `<MaintenanceHistory`, no import of
+> `@/components/MaintenanceHistory` or `./MaintenanceHistory`, no
+> `dynamic()`/`lazy()` reference, in `app/` or `components/`. It exports a
+> default that no file consumes. The only mention left in the tree is a comment
+> in `CollapsibleSection.tsx`.
+>
+> **And the live page does not have this defect.**
+> `app/documents/[vehicleId]/page.tsx` renders the service history itself and
+> contains no `hidden sm:`, no `truncate` and no date formatting at all — the
+> date is printed plainly, which is the thing R13 asks for.
+>
+> The fix was written and then reverted rather than committed. Editing a
+> component nothing renders is work that looks like progress, cannot be
+> verified by any flow, and would leave the file looking maintained.
+>
+> **This is item 12's failure again, one layer over.** That entry records
+> `photography/build_assets.py` as "never committed… which is how the audit
+> reached a wrong conclusion in good faith". Same shape: the audit read source
+> and inferred that reading it meant it ran.
+>
+> **David's call, and it is a scope decision rather than a fix:** delete
+> `MaintenanceHistory.tsx` and `UpcomingMaintenance.tsx`, or wire them up if
+> they were meant to be reached. R13 and R14 only become real after that.
 - **Problem:** `MaintenanceHistory.tsx:347–376` keeps one line and pays for it — date `hidden sm:flex`, part number `hidden sm:inline`, description `truncate`, beside a category badge and a right-aligned cost. A maintenance record with its date hidden has the second-most-important fact removed, on the screen whose whole job is "what was done, when, for how much."
 - **Change:** two lines below `sm`, one line above —
   ```
@@ -544,6 +576,14 @@ Add to `app/globals.css` and to the DS spec, then reference by name in review.
 - **Effort:** ~2 hours.
 
 ### R14. A 260px carousel that fits neither phone nor desktop — MEDIUM
+> **INVALID AS WRITTEN — `components/UpcomingMaintenance.tsx` is not rendered
+> anywhere either.** Same evidence as R13, and the claim that it "is the only
+> horizontally-scrolling region in the app" is the tell: the only live
+> `overflow-x-auto` in `app/` or `components/` outside it are the dashboard's
+> tab strip, which carries `edge-fade-x` deliberately, and `EmailDraftDisplay`.
+> There is no carousel on any screen a user can reach.
+>
+> Fix written and reverted, for the reason under R13. Same decision needed.
 - **Problem:** `UpcomingMaintenance.tsx:136`, `:415` — fixed `w-[260px]` cards in a snap scroller. At 375px that leaves a 19px sliver of the next card: too little to read as "more," too much to read as an edge. At 1440px the same strip scrolls through four items while 600px of row sits empty. It is the only horizontally-scrolling region in the app and it scrolls at *every* width.
 - **Change:** below `sm` → `w-[78vw] max-w-[300px] snap-start` (a legible next-card peek); `md`+ → `grid grid-cols-2 xl:grid-cols-3`, no scroller.
 - **Effort:** ~1 hour.
@@ -620,10 +660,10 @@ RB0/RP0 at 11:12, both after it was written.
 
 ## Where things stand
 
-- `main` = `1a691e7`. Working tree clean. **Nothing from this session is
+- `main` = `0fe7248`, pushed. Working tree clean. **Nothing from this session is
   pushed or promoted** — production still serves `e729ee96`, which is the
   morning's work.
-- 61 suites, 1055 tests, green. `npm run typecheck` clean.
+- 62 suites, 1075 tests, green. `npm run typecheck` clean.
 - **Two stale worktrees** under `.claude/worktrees/` (`confident-shtern`,
   `friendly-lewin`). Both are *behind* `main` with nothing ahead — checked, no
   stranded work. Prunable whenever.
@@ -751,21 +791,76 @@ will not fire and it will not stall mid-run.
 
 ## What I would pick up first, in order
 
-1. **Promote, or decide not to.** Six commits sit unpromoted, including a
-   consultant behaviour change. The round-trip gate passes locally; running it
-   against the candidate is the thing that should gate the promote.
+1. ~~**Promote, or decide not to.**~~ **Done — `f09a0ef6`.** The gate blocked the
+   first attempt on four 502s from `verify-demo`; they were cold-start edge
+   function failures on a fresh deploy, not a regression, and cleared on a
+   re-run once the functions were warm. Worth knowing: **a first gate run
+   against a just-built candidate can fail for reasons that are not yours.**
+   Re-run before diagnosing.
 2. ~~**2.95c — per-account metering.**~~ **Done (`bb83782`)** — all ten call
    sites record. Waiting only on the migration above, then two weeks of data
    before **D2 (price point)** can be taken as a decision rather than a guess.
-3. **David: 5.0.** Entity, terms, privacy policy. Still the only genuine blocker
-   on revenue and the only one whose duration nobody controls.
-4. **The R10 tail** — data and labels to 13px on mobile. Needs a judgement per
+3. ~~**5.1 — tier limits and budget enforcement.**~~ **Enforcement half done
+   (`0fe7248`).** A monthly output-token ceiling read from the meter, wired into
+   the consultant and invoice paths. **The upgrade-prompt half is deliberately
+   not built** — D2 and D3 are open, the KB is silent on both, and a prompt
+   leading nowhere is worse than a plain limit. Two risk decisions are recorded
+   at their call sites: the demo is measured but never hard-stopped, and the
+   check fails open.
+4. **David: 5.0.** Entity, terms, privacy policy. Still the only genuine blocker
+   on revenue and the only one whose duration nobody controls. **Now the
+   binding constraint on the whole money track** — 2.95 and 5.1 are done, and
+   5.2 cannot ship to a real card without it.
+5. **R13/R14's dead components.** Delete `MaintenanceHistory.tsx` and
+   `UpcomingMaintenance.tsx`, or wire them up. A scope decision, not a fix.
+6. **2.95d — window the consultant context.** Waits on two weeks of meter data,
+   per Addendum A. The first three rows already say thinking runs 5–8× the
+   visible answer *at `LOW`*, which is an argument for re-testing `MINIMAL` on
+   the non-prose paths once there is a sample worth reading.
+7. **The R10 tail** — data and labels to 13px on mobile. Needs a judgement per
    site, which is why only the 12px floor landed.
-5. **Item 17's contrast finding** — `white/30` and `white/40` body text at
-   2.71:1 and 3.78:1, both failing AA. Unchanged from this morning: app-wide
-   tokens, so it is a Design call, and still a real defect on a portfolio piece.
-6. **The R9 lint rule** in `_adherence.oxlintrc.json`. It is in the DS repo, so
+8. **Item 17's contrast finding** — `white/30` and `white/40` body text at
+   2.71:1 and 3.78:1, both failing AA. Unchanged: app-wide tokens, so it is a
+   Design call, and still a real defect on a portfolio piece.
+9. **The R9 lint rule** in `_adherence.oxlintrc.json`. It is in the DS repo, so
    the 44px floor is still a review comment rather than a check.
+
+## Phase 3.3 — account deletion, and how far it is verified
+
+**Built and bundled, not run.** `AccountScreen` is one tap from the garage and
+`DELETE /api/v1/account` is wired. What has actually been checked:
+
+- mobile `tsc` clean; web 62 suites / 1090 tests green
+- the confirmation rule, the inventory and the summary are shared from
+  `packages/core/src/account-deletion.ts` and unit-tested — the web dialog
+  imports them rather than keeping its own copy, because **Apple reviews the
+  mobile surface** and two implementations let the reviewed one drift weaker
+- `npx expo export --platform ios` bundles clean, 636 modules, and the shipped
+  `.hbc` contains "Delete my account", "Signed in as", "Every consultant
+  conversation" and "Your account has been deleted" — so the screen *and* the
+  cross-package core import are genuinely in the binary, not tree-shaken
+
+**Not verified: it has never been rendered.** No simulator run, no tap-through.
+Treat 5.1.1(v) as built-not-proven until someone launches it.
+
+> **Do not chase `xcode-select` on this Mac.** The simulator MCP tool reports
+> "Xcode is installed but not selected" and asks for
+> `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`. **The Mac
+> is already configured correctly** — Xcode → Settings → Locations shows
+> *Command Line Tools: Xcode 16.3 (16E140)*, `xcode-select -p` returns the
+> Xcode path, and `xcrun --find simctl` resolves into `Xcode.app`. The tool's
+> precondition check is what is wrong.
+>
+> Two signals that look like evidence and are not: `xcrun --show-sdk-path` with
+> no argument returns the default *macOS* SDK, which Command Line Tools
+> legitimately provides, and `/var/db/xcode_select_link` is absent on a machine
+> that is nonetheless correctly selected. I read both as faults and sent David
+> to fix something that was not broken. Check `xcrun --find simctl` instead.
+
+**When someone does run it, do not press the final delete.** There is one real
+account and no throwaway. Verify the screen renders, the button stays disabled
+until the phrase is typed, and stop there — item D already proved the cascade
+against a disposable account on 1 Aug.
 
 ## Environment gaps that are not code
 

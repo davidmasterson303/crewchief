@@ -40,6 +40,71 @@ export const DOC_MAX_EDGE = 2048;
 export const DOC_TARGET_BYTES = 500 * 1024;
 
 /**
+ * The largest a vehicle photo may be *as stored*.
+ *
+ * ── The defect this closes ──────────────────────────────────────────────────
+ *
+ * Nothing server-side bounded this. `uploadVehiclePhoto` read the file and put
+ * it in the bucket, and the only thing keeping stored photos small was
+ * `downscaleImage` running in the browser — which is explicitly designed to
+ * give up and return the original on any failure, because a photo that uploads
+ * large is better than a photo that fails to upload.
+ *
+ * That is the right call in the client and the wrong place for the only copy
+ * of the rule. Measured 2 Aug against live storage: the one real stored photo
+ * is **2,328,761 bytes**, uploaded sixteen hours before the client downscale
+ * landed, and every viewer of that car downloads all of it to fill a card 172
+ * points tall. On a phone that is the user's data allowance.
+ *
+ * ── Why a ceiling and not a server-side resize ──────────────────────────────
+ *
+ * The roadmap's fix is "sign a resized URL". **That is not available here** —
+ * Supabase image transformation returns `FeatureNotEnabled` for this tenant,
+ * verified against the live API rather than assumed from the plan page. Nor can
+ * the server re-encode: `sharp` is a devDependency whose outputs are committed
+ * precisely because Netlify never runs it.
+ *
+ * So the lever that exists is refusal, at the one chokepoint every upload
+ * passes through.
+ *
+ * ── The number ──────────────────────────────────────────────────────────────
+ *
+ * `TARGET_BYTES` is 150 KB, so a photo the client processed successfully
+ * arrives an order of magnitude under this. A file arriving above it means the
+ * downscale did not run — a decode failure, or a caller that is not the dialog
+ * — which is exactly the case worth refusing rather than storing forever.
+ */
+export const MAX_STORED_PHOTO_BYTES = 1_500 * 1024;
+
+/**
+ * Whether a file may be stored as a vehicle photo.
+ *
+ * Returns the reason rather than a boolean, because the caller has to tell the
+ * user something they can act on — "too large" with no number is the kind of
+ * error message that produces a support conversation instead of a retry.
+ */
+export function checkStoredPhotoSize(bytes: number): { ok: true } | { ok: false; reason: string } {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    // Unknown size is not a reason to refuse. The bound exists to stop a
+    // specific, measurable harm, and a missing `size` is not evidence of it.
+    return { ok: true };
+  }
+
+  if (bytes <= MAX_STORED_PHOTO_BYTES) return { ok: true };
+
+  const mb = (bytes / (1024 * 1024)).toFixed(1);
+  const maxMb = (MAX_STORED_PHOTO_BYTES / (1024 * 1024)).toFixed(1);
+
+  return {
+    ok: false,
+    reason:
+      `That photo is ${mb} MB, and the limit is ${maxMb} MB. ` +
+      `Photos are normally shrunk in your browser before upload — if this one was not, ` +
+      `try a different photo or a smaller export.`,
+  };
+}
+
+/**
  * Whether an upload is a raster image this pipeline can usefully re-encode.
  *
  * The document path accepts PDFs as well as photographs. `downscaleImage` would
