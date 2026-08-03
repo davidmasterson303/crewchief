@@ -72,6 +72,169 @@ export function isRecordableVisitorId(visitorId: unknown): visitorId is string {
   return trimmed.length >= 8 && trimmed.length <= 128 && trimmed === visitorId;
 }
 
+/* ─── Visitor identity ──────────────────────────────────────────────────────
+ *
+ * The half of 2.97d that costs real effort, and the reason the item was
+ * re-sized from 0.5 ed to 0.75. There is no anonymous identity anywhere in this
+ * app — `checkRateLimit` takes a caller-supplied string, not an IP or a cookie —
+ * so this is new, and it is what makes four events a funnel rather than four
+ * counters.
+ *
+ * The policy lives here, portable and testable. The glue that reads and writes
+ * an actual cookie needs `next/headers` and lives in `lib/funnel-visitor.ts`,
+ * the same split as every other module in this package.
+ */
+
+/**
+ * The cookie name.
+ *
+ * `cc_` prefix to match `cc_intro_played`, the only other first-party key this
+ * app sets.
+ */
+export const VISITOR_COOKIE = 'cc_fv';
+
+/**
+ * How long a visitor id survives. **24 hours, and short on purpose.**
+ *
+ * The funnel it has to span is one sitting — land, upload, get an answer,
+ * decide. A day covers that with room for someone who comes back after lunch,
+ * and it stops well short of the durable cross-session identifier that would
+ * make this a tracking cookie rather than a measurement one.
+ *
+ * That distinction is not decoration. It is the whole basis of the argument in
+ * the roadmap that this is a weaker consent case than a third-party tracker,
+ * and the thing 5.0's legal review will actually be asked about. Raising this
+ * to weeks would quietly move the answer.
+ *
+ * The cost is honest: a visitor who returns on day three is a new visitor, so
+ * repeat-visit conversion is invisible to this table. That is a question this
+ * instrument deliberately cannot answer.
+ */
+export const VISITOR_TTL_SECONDS = 60 * 60 * 24;
+
+/** Current id scheme. Bumped if the format changes, so old ids stay readable. */
+const VISITOR_PREFIX = 'v1_';
+
+/**
+ * Format a visitor id from caller-supplied randomness.
+ *
+ * Takes the uuid rather than generating one so this module stays free of Node
+ * built-ins and `globalThis.crypto` — React Native provides neither
+ * `crypto.randomUUID` nor `node:crypto`, and this package is imported by the
+ * mobile client. The caller has a source of randomness; this decides the shape.
+ */
+export function formatVisitorId(uuid: string): string {
+  // Dashes stripped so the id is one token in a log line and in a URL, should
+  // it ever appear in either. 3 + 32 = 35 characters, inside the 8..128 bound
+  // `isRecordableVisitorId` and the database CHECK both enforce.
+  return `${VISITOR_PREFIX}${uuid.replace(/-/g, '')}`;
+}
+
+/**
+ * Cookie attributes. Every one of these is load-bearing.
+ *
+ * `httpOnly` — nothing in the browser needs to read this. The four events are
+ * recorded server-side, so exposing it to script would add a fingerprinting
+ * surface and buy nothing.
+ *
+ * `sameSite: 'lax'` — the front door is reached from a forum link, which is a
+ * top-level cross-site GET. `strict` would withhold the cookie on exactly that
+ * navigation, so every visitor arriving from the M1 distribution channel would
+ * be issued a fresh id on their second page and the funnel would show a
+ * hundred percent bounce. `none` would make it a cross-site cookie, which it
+ * is not.
+ *
+ * `secure` — off only for local http development, where the browser would
+ * otherwise refuse the cookie entirely.
+ */
+export function visitorCookieOptions(secure: boolean) {
+  return {
+    httpOnly: true,
+    sameSite: 'lax' as const,
+    secure,
+    path: '/',
+    maxAge: VISITOR_TTL_SECONDS,
+  };
+}
+
+/**
+ * Whether this request is a prefetch rather than a person arriving.
+ *
+ * `landed` is the awkward event — it fires on a render, and Next prefetches
+ * links in the viewport, so without this the top of the funnel counts pages
+ * nobody looked at and every conversion rate below it is divided by a made-up
+ * number. Silent, and in the flattering direction for bounce and the
+ * unflattering one for conversion.
+ *
+ * Three headers because three generations of the same idea are in the wild and
+ * the app is served to whatever the visitor happens to be running:
+ * `next-router-prefetch` is Next's own, `Sec-Purpose` is the current standard,
+ * and `purpose: prefetch` is what older Chrome and some proxies still send.
+ *
+ * Reloads are *not* handled here — `UNIQUE (visitor_id, step)` already collapses
+ * them, which is why that constraint is in the schema.
+ */
+export function isPrefetchRequest(header: (name: string) => string | null | undefined): boolean {
+  if (header('next-router-prefetch')) return true;
+
+  const secPurpose = header('Sec-Purpose') ?? header('sec-purpose');
+  if (secPurpose && secPurpose.toLowerCase().includes('prefetch')) return true;
+
+  const purpose = header('purpose') ?? header('Purpose') ?? header('x-purpose');
+  if (purpose && purpose.toLowerCase() === 'prefetch') return true;
+
+  return false;
+}
+
+export interface VisitorDecision {
+  /** The id to attribute this request's events to, or `null` to record nothing. */
+  visitorId: string | null;
+  /** Whether the caller must write the cookie onto the response. */
+  issue: boolean;
+}
+
+/**
+ * Read-or-issue, as a decision rather than an effect.
+ *
+ * The whole policy in one pure function, for the reason `decideIntro` gives:
+ * this is the part that can be wrong in ways nobody notices. A funnel with a
+ * subtly wrong denominator looks exactly like a funnel.
+ *
+ * Three cases, and the middle one is the one worth having:
+ *
+ *   existing valid id  →  reuse it, write nothing. A reload keeps its identity,
+ *                         and re-issuing would make one visitor look like two
+ *   prefetch           →  no id, nothing recorded. A link in a viewport is not
+ *                         a visit, and issuing here would burn an id on a
+ *                         person who never arrives — then the real navigation
+ *                         reuses it and `landed` is attributed to a prefetch
+ *   otherwise          →  issue
+ *
+ * A cookie that exists but fails `isRecordableVisitorId` is replaced rather
+ * than trusted. It is an anonymous caller's text, so it is either corrupt or
+ * hand-written, and neither should reach the database on the strength of
+ * having been in a cookie jar.
+ */
+export function decideVisitor({
+  existing,
+  prefetch,
+  newId,
+}: {
+  existing: string | null | undefined;
+  prefetch: boolean;
+  newId: string;
+}): VisitorDecision {
+  if (isRecordableVisitorId(existing)) {
+    return { visitorId: existing, issue: false };
+  }
+
+  if (prefetch) {
+    return { visitorId: null, issue: false };
+  }
+
+  return { visitorId: newId, issue: true };
+}
+
 /**
  * The furthest step a visitor reached, or `null` if they reached none.
  *

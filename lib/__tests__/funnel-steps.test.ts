@@ -26,6 +26,12 @@ import {
   isRecordableVisitorId,
   deepestStep,
   funnelCounts,
+  decideVisitor,
+  formatVisitorId,
+  isPrefetchRequest,
+  visitorCookieOptions,
+  VISITOR_COOKIE,
+  VISITOR_TTL_SECONDS,
 } from '@crewchief/core/funnel';
 
 const ROOT = join(__dirname, '..', '..');
@@ -181,6 +187,151 @@ describe('funnelCounts', () => {
 
   it('ignores visitors who reached nothing rather than counting them as landed', () => {
     expect(funnelCounts([[], []])).toEqual({ landed: 0, uploaded: 0, answered: 0, saved: 0 });
+  });
+});
+
+describe('formatVisitorId', () => {
+  const UUID = '3f2a1b8c-9d4e-4f6a-8b2c-1d5e7f9a0b3c';
+
+  it('produces an id the writer and the database both accept', () => {
+    const id = formatVisitorId(UUID);
+    expect(isRecordableVisitorId(id)).toBe(true);
+    expect(id.length).toBeGreaterThanOrEqual(8);
+    expect(id.length).toBeLessThanOrEqual(128);
+  });
+
+  it('carries a scheme prefix, so a format change stays readable', () => {
+    expect(formatVisitorId(UUID)).toMatch(/^v1_/);
+  });
+
+  it('is one token — no dashes to break a log line or a URL', () => {
+    expect(formatVisitorId(UUID)).not.toMatch(/-/);
+  });
+
+  it('is distinct per uuid', () => {
+    expect(formatVisitorId(UUID)).not.toBe(formatVisitorId('00000000-0000-4000-8000-000000000000'));
+  });
+});
+
+describe('isPrefetchRequest', () => {
+  const from = (headers: Record<string, string>) => (name: string) => headers[name] ?? null;
+
+  it('detects Next own prefetch header', () => {
+    expect(isPrefetchRequest(from({ 'next-router-prefetch': '1' }))).toBe(true);
+  });
+
+  it('detects Sec-Purpose, the current standard', () => {
+    expect(isPrefetchRequest(from({ 'Sec-Purpose': 'prefetch;prerender' }))).toBe(true);
+    expect(isPrefetchRequest(from({ 'sec-purpose': 'prefetch' }))).toBe(true);
+  });
+
+  it('detects the older purpose header', () => {
+    expect(isPrefetchRequest(from({ purpose: 'prefetch' }))).toBe(true);
+    expect(isPrefetchRequest(from({ 'x-purpose': 'Prefetch' }))).toBe(true);
+  });
+
+  it('a real navigation is not a prefetch', () => {
+    expect(isPrefetchRequest(from({ accept: 'text/html' }))).toBe(false);
+    expect(isPrefetchRequest(from({}))).toBe(false);
+  });
+});
+
+describe('decideVisitor', () => {
+  const NEW_ID = formatVisitorId('11111111-2222-4333-8444-555555555555');
+  const EXISTING = formatVisitorId('99999999-8888-4777-8666-555555555555');
+
+  it('reuses an existing id and writes nothing', () => {
+    /*
+      A reload must keep its identity. Re-issuing would make one visitor look
+      like two, which inflates the top of the funnel and depresses every rate
+      under it — the same corruption a missing id causes, in the same direction.
+    */
+    expect(decideVisitor({ existing: EXISTING, prefetch: false, newId: NEW_ID })).toEqual({
+      visitorId: EXISTING,
+      issue: false,
+    });
+  });
+
+  it('issues to a first-time visitor', () => {
+    expect(decideVisitor({ existing: undefined, prefetch: false, newId: NEW_ID })).toEqual({
+      visitorId: NEW_ID,
+      issue: true,
+    });
+  });
+
+  it('records nothing for a prefetch, and issues nothing either', () => {
+    /*
+      The assertion this function exists for. A link sitting in someone's
+      viewport is not a visit. Issuing an id here would be worse than counting
+      the prefetch: the id would then be reused by the real navigation, so
+      `landed` would be attributed to a request nobody made, and the visitor
+      would look like a returning one.
+    */
+    expect(decideVisitor({ existing: null, prefetch: true, newId: NEW_ID })).toEqual({
+      visitorId: null,
+      issue: false,
+    });
+  });
+
+  it('a prefetch from a visitor who already has an id still reuses it', () => {
+    // Ordering. They are a known visitor; the prefetch is irrelevant to who
+    // they are, and withholding the id here would re-issue on their next real
+    // navigation and split one visitor in two.
+    expect(decideVisitor({ existing: EXISTING, prefetch: true, newId: NEW_ID })).toEqual({
+      visitorId: EXISTING,
+      issue: false,
+    });
+  });
+
+  it('replaces a corrupt or hand-written cookie rather than trusting it', () => {
+    // The value is an anonymous caller's text. Having been in a cookie jar is
+    // not provenance.
+    for (const bad of ['', '   ', 'abc', 'x'.repeat(200)]) {
+      expect(decideVisitor({ existing: bad, prefetch: false, newId: NEW_ID })).toEqual({
+        visitorId: NEW_ID,
+        issue: true,
+      });
+    }
+  });
+});
+
+describe('the visitor cookie', () => {
+  it('matches the app other first-party key convention', () => {
+    expect(VISITOR_COOKIE).toBe('cc_fv');
+  });
+
+  it('is short-lived, which is the basis of the consent argument', () => {
+    /*
+      24 hours spans one sitting. Raising this to weeks would quietly turn a
+      measurement cookie into a durable cross-session tracking id — and that is
+      the exact question 5.0 legal review will be asked, so it should not drift
+      without someone deciding to move it.
+    */
+    expect(VISITOR_TTL_SECONDS).toBe(60 * 60 * 24);
+  });
+
+  it('is httpOnly — nothing in the browser reads it', () => {
+    expect(visitorCookieOptions(true).httpOnly).toBe(true);
+  });
+
+  it('is sameSite lax, so a forum link still carries it', () => {
+    /*
+      `strict` would withhold the cookie on a top-level cross-site GET — which
+      is exactly how someone arrives from r/MechanicAdvice under M1. Every such
+      visitor would be issued a fresh id on their second page and the funnel
+      would report a hundred percent bounce from the one channel the plan
+      actually has.
+    */
+    expect(visitorCookieOptions(true).sameSite).toBe('lax');
+  });
+
+  it('is secure in production and relaxed only for local http', () => {
+    expect(visitorCookieOptions(true).secure).toBe(true);
+    expect(visitorCookieOptions(false).secure).toBe(false);
+  });
+
+  it('expires with the ttl rather than persisting as a session cookie', () => {
+    expect(visitorCookieOptions(true).maxAge).toBe(VISITOR_TTL_SECONDS);
   });
 });
 
