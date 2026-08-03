@@ -138,6 +138,22 @@ const NOT_PORTABLE: Record<string, string> = {
     limit.
   */
   'lib/ai-budget.ts': 'reads usage with the service role — reaches Supabase through lib/supabase',
+  /*
+    The same split a third time. The vocabulary, the visitor-id rule and the
+    cumulative counts are in `packages/core/src/funnel.ts` and are portable.
+    Only the write needs a service-role client, and here that is not a detail:
+    the front door is reached by `anon`, so a client-writable funnel table is a
+    set of counts anyone on the internet can type into.
+  */
+  'lib/funnel.ts': 'writes with the service role — reaches Supabase through lib/supabase',
+  /*
+    Glue, and only glue. Every decision about the visitor id — the cookie
+    attributes, the ttl, prefetch detection, read-or-issue — is in
+    `packages/core/src/funnel.ts` and is portable. What stays here is
+    `next/headers`, which a mobile client has no use for anyway: there is no
+    anonymous front door on mobile and `cc-product-0001` says there will not be.
+  */
+  'lib/funnel-visitor.ts': 'next/headers, and Web Crypto on the Edge runtime',
   'lib/sign-out.ts': 'Supabase types',
   /*
     The precedence rule — owner photo over stock, the unphotographed-demo

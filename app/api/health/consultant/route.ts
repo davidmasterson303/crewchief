@@ -121,8 +121,19 @@ async function attemptRoundTrip(): Promise<ConsultantHealth> {
     // purpose so its spend is separable from the consultant's — otherwise a
     // cost-per-user figure quietly includes a robot asking the same question
     // every few minutes.
+    // `surface` is stated rather than derived, and this is the only call site
+    // that needs to. With no user and no vehicle the derivation would read this
+    // as `anonymous` — front-door traffic — which is exactly the bucket a price
+    // decision will one day be built on. Measured on the first eight rows, the
+    // canary ran at 7.34x thinking-to-visible against real consultant traffic's
+    // 1.39x, so mislabelling it does not add noise, it adds bias.
     recordAiUsageInBackground(
-      { purpose: 'health_check', model: CONSULTANT_HEALTH_MODEL, userId: null },
+      {
+        purpose: 'health_check',
+        model: CONSULTANT_HEALTH_MODEL,
+        userId: null,
+        surface: 'canary',
+      },
       response.usageMetadata
     );
 

@@ -2,10 +2,13 @@ import { getServiceRoleClient } from './supabase';
 import { logger } from '@crewchief/core/logger';
 import {
   AI_USAGE_PURPOSES,
+  AI_USAGE_SURFACES,
   type AiUsagePurpose,
+  type AiUsageSurface,
   readUsageMetadata,
   isWorthRecording,
 } from '@crewchief/core/ai/usage';
+import { isDemoVehicleId } from '@crewchief/core/demo';
 
 /**
  * Record what a Gemini call cost, per account.
@@ -36,8 +39,8 @@ import {
  * as one.
  */
 
-export type { AiUsagePurpose };
-export { AI_USAGE_PURPOSES };
+export type { AiUsagePurpose, AiUsageSurface };
+export { AI_USAGE_PURPOSES, AI_USAGE_SURFACES };
 
 export interface AiUsageContext {
   purpose: AiUsagePurpose;
@@ -45,6 +48,33 @@ export interface AiUsageContext {
   /** NULL for anonymous demo traffic, which is real spend belonging to nobody. */
   userId: string | null;
   vehicleId?: string | null;
+  /**
+   * Whose traffic this was. **Omit it** unless the derivation below cannot
+   * reach the right answer — the canary is the only such case today, because it
+   * has no user and no vehicle and would otherwise look like front-door traffic.
+   *
+   * Deriving rather than requiring it at eleven call sites is deliberate: an
+   * explicit parameter is one a future call site can forget, and a forgotten
+   * one lands in whichever bucket the default names. The cost of that mistake
+   * is a silently wrong price input, which is the exact failure this column
+   * exists to prevent.
+   */
+  surface?: AiUsageSurface;
+}
+
+/**
+ * Work out whose traffic a call was from what the caller already has.
+ *
+ * Order matters. A signed-in user reading the demo garage is still an account —
+ * their calls cost real money against a real person who might pay — so the
+ * `userId` check comes first and the demo check only ever applies to
+ * unauthenticated traffic.
+ */
+export function deriveSurface(context: AiUsageContext): AiUsageSurface {
+  if (context.surface) return context.surface;
+  if (context.userId) return 'account';
+  if (context.vehicleId && isDemoVehicleId(context.vehicleId)) return 'demo';
+  return 'anonymous';
 }
 
 /**
@@ -84,6 +114,7 @@ export async function recordAiUsage(
       vehicle_id: context.vehicleId ?? null,
       model: context.model,
       purpose: context.purpose,
+      surface: deriveSurface(context),
       prompt_tokens: usage.promptTokens,
       output_tokens: usage.outputTokens,
       thoughts_tokens: usage.thoughtsTokens,

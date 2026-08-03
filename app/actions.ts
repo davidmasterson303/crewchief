@@ -4497,216 +4497,43 @@ async function checkDatabaseHealth(): Promise<{ success: boolean; error?: string
   }
 }
 
-export async function generateQuoteRequest(
+/**
+ * Phase 2.98c — record that someone took the quote pull.
+ *
+ * ── Why a server action and not an analytics call ───────────────────────────
+ *
+ * There is no analytics product in this application. Not "not wired up" — none:
+ * no PostHog, no Plausible, no event pipeline. The only durable observability
+ * is the structured logger, which lands in the platform's function logs.
+ *
+ * So this is deliberately the smallest thing that answers the question 2.98
+ * exists to ask — *does anyone click this?* — using only what is already here.
+ * It is a counter, not a funnel. When 2.97d brings a real instrumentation
+ * substrate (it is a ship gate for the front door, so it must), this should be
+ * replaced by it rather than grown.
+ *
+ * **It records intent, not conversion.** A click here means the affordance was
+ * taken, not that a quote was generated — `generateQuoteRequestV2` already logs
+ * that end separately, and reading the two together is what gives a rate.
+ *
+ * Never throws and never blocks the UI: the dialog opens whether or not this
+ * write succeeds. An instrumentation failure that stops a user getting quotes
+ * would be a strictly worse product than an unmeasured click.
+ */
+export async function recordQuotePullClick(
+  source: 'consultant_reply' | 'cost_estimate',
   vehicleId: string,
-  selectedItemIds: string[],
-  zipCode: string,
-  additionalNotes?: string,
-  quoteName?: string,
-  items?: Array<{ id: string; description: string; category: string }>
-): Promise<{
-  success: boolean;
-  data?: {
-    quoteRequestId: string;
-    emailDraft: string;
-    costBreakdown: CostEstimate;
-  };
-  error?: string
-}> {
-  const timestamp = new Date().toISOString();
-  console.log(`[QUOTE:START] ${timestamp} - Generating quote for vehicle ${vehicleId}, ${selectedItemIds.length} items, zip: ${zipCode}, itemsProvided: ${!!items}`);
-
+  itemCount: number
+): Promise<void> {
   try {
-    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
-    if (!access.ok) {
-      return { success: false, error: access.error };
-    }
-
-    const healthCheck = await checkDatabaseHealth();
-    if (!healthCheck.success) {
-      console.error(`[QUOTE:ERROR_HEALTH] ${timestamp} - Database health check failed:`, healthCheck.error);
-      return { success: false, error: healthCheck.error || 'Database connection failed' };
-    }
-
-    const client = getServiceRoleClient();
-
-    console.log(`[QUOTE:FETCH_VEHICLE] ${timestamp} - Fetching vehicle data...`);
-    const { data: vehicle, error: vehicleError } = await withRetry(
-      async () => {
-        return await client
-          .from('vehicles')
-          .select('*')
-          .eq('id', vehicleId)
-          .single();
-      },
-      {
-        maxAttempts: 3,
-        initialDelayMs: 1000,
-        context: 'QUOTE:FETCH_VEHICLE',
-        isRetryable: (error: Error) => {
-          const message = error.message.toLowerCase();
-          return !isSupabaseAuthError(error) && (
-            message.includes('network') ||
-            message.includes('timeout') ||
-            message.includes('connection') ||
-            message.includes('refused')
-          );
-        }
-      }
-    );
-
-    if (vehicleError) {
-      console.error(`[QUOTE:ERROR_VEHICLE] ${timestamp} - Vehicle fetch error:`, vehicleError);
-      if (isSupabaseAuthError(vehicleError)) {
-        return { success: false, error: 'Database authentication failed. Please verify your Supabase configuration.' };
-      }
-      return { success: false, error: `Vehicle fetch failed: ${vehicleError.message}` };
-    }
-    if (!vehicle) {
-      console.error(`[QUOTE:ERROR_VEHICLE] ${timestamp} - Vehicle not found for ID: ${vehicleId}`);
-      return { success: false, error: 'Vehicle not found' };
-    }
-    console.log(`[QUOTE:SUCCESS_VEHICLE] ${timestamp} - Vehicle found: ${vehicle.year} ${vehicle.make} ${vehicle.model}`);
-
-    let serviceItems: any[];
-
-    if (items && items.length > 0) {
-      console.log(`[QUOTE:USE_PROVIDED_ITEMS] ${timestamp} - Using provided items (from wishlist), skipping database lookup`);
-      serviceItems = items.filter(item => selectedItemIds.includes(item.id));
-
-      if (serviceItems.length === 0) {
-        console.error(`[QUOTE:ERROR_ITEMS] ${timestamp} - No matching items found in provided items array`);
-        return { success: false, error: 'Service items not found' };
-      }
-      console.log(`[QUOTE:SUCCESS_ITEMS] ${timestamp} - Found ${serviceItems.length} provided items: ${serviceItems.map((i: any) => i.description).join(', ')}`);
-    } else {
-      console.log(`[QUOTE:FETCH_ITEMS] ${timestamp} - Fetching ${selectedItemIds.length} service items from database...`);
-      const { data: fetchedItems, error: itemsError } = await withRetry(
-        async () => {
-          return await client
-            .from('service_items')
-            .select('*')
-            .in('id', selectedItemIds);
-        },
-        {
-          maxAttempts: 3,
-          initialDelayMs: 1000,
-          context: 'QUOTE:FETCH_ITEMS',
-          isRetryable: (error: Error) => {
-            const message = error.message.toLowerCase();
-            return !isSupabaseAuthError(error) && (
-              message.includes('network') ||
-              message.includes('timeout') ||
-              message.includes('connection') ||
-              message.includes('refused')
-            );
-          }
-        }
-      );
-
-      if (itemsError) {
-        console.error(`[QUOTE:ERROR_ITEMS] ${timestamp} - Service items fetch error:`, itemsError);
-        if (isSupabaseAuthError(itemsError)) {
-          return { success: false, error: 'Database authentication failed. Please verify your Supabase configuration.' };
-        }
-        return { success: false, error: `Service items fetch failed: ${itemsError.message}` };
-      }
-      if (!fetchedItems || fetchedItems.length === 0) {
-        console.error(`[QUOTE:ERROR_ITEMS] ${timestamp} - No service items found. Requested IDs: ${selectedItemIds.join(',')}`);
-        return { success: false, error: 'Service items not found' };
-      }
-      serviceItems = fetchedItems;
-      console.log(`[QUOTE:SUCCESS_ITEMS] ${timestamp} - Found ${serviceItems.length} service items: ${serviceItems.map((i: any) => i.description).join(', ')}`);
-    }
-
-    console.log(`[QUOTE:ESTIMATING_COSTS] ${timestamp} - Calling AI to estimate costs...`);
-    const costResult = await estimateCosts(vehicle, serviceItems, zipCode);
-    if (!costResult.success || !costResult.data) {
-      console.error(`[QUOTE:ERROR_COSTS] ${timestamp} - Cost estimation failed:`, costResult.error);
-      return { success: false, error: costResult.error || 'Failed to estimate costs' };
-    }
-    console.log(`[QUOTE:SUCCESS_COSTS] ${timestamp} - Costs estimated. Range: $${costResult.data.total_low?.toFixed(0)} - $${costResult.data.total_high?.toFixed(0)}`);
-
-    console.log(`[QUOTE:GENERATING_EMAIL] ${timestamp} - Calling AI to generate email draft...`);
-    const emailResult = await generateEmailDraft(vehicle, serviceItems, additionalNotes);
-    if (!emailResult.success || !emailResult.data) {
-      console.error(`[QUOTE:ERROR_EMAIL] ${timestamp} - Email generation failed:`, emailResult.error);
-      return { success: false, error: emailResult.error || 'Failed to generate email draft' };
-    }
-    console.log(`[QUOTE:SUCCESS_EMAIL] ${timestamp} - Email draft generated (${emailResult.data.length} chars)`);
-
-    const selectedItemsData = serviceItems.map((item: any) => ({
-      id: item.id,
-      description: item.description,
-      category: item.category
-    }));
-
-    console.log(`[QUOTE:SAVING_DB] ${timestamp} - Saving quote request to database with name: "${quoteName || 'auto-generated'}"`);
-    const { data: quoteRequest, error: insertError } = await withRetry(
-      async () => {
-        return await client
-          .from('quote_requests')
-          .insert({
-            vehicle_id: vehicleId,
-            selected_items: selectedItemsData,
-            zip_code: zipCode,
-            additional_notes: additionalNotes || null,
-            name: quoteName || null,
-            email_draft: emailResult.data!,
-            estimated_total_low: costResult.data!.total_low,
-            estimated_total_high: costResult.data!.total_high,
-            cost_breakdown: costResult.data!
-          })
-          .select()
-          .single();
-      },
-      {
-        maxAttempts: 3,
-        initialDelayMs: 1000,
-        context: 'QUOTE:SAVE_DB',
-        isRetryable: (error: Error) => {
-          const message = error.message.toLowerCase();
-          return !isSupabaseAuthError(error) && (
-            message.includes('network') ||
-            message.includes('timeout') ||
-            message.includes('connection') ||
-            message.includes('refused')
-          );
-        }
-      }
-    );
-
-    if (insertError) {
-      console.error(`[QUOTE:ERROR_DB] ${timestamp} - Database insert error:`, insertError);
-      console.error(`[QUOTE:ERROR_DB_DETAIL] ${timestamp} - Error code: ${insertError.code}, Message: ${insertError.message}, Details: ${JSON.stringify(insertError.details)}`);
-      if (isSupabaseAuthError(insertError)) {
-        return { success: false, error: 'Database authentication failed. Please verify your Supabase configuration.' };
-      }
-      return { success: false, error: `Database save failed: ${insertError.message}` };
-    }
-    if (!quoteRequest) {
-      console.error(`[QUOTE:ERROR_DB] ${timestamp} - Quote request was not returned after insert`);
-      return { success: false, error: 'Failed to retrieve saved quote request' };
-    }
-
-    console.log(`[QUOTE:SUCCESS_DB] ${timestamp} - Quote request saved with ID: ${quoteRequest.id}`);
-    console.log(`[QUOTE:COMPLETE] ${timestamp} - Quote generation completed successfully`);
-
-    return {
-      success: true,
-      data: {
-        quoteRequestId: quoteRequest.id,
-        emailDraft: emailResult.data,
-        costBreakdown: costResult.data
-      }
-    };
-  } catch (error: any) {
-    console.error(`[QUOTE:EXCEPTION] ${timestamp} - Unexpected error:`, error);
-    console.error(`[QUOTE:EXCEPTION_DETAIL] ${timestamp} - Error type: ${error.constructor.name}, Message: ${error.message}, Stack: ${error.stack}`);
-    return {
-      success: false,
-      error: error.message || 'Failed to generate quote request'
-    };
+    logger.info('QUOTE_PULL:CLICK', 'Quote pull affordance taken', {
+      source,
+      vehicleId,
+      itemCount,
+      isDemo: isDemoVehicleId(vehicleId),
+    });
+  } catch {
+    // Instrumentation is never allowed to surface to the caller.
   }
 }
 
