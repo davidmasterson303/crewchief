@@ -36,6 +36,33 @@ export const AI_USAGE_PURPOSES = [
 
 export type AiUsagePurpose = (typeof AI_USAGE_PURPOSES)[number];
 
+/**
+ * Whose traffic a call was, which is orthogonal to what it was *for*.
+ *
+ * `purpose` says which feature spent the money. This says whether the money was
+ * spent on someone who might one day pay. A consultant call can be any of these
+ * and they cost the same to serve while meaning entirely different things to a
+ * price decision.
+ *
+ * **Only `account` belongs in the D2 dataset.**
+ *
+ *   account    a signed-in user — the only traffic a subscription price can be
+ *              derived from
+ *   demo       the seeded public demo garage. Wanted traffic, but nobody will
+ *              ever pay for it
+ *   anonymous  the Phase 2.97 front door, when it exists. Its own budget line
+ *   canary     `/api/health/consultant`. Synthetic, and it distorts badly — it
+ *              asks a fixed question for a ~40-token answer while thinking is
+ *              roughly fixed per call, so it ran at 7.34x thinking-to-visible
+ *              against real consultant traffic's 1.39x. Blending the two
+ *              produced 3.45x, a figure describing neither
+ *
+ * Adding a value is a migration, same as `purpose`, and for the same reason.
+ */
+export const AI_USAGE_SURFACES = ['account', 'demo', 'anonymous', 'canary'] as const;
+
+export type AiUsageSurface = (typeof AI_USAGE_SURFACES)[number];
+
 export interface AiUsage {
   promptTokens: number;
   outputTokens: number;
