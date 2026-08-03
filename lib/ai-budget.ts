@@ -4,10 +4,13 @@ import {
   dayStart,
   decideBudget,
   decideDemoBudget,
+  decideFrontDoor,
   monthStart,
   resolveTier,
+  FRONT_DOOR_DISABLED_ENV,
   type BudgetDecision,
   type DemoBudgetDecision,
+  type FrontDoorDecision,
 } from '@crewchief/core/ai/budget';
 
 /**
@@ -42,7 +45,7 @@ import {
  * where it is.
  */
 
-export type { BudgetDecision, DemoBudgetDecision };
+export type { BudgetDecision, DemoBudgetDecision, FrontDoorDecision };
 
 /** Allowed, with nothing measured. The shape returned on every bail-out path. */
 const UNMEASURED: BudgetDecision = {
@@ -115,6 +118,98 @@ export async function checkDemoBudget(): Promise<DemoBudgetDecision> {
       message: err instanceof Error ? err.message : String(err),
     });
     return { allowed: true, exhausted: null, usedToday: 0, usedThisMonth: 0 };
+  }
+}
+
+/**
+ * Whether the anonymous front door may make another model call. Phase 2.97a.
+ *
+ * **Keys on `surface = 'anonymous'`, not on `user_id IS NULL`.** That
+ * distinction is the whole reason this function exists rather than reusing
+ * `checkDemoBudget`: the null-user predicate matches the seeded demo today, and
+ * will match both surfaces the moment this door opens. Two budgets D3 requires
+ * to be separate would silently become one pool, and the more abusable surface
+ * would be spending the portfolio piece's allowance.
+ *
+ * Daily window only — see `FRONT_DOOR_BUDGET` for why a monthly ceiling is the
+ * wrong shape here even though the demo has one.
+ *
+ * Fails **open**, like every other budget check in this file, and here that is
+ * a genuinely uncomfortable choice worth naming rather than inheriting: this is
+ * an unauthenticated endpoint, so failing open on a metering outage means an
+ * uncapped anonymous path to a paid model. It is still right. A budget read
+ * that fails closed turns a Postgres hiccup into a dead acquisition surface,
+ * the per-IP bucket is still underneath, and the manual kill switch does not
+ * depend on this query at all — which is precisely why the switch is checked
+ * first and separately.
+ */
+export async function checkFrontDoorBudget(): Promise<FrontDoorDecision> {
+  const manuallyDisabled = process.env[FRONT_DOOR_DISABLED_ENV] === 'true';
+
+  /*
+    Checked before the query, and returned before it. The switch is what
+    someone reaches for while watching money leave, so it must not be able to
+    fail because the thing it is protecting against has also broken the
+    database.
+  */
+  if (manuallyDisabled) {
+    return decideFrontDoor({ usedToday: 0, manuallyDisabled: true });
+  }
+
+  try {
+    const client = getServiceRoleClient();
+
+    const { data, error } = await client
+      .from('ai_usage_events')
+      .select('output_tokens, thoughts_tokens')
+      .eq('surface', 'anonymous')
+      .gte('created_at', dayStart().toISOString());
+
+    if (error) {
+      logger.warn('AI_BUDGET:FRONT_DOOR_READ_FAILED', 'Could not read front-door usage; allowing the call', {
+        message: error.message,
+      });
+      return decideFrontDoor({ usedToday: 0, manuallyDisabled: false });
+    }
+
+    // Thinking summed with output — it bills at the output rate, and on a
+    // vision call it is not the small half.
+    const usedToday = (data ?? []).reduce(
+      (sum, row) => sum + (row.output_tokens ?? 0) + (row.thoughts_tokens ?? 0),
+      0
+    );
+
+    const decision = decideFrontDoor({ usedToday, manuallyDisabled: false });
+
+    if (decision.shouldAlert) {
+      /*
+        The only `error`-level line in this file. Everything else here is a warn
+        because it degrades something; this one means the acquisition surface is
+        shut and will stay shut until midnight UTC.
+
+        **Who receives it is undecided** — the third part of D8, unanswered while
+        the captcha and ceiling halves were settled. Until that is closed this
+        reaches the platform log and nobody's phone, which is worth knowing
+        rather than assuming.
+      */
+      logger.error(
+        'AI_BUDGET:FRONT_DOOR_EXHAUSTED',
+        new Error('Front door daily ceiling hit — anonymous quote checks are closed until tomorrow'),
+        { usedToday: decision.usedToday, limitToday: decision.limitToday }
+      );
+    } else if (decision.state === 'approaching') {
+      logger.warn('AI_BUDGET:FRONT_DOOR_APPROACHING', 'Front door is near its daily ceiling', {
+        usedToday: decision.usedToday,
+        limitToday: decision.limitToday,
+      });
+    }
+
+    return decision;
+  } catch (err) {
+    logger.warn('AI_BUDGET:FRONT_DOOR_THREW', 'Front-door budget check threw; allowing the call', {
+      message: err instanceof Error ? err.message : String(err),
+    });
+    return decideFrontDoor({ usedToday: 0, manuallyDisabled: false });
   }
 }
 

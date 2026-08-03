@@ -118,6 +118,198 @@ export const DEMO_BUDGET = {
 /** The fraction of the budget at which a user is told they are approaching it. */
 export const WARN_AT = 0.8;
 
+/**
+ * The anonymous front door's own ceiling. Phase 2.97a, decision **D8**.
+ *
+ * ── Why it cannot share the demo's pool ─────────────────────────────────────
+ *
+ * `checkDemoBudget` keys on `user_id IS NULL`, which today means the seeded
+ * demo garage and nothing else. **The moment the front door opens, that
+ * predicate matches both surfaces** and two budgets that must stay separate
+ * become one. Roadmap D3 is explicit that the anonymous tier needs its own
+ * budget line, and it is the more abusable of the two: the demo is three fixed
+ * vehicles a visitor can chat to, while the front door accepts an uploaded
+ * photograph from anyone.
+ *
+ * So this keys on `surface = 'anonymous'`, which is exactly what
+ * `20260802200000` added the column for.
+ *
+ * ── D8: this is the primary control, and the ordering is the decision ───────
+ *
+ * Erratum **T1** corrected the original 2.97a wording, which named IP-bucketed
+ * rate limiting as primary. `cc-tech-0003` (**high** confidence) forbids that
+ * reasoning: a bucket keyed on a value the caller supplies is decorative, and
+ * `X-Forwarded-For` is caller-supplied. A spend ceiling is not — it counts
+ * money that has actually been spent, which no header can lie about.
+ *
+ *   1. **primary**   this ceiling, plus the kill switch
+ *   2. *secondary*   per-IP bucketing on the platform-provided client IP
+ *   3. always        no dossier generation on this path, ever (D6)
+ *
+ * David chose no captcha (D8, 3 Aug), on the grounds that a captcha is a
+ * conversion tax on the exact surface 2.97d exists to measure.
+ *
+ * ── Daily only, and that is deliberate ──────────────────────────────────────
+ *
+ * The demo carries a monthly ceiling as well, because one bad afternoon should
+ * not silence it for three weeks. **The front door takes the opposite lesson.**
+ * A monthly cap here would mean an attack on the 3rd closes the acquisition
+ * surface until the 1st — turning a cost incident into a month with no top of
+ * funnel. A daily ceiling bounds the worst case to one day and bounds the month
+ * to roughly thirty times it, which is the bill David actually signed up for.
+ *
+ * ── The arithmetic, and what is honestly not known ──────────────────────────
+ *
+ * $15/day, at roughly $7.50 per million output-equivalent tokens on Flash:
+ *
+ *   $15 / $7.50 per M  ≈  2,000,000 output-equivalent tokens per day
+ *
+ * Expressed in tokens rather than dollars for the same reason `TIERS` is: a
+ * token ceiling protects the bill without pretending to know a price.
+ *
+ * **What is not known is the per-scan cost.** A consultant turn was measured on
+ * 2 Aug at ~600 output-equivalent tokens, but the front door adds vision over a
+ * full-resolution phone photograph and no such call has ever been made here.
+ * Dividing the ceiling by a guessed per-scan figure would be exactly the
+ * unearned number `cc-product-0003` exists to stop. **2.97d's meter is what
+ * produces the real figure**, and the first week of it should be used to
+ * re-set this constant rather than to confirm it.
+ */
+export const FRONT_DOOR_BUDGET = {
+  dailyOutputTokens: 2_000_000,
+} as const;
+
+/**
+ * Environment variable that closes the door by hand.
+ *
+ * The manual half of the kill switch. Read at request time rather than at
+ * build time so flipping it takes effect without a deploy — a switch that
+ * needs a build is not a switch, and the incident it exists for is one where
+ * money is leaving every second.
+ */
+export const FRONT_DOOR_DISABLED_ENV = 'FRONT_DOOR_DISABLED';
+
+export type FrontDoorState = 'ok' | 'approaching' | 'exhausted' | 'disabled';
+
+export interface FrontDoorDecision {
+  allowed: boolean;
+  state: FrontDoorState;
+  usedToday: number;
+  limitToday: number;
+  /** Never above 1 — 20% over is 100%, not 120%. */
+  fractionUsed: number;
+  /**
+   * Whether this decision is worth waking someone for.
+   *
+   * True when the ceiling is actually hit, and *not* at the warn threshold:
+   * `approaching` is a normal busy day on a surface whose whole purpose is to
+   * attract strangers. Paging on 80% would train whoever carries it to ignore
+   * the page, which is worse than not having one.
+   *
+   * **Who receives it is still undecided** — it was the third part of D8 and
+   * only the captcha and ceiling halves were answered. Today this drives a
+   * logger call at error level and nothing else.
+   */
+  shouldAlert: boolean;
+}
+
+/**
+ * Decide whether the anonymous front door may make another model call.
+ *
+ * Pure, and separate from the query that feeds it, for the reason `decideBudget`
+ * gives: the boundary conditions are where this goes quietly wrong, and none of
+ * them throw.
+ *
+ * The manual switch is checked first and unconditionally. It is the control
+ * someone reaches for while watching a bill climb, and anything that could
+ * override it — including a misread of usage — makes it untrustworthy at the
+ * only moment it matters.
+ */
+export function decideFrontDoor({
+  usedToday,
+  manuallyDisabled,
+  budget = FRONT_DOOR_BUDGET,
+}: {
+  usedToday: number;
+  manuallyDisabled: boolean;
+  budget?: { dailyOutputTokens: number };
+}): FrontDoorDecision {
+  const used = Math.max(0, Math.round(usedToday || 0));
+
+  if (manuallyDisabled) {
+    return {
+      allowed: false,
+      state: 'disabled',
+      usedToday: used,
+      limitToday: budget.dailyOutputTokens,
+      fractionUsed: 0,
+      // Someone turned this off on purpose. Paging them about it is noise.
+      shouldAlert: false,
+    };
+  }
+
+  /*
+    A non-positive ceiling means "not configured", never "spend nothing" — the
+    same rule as `decideBudget` and `decideDemoBudget`.
+
+    It is worth being explicit that this failure direction is *open* on an
+    unauthenticated endpoint, which is the uncomfortable case. It is still
+    right: a config typo that silently closes the acquisition surface would be
+    found in weeks, by wondering why the funnel is empty, whereas a typo that
+    leaves it open is bounded by the per-IP bucket underneath and visible in
+    the meter the next morning.
+  */
+  const limit = budget.dailyOutputTokens > 0 ? budget.dailyOutputTokens : Infinity;
+
+  if (!Number.isFinite(limit)) {
+    return {
+      allowed: true,
+      state: 'ok',
+      usedToday: used,
+      limitToday: 0,
+      fractionUsed: 0,
+      shouldAlert: false,
+    };
+  }
+
+  const fractionUsed = Math.min(1, used / limit);
+
+  // `>=` at the boundary: spent exactly the ceiling means spent it.
+  if (used >= limit) {
+    return {
+      allowed: false,
+      state: 'exhausted',
+      usedToday: used,
+      limitToday: limit,
+      fractionUsed,
+      shouldAlert: true,
+    };
+  }
+
+  return {
+    allowed: true,
+    state: used >= limit * WARN_AT ? 'approaching' : 'ok',
+    usedToday: used,
+    limitToday: limit,
+    fractionUsed,
+    shouldAlert: false,
+  };
+}
+
+/**
+ * What a visitor is told when the door is shut.
+ *
+ * Never mentions a budget, a limit or a cost. A stranger who came to find out
+ * whether their repair quote was fair does not care why, and "we have hit our
+ * daily spending cap" invites both "so you are broke" and someone testing how
+ * fast they can hit it tomorrow. It says the honest user-facing thing —
+ * temporarily unavailable, try later — and points at the account path, which
+ * is real and is not rate-limited by this ceiling.
+ */
+export function frontDoorClosedMessage(): string {
+  return 'Quote checks are temporarily unavailable — please try again later. If you have an account, your advisor is still available as usual.';
+}
+
 export type BudgetState = 'ok' | 'approaching' | 'exceeded';
 
 export interface BudgetDecision {
