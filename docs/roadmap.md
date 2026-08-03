@@ -654,10 +654,233 @@ Nine deliberate pieces of responsive work are already in the codebase. The recom
 
 ---
 
-# Handoff — 2 Aug 2026, end of day
+# Handoff — 2 Aug 2026, night (final session)
 
-Read this one. The morning's handoff is kept at the bottom for the record; its
-"what I would pick up first" list is spent.
+**Read this one.** Two earlier handoffs are kept below — the ~19:38 "end of day"
+entry, which was written before this session and is now superseded on state, and
+the morning's, kept for its gotchas. Neither "what I would pick up first" list is
+current.
+
+## Where things stand
+
+- `main` = `6e1d727`, working tree clean. **Two commits are unpromoted**:
+  `1cb0d31` (2.98) and `6e1d727` (traffic-class split).
+- Production serves `e7f14df7` = `main @ 1ec6e68`, promoted 19:33 through the
+  full scripted gate. **Verified from the artifact, not the report**: `--no-ff`
+  merge with parents `f09a0ef6` and `1ec6e68b`, subject byte-identical to
+  `promote-demo.mjs`'s own format, and — the load-bearing part — **an empty
+  body**, where a waived AI gate would have written `AI GATE WAIVED with
+  --allow-degraded-ai`. So the consultant round-trip ran and passed.
+- **64 suites, 1110 tests, green.** `npm run typecheck` clean. `npm run build`
+  clean, all routes compiled.
+- Two stale worktrees under `.claude/worktrees/`, both behind `main` with nothing
+  ahead. Prunable.
+
+## ⚠ David's list — one migration is time-sensitive
+
+1. **Apply `20260802200000_split_ai_usage_by_traffic_class.sql`.** Pure
+   additions, no `DROP`, so the SQL Editor will not stall. **Every metering row
+   written before it runs is blended permanently** — no later migration can
+   reconstruct which traffic was demo, real, or the canary. This is the one item
+   that gets worse by waiting.
+2. **`brew install cocoapods`** — unblocks the simulator and the rest of Phase 3.
+3. **A dashboard read for erratum T2**, blocking 5.2:
+   `select tablename, policyname, cmd, roles, qual from pg_policies order by tablename;`
+4. **Review the KB queue** — `cd ~/Developer/advisor-kb && node dist/cli.js queue`.
+
+*The `ai_usage_events` migration is **already applied** — recording since
+2 Aug 21:09Z, and schema-verified in the ~19:38 handoff below. It was still
+listed as outstanding in the ~14:30 handoff and in Rev. E when this session
+started, which is why item 1 above is worth reading carefully rather than
+pattern-matching to "the migration is done".*
+
+## What landed this session
+
+| Commit | What |
+|---|---|
+| `1cb0d31` | **2.98a/c/d** — the quote pull, its instrumentation, and V1 deleted |
+| `6e1d727` | **Traffic-class split** on `ai_usage_events` — `surface`, and the canary out of the price dataset |
+
+Documents, outside the repo: the full 2 Aug day landed in `CREWCHIEF_STATUS.md`;
+Rev. E's state table corrected and errata T1/T2 applied; ten KB proposals staged
+(`p-20260802194500-rev5`, queue 1/25); `CREWCHIEF_FEATURES.md` corrected.
+
+## The finding worth carrying: an average across two populations measures neither
+
+The first eight metering rows read 583 visible tokens against 2,012 thinking —
+**3.45×**, after 2.95a had set a thinking level. I published that number in
+`CREWCHIEF_STATUS.md` as "thinking is running 3.45× the visible answer, after
+2.95a", and it was read — reasonably — as evidence that 2.95a had only half
+landed and that D2's clock was running on a half-fixed system.
+
+It had fully landed. Grouped by purpose:
+
+```
+health_check (canary)   5 rows    40 visible/call   296 thinking/call   7.34x
+consultant (real)       3 rows   127 visible/call   177 thinking/call   1.39x
+── blended ──           8 rows                                          3.45x
+```
+
+**Real traffic was at 1.39× the whole time**, essentially the target. The canary
+asks a fixed question and gets a ~40-token answer while thinking is roughly a
+fixed cost per call, so its ratio is a property of the probe rather than of the
+model — and it was 5 of the 8 rows, so it dominated.
+
+Three things generalise from this:
+
+1. **A ratio metric is unsafe on short-answer paths.** Thinking-per-call is the
+   stable number; thinking-to-visible is not, because the denominator moves for
+   reasons that have nothing to do with cost.
+2. **Never aggregate a synthetic probe with real traffic.** That is what the
+   `surface` column now prevents structurally, rather than by remembering.
+3. **I reported an aggregate without checking whether it was one population.**
+   The check took one query. The cost of not doing it was a day of the roadmap
+   carrying "2.95a may have only half-landed" as an open risk.
+
+## The real 2.95a gap, which is smaller and different
+
+**The level shipped is `LOW`, not `MINIMAL`** — six of the seven `withThinking`
+call sites (only the lite-model classifier at `app/actions.ts:776` uses
+`MINIMAL`). So the ~73.6% reduction anyone expected was for a setting the code
+does not use.
+
+The bench in the previous session measured, on the same prompt:
+
+```
+unset 861  ·  HIGH 726  ·  LOW 424  ·  MINIMAL 0
+```
+
+So **`LOW` cuts ~51% against unset, and `MINIMAL` cuts 100% — zero thinking
+tokens.** The economics document's 73.6% figure matches neither and is cited
+there as *reported* rather than measured; the bench is the better source and the
+doc should be corrected to it.
+
+**`LOW → MINIMAL` is a real remaining lever, but it is a quality decision, not a
+cost one.** Zero thinking tokens on the consultant may or may not survive the
+round-trip gate, and eight rows is not a basis for deciding. Vision is already
+deliberately left with no level at all, for the documented reason that a
+regression there is invisible — fewer line items still returns valid JSON and
+still passes every gate.
+
+## Gotchas this session added
+
+1. **`purpose` and `surface` are orthogonal and it is worth keeping them so.**
+   `purpose` says which *feature* spent the money; `surface` says whose traffic
+   it was. The instruction that produced this work said "add a `purpose` column",
+   but `purpose` already existed and answers the other question. A consultant
+   call can be demo, real or anonymous, costs the same to serve, and means three
+   different things to a price.
+2. **`surface` defaults to `account`, deliberately.** A future call site that
+   has not been taught about the column lands in the bucket that *counts* toward
+   cost. Over-counting a price input is visible and recoverable; under-counting
+   it produces a confident, cheap, wrong number.
+3. **The derivation order in `deriveSurface` is load-bearing and tested.** A
+   signed-in user browsing the demo garage is still an `account` — their calls
+   cost real money against a real person who might pay. Reversing the `userId`
+   and demo-vehicle checks would quietly move real spend into an excluded
+   bucket.
+4. **`generateQuoteRequestV2` takes wishlist ids**, so the consultant pull can
+   only offer items that were actually added. Items without an id are filtered
+   rather than sent, which is why the affordance can disappear again after an
+   add. Both add outcomes carry an id — 201 returns the row, 409 returns
+   `itemId` — and the 409 is a normal path, because the dossier and the
+   consultant suggest the same job.
+5. **A preselection effect keyed on an array re-runs forever.** Callers build
+   `preselectedItemIds` inline, so it is a new identity every render; keying the
+   effect on it stamps the preselection back over the user's own tick-boxes
+   while the dialog sits open. It is keyed on the joined string instead, and the
+   fourth test in `quote-pull-preselection.test.ts` is what catches that being
+   undone.
+6. **There is no analytics product in this application.** No PostHog, no
+   Plausible, no event pipeline — only the structured logger. This matters
+   beyond 2.98c: the roadmap makes funnel instrumentation a **ship gate** for
+   the anonymous front door, and that substrate does not exist. Now sized at
+   0.75 ed, and **the cost is anonymous visitor correlation**, which also does
+   not exist — `checkRateLimit` takes a caller-supplied string, not an IP or a
+   cookie. Four events without a join key are four counters, not a funnel.
+
+## Two documents that were wrong, and how they got that way
+
+**`CREWCHIEF_FEATURES.md` claimed a capability that does not exist.** *Service
+items and costs* pitched "compare that against what you were quoted" — there is
+no stored quoted figure anywhere in the schema, and `estimateCosts` has exactly
+one caller, inside `generateQuoteRequestV2`. **That sentence is where roadmap
+task 2.98b came from.** The claim did not merely misdescribe the product; it was
+read as a specification and produced a task that was costed, sequenced and
+partially planned before anyone checked the tree. It is the second false
+capability claim found in that file.
+
+An audit of the whole file — 109 symbols named in `how:`/`pitch:` lines, checked
+against the tree — found **no third false capability claim**, but **ten stale
+`lib/` paths** left over from the Phase 2.4 move into `@crewchief/core`.
+`lib/onboarding.ts` was among them, and the knowledge base corrected exactly that
+path on 28 July: the fix reached the KB and never reached the features file. All
+ten now resolve.
+
+**A build-time guard does not generalise, for a structural reason.** The obvious
+model is `provenance-claims.test.ts`, which fails the build if the app renders an
+unsubstantiated provenance badge. It cannot be copied here: `CREWCHIEF_FEATURES.md`
+is not in the repository, and `FeaturesDrawer.tsx` carries none of the pitch copy,
+so the build cannot see the artifact. Making it a *test* means moving the file
+into the repo first — a real decision, since it is the document sent to other
+people.
+
+So it is a script instead, alongside `audit-rls.mjs`, which is not in CI for the
+same class of reason:
+
+```
+node scripts/audit-feature-claims.mjs
+```
+
+**It catches drift, not falsehood**, and says so on every clean run. Neither of
+the two false capability claims would have failed it. Three things it learned the
+hard way, all recorded in its own comments:
+
+- **A path-like symbol is a claim about the filesystem, not about source text.**
+  Grepping file *contents* for `packages/core/src/prompts.ts` always misses; the
+  first run reported six false negatives on paths that were perfectly correct.
+- **A "not a real path" category will swallow a real reference if you let it.**
+  An earlier version matched URLs on "has dots" and quietly absorbed
+  `storage-paths.test.ts`. Source extensions now win over every category.
+- **An `internal:` note legitimately names things that are gone.**
+  `uploadInvoiceForCompletion` "used to write `invoices/{file}`" is a correct
+  sentence about a path that must *not* exist. Symbols that fail to resolve on a
+  line narrating a change are reported as historical rather than stale — printed,
+  never dropped, because that heuristic could in principle hide a real defect.
+
+## Still open, in priority order
+
+1. **Erratum T2** — blocks 5.2. The anon RLS audit run this session found no
+   non-demo rows reachable across 25 tables, and `vehicle-documents` is private.
+   **That evidence does not touch the actual question**, which is what an
+   *authenticated* caller whose subscription lapsed can reach. Do not let anyone
+   close T2 on the anon result.
+2. **Phase 3 stays at ~16 remaining.** Built is not proven, and the simulator has
+   never run. **The blocker was never `xcode-select`** — that diagnosis was
+   wrong twice. `apps/mobile/ios` has never been generated (gitignored at
+   `apps/mobile/.gitignore:40`, no DerivedData, nothing installed on the booted
+   device) and CocoaPods is not installed. Do not run the simulator tool's
+   suggested `sudo xcode-select -s`; it is already the current selection.
+3. **2.98b is undecided, not dropped.** Recommendation is to drop it; three
+   costed options are in the roadmap's §3.3.
+4. **`LOW → MINIMAL`** on the non-prose paths, once the round-trip gate can
+   speak to quality.
+5. **5.1's remaining half** — the upgrade-prompt UI, still deliberately unbuilt
+   while D2 and D3 are open.
+
+---
+---
+
+# Handoff — 2 Aug 2026, ~19:38 (evening session, superseded on state)
+
+**Superseded by the entry above**, which was written after two more commits
+landed. Its "where things stand" is accurate as of 19:38 and wrong now in three
+specific ways, all corrected above: `main` has moved to `6e1d727`, the test
+count is 64/1110, and **two commits are unpromoted** rather than none.
+
+Kept in full because everything else in it holds: the promote verification, the
+afternoon's commit table, its schema check on the applied metering migration,
+and its gotchas.
 
 ## Where things stand
 
