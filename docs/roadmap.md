@@ -6,13 +6,15 @@ Source: `Live-Site Audit.dc.html` (2 Aug 2026), grounded in repo `davidmasterson
 
 ## Status — 2 Aug 2026, afternoon session
 
-**Live on production.** `crewchief-demo.davidmasterson.co` is serving `f09a0ef6`
-(the `demo-live` merge), promoted from `main` at `3a246fa2` through
-`scripts/promote-demo.mjs`. All gate checks passed; `verify-demo.mjs` green
-against prod afterwards, with the two standing warnings.
+**Live on production.** `crewchief-demo.davidmasterson.co` is serving `e7f14df7`
+(the `demo-live` merge), promoted from `main` at `1ec6e68` through
+`scripts/promote-demo.mjs`. All gate checks passed first time; `verify-demo.mjs`
+green against prod afterwards, with the two standing warnings.
 
-**The whole afternoon is live.** RP1, R4, R8, Phase 2.95 a/b/c and all four of
-Cowork's QA findings.
+**The whole day is live** — RP1, R4, R8, R11, R12, Phase 2.95 a/b/c, 5.1, the
+demo cap, the server-side photo bound, item 17's contrast fix, Phase 3.3's
+account-deletion screen, and all four of Cowork's QA findings. Nothing is
+sitting unpromoted.
 
 **Verified on prod after the promote, at the widths that could not be reached
 locally:** `/` at 375 — horizontal overflow 0 and `textUnder12px` **0**, down
@@ -652,26 +654,37 @@ Nine deliberate pieces of responsive work are already in the codebase. The recom
 
 ---
 
-# Handoff — 2 Aug 2026, ~14:30 (afternoon session)
+# Handoff — 2 Aug 2026, end of day
 
-Read this one. The morning's handoff is kept below it for the record, and its
-"what I would pick up first" list is **spent** — item 10 shipped at 11:03 and
-RB0/RP0 at 11:12, both after it was written.
+Read this one. The morning's handoff is kept at the bottom for the record; its
+"what I would pick up first" list is spent.
 
 ## Where things stand
 
-- `main` = `0fe7248`, pushed. Working tree clean. **Nothing from this session is
-  pushed or promoted** — production still serves `e729ee96`, which is the
-  morning's work.
-- 62 suites, 1075 tests, green. `npm run typecheck` clean.
+- `main` = `1ec6e68`, pushed. Working tree clean.
+- **Production serves `e7f14df7`**, promoted from `main @ 1ec6e68` through the
+  full gate. `verify-demo.mjs` green against prod afterwards, two standing
+  warnings. **Everything in this document is live** — nothing is sitting
+  unpromoted.
+- 62 suites, 1090 tests, green. `npm run typecheck` clean.
 - **Two stale worktrees** under `.claude/worktrees/` (`confident-shtern`,
   `friendly-lewin`). Both are *behind* `main` with nothing ahead — checked, no
   stranded work. Prunable whenever.
 
+### Verified on prod after the promote, not just locally
+
+- `/dashboard` — 44 rendered text nodes, **0 failing WCAG AA**
+- `/` at 375 — horizontal overflow 0, `textUnder12px` 0
+- `/` at 700 — two 314px columns (was one 652px column)
+- `/consultant` at 375 — composer on screen, thread scrolling, no overflow
+- demo consultant answered anonymously through the new cap, and the meter
+  recorded it — the first `purpose: 'consultant'` row in `ai_usage_events`
+
 ## What landed this afternoon
 
-Four commits, two tracks. The design track was the visible half; the cost track
-is the one that changes the unit economics.
+Eighteen commits across three tracks — design, cost, and mobile. The design
+track was the visible half; the cost track is the one that changes the unit
+economics.
 
 | Commit | What |
 |---|---|
@@ -686,6 +699,13 @@ is the one that changes the unit economics.
 | `fec351b` | **NEW-04** — last four hover-only reveals, plus a build check |
 | `9b8cf8f` | **NEW-03** — QA script corrected against the tree it will next be run on |
 | `1a691e7` | **R8** — cost breakdown becomes cards below `md` |
+| `680b5a9` | **R11 + R12** — phone-sized title, and the way back |
+| `7aa60a6` | **R13/R14 invalid** — both target components nothing renders |
+| `0fe7248` | **5.1** — a monthly ceiling on AI spend, per account |
+| `7f1f0ce` | **Phase 3.3** — account deletion reachable in-app (Apple 5.1.1(v)) |
+| `d756780` | **Demo cap** — two windows, one pool, degrades rather than breaks |
+| `47af5c4` | Stored photo size bounded server-side |
+| `1ec6e68` | **Item 17** — body text raised to the AA floor, measured |
 
 ## Cowork's QA report — triaged
 
@@ -776,54 +796,77 @@ at once, and `tsc` is perfectly happy about it. Always go through
    It was reading prose and reporting it as schema — the same instrument failure
    this file keeps recording, this time caught in the instrument being written.
 
-## David's one item — a migration to apply
+6. **Two ceilings, two different failure modes, one shared rule.** Both the
+   per-account budget and the demo cap treat a **non-positive limit as "not
+   configured", never as "spend nothing"** — read literally, a config typo would
+   silence the public demo instantly. Both also **fail open** on a read error:
+   what is being protected is a bill, not a security boundary, and the
+   per-minute rate limit is still underneath. The honest consequence is that
+   both ceilings are best-effort and under-report.
+7. **A responsive duplicate must compute its numbers once.** R8 renders the cost
+   breakdown as cards below `md` and a table above. Two presentations of the
+   same figures drift, and here drift is worse than the bug it fixed — a phone
+   showing a different total from the desktop is legible and wrong, and someone
+   takes it to a shop.
+8. **Bundle output is real evidence when a screen cannot be run.** `expo export`
+   plus `strings` on the `.hbc` proved the new Account screen *and* its
+   cross-package `@crewchief/core` import are genuinely in the iOS binary. It is
+   not a substitute for rendering it, and the roadmap says so.
 
-**`20260802150000_meter_ai_usage_per_account.sql` is committed and unapplied.**
-Until it runs, every Gemini call logs `AI_USAGE:WRITE_FAILED` and records
-nothing. That is deliberate and safe — verified, not assumed: with the table
-absent the consultant health round trip still answered in 2.3s and the meter
-dropped the row. Deploying ahead of the migration breaks nothing. It just does
-not measure anything, and **the two-week clock on decision D2 does not start
-until it is applied.**
+## Decisions waiting on David — nothing else is blocked on code
 
-Pure additions, no `DROP`, so the SQL Editor's "Potential issue detected" modal
-will not fire and it will not stall mid-run.
+1. **5.0 — entity, terms, privacy policy.** *The* binding constraint now.
+   2.95 a/b/c and 5.1 are done, so the money track's code is ahead of its
+   decisions: 5.2 cannot ship to a real card without this, and it is the only
+   item whose duration nobody controls.
+2. **The primary button fails AA.** "Sign up" is white on `bg-cyan-600` at
+   **3.68:1**; `bg-cyan-700` measures **5.36:1** and closes it. Deliberately not
+   changed — `bg-cyan-600` is at 36 sites, so it is the brand colour on every
+   primary button, and that is a design decision rather than something to slip
+   into an accessibility pass.
+3. **The two dead components.** Delete `MaintenanceHistory.tsx` and
+   `UpcomingMaintenance.tsx`, or wire them up. R13 and R14 only become real
+   after that.
+4. **D2 (price) after two weeks of meter data**, per Addendum A. The first rows
+   already show thinking at 5–8× the visible answer *at `LOW`*, which argues for
+   re-testing `MINIMAL` on the non-prose paths once there is a fortnight to read.
+5. **Re-upload the M235i photo** in the app, whenever convenient. It is the one
+   stored photo predating the browser downscale — 2,328,761 bytes — and
+   re-uploading it now shrinks it. Thirty seconds, no code.
+
+## The metering migration — applied
+
+`20260802150000_meter_ai_usage_per_account.sql` was applied to production on
+2 Aug and verified against the live schema: table present, 11 columns, 3
+indexes, RLS enabled, one policy, the purpose CHECK present, and
+`authenticated` holding SELECT only with `anon` holding nothing.
+
+Confirmed working end to end rather than taken on report — rows are landing,
+including a `purpose: 'consultant'` row written by prod traffic after the
+promote. **The two-week clock on D2 starts from 2 Aug.**
 
 ## What I would pick up first, in order
 
-1. ~~**Promote, or decide not to.**~~ **Done — `f09a0ef6`.** The gate blocked the
-   first attempt on four 502s from `verify-demo`; they were cold-start edge
-   function failures on a fresh deploy, not a regression, and cleared on a
-   re-run once the functions were warm. Worth knowing: **a first gate run
-   against a just-built candidate can fail for reasons that are not yours.**
-   Re-run before diagnosing.
-2. ~~**2.95c — per-account metering.**~~ **Done (`bb83782`)** — all ten call
-   sites record. Waiting only on the migration above, then two weeks of data
-   before **D2 (price point)** can be taken as a decision rather than a guess.
-3. ~~**5.1 — tier limits and budget enforcement.**~~ **Enforcement half done
-   (`0fe7248`).** A monthly output-token ceiling read from the meter, wired into
-   the consultant and invoice paths. **The upgrade-prompt half is deliberately
-   not built** — D2 and D3 are open, the KB is silent on both, and a prompt
-   leading nowhere is worse than a plain limit. Two risk decisions are recorded
-   at their call sites: the demo is measured but never hard-stopped, and the
-   check fails open.
-4. **David: 5.0.** Entity, terms, privacy policy. Still the only genuine blocker
-   on revenue and the only one whose duration nobody controls. **Now the
-   binding constraint on the whole money track** — 2.95 and 5.1 are done, and
-   5.2 cannot ship to a real card without it.
-5. **R13/R14's dead components.** Delete `MaintenanceHistory.tsx` and
-   `UpcomingMaintenance.tsx`, or wire them up. A scope decision, not a fix.
-6. **2.95d — window the consultant context.** Waits on two weeks of meter data,
-   per Addendum A. The first three rows already say thinking runs 5–8× the
-   visible answer *at `LOW`*, which is an argument for re-testing `MINIMAL` on
-   the non-prose paths once there is a sample worth reading.
-7. **The R10 tail** — data and labels to 13px on mobile. Needs a judgement per
+Everything below is unblocked code unless marked. The blocked items are in
+"Decisions waiting on David" above.
+
+1. **Run the mobile Account screen.** It is the only thing shipped today that
+   has never been rendered — see the Phase 3.3 section below for exactly how far
+   it *is* verified, and for the `xcode-select` false alarm not to repeat. **Do
+   not press the final delete**: one real account, no throwaway.
+2. **5.2 — Stripe checkout (3 ed).** The next code item on the money track, and
+   the largest remaining. Blocked from *shipping* by 5.0 but not from being
+   built; D2 should be settled first so the price is not hard-coded twice.
+3. **2.95d — window the consultant context (1.25 ed).** Size it against the
+   meter rather than the guess, per Addendum A. Gate the consultant round trip
+   before and after: a worse-grounded answer is still a well-formed answer.
+4. **The R10 tail** — data and labels to 13px on mobile. Needs a judgement per
    site, which is why only the 12px floor landed.
-8. **Item 17's contrast finding** — `white/30` and `white/40` body text at
-   2.71:1 and 3.78:1, both failing AA. Unchanged: app-wide tokens, so it is a
-   Design call, and still a real defect on a portfolio piece.
-9. **The R9 lint rule** in `_adherence.oxlintrc.json`. It is in the DS repo, so
-   the 44px floor is still a review comment rather than a check.
+5. **Next.js upgrade (3.5–6 ed).** Still a pre-submission gate. Taking money
+   does not make 13.5.11 more acceptable and does not move it earlier either.
+6. **The R9 lint rule** in `_adherence.oxlintrc.json`. It is in the DS repo, so
+   the 44px floor is still a review comment rather than a check — the one guard
+   from this session's work that did not get automated.
 
 ## Phase 3.3 — account deletion, and how far it is verified
 
