@@ -138,6 +138,14 @@ const NOT_PORTABLE: Record<string, string> = {
     limit.
   */
   'lib/ai-budget.ts': 'reads usage with the service role — reaches Supabase through lib/supabase',
+  /*
+    The same split a third time. The vocabulary, the visitor-id rule and the
+    cumulative counts are in `packages/core/src/funnel.ts` and are portable.
+    Only the write needs a service-role client, and here that is not a detail:
+    the front door is reached by `anon`, so a client-writable funnel table is a
+    set of counts anyone on the internet can type into.
+  */
+  'lib/funnel.ts': 'writes with the service role — reaches Supabase through lib/supabase',
   'lib/sign-out.ts': 'Supabase types',
   /*
     The precedence rule — owner photo over stock, the unphotographed-demo
