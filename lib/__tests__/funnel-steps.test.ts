@@ -26,6 +26,8 @@ import {
   isRecordableVisitorId,
   deepestStep,
   funnelCounts,
+  funnelRates,
+  groupByVisitor,
   decideVisitor,
   formatVisitorId,
   isPrefetchRequest,
@@ -392,5 +394,74 @@ describe('the migration protects the dataset it is written for', () => {
     // before.
     expect(SQL).not.toMatch(/\bDROP\b/i);
     expect(SQL).not.toMatch(/\bTRUNCATE\b/i);
+  });
+});
+
+describe('groupByVisitor', () => {
+  it('collapses rows into one entry per visitor', () => {
+    const grouped = groupByVisitor([
+      { visitor_id: 'a', step: 'landed' },
+      { visitor_id: 'b', step: 'landed' },
+      { visitor_id: 'a', step: 'uploaded' },
+    ]);
+    expect(grouped).toHaveLength(2);
+    expect(grouped.find((g) => g.length === 2)).toEqual(['landed', 'uploaded']);
+  });
+
+  it('drops a step the vocabulary does not know', () => {
+    // The CHECK should make this impossible. A value that got past it is
+    // corrupt, not interesting, and must not become a fifth funnel stage.
+    expect(groupByVisitor([{ visitor_id: 'a', step: 'teleported' }])).toEqual([]);
+  });
+
+  it('is empty for no rows', () => {
+    expect(groupByVisitor([])).toEqual([]);
+  });
+});
+
+describe('funnelRates — the line that makes this a funnel', () => {
+  it('computes step-to-step and overall conversion', () => {
+    const r = funnelRates([
+      ['landed'],
+      ['landed', 'uploaded'],
+      ['landed', 'uploaded', 'answered'],
+      ['landed', 'uploaded', 'answered', 'saved'],
+    ]);
+
+    expect(r.counts).toEqual({ landed: 4, uploaded: 3, answered: 2, saved: 1 });
+    expect(r.stepConversion.uploaded).toBeCloseTo(3 / 4);
+    expect(r.stepConversion.answered).toBeCloseTo(2 / 3);
+    expect(r.stepConversion.saved).toBeCloseTo(1 / 2);
+    expect(r.overallConversion).toBeCloseTo(1 / 4);
+    expect(r.visitors).toBe(4);
+  });
+
+  it('returns zeroes, never NaN, on an empty window', () => {
+    /*
+      The normal state of this table until the door opens. A NaN here would
+      render as "NaN%" and make a correct instrument look broken on exactly the
+      days it is telling the truth.
+    */
+    const r = funnelRates([]);
+    expect(r.visitors).toBe(0);
+    expect(r.overallConversion).toBe(0);
+    for (const step of FUNNEL_STEPS) {
+      expect(Number.isNaN(r.stepConversion[step])).toBe(false);
+      expect(r.stepConversion[step]).toBe(0);
+    }
+  });
+
+  it('landed is 1 when anyone landed, so callers need no special case', () => {
+    expect(funnelRates([['landed']]).stepConversion.landed).toBe(1);
+  });
+
+  it('never reports a conversion above 1', () => {
+    // Cumulative counts make this structurally impossible; asserted because a
+    // rate above 100% is the visible symptom if that ever stops holding.
+    const r = funnelRates([['landed', 'answered'], ['landed', 'uploaded', 'answered', 'saved']]);
+    for (const step of FUNNEL_STEPS) {
+      expect(r.stepConversion[step]).toBeLessThanOrEqual(1);
+    }
+    expect(r.overallConversion).toBeLessThanOrEqual(1);
   });
 });
