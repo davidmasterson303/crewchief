@@ -99,7 +99,7 @@ export default function OnboardVinForm() {
                 <Label htmlFor="vin" className="text-sm font-medium text-white/80">
                   Vehicle Identification Number (VIN)
                 </Label>
-                <span className={`text-xs font-mono tabular-nums transition-colors ${vin.length === 17 ? 'text-green-400' : 'text-white/30'}`}>
+                <span className={`text-xs font-mono tabular-nums transition-colors ${vin.length === 17 ? 'text-green-400' : 'text-white/50'}`}>
                   {vin.length}/17
                 </span>
               </div>
@@ -114,7 +114,7 @@ export default function OnboardVinForm() {
                 autoComplete="off"
                 spellCheck={false}
               />
-              <p className="text-xs text-white/40">
+              <p className="text-xs text-white/50">
                 Find your VIN on the driver&apos;s side dashboard or door jamb
               </p>
             </div>
@@ -142,7 +142,7 @@ export default function OnboardVinForm() {
           </form>
 
           <div className="mt-6 pt-6 border-t border-white/8">
-            <p className="text-sm text-center text-white/40">
+            <p className="text-sm text-center text-white/50">
               Already have vehicles?{' '}
               <button
                 className="text-cyan-400 hover:text-cyan-300 transition-colors font-medium"

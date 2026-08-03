@@ -487,12 +487,12 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
                     <TabsTrigger
                       key={tabVal}
                       value={tabVal}
-                      className={`relative flex items-center gap-1.5 rounded-lg py-2 transition-all duration-200 ${isActive ? 'bg-slate-800 text-white shadow-md' : 'text-white/40 hover:text-white/65 bg-transparent'}`}
+                      className={`relative flex items-center gap-1.5 rounded-lg py-2 transition-all duration-200 ${isActive ? 'bg-slate-800 text-white shadow-md' : 'text-white/50 hover:text-white/65 bg-transparent'}`}
                       style={isActive ? { boxShadow: '0 0 0 1px rgba(34,211,238,0.18), 0 1px 6px rgba(0,0,0,0.4)' } : undefined}
                     >
                       <Icon className={`h-3.5 w-3.5 ${isActive ? 'text-cyan-400' : ''}`} />
                       <span className={`font-medium text-xs ${isActive ? 'text-white' : ''}`}>{label}</span>
-                      <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold tabular-nums ${isActive ? 'bg-cyan-400/10 text-cyan-300' : 'bg-white/8 text-white/35'}`}>
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold tabular-nums ${isActive ? 'bg-cyan-400/10 text-cyan-300' : 'bg-white/8 text-white/50'}`}>
                         {count}
                       </span>
                       {isActive && (

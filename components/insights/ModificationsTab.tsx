@@ -136,7 +136,7 @@ export default function ModificationsTab({
           {doneMods.length > 0 && (
             <div className="mt-2">
               <button
-                className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white/60 transition-colors"
+                className="flex items-center gap-1.5 text-xs text-white/50 hover:text-white/60 transition-colors"
                 onClick={() => setShowCompleted((v) => !v)}
               >
                 {showCompleted ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}

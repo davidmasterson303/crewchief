@@ -326,7 +326,7 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
                 >
                   {selectedFiles.length === 0 ? (
                     <div className="p-10 text-center">
-                      <div className={`transition-colors ${isDragging ? 'text-info' : 'text-white/25'}`}>
+                      <div className={`transition-colors ${isDragging ? 'text-info' : 'text-white/50'}`}>
                         {isDragging ? (
                           <>
                             <ImageIcon className="h-12 w-12 mx-auto mb-3" />
@@ -339,9 +339,9 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
                               <span className="text-cyan-400 hover:text-cyan-300 font-medium transition-colors">
                                 Choose files
                               </span>
-                              <span className="text-white/45"> or drag and drop</span>
+                              <span className="text-white/50"> or drag and drop</span>
                             </Label>
-                            <p className="text-xs text-white/30 mt-1.5">PNG, JPG, PDF up to 10MB each. Multiple files supported.</p>
+                            <p className="text-xs text-white/50 mt-1.5">PNG, JPG, PDF up to 10MB each. Multiple files supported.</p>
                           </>
                         )}
                       </div>
@@ -379,7 +379,7 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
                               </div>
                               <div className="min-w-0">
                                 <p className="text-sm font-medium text-white truncate">{file.name}</p>
-                                <p className="text-xs text-white/35">
+                                <p className="text-xs text-white/50">
                                   {(file.size / 1024 / 1024).toFixed(2)} MB
                                 </p>
                               </div>
@@ -399,7 +399,7 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
                           variant="ghost"
                           onClick={() => setSelectedFiles([])}
                           disabled={uploading}
-                          className="text-white/40 hover:text-white hover:bg-white/8 border border-white/10 text-sm"
+                          className="text-white/50 hover:text-white hover:bg-white/8 border border-white/10 text-sm"
                         >
                           Clear All
                         </Button>
@@ -465,15 +465,15 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
               <p>The invoice appears to be for a different vehicle:</p>
               <div className="bg-orange-500/8 border border-orange-400/20 rounded-xl p-4 space-y-3">
                 <div>
-                  <span className="text-xs font-semibold uppercase tracking-widest text-white/40">Invoice shows</span>
+                  <span className="text-xs font-semibold uppercase tracking-widest text-white/50">Invoice shows</span>
                   <p className="text-sm text-white font-semibold mt-1">{vehicleMismatchData?.extractedVehicle}</p>
                 </div>
                 <div className="border-t border-white/8 pt-3">
-                  <span className="text-xs font-semibold uppercase tracking-widest text-white/40">Uploading to</span>
+                  <span className="text-xs font-semibold uppercase tracking-widest text-white/50">Uploading to</span>
                   <p className="text-sm text-white font-semibold mt-1">{vehicleMismatchData?.expectedVehicle}</p>
                 </div>
               </div>
-              <p className="text-sm text-white/40">Are you sure you want to continue?</p>
+              <p className="text-sm text-white/50">Are you sure you want to continue?</p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

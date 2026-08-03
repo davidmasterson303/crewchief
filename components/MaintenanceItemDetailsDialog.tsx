@@ -58,7 +58,7 @@ export default function MaintenanceItemDetailsDialog({
         <div className="space-y-5 pt-5">
           <div className="grid grid-cols-2 gap-3">
             <div className="p-3 bg-white/4 rounded-xl border border-white/8">
-              <p className="text-xs text-white/45 flex items-center gap-1.5 mb-1.5 font-medium uppercase tracking-wide">
+              <p className="text-xs text-white/50 flex items-center gap-1.5 mb-1.5 font-medium uppercase tracking-wide">
                 <Calendar className="h-3.5 w-3.5" />
                 Service Date
               </p>
@@ -69,7 +69,7 @@ export default function MaintenanceItemDetailsDialog({
 
             {item.shop_name && (
               <div className="p-3 bg-white/4 rounded-xl border border-white/8">
-                <p className="text-xs text-white/45 flex items-center gap-1.5 mb-1.5 font-medium uppercase tracking-wide">
+                <p className="text-xs text-white/50 flex items-center gap-1.5 mb-1.5 font-medium uppercase tracking-wide">
                   <MapPin className="h-3.5 w-3.5" />
                   Shop
                 </p>
@@ -79,7 +79,7 @@ export default function MaintenanceItemDetailsDialog({
 
             {item.part_number && (
               <div className="p-3 bg-white/4 rounded-xl border border-white/8">
-                <p className="text-xs text-white/45 flex items-center gap-1.5 mb-1.5 font-medium uppercase tracking-wide">
+                <p className="text-xs text-white/50 flex items-center gap-1.5 mb-1.5 font-medium uppercase tracking-wide">
                   <Hash className="h-3.5 w-3.5" />
                   Part #
                 </p>
@@ -89,7 +89,7 @@ export default function MaintenanceItemDetailsDialog({
 
             {item.quantity && item.quantity > 1 && (
               <div className="p-3 bg-white/4 rounded-xl border border-white/8">
-                <p className="text-xs text-white/45 flex items-center gap-1.5 mb-1.5 font-medium uppercase tracking-wide">
+                <p className="text-xs text-white/50 flex items-center gap-1.5 mb-1.5 font-medium uppercase tracking-wide">
                   <Package className="h-3.5 w-3.5" />
                   Quantity
                 </p>
@@ -99,7 +99,7 @@ export default function MaintenanceItemDetailsDialog({
 
             {item.location_zone && (
               <div className="p-3 bg-white/4 rounded-xl border border-white/8">
-                <p className="text-xs text-white/45 flex items-center gap-1.5 mb-1.5 font-medium uppercase tracking-wide">
+                <p className="text-xs text-white/50 flex items-center gap-1.5 mb-1.5 font-medium uppercase tracking-wide">
                   <Wrench className="h-3.5 w-3.5" />
                   Zone
                 </p>
@@ -116,11 +116,11 @@ export default function MaintenanceItemDetailsDialog({
               </p>
               <div className="grid grid-cols-3 gap-3">
                 <div className="text-center p-3 bg-white/3 rounded-lg">
-                  <p className="text-xs text-white/40 mb-1">Labor</p>
+                  <p className="text-xs text-white/50 mb-1">Labor</p>
                   <p className="text-base font-bold text-white tabular-nums">${(item.cost_labor || 0).toFixed(2)}</p>
                 </div>
                 <div className="text-center p-3 bg-white/3 rounded-lg">
-                  <p className="text-xs text-white/40 mb-1">Parts</p>
+                  <p className="text-xs text-white/50 mb-1">Parts</p>
                   <p className="text-base font-bold text-white tabular-nums">${(item.cost_parts || 0).toFixed(2)}</p>
                 </div>
                 <div className="text-center p-3 bg-info-wash border border-info-border rounded-lg">
@@ -137,7 +137,7 @@ export default function MaintenanceItemDetailsDialog({
               </p>
               <p className="text-2xl font-bold text-white tabular-nums">${totalCost.toFixed(2)}</p>
               {item.quantity && item.unit_cost && item.quantity > 1 && item.unit_cost > 0 && (
-                <p className="text-xs text-white/40 mt-1">{item.quantity} × ${item.unit_cost.toFixed(2)}</p>
+                <p className="text-xs text-white/50 mt-1">{item.quantity} × ${item.unit_cost.toFixed(2)}</p>
               )}
             </div>
           ) : null}
@@ -161,7 +161,7 @@ export default function MaintenanceItemDetailsDialog({
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-white group-hover:text-cyan-300 transition-colors">View Invoice PDF</p>
-                <p className="text-xs text-white/40">Opens in new tab</p>
+                <p className="text-xs text-white/50">Opens in new tab</p>
               </div>
               <svg className="h-4 w-4 text-white/25 group-hover:text-cyan-400 transition-colors flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

@@ -104,7 +104,7 @@ function LoginForm() {
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 hover:text-white/60 transition-colors"
             tabIndex={-1}
           >
             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -144,7 +144,7 @@ export default function LoginPage() {
           </Suspense>
 
           <div className="mt-6 pt-6 border-t border-white/[0.08] text-center">
-            <p className="text-white/40 text-sm">
+            <p className="text-white/50 text-sm">
               Don't have an account?{' '}
               <Link href="/signup" className="text-cyan-400 hover:text-cyan-300 transition-colors font-medium">
                 Sign up free
@@ -153,7 +153,7 @@ export default function LoginPage() {
           </div>
 
           <div className="mt-4 text-center">
-            <Link href="/" className="text-white/30 hover:text-white/50 text-xs transition-colors">
+            <Link href="/" className="text-white/50 hover:text-white/50 text-xs transition-colors">
               Or try the demo without an account
             </Link>
           </div>

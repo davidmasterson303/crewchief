@@ -140,7 +140,7 @@ export function LogServiceModal({
         <DialogContent className="sm:max-w-md bg-[#111114] border-white/10 text-white">
           <DialogHeader>
             <DialogTitle className="text-white">Log {categoryName}</DialogTitle>
-            <DialogDescription className="text-white/45">
+            <DialogDescription className="text-white/50">
               Choose how you want to record this service.
             </DialogDescription>
           </DialogHeader>
@@ -153,7 +153,7 @@ export function LogServiceModal({
                 className={`flex-1 flex flex-col items-center gap-1 px-2 py-2 rounded-lg text-xs font-medium transition-all ${
                   tab === id
                     ? 'bg-cyan-400/10 text-cyan-300 border border-cyan-400/25'
-                    : 'text-white/40 hover:text-white/70 hover:bg-white/5'
+                    : 'text-white/50 hover:text-white/70 hover:bg-white/5'
                 }`}
               >
                 <Icon className="h-3.5 w-3.5" />
@@ -214,7 +214,7 @@ export function LogServiceModal({
                 <div className="space-y-1.5">
                   <Label className="text-xs text-white/55">Cost (optional)</Label>
                   <div className="relative">
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/30 text-sm">$</span>
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/50 text-sm">$</span>
                     <Input fieldSize="sm"
                       type="number"
                       value={manualCost}
@@ -263,7 +263,7 @@ export function LogServiceModal({
                   value={dismissMileage}
                   onChange={(e) => setDismissMileage(e.target.value)}
                 />
-                <p className="text-xs text-white/30">Defaults to your current mileage ({currentMileage.toLocaleString()} mi)</p>
+                <p className="text-xs text-white/50">Defaults to your current mileage ({currentMileage.toLocaleString()} mi)</p>
               </div>
               <Button
                 onClick={handleDismiss}

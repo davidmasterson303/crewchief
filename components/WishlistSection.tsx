@@ -168,7 +168,7 @@ export function WishlistSection({ vehicleId }: WishlistSectionProps) {
             <div>
               <h2 className="text-base font-semibold text-white leading-tight">Wishlist</h2>
               {wishlistItems.length > 0 && (
-                <p className="text-xs text-white/40 mt-0.5">
+                <p className="text-xs text-white/50 mt-0.5">
                   {wishlistItems.length} item{wishlistItems.length !== 1 ? 's' : ''}{totalEstimate > 0 ? ` · Est. ${formatCurrency(totalEstimate)}` : ''}
                 </p>
               )}
@@ -203,7 +203,7 @@ export function WishlistSection({ vehicleId }: WishlistSectionProps) {
               <ListChecks className="h-6 w-6 text-white/25" />
             </div>
             <p className="text-sm font-medium text-white/50 mb-1">Your wishlist is empty</p>
-            <p className="text-xs text-white/30 mb-5 max-w-xs leading-relaxed">
+            <p className="text-xs text-white/50 mb-5 max-w-xs leading-relaxed">
               Track repairs, upgrades, and modifications you want done on your vehicle.
             </p>
             <Button
@@ -242,7 +242,7 @@ export function WishlistSection({ vehicleId }: WishlistSectionProps) {
                         {item.description && (
                           <p className="text-xs text-white/55 mb-2 leading-relaxed">{item.description}</p>
                         )}
-                        <div className="flex flex-wrap gap-3 text-xs text-white/40">
+                        <div className="flex flex-wrap gap-3 text-xs text-white/50">
                           {totalCost > 0 && (
                             <span className="font-medium text-white/60">{formatCurrency(totalCost)} est.</span>
                           )}
@@ -253,7 +253,7 @@ export function WishlistSection({ vehicleId }: WishlistSectionProps) {
                             <span>{item.category}</span>
                           )}
                           {item.notes && (
-                            <span className="italic text-white/30">{item.notes}</span>
+                            <span className="italic text-white/50">{item.notes}</span>
                           )}
                         </div>
                       </div>
@@ -352,7 +352,7 @@ export function WishlistSection({ vehicleId }: WishlistSectionProps) {
               </div>
             ) : quoteHistory.length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-sm text-white/40">No quotes found</p>
+                <p className="text-sm text-white/50">No quotes found</p>
               </div>
             ) : (
               quoteHistory.map((quote) => (
@@ -370,7 +370,7 @@ export function WishlistSection({ vehicleId }: WishlistSectionProps) {
                         <h3 className="text-sm font-semibold text-white mb-1 truncate">
                           {quote.name || 'Unnamed Quote'}
                         </h3>
-                        <div className="flex flex-wrap gap-3 text-xs text-white/45">
+                        <div className="flex flex-wrap gap-3 text-xs text-white/50">
                           <span>{formatDate(quote.created_at)}</span>
                           <span>{quote.selected_items?.length || 0} items</span>
                           <span>{quote.zip_code}</span>

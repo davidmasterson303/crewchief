@@ -287,7 +287,7 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
                           <span>
                             {item.item_description}
                             {item.part_number && (
-                              <span className="text-white/40 ml-2 text-xs">{item.part_number}</span>
+                              <span className="text-white/50 ml-2 text-xs">{item.part_number}</span>
                             )}
                           </span>
                         </li>

@@ -281,14 +281,14 @@ export function QuoteRequestDialogV2({
                 <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                   s < state.step ? 'bg-cyan-500 text-white' :
                   s === state.step ? 'bg-cyan-400/10 border border-cyan-400/50 text-cyan-400' :
-                  'bg-white/6 border border-white/12 text-white/25'
+                  'bg-white/6 border border-white/12 text-white/50'
                 }`}>
                   {s < state.step ? <CheckCircle className="h-3 w-3" /> : s}
                 </div>
                 {s < 3 && <div className={`w-8 h-px ${s < state.step ? 'bg-cyan-500/60' : 'bg-white/10'}`} />}
               </div>
             ))}
-            <span className="text-xs text-white/35 ml-1">
+            <span className="text-xs text-white/50 ml-1">
               {state.step === 1 ? 'Select Items' : state.step === 2 ? 'Details' : 'Results'}
             </span>
           </div>
@@ -305,7 +305,7 @@ export function QuoteRequestDialogV2({
           {state.step === 1 && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <p className="text-xs text-white/45 font-medium uppercase tracking-wide">
+                <p className="text-xs text-white/50 font-medium uppercase tracking-wide">
                   {state.selectedItemIds.size} of {wishlistItems.length} selected
                 </p>
                 <button
@@ -320,7 +320,7 @@ export function QuoteRequestDialogV2({
               </div>
 
               {wishlistItems.length === 0 ? (
-                <div className="text-center py-10 text-sm text-white/40">
+                <div className="text-center py-10 text-sm text-white/50">
                   No items in your wishlist yet.
                 </div>
               ) : (
@@ -377,13 +377,13 @@ export function QuoteRequestDialogV2({
                   onChange={(e) => dispatch({ type: 'SET_ZIP_CODE', zipCode: e.target.value })}
                   maxLength={5}
                 />
-                <p className="text-xs text-white/30">Used to estimate regional labor rates</p>
+                <p className="text-xs text-white/50">Used to estimate regional labor rates</p>
               </div>
 
               <div className="space-y-1.5">
                 <label htmlFor="quoteName" className="text-xs font-semibold text-white/50 uppercase tracking-wide">
                   Quote Name
-                  <span className="text-white/25 ml-1 font-normal normal-case tracking-normal">optional</span>
+                  <span className="text-white/50 ml-1 font-normal normal-case tracking-normal">optional</span>
                 </label>
                 <Input
                   id="quoteName"
@@ -397,7 +397,7 @@ export function QuoteRequestDialogV2({
                 <label htmlFor="notes" className="text-xs font-semibold text-white/50 uppercase tracking-wide flex items-center gap-1.5">
                   <FileText className="h-3.5 w-3.5" />
                   Additional Notes
-                  <span className="text-white/25 font-normal normal-case tracking-normal">optional</span>
+                  <span className="text-white/50 font-normal normal-case tracking-normal">optional</span>
                 </label>
                 <Textarea
                   id="notes"
@@ -429,7 +429,7 @@ export function QuoteRequestDialogV2({
 
               <EmailDraftDisplay emailDraft={state.result.emailDraft} />
 
-              <p className="text-xs text-white/30 text-center leading-relaxed">
+              <p className="text-xs text-white/50 text-center leading-relaxed">
                 Use the cost breakdown to compare shop quotes and the email draft to request quotes from multiple shops.
               </p>
             </div>
@@ -442,7 +442,7 @@ export function QuoteRequestDialogV2({
               {state.step > 1 && state.step < 3 && (
                 <button
                   onClick={handleBack}
-                  className="flex items-center gap-1.5 text-sm text-white/45 hover:text-white/75 transition-colors"
+                  className="flex items-center gap-1.5 text-sm text-white/50 hover:text-white/75 transition-colors"
                 >
                   <ChevronLeft className="h-4 w-4" />
                   Back

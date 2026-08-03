@@ -65,7 +65,7 @@ function ScoreRing({ score }: { score: number }) {
         <span className="num text-xl font-bold text-foreground leading-none">
           {Math.round(animated)}
         </span>
-        <span className="text-xs text-white/40 mt-0.5">/100</span>
+        <span className="text-xs text-white/50 mt-0.5">/100</span>
       </div>
     </div>
   );
@@ -215,7 +215,7 @@ export default function HealthSummary({ vehicleId, healthSummary, recalls = [], 
             <button
               onClick={handleRefresh}
               disabled={isRefreshing}
-              className="p-1.5 rounded-lg text-white/30 hover:text-cyan-400 hover:bg-cyan-400/8 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+              className="p-1.5 rounded-lg text-white/50 hover:text-cyan-400 hover:bg-cyan-400/8 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
               aria-label="Refresh health summary"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -271,7 +271,7 @@ export default function HealthSummary({ vehicleId, healthSummary, recalls = [], 
             size="sm"
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="text-white/40 hover:text-cyan-400 hover:bg-cyan-400/8 transition-colors"
+            className="text-white/50 hover:text-cyan-400 hover:bg-cyan-400/8 transition-colors"
             aria-label="Refresh health summary"
           >
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -406,7 +406,7 @@ export default function HealthSummary({ vehicleId, healthSummary, recalls = [], 
           </div>
         )}
 
-        <p className="text-xs text-white/30 text-right">
+        <p className="text-xs text-white/50 text-right">
           Last updated:{' '}
           {healthSummary.last_generated
             ? new Date(healthSummary.last_generated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })

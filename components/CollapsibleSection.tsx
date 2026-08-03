@@ -103,7 +103,7 @@ export default function CollapsibleSection({
           {/* Truncates rather than wraps — a summary that grows a second line
               defeats the point of the section being folded. */}
           {summary && !open && (
-            <span className="text-[13px] text-white/45 truncate max-w-[45%]">{summary}</span>
+            <span className="text-[13px] text-white/50 truncate max-w-[45%]">{summary}</span>
           )}
         </button>
       </h2>

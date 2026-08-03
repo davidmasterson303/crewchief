@@ -147,7 +147,7 @@ export default function ResetPasswordPage() {
           <div className="bg-white/5 border border-white/10 rounded-2xl p-10 backdrop-blur-xl">
             <Loader2 className="h-10 w-10 text-info mx-auto mb-5 animate-spin" />
             <p className="text-white/55 text-sm">Verifying reset link...</p>
-            <p className="text-white/30 text-xs mt-3">
+            <p className="text-white/50 text-xs mt-3">
               If this takes too long,{' '}
               <Link href="/forgot-password" className="text-cyan-400 hover:text-cyan-300">
                 request a new link
@@ -189,7 +189,7 @@ export default function ResetPasswordPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 hover:text-white/60 transition-colors"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>

@@ -102,7 +102,7 @@ export default function TierProgressCard({ progress, loading }: TierProgressCard
         </div>
 
         {!isAggressive && (
-          <div className="flex items-center gap-1 text-white/30">
+          <div className="flex items-center gap-1 text-white/50">
             <Lock className="h-3 w-3" />
             <span className="text-xs">{config.nextLabel}</span>
             <ChevronRight className="h-3 w-3" />
@@ -115,7 +115,7 @@ export default function TierProgressCard({ progress, loading }: TierProgressCard
           <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
             <div className="h-full w-full bg-gradient-to-r from-red-500 to-orange-500 rounded-full animate-pulse" />
           </div>
-          <span className="text-xs text-white/40 whitespace-nowrap">Always evolving</span>
+          <span className="text-xs text-white/50 whitespace-nowrap">Always evolving</span>
         </div>
       ) : (
         <div className="mt-3 space-y-1.5">

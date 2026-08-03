@@ -42,13 +42,13 @@ function StepIndicator({ currentStep, totalSteps, labels }: { currentStep: numbe
                   ? 'bg-cyan-500 text-black'
                   : isActive
                   ? 'bg-cyan-400/10 border-2 border-cyan-400 text-cyan-400'
-                  : 'bg-white/5 border border-white/15 text-white/30'
+                  : 'bg-white/5 border border-white/15 text-white/50'
               }`}>
                 {isCompleted ? <CheckCircle2 className="h-4 w-4" /> : stepNum}
               </div>
               {labels[i] && (
                 <span className={`text-xs mt-1.5 font-medium whitespace-nowrap ${
-                  isActive ? 'text-white/80' : isCompleted ? 'text-info/70' : 'text-white/25'
+                  isActive ? 'text-white/80' : isCompleted ? 'text-info/70' : 'text-white/50'
                 }`}>
                   {labels[i]}
                 </span>
@@ -418,7 +418,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
             </div>
             <span className="text-white font-semibold text-lg tracking-tight">CrewChief</span>
           </div>
-          <p className="text-white/40 text-sm">Vehicle Setup</p>
+          <p className="text-white/50 text-sm">Vehicle Setup</p>
         </div>
 
         <div className="glass-panel rounded-2xl p-8">
@@ -460,7 +460,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
                 />
               </div>
               <div>
-                <Label className="text-white/70 text-xs font-semibold uppercase tracking-widest mb-1.5 block">Trim <span className="text-white/25 normal-case font-normal">(optional)</span></Label>
+                <Label className="text-white/70 text-xs font-semibold uppercase tracking-widest mb-1.5 block">Trim <span className="text-white/50 normal-case font-normal">(optional)</span></Label>
                 <Input
                   value={formData.trim}
                   onChange={(e) => updateFormData('trim', e.target.value)}
@@ -475,7 +475,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
                   placeholder="e.g., Black, Silver, Red"
                   required
                 />
-                <p className="text-xs text-white/30 mt-1.5">This helps us find the right vehicle image</p>
+                <p className="text-xs text-white/50 mt-1.5">This helps us find the right vehicle image</p>
               </div>
 
               {!powertrainReady && (
@@ -494,9 +494,9 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
 
               <div>
                 <Label className="text-white/70 text-xs font-semibold uppercase tracking-widest mb-1.5 block">
-                  Vehicle Photo <span className="text-white/25 normal-case font-normal">(optional)</span>
+                  Vehicle Photo <span className="text-white/50 normal-case font-normal">(optional)</span>
                 </Label>
-                <p className="text-xs text-white/35 mb-3">Upload your own photo or we&apos;ll find one automatically</p>
+                <p className="text-xs text-white/50 mb-3">Upload your own photo or we&apos;ll find one automatically</p>
 
                 {photoPreview ? (
                   <div className="relative rounded-xl overflow-hidden border border-white/12 bg-black/30">
@@ -525,7 +525,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
                     onDragOver={handleDragOver}
                     onDrop={handleDrop}
                   >
-                    <div className={`flex flex-col items-center gap-2 transition-colors ${isDragging ? 'text-cyan-400' : 'text-white/30'}`}>
+                    <div className={`flex flex-col items-center gap-2 transition-colors ${isDragging ? 'text-cyan-400' : 'text-white/50'}`}>
                       {isDragging ? (
                         <>
                           <ImageIcon className="h-8 w-8" />
@@ -579,7 +579,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
                   onChange={(e) => updateFormData('current_mileage', e.target.value)}
                   required
                 />
-                <p className="text-xs text-white/30 mt-1.5">Enter total miles on your vehicle</p>
+                <p className="text-xs text-white/50 mt-1.5">Enter total miles on your vehicle</p>
               </div>
               <div>
                 <Label className="text-white/70 text-xs font-semibold uppercase tracking-widest mb-1.5 block">Average Miles Per Month <span className="text-red-400">*</span></Label>
@@ -636,14 +636,14 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
                       <RadioGroupItem value={value} id={`ownership-${value}`} className="border-white/30" />
                       <Label htmlFor={`ownership-${value}`} className="flex-1 cursor-pointer">
                         <div className="font-medium text-white text-sm">{label}</div>
-                        <div className="text-xs text-white/40 mt-0.5">{desc}</div>
+                        <div className="text-xs text-white/50 mt-0.5">{desc}</div>
                       </Label>
                     </div>
                   ))}
                 </RadioGroup>
               </div>
               <div>
-                <Label className="text-white/70 text-xs font-semibold uppercase tracking-widest mb-1.5 block">Additional context <span className="text-white/25 normal-case font-normal">(optional)</span></Label>
+                <Label className="text-white/70 text-xs font-semibold uppercase tracking-widest mb-1.5 block">Additional context <span className="text-white/50 normal-case font-normal">(optional)</span></Label>
                 <Textarea
                   placeholder="e.g., Planning to pass it down to my kid, Need reliability for long commute..."
                   value={formData.ownership_details}
@@ -681,14 +681,14 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
                       <RadioGroupItem value={value} id={`perf-${value}`} className="border-white/30" />
                       <Label htmlFor={`perf-${value}`} className="flex-1 cursor-pointer">
                         <div className="font-medium text-white text-sm">{label}</div>
-                        <div className="text-xs text-white/40 mt-0.5">{desc}</div>
+                        <div className="text-xs text-white/50 mt-0.5">{desc}</div>
                       </Label>
                     </div>
                   ))}
                 </RadioGroup>
               </div>
               <div>
-                <Label className="text-white/70 text-xs font-semibold uppercase tracking-widest mb-1.5 block">Driving Style <span className="text-white/25 normal-case font-normal">(optional)</span></Label>
+                <Label className="text-white/70 text-xs font-semibold uppercase tracking-widest mb-1.5 block">Driving Style <span className="text-white/50 normal-case font-normal">(optional)</span></Label>
                 <Textarea
                   placeholder="e.g., Mostly highway cruising, Spirited weekend drives, Daily commuter..."
                   value={formData.driving_style}

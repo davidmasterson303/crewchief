@@ -168,7 +168,7 @@ function ForecastCard({
               <Layers className="h-3.5 w-3.5 text-amber-400 flex-shrink-0" />
               <span className="text-xs font-semibold text-amber-400 uppercase tracking-wide">Establish Baseline</span>
             </div>
-            <p className="text-xs text-white/45 leading-relaxed">
+            <p className="text-xs text-white/50 leading-relaxed">
               No recent records found. Prioritize verifying fluid health or replacing preemptively to protect {engineLabel}.
             </p>
           </div>
@@ -180,16 +180,16 @@ function ForecastCard({
                 ~{item.overdueMiles.toLocaleString()} mi past due
               </p>
             </div>
-            <p className="text-xs text-white/40">Address as soon as possible.</p>
+            <p className="text-xs text-white/50">Address as soon as possible.</p>
           </div>
         ) : (
           <div className="space-y-1">
             <p className="text-lg font-bold text-white tabular-nums leading-none">
               {item.milesUntilDue > 0 ? `~${item.milesUntilDue.toLocaleString()}` : '—'}
-              <span className="text-xs font-normal text-white/40 ml-1">mi</span>
+              <span className="text-xs font-normal text-white/50 ml-1">mi</span>
             </p>
             {item.monthsUntilDue > 0 && (
-              <p className="text-xs text-white/40">
+              <p className="text-xs text-white/50">
                 est. {item.monthsUntilDue} {item.monthsUntilDue === 1 ? 'month' : 'months'} away
               </p>
             )}
@@ -355,7 +355,7 @@ export default function UpcomingMaintenance({ vehicle, knowledge, maintenanceLin
             <h2 className="text-base font-semibold text-white group-hover:text-white/80 transition-colors">
               Maintenance Forecast
             </h2>
-            <span className="text-xs text-white/30 font-normal">Estimated</span>
+            <span className="text-xs text-white/50 font-normal">Estimated</span>
             <ChevronDown
               className={`h-4 w-4 text-white/30 group-hover:text-white/50 transition-all duration-200 ${collapsed ? '-rotate-90' : ''}`}
             />
@@ -428,7 +428,7 @@ export default function UpcomingMaintenance({ vehicle, knowledge, maintenanceLin
             <div className="pointer-events-none absolute right-0 top-0 bottom-2 w-12 bg-gradient-to-l from-[#0a0a0f] to-transparent rounded-r-2xl" />
           </div>
 
-          <p className="text-xs text-white/20 mt-2">
+          <p className="text-xs text-white/50 mt-2">
             Based on {currentMileage.toLocaleString()} mi &amp; {avgMilesPerMonth.toLocaleString()} mi/mo avg.
             {syncedCount > 0 && (
               <span className="text-info/50 ml-1">{syncedCount} item{syncedCount !== 1 ? 's' : ''} auto-linked from history.</span>

@@ -271,17 +271,17 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
               >
                 <ChevronLeft className="h-4 w-4 shrink-0" />
                 <span>Garage</span>
-                <span className="text-white/25" aria-hidden="true">·</span>
+                <span className="text-white/50" aria-hidden="true">·</span>
                 <span className="text-white/70 truncate max-w-[7.5rem]">{vehicle.model}</span>
                 {healthSummary?.health_score != null && (
                   <>
-                    <span className="text-white/25" aria-hidden="true">·</span>
+                    <span className="text-white/50" aria-hidden="true">·</span>
                     {healthPill(healthSummary.health_score)}
                   </>
                 )}
               </button>
 
-              <div className="hidden sm:flex items-center gap-1 text-white/30 text-sm">
+              <div className="hidden sm:flex items-center gap-1 text-white/50 text-sm">
                 <ChevronRight className="h-3.5 w-3.5" />
                 <button
                   onClick={() => router.push(homeHref)}
@@ -428,7 +428,7 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                     aria-label="Edit mileage"
                   >
                     <span className="text-2xl font-bold text-white tabular-nums tracking-tight">{displayVehicle.current_mileage?.toLocaleString() || '—'}</span>
-                    <span className="text-sm text-white/30 font-normal">mi</span>
+                    <span className="text-sm text-white/50 font-normal">mi</span>
                     <Edit2 className="meta-edit h-3.5 w-3.5 text-white/30 group-hover/edit:text-cyan-400 transition-colors" />
                   </button>
                 )}
@@ -460,7 +460,7 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                     aria-label="Edit average monthly miles"
                   >
                     <span className="text-2xl font-bold text-white tabular-nums tracking-tight">{displayVehicle.avg_miles_per_month || '—'}</span>
-                    <span className="text-sm text-white/30 font-normal">mi/mo</span>
+                    <span className="text-sm text-white/50 font-normal">mi/mo</span>
                     <Edit2 className="meta-edit h-3.5 w-3.5 text-white/30 group-hover/edit:text-cyan-400 transition-colors" />
                   </button>
                 )}
@@ -507,7 +507,7 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                   <div className="flex items-center gap-2">
                     <span className="text-2xl font-bold text-white tabular-nums tracking-tight">
                       {knowledge.reliability_score}
-                      <span className="text-sm text-white/40 ml-0.5">/10</span>
+                      <span className="text-sm text-white/50 ml-0.5">/10</span>
                     </span>
                     <Badge variant="outline" className={`${getReliabilityBadge(knowledge.reliability_score).color} border text-xs`}>
                       {getReliabilityBadge(knowledge.reliability_score).text}
@@ -536,7 +536,7 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
           {children}
         </div>
 
-        <footer className={`${appShell ? 'hidden md:flex ' : 'flex '}mt-10 pt-6 border-t border-white/6 items-center justify-between text-xs text-white/25`}>
+        <footer className={`${appShell ? 'hidden md:flex ' : 'flex '}mt-10 pt-6 border-t border-white/6 items-center justify-between text-xs text-white/50`}>
           <span>CrewChief &copy; {new Date().getFullYear()}</span>
           <div className="flex items-center gap-4">
             <a href="mailto:feedback@crewchief.app" className="hover:text-white/50 transition-colors">Feedback</a>

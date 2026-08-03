@@ -239,7 +239,7 @@ export default function MaintenanceHistory({ vehicleId, documents, lineItems = [
               <Wrench className="h-5 w-5 text-info" />
               Maintenance History
             </CardTitle>
-            <p className="text-sm text-white/40 mt-0.5">
+            <p className="text-sm text-white/50 mt-0.5">
               {sortedRecords.length} record{sortedRecords.length !== 1 ? 's' : ''}
               {totalCost > 0 && <span className="ml-2 text-white/60 font-medium">&middot; ${totalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} total</span>}
             </p>
@@ -305,7 +305,7 @@ export default function MaintenanceHistory({ vehicleId, documents, lineItems = [
               </div>
             </div>
             <h3 className="text-sm font-semibold text-white/70 mb-1">No maintenance records yet</h3>
-            <p className="text-xs text-white/35 mb-5 max-w-xs leading-relaxed">
+            <p className="text-xs text-white/50 mb-5 max-w-xs leading-relaxed">
               Upload service invoices to automatically track your vehicle&apos;s maintenance history and build a service timeline.
             </p>
             <Button
@@ -348,11 +348,11 @@ export default function MaintenanceHistory({ vehicleId, documents, lineItems = [
                         <span className="text-sm font-medium text-white truncate max-w-xs">{record.display_description}</span>
                         {getCategoryBadge(record)}
                         {record.part_number && (
-                          <span className="text-xs text-white/30 font-mono hidden sm:inline">{record.part_number}</span>
+                          <span className="text-xs text-white/50 font-mono hidden sm:inline">{record.part_number}</span>
                         )}
                       </div>
                       {record.display_shop && (
-                        <p className="text-xs text-white/40 truncate">{record.display_shop}</p>
+                        <p className="text-xs text-white/50 truncate">{record.display_shop}</p>
                       )}
                     </div>
 
@@ -360,7 +360,7 @@ export default function MaintenanceHistory({ vehicleId, documents, lineItems = [
                       {record.display_date && (
                         <div className="hidden sm:flex items-center gap-1.5 text-right">
                           <Calendar className="h-3.5 w-3.5 text-white/25 flex-shrink-0" />
-                          <span className="text-xs text-white/45 tabular-nums whitespace-nowrap">
+                          <span className="text-xs text-white/50 tabular-nums whitespace-nowrap">
                             {new Date(record.display_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                           </span>
                         </div>

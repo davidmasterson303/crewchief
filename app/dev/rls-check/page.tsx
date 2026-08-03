@@ -195,7 +195,7 @@ export default function RlsCheckPage() {
           </table>
 
           {results.some((r) => r.verdict === 'ERROR') && (
-            <p className="text-xs text-white/40 mt-4">
+            <p className="text-xs text-white/50 mt-4">
               ERROR rows are not passes — hover for the message. A table-level GRANT refusal is a
               different mechanism from RLS, and a renamed table lands here too.
             </p>
