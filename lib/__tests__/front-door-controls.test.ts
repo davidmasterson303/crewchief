@@ -27,6 +27,7 @@ import {
   SPOOFABLE_IP_HEADERS,
   platformClientIp,
 } from '@crewchief/core/client-ip';
+import { getClientIdentifier } from '@/lib/rate-limit';
 
 const LIMIT = FRONT_DOOR_BUDGET.dailyOutputTokens;
 
@@ -200,5 +201,42 @@ describe('platformClientIp — the secondary control', () => {
     for (const safe of PLATFORM_IP_HEADERS) {
       expect(SPOOFABLE_IP_HEADERS).not.toContain(safe);
     }
+  });
+});
+
+describe('getClientIdentifier — the existing limiter, hardened not replaced', () => {
+  const request = (headers: Record<string, string>) =>
+    ({ headers: new Headers(headers) }) as unknown as Request;
+
+  it('prefers the platform address over a spoofed forwarded header', () => {
+    expect(
+      getClientIdentifier(
+        request({
+          'x-forwarded-for': '198.51.100.4',
+          'x-nf-client-connection-ip': '203.0.113.7',
+        })
+      )
+    ).toBe('203.0.113.7');
+  });
+
+  it('still falls back, so removing the weakness cannot cause an outage', () => {
+    /*
+      Deliberate, and the reasoning is worth keeping next to the assertion. A
+      platform-only version collapses every request onto one shared 60/minute
+      bucket if the platform header is ever absent in production — which could
+      not be verified from a development machine. That trades a hardening for a
+      live outage on the demo. The order below is strictly no worse than the
+      old behaviour anywhere and strictly better wherever the edge supplies an
+      address, which on Netlify is every external request.
+    */
+    expect(getClientIdentifier(request({ 'x-forwarded-for': '198.51.100.4' }))).toBe('198.51.100.4');
+    expect(getClientIdentifier(request({ 'x-real-ip': '198.51.100.5' }))).toBe('198.51.100.5');
+    expect(getClientIdentifier(request({}))).toBe('unknown');
+  });
+
+  it('takes the first entry of a forwarded list rather than the whole string', () => {
+    expect(getClientIdentifier(request({ 'x-forwarded-for': '198.51.100.4, 10.0.0.1' }))).toBe(
+      '198.51.100.4'
+    );
   });
 });
