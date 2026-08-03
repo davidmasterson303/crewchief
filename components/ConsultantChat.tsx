@@ -17,7 +17,9 @@ import {
   generateSessionTitle,
   getConsultantSession,
   getConsultantSessions,
+  recordQuotePullClick,
 } from '@/app/actions';
+import { QuoteRequestDialogV2 } from './QuoteRequestDialogV2';
 import { toast } from 'sonner';
 import { invalidateDashboardCache } from '@crewchief/core/query-invalidation';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
@@ -210,8 +212,20 @@ export default function ConsultantChat({
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const [uploadedDocuments, setUploadedDocuments] = useState<any[]>([]);
-  const [addedWishlistItems, setAddedWishlistItems] = useState<Set<string>>(new Set());
+  /*
+    Phase 2.98a. This was a `Set` of `name-type` keys, which was all the "✓
+    Added" state needed. The quote pull needs the *row* — a wishlist id to
+    preselect, and a description and category to render in the dialog's step 1
+    — because the `wishlistItems` prop is server-rendered and does not contain
+    an item added seconds ago in this component. So it is a Map keyed the same
+    way; `.has()` keeps every existing call site working unchanged.
+  */
+  const [addedWishlistItems, setAddedWishlistItems] = useState<
+    Map<string, { id: string | null; description: string; category: string }>
+  >(new Map());
   const [addingWishlistItem, setAddingWishlistItem] = useState<string | null>(null);
+  const [quotePullOpen, setQuotePullOpen] = useState(false);
+  const [quotePullItemIds, setQuotePullItemIds] = useState<string[]>([]);
   const [showFollowUps, setShowFollowUps] = useState(false);
   const [currentFollowUps, setCurrentFollowUps] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -346,7 +360,34 @@ export default function ConsultantChat({
       });
       const result = await response.json();
       if (response.ok || response.status === 409) {
-        setAddedWishlistItems((prev) => { const next = new Set(Array.from(prev)); next.add(key); return next; });
+        /*
+          Both outcomes carry an id, and both are needed: 201 returns the new
+          row, 409 returns `itemId` for the row that already existed. The 409
+          is not an edge case here — the dossier and the consultant can suggest
+          the same job, so "already in your wishlist" is a normal way to arrive
+          at an item the user then wants quotes for.
+        */
+        const id: string | null = result?.wishlistItem?.id ?? result?.itemId ?? null;
+        /*
+          Recorded whether or not an id came back. The "✓ Added" state is the
+          user's feedback that their tap worked and must not become conditional
+          on a field the quote pull happens to want — a missing id costs the
+          item its place in the pull, not its acknowledgement.
+        */
+        setAddedWishlistItems((prev) => {
+          const next = new Map(prev);
+          next.set(key, {
+            id,
+            description: action.description || action.name,
+            category:
+              action.type === 'modification'
+                ? 'modification'
+                : action.type === 'maintenance'
+                  ? 'maintenance'
+                  : 'repair',
+          });
+          return next;
+        });
         toast.success(`Added "${action.name}" to wishlist`);
       } else {
         toast.error(result.error || 'Failed to add to wishlist');
@@ -356,6 +397,20 @@ export default function ConsultantChat({
     } finally {
       setAddingWishlistItem(null);
     }
+  };
+
+  /**
+   * Phase 2.98a/c — open the quote request against the work just accepted.
+   *
+   * The instrumentation call is fired but not awaited, and its failure cannot
+   * reach the user: 2.98 exists to find out whether anyone takes this path, and
+   * a measurement that can block the thing it measures is worse than no
+   * measurement. The dialog opens either way.
+   */
+  const handleQuotePull = (itemIds: string[]) => {
+    void recordQuotePullClick('consultant_reply', vehicleId, itemIds.length).catch(() => {});
+    setQuotePullItemIds(itemIds);
+    setQuotePullOpen(true);
   };
 
   const handleNewChat = () => {
@@ -837,6 +892,41 @@ export default function ConsultantChat({
                             </button>
                           );
                         })}
+                        {/*
+                          Phase 2.98a — the quote pull.
+
+                          Deliberately conditional on something having been
+                          added, not shown beside every suggestion. The pull is
+                          for the moment a user has decided work is needed and
+                          is now weighing what it should cost; offering it
+                          against an empty selection would be a dead button and
+                          would train people to ignore the row.
+
+                          `generateQuoteRequestV2` takes wishlist ids, so an
+                          item with no id cannot be quoted — those are filtered
+                          rather than sent, which is why this can disappear
+                          again even after an add.
+                        */}
+                        {(() => {
+                          const pullable = msg.wishlistActions
+                            .map((a: any) => addedWishlistItems.get(`${a.name}-${a.type}`))
+                            .filter((entry: any): entry is { id: string; description: string; category: string } =>
+                              Boolean(entry?.id)
+                            );
+                          if (pullable.length === 0) return null;
+                          return (
+                            <button
+                              onClick={() => handleQuotePull(pullable.map((e: any) => e.id))}
+                              className="flex items-center gap-2 w-full text-left p-2.5 rounded-xl text-sm min-h-[44px] bg-amber-400/10 border border-amber-400/25 text-amber-300 hover:bg-amber-400/20 hover:border-amber-400/40 transition-all"
+                            >
+                              <FileText className="h-3.5 w-3.5 flex-shrink-0" />
+                              <span className="flex-1 font-medium text-xs">Get competing quotes</span>
+                              <span className="text-xs opacity-60">
+                                {pullable.length} item{pullable.length > 1 ? 's' : ''}
+                              </span>
+                            </button>
+                          );
+                        })()}
                       </div>
                     )}
                   </div>
@@ -1070,6 +1160,48 @@ export default function ConsultantChat({
           </p>
         </div>
       </div>
+
+      {/*
+        Phase 2.98a. The item list is the server-rendered wishlist *merged with*
+        anything added during this conversation, because the prop is a snapshot
+        from page load and the whole point of this entry point is to quote work
+        the user accepted a moment ago.
+
+        Merged by id with the server row winning, so an item that came back as a
+        409 — already on the wishlist — appears once with its stored name rather
+        than twice.
+      */}
+      <QuoteRequestDialogV2
+        open={quotePullOpen}
+        onOpenChange={setQuotePullOpen}
+        vehicleId={vehicleId}
+        wishlistItems={(() => {
+          const merged = new Map<string, { id: string; description: string; category: string }>();
+          for (const entry of Array.from(addedWishlistItems.values())) {
+            if (entry.id) {
+              merged.set(entry.id, {
+                id: entry.id,
+                description: entry.description,
+                category: entry.category,
+              });
+            }
+          }
+          for (const item of wishlistItems || []) {
+            if (!item?.id) continue;
+            merged.set(item.id, {
+              id: item.id,
+              description: item.item_name || item.description || 'Service item',
+              category: item.category || 'repair',
+            });
+          }
+          return Array.from(merged.values());
+        })()}
+        preferredZipCode={vehicle?.preferred_zip_code}
+        preselectedItemIds={quotePullItemIds}
+        onQuoteSaved={() => {
+          toast.success('Quote request saved!');
+        }}
+      />
     </div>
   );
 }

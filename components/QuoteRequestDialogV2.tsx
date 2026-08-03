@@ -133,6 +133,17 @@ interface QuoteRequestDialogV2Props {
   wishlistItems: ServiceItem[];
   preferredZipCode?: string;
   onQuoteSaved?: (quoteRequestId: string) => void;
+  /**
+   * Phase 2.98a. Items to arrive with already ticked, for the entry points that
+   * know what the user is asking about — the consultant reply pull opens this
+   * dialog *because* of specific work, so making them re-pick it from a list
+   * would throw away the only thing that entry point knows.
+   *
+   * Step 1 is still shown rather than skipped: the selection stays reviewable
+   * and correctable, which is the difference between a shortcut and a
+   * surprise.
+   */
+  preselectedItemIds?: string[];
 }
 
 export function QuoteRequestDialogV2({
@@ -142,11 +153,21 @@ export function QuoteRequestDialogV2({
   wishlistItems,
   preferredZipCode,
   onQuoteSaved,
+  preselectedItemIds,
 }: QuoteRequestDialogV2Props) {
   const [state, dispatch] = useReducer(dialogReducer, {
     ...initialState,
     zipCode: preferredZipCode || '',
   });
+
+  /*
+    `preselectedItemIds` is joined rather than passed by reference: a caller
+    building the array inline (`items.map(i => i.id)`) makes a new array every
+    render, which as a dependency would re-run this effect continuously and
+    stamp the user's own tick-box changes back to the preselection while the
+    dialog sat open.
+  */
+  const preselectedKey = preselectedItemIds?.join(',') ?? '';
 
   useEffect(() => {
     if (open) {
@@ -154,8 +175,11 @@ export function QuoteRequestDialogV2({
       if (preferredZipCode) {
         dispatch({ type: 'SET_ZIP_CODE', zipCode: preferredZipCode });
       }
+      if (preselectedKey) {
+        dispatch({ type: 'SELECT_ALL', itemIds: preselectedKey.split(',') });
+      }
     }
-  }, [open, preferredZipCode]);
+  }, [open, preferredZipCode, preselectedKey]);
 
   const validateStep1 = () => {
     if (state.selectedItemIds.size === 0) {
