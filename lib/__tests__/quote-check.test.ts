@@ -242,3 +242,96 @@ describe('the route wiring', () => {
     }
   });
 });
+
+describe('2.97c — claiming a scan into an account', () => {
+  const ROOT2 = join(__dirname, '..', '..');
+  const CLAIM = readFileSync(join(ROOT2, 'app/api/v1/front-door/claim/route.ts'), 'utf8');
+  const claimCode = CLAIM.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+
+  const MIGRATION = readFileSync(
+    join(ROOT2, 'supabase/migrations/20260803230000_claim_a_scan_into_an_account.sql'),
+    'utf8'
+  );
+  const sql = MIGRATION.replace(/\/\*[\s\S]*?\*\//g, '').replace(/--[^\n]*/g, '');
+  const schema = sql.replace(/COMMENT\s+ON[\s\S]*?IS\s*'(?:[^']|'')*'\s*;/gi, '');
+
+  it('the stripped sources survived — these checks are not vacuous', () => {
+    expect(claimCode).toMatch(/export async function POST/);
+    expect(schema).toMatch(/CREATE TABLE IF NOT EXISTS public\.front_door_scans/i);
+  });
+
+  it('takes the visitor id from the cookie, never from the request', () => {
+    /*
+      **This is the authorization, not the session.** `requireSession` says who
+      is claiming; the cookie is what decides what they may claim. An id read
+      from a body would let any signed-in user claim any visitor's scan by
+      replaying an id — and ids are not secrets: they sit in the database and in
+      logs. The cookie is httpOnly, so no browser script can read or forge one.
+    */
+    expect(claimCode).toMatch(/readVisitorId\(\)/);
+    expect(claimCode).not.toMatch(/request\.json|await req\.json|body\.visitorId/);
+  });
+
+  it('is authenticated', () => {
+    expect(claimCode).toMatch(/requireSession/);
+  });
+
+  it('records saved only when something actually moved', () => {
+    // A signup with no scan behind it is not a front-door conversion. Counting
+    // it would inflate the single number this phase exists to produce, and
+    // both signup paths call this endpoint — refreshes included.
+    const guard = claimCode.indexOf('claimed > 0');
+    const saved = claimCode.indexOf("step: 'saved'");
+    expect(guard).toBeGreaterThan(-1);
+    expect(saved).toBeGreaterThan(guard);
+  });
+
+  it('treats a missing cookie as success with nothing claimed', () => {
+    // Most signups will have no cookie — different device, expired, or they
+    // never used the front door. That is ordinary, not an error.
+    expect(claimCode).toMatch(/claimed:\s*0/);
+  });
+
+  it('stores the answer and never the evidence', () => {
+    /*
+      A photographed estimate carries a shop's name, an address, sometimes a
+      customer's — and it arrived from someone with no account who agreed to
+      nothing. The stored row is what is needed to re-display the answer and
+      not one column more.
+    */
+    for (const forbidden of ['image', 'photo', 'base64', 'file_url', 'line_item', 'shop_name', 'raw_text']) {
+      expect(schema.toLowerCase()).not.toContain(forbidden);
+    }
+  });
+
+  it('deletes claimed scans with the account that owns them', () => {
+    // cc-product-0005 ships immediate-only deletion. A row surviving it would
+    // be a quiet exception to a promise the product makes explicitly.
+    expect(schema).toMatch(/claimed_by\s+uuid\s+REFERENCES\s+auth\.users\(id\)\s+ON DELETE CASCADE/i);
+  });
+
+  it('cannot record half a claim', () => {
+    // A claimed_by with no timestamp makes the retention sweep unable to tell a
+    // fresh claim from an ancient one.
+    expect(schema).toMatch(/\(claimed_by IS NULL\)\s*=\s*\(claimed_at IS NULL\)/i);
+  });
+
+  it('lets an account read only what it claimed, and write nothing', () => {
+    expect(schema).toMatch(/USING \(claimed_by = auth\.uid\(\)\)/i);
+    expect(schema).toMatch(/GRANT SELECT ON public\.front_door_scans TO authenticated/i);
+    // No UPDATE grant or policy: that absence is what stops a client
+    // reassigning a row to itself directly.
+    expect(schema).not.toMatch(/FOR UPDATE/i);
+    expect(schema).not.toMatch(/GRANT[\s\S]{0,40}UPDATE[\s\S]{0,40}front_door_scans/i);
+  });
+
+  it('grants anon nothing — it is the role the front door runs as', () => {
+    expect(schema).toMatch(/REVOKE ALL ON public\.front_door_scans FROM anon/i);
+    expect(schema).not.toMatch(/GRANT[^;]*TO anon/i);
+  });
+
+  it('is a pure addition, so the SQL Editor will not stall on it', () => {
+    expect(schema).not.toMatch(/\bDROP\b/i);
+    expect(schema).not.toMatch(/\bTRUNCATE\b/i);
+  });
+});

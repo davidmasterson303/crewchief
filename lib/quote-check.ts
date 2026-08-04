@@ -3,10 +3,12 @@ import { recordAiUsageInBackground } from './ai-usage';
 import { logger } from '@crewchief/core/logger';
 import { extractJSON } from '@crewchief/core/vehicle-utils';
 import { FLASH_VISION_MODEL } from '@crewchief/core/ai/models';
+import { getServiceRoleClient } from './supabase';
 import {
   QUOTE_CHECK_PROMPT,
   parseQuoteCheck,
   unreadableMessage,
+  type QuoteCheck,
   type QuoteCheckResult,
 } from '@crewchief/core/quote-check';
 
@@ -98,4 +100,79 @@ export async function runQuoteCheck({
     });
     return { ok: false, reason: 'malformed', message: unreadableMessage() };
   }
+}
+
+/**
+ * Hold an answer so a visitor who signs up does not re-upload. Phase 2.97c.
+ *
+ * Fire-and-forget, same hard rule as the meter: a stranger asked whether their
+ * quote was fair and got an answer, and whether we filed a copy is not their
+ * problem. A failure here must never turn a working answer into an error.
+ *
+ * Stores the answer and never the image — see the migration header for the full
+ * list of what is deliberately not kept.
+ */
+export function holdScanInBackground(visitorId: string, check: QuoteCheck): void {
+  void (async () => {
+    try {
+      const client = getServiceRoleClient();
+      const { error } = await client.from('front_door_scans').insert({
+        visitor_id: visitorId,
+        job_summary: check.jobSummary,
+        vehicle: check.vehicle,
+        quoted_total: check.quotedTotal,
+        typical_low: check.typical.low,
+        typical_high: check.typical.high,
+      });
+      if (error) {
+        logger.warn('QUOTE_CHECK:HOLD_FAILED', 'Could not hold the scan for claiming', {
+          message: error.message,
+        });
+      }
+    } catch (err) {
+      logger.warn('QUOTE_CHECK:HOLD_THREW', 'Holding the scan threw and was dropped', {
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  })();
+}
+
+/**
+ * Attach every unclaimed scan for this visitor to an account. Phase 2.97c.
+ *
+ * Returns how many were claimed, so the caller can record `saved` only when
+ * something actually moved — a signup with no scan behind it is not a front-door
+ * conversion, and counting it would inflate the one number this phase exists to
+ * produce.
+ *
+ * ── Why the visitor id is not trusted from the request body ─────────────────
+ *
+ * The caller passes an id read from the **httpOnly cookie**, which a browser
+ * script cannot read or forge. If this took an id from a JSON body, any
+ * authenticated user could claim any visitor's scan by guessing or replaying an
+ * id — and ids appear in no URL, but they do appear in the database and in
+ * logs. The cookie is the only acceptable source.
+ *
+ * ── Unlike the write, this one throws ───────────────────────────────────────
+ *
+ * The caller is a signed-in user completing an action they asked for, so a
+ * silent failure would show them an account with their scan mysteriously
+ * absent. There is no request to protect here — the request *is* this.
+ */
+export async function claimScansForVisitor(visitorId: string, userId: string): Promise<number> {
+  const client = getServiceRoleClient();
+
+  const { data, error } = await client
+    .from('front_door_scans')
+    .update({ claimed_by: userId, claimed_at: new Date().toISOString() })
+    // `is('claimed_by', null)` is the concurrency guard, not decoration: two
+    // tabs finishing signup together would otherwise reassign the same rows,
+    // and the second would overwrite the first's timestamp.
+    .eq('visitor_id', visitorId)
+    .is('claimed_by', null)
+    .select('id');
+
+  if (error) throw new Error(`Could not claim scans: ${error.message}`);
+
+  return data?.length ?? 0;
 }

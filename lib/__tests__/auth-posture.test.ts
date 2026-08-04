@@ -261,6 +261,25 @@ const ROUTE_POSTURE: Record<string, 'vehicle-scoped' | 'session' | 'public' | 's
     ever weakened, this entry is the thing that should stop them.
   */
   'app/api/v1/front-door/check/route.ts': 'public',
+  /*
+    Phase 2.97c — the seam where an anonymous session becomes an account, and
+    the **only** authenticated route on the front-door path. Everything else
+    there is deliberately open; this one moves rows onto a user id, so it has to
+    know who is asking.
+
+    `session` rather than `vehicle-scoped`: there is no vehicle. The rows being
+    claimed were produced by someone with no account and no car on file, which
+    is the entire premise of 2.97.
+
+    **The authorization that matters here is not the session.** `requireSession`
+    establishes *who* is claiming; what decides *what* they may claim is that
+    the visitor id is read from the httpOnly `cc_fv` cookie and never from the
+    request. Accepting an id from a body would let any signed-in user claim any
+    visitor's scan by replaying an id — and ids appear in the database and in
+    logs, so they are not secrets. There is no UPDATE policy on the table for
+    `authenticated` either, so a client cannot reassign a row directly.
+  */
+  'app/api/v1/front-door/claim/route.ts': 'session',
 };
 
 /**

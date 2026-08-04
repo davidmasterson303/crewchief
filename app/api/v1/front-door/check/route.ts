@@ -9,7 +9,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { platformClientIp } from '@crewchief/core/client-ip';
 import { resolveVisitor } from '@/lib/funnel-visitor';
 import { recordFunnelStepInBackground } from '@/lib/funnel';
-import { runQuoteCheck } from '@/lib/quote-check';
+import { holdScanInBackground, runQuoteCheck } from '@/lib/quote-check';
 
 export const dynamic = 'force-dynamic';
 
@@ -145,7 +145,15 @@ export async function POST(request: NextRequest): Promise<Response> {
     );
   }
 
-  if (visitorId) recordFunnelStepInBackground({ visitorId, step: 'answered' });
+  if (visitorId) {
+    recordFunnelStepInBackground({ visitorId, step: 'answered' });
+    /*
+      2.97c. Held now rather than at signup, because at signup the answer is
+      gone — the upload was never persisted and re-running the model would cost
+      a second call and could return a different range for the same document.
+    */
+    holdScanInBackground(visitorId, result.check);
+  }
 
   const { check } = result;
 

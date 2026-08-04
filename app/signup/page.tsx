@@ -69,6 +69,22 @@ export default function SignupPage() {
        * its owner. Do not reintroduce that fallback.
        */
       if (data.session) {
+        /*
+          Phase 2.97c. Attach any scan this browser made before signing up, so
+          the answer they just liked is waiting in the account rather than
+          needing a second photograph.
+
+          Awaited but never allowed to block the redirect on failure: the
+          account exists and they are signed in, and stranding them on the
+          signup form because a claim failed would trade the whole conversion
+          for a nicety. `/auth/callback` covers the verification path.
+        */
+        try {
+          await fetch('/api/v1/front-door/claim', { method: 'POST' });
+        } catch {
+          // Deliberately silent. The scan stays unclaimed; the signup succeeded.
+        }
+
         setSuccess(true);
         setTimeout(() => { router.push('/onboard'); router.refresh(); }, 1000);
         return;
