@@ -47,6 +47,16 @@ import { frontDoorClosedMessage, type FrontDoorDecision } from './ai/budget';
  * surface could make.
  */
 
+/**
+ * Where the front door lives.
+ *
+ * A constant because three places need to agree on it — the middleware that
+ * issues the visitor cookie and records `landed`, the matcher that decides
+ * whether middleware runs at all, and the page. A matcher that drifts out of
+ * step with the page is a funnel with no top and no error.
+ */
+export const FRONT_DOOR_PATH = '/check';
+
 export type GateRefusal = 'disabled' | 'closed' | 'rate_limited';
 
 export type FrontDoorGate =

@@ -1,7 +1,11 @@
 import { createServerClient } from '@supabase/ssr';
-import { NextResponse, type NextRequest } from 'next/server';
+import { NextResponse, type NextRequest, type NextFetchEvent } from 'next/server';
 import { resolveRoute } from '@crewchief/core/routes';
 import { corsHeadersFor, isVersionedApiPath } from '@crewchief/core/cors';
+import { FRONT_DOOR_PATH } from '@crewchief/core/front-door';
+import { VISITOR_COOKIE, visitorCookieOptions } from '@crewchief/core/funnel';
+import { resolveVisitor } from '@/lib/funnel-visitor';
+import { recordFunnelStep } from '@/lib/funnel';
 
 /**
  * Route protection.
@@ -97,7 +101,74 @@ function handleApiCors(request: NextRequest): NextResponse {
   return response;
 }
 
-export async function middleware(request: NextRequest) {
+/**
+ * The front door's `landed` event, and the cookie that makes it joinable.
+ *
+ * Phase 2.97d's last call site. It has to be here rather than on the page for a
+ * reason that is not stylistic: `cookies()` is **read-only during a Server
+ * Component render** on Next 13.5, so the page that needs the id cannot mint
+ * it, and middleware is the only place that holds the response before the
+ * render.
+ *
+ * Returns before any session work. `/check` is anonymous by definition, and the
+ * matcher is scoped precisely so public pages do not pay for a `getUser()` they
+ * never use — adding the front door to it and then falling through would put a
+ * network round trip in front of the surface whose whole job is a fast first
+ * impression.
+ *
+ * **`event.waitUntil` is load-bearing.** An un-awaited promise in Edge
+ * middleware is killed when the response is returned, so a bare
+ * fire-and-forget call here would record nothing — and would do it silently,
+ * which is the worst version. Awaiting it instead would put a database write in
+ * front of the first paint. `waitUntil` is the only option that is neither.
+ */
+function handleFrontDoor(request: NextRequest, event: NextFetchEvent): NextResponse {
+  const response = NextResponse.next();
+  const visitor = resolveVisitor(request);
+
+  if (visitor.issue && visitor.visitorId) {
+    response.cookies.set(
+      VISITOR_COOKIE,
+      visitor.visitorId,
+      visitorCookieOptions(process.env.NODE_ENV === 'production')
+    );
+  }
+
+  /*
+    `resolveVisitor` returns a null id for a prefetch, so a link sitting in
+    someone's viewport records nothing. That check is in `decideVisitor` and
+    tested there.
+
+    ── But it is weaker HERE than its unit tests suggest, measured 3 Aug ──────
+
+    **Next 13.5 strips its own `next-router-prefetch` and `RSC` headers before
+    middleware runs.** Verified by logging every header this function receives
+    during a prefetch-shaped request: `accept`, `host`, `user-agent`, and
+    nothing else. A custom `Sec-Purpose` or `purpose` *does* arrive, which is
+    why two of the three signals work and Next's own does not.
+
+    So `isPrefetchRequest` is green in its suite and partly inert in this
+    position — the precise shape this file's own docstring records from
+    `security.test.ts`: a test asserting protection the app does not have.
+    Written down rather than deleted, because the check is correct in the route
+    handler, correct for browser speculative loads (`Sec-Purpose`), and would
+    start working here if Next stops stripping.
+
+    **What actually protects the top of the funnel today:** nothing links to
+    `/check` with prefetching on. A Next `<Link>` prefetch is a client `fetch()`
+    that carries no browser prefetch header, so it is undetectable from here —
+    which makes `prefetch={false}` on any future link to this route a
+    correctness requirement, not a preference. `front-door-gate.test.ts`
+    asserts it.
+  */
+  if (visitor.visitorId) {
+    event.waitUntil(recordFunnelStep({ visitorId: visitor.visitorId, step: 'landed' }));
+  }
+
+  return response;
+}
+
+export async function middleware(request: NextRequest, event: NextFetchEvent) {
   const pathname = request.nextUrl.pathname;
 
   // Before the session work, and before anything else: the API surface is not
@@ -105,6 +176,12 @@ export async function middleware(request: NextRequest) {
   // session lookup it does not use.
   if (isVersionedApiPath(pathname)) {
     return handleApiCors(request);
+  }
+
+  // Same reasoning, one surface further: anonymous by definition, so it returns
+  // before the session lookup rather than after it.
+  if (pathname === FRONT_DOOR_PATH) {
+    return handleFrontDoor(request, event);
   }
 
   const supabaseConfig = readSupabaseConfig();
@@ -179,5 +256,16 @@ export const config = {
     '/settings/:path*',
     '/login',
     '/signup',
+    /*
+      The anonymous front door. Unlike every other entry here it is not about
+      protection — `handleFrontDoor` returns before the session lookup. It is on
+      the matcher because middleware is the only place that can set a cookie
+      before a Server Component renders, and without that cookie the funnel has
+      no top and every conversion rate below it is uncomputable.
+
+      Kept in step with the page by `FRONT_DOOR_PATH`; a matcher that drifted
+      from the route would silently stop recording rather than fail.
+    */
+    '/check',
   ],
 };

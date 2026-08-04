@@ -13,7 +13,7 @@
  * ones that would not are marked, and they are the reason this file exists.
  */
 
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { decideFrontDoorGate, tooFastMessage } from '@crewchief/core/front-door';
 import { decideFrontDoor, frontDoorClosedMessage } from '@crewchief/core/ai/budget';
@@ -182,4 +182,57 @@ describe('D6 — no dossier generation on this path, ever', () => {
       expect(present.has(file)).toBe(true);
     }
   });
+});
+
+describe('nothing prefetches the front door', () => {
+  /*
+    A correctness requirement, not a style preference, and the reason is
+    environmental rather than logical.
+
+    Measured 3 Aug: **Next 13.5 strips `next-router-prefetch` and `RSC` before
+    middleware runs.** During a prefetch-shaped request `handleFrontDoor`
+    receives `accept`, `host` and `user-agent` and nothing else. A Next `<Link>`
+    prefetch is a client `fetch()` that carries no browser prefetch header
+    either, so from middleware it is indistinguishable from a person arriving.
+
+    `isPrefetchRequest` still passes its own suite — it is correct, and it works
+    in the route handler and against browser speculative loads. It simply cannot
+    fire in the one position that mints visitor ids. That gap is closed here,
+    at the only other place it can be: the links themselves.
+
+    Without this, adding a nav link to the front door would silently inflate
+    `landed` with everyone who merely saw the link, and every conversion rate
+    below it would be divided by a made-up number — invisibly, and in the
+    flattering direction for bounce.
+  */
+  const APP = join(__dirname, '..', '..', 'app');
+  const COMPONENTS = join(__dirname, '..', '..', 'components');
+
+  function tsxFiles(dir: string, acc: string[] = []): string[] {
+    if (!existsSync(dir)) return acc;
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) tsxFiles(full, acc);
+      else if (entry.name.endsWith('.tsx')) acc.push(full);
+    }
+    return acc;
+  }
+
+  const files = [...tsxFiles(APP), ...tsxFiles(COMPONENTS)];
+
+  it('found files to check — the sweep is not vacuous', () => {
+    expect(files.length).toBeGreaterThan(10);
+  });
+
+  it.each(files.map((f) => f.slice(join(__dirname, '..', '..').length + 1)))(
+    '%s does not link to the front door with prefetching on',
+    (rel) => {
+      const source = readFileSync(join(__dirname, '..', '..', rel), 'utf8');
+      // Every <Link> whose href is the front door must disable prefetch.
+      const links = source.match(/<Link\b[^>]*href=["'{]\/check["'}][^>]*>/g) || [];
+      for (const link of links) {
+        expect(link).toMatch(/prefetch=\{false\}/);
+      }
+    }
+  );
 });
