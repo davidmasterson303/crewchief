@@ -226,6 +226,41 @@ const ROUTE_POSTURE: Record<string, 'vehicle-scoped' | 'session' | 'public' | 's
     neither of which has a user session.
   */
   'app/api/health/consultant/route.ts': 'secret-gated',
+  /*
+    The anonymous front door (Phase 2.97b, decision D9). It spends Gemini
+    tokens on request, from an unauthenticated caller, on an uploaded image.
+
+    **Read the entry directly above before accepting this one.** By that
+    reasoning `/api/health/consultant` is secret-gated precisely because a
+    public endpoint that spends tokens on request is the unbounded-cost bug
+    this project has already shipped once. That reasoning is right, and it
+    does not exempt this route — it sets the bar it has to clear.
+
+    The difference is what the endpoint is *for*, and therefore what the fix
+    can be. The consultant health check had no reason to be reachable by the
+    public, so closing it cost nothing and "cost stops being a design problem
+    once the caller must authenticate" was available. This route's entire
+    product purpose is that a stranger with no account can use it — that is
+    Phase 2.97, and closing it would delete the feature. So the cost problem
+    cannot be dissolved by authentication and has to be *carried*, by controls
+    built for it:
+
+      - a global daily spend ceiling keyed on surface = 'anonymous', with a
+        manual kill switch checked before it (D8, `lib/ai-budget.ts`);
+      - per-IP bucketing on the platform-supplied address only, never a
+        forwarded header (erratum T1, `packages/core/src/client-ip.ts`);
+      - a set thinking level, unlike `parseInvoiceLineItems`, because default
+        thinking on an anonymous endpoint is the money faucet 2.95a closed;
+      - no dossier generation, ever (D6) — asserted as an absence in
+        `front-door-gate.test.ts` and `quote-check.test.ts`;
+      - bounded upload size and bounded pasted text.
+
+    'public' is the honest label and it is the uncomfortable one. It is chosen
+    over inventing a softer category because the exposure is real and should
+    read as real every time someone opens this file. If the controls above are
+    ever weakened, this entry is the thing that should stop them.
+  */
+  'app/api/v1/front-door/check/route.ts': 'public',
 };
 
 /**

@@ -14,7 +14,7 @@
  *
  * One per call site as of 2 Aug 2026. Mirrors the CHECK constraint in
  * `20260802150000_meter_ai_usage_per_account.sql` and is held in step with it by
- * `ai-usage-purposes.test.ts` — a purpose the application knows and the database
+ * `ai-usage.test.ts` — a purpose the application knows and the database
  * refuses is a write that fails at runtime, on the one path that is not allowed
  * to disturb a request.
  *
@@ -32,6 +32,20 @@ export const AI_USAGE_PURPOSES = [
   'modification_backfill',
   'performance_stats',
   'health_check',
+  /*
+    Phase 2.97b, the anonymous front door. Its own purpose rather than reusing
+    `invoice_extraction`, because it is a different feature: a different prompt,
+    a range instead of line items, and — unlike invoice extraction, which is
+    deliberately the one 3.x site left at the default — a set thinking level,
+    since an anonymous endpoint at default thinking is the money faucet 2.95a
+    exists to close.
+
+    `surface` would already separate the traffic, but it answers "whose", not
+    "which feature". Both questions get asked of this table.
+
+    Added by `20260803210000_the_front_door_spends_on_its_own_line.sql`.
+  */
+  'quote_check',
 ] as const;
 
 export type AiUsagePurpose = (typeof AI_USAGE_PURPOSES)[number];

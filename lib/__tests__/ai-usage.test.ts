@@ -16,7 +16,7 @@
  * the only kind available.
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   AI_USAGE_PURPOSES,
@@ -159,12 +159,60 @@ describe('the purpose vocabulary matches the CHECK constraint', () => {
     cannot throw, so a disagreement produces a warn line and a silently
     incomplete cost report rather than an error anyone would see.
   */
-  /** The values inside `CHECK (purpose IN (…))`, read from the SQL itself. */
+  /**
+   * The values inside `CHECK (purpose IN (…))` — from **the whole corpus, in
+   * order**, taking the last definition.
+   *
+   * This read used to look at `20260802150000` alone, which was correct exactly
+   * as long as that migration was the only one that ever defined the
+   * constraint. `20260803210000` drops and recreates it to add `quote_check`,
+   * and the single-file version failed immediately — reporting that the
+   * database refuses a purpose the database in fact accepts.
+   *
+   * A constraint's effective definition is the last one applied, not the first
+   * one written. Reading one file and calling it "the schema" is the same
+   * mistake this project keeps finding in its own instruments, one layer down:
+   * the corpus is a sequence, and a test that models it as a snapshot is
+   * accurate only until the second migration touches the same object.
+   *
+   * This still does not read the live database, and cannot — `SUPABASE_DB_URL`
+   * is empty and there is no `psql`. It models the corpus applied in order,
+   * which is a strictly better model than one file and still not the truth.
+   * The standing rule holds: **the migration corpus does not reproduce the live
+   * database.**
+   */
   const listed = (() => {
-    const block = SQL.match(/CHECK\s*\(\s*purpose\s+IN\s*\(([\s\S]*?)\)\s*\)/i);
-    if (!block) throw new Error('Could not find the purpose CHECK constraint in the migration');
-    return (block[1].match(/'([a-z_]+)'/g) || []).map((s) => s.replace(/'/g, ''));
+    const dir = join(ROOT, 'supabase/migrations');
+    const files = readdirSync(dir)
+      .filter((f) => f.endsWith('.sql'))
+      .sort(); // filenames are timestamp-prefixed, so lexical order is apply order
+
+    let last: string[] | null = null;
+    let source = '';
+
+    for (const file of files) {
+      const sql = readFileSync(join(dir, file), 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/--[^\n]*/g, '');
+      const block = sql.match(/CHECK\s*\(\s*purpose\s+IN\s*\(([\s\S]*?)\)\s*\)/i);
+      if (!block) continue;
+      last = (block[1].match(/'([a-z_]+)'/g) || []).map((s) => s.replace(/'/g, ''));
+      source = file;
+    }
+
+    if (!last) throw new Error('No migration in the corpus defines the purpose CHECK constraint');
+    // Surfaced so a failure names which migration is being asserted against,
+    // rather than leaving the reader to guess which of several it found.
+    expect(source).toBeTruthy();
+    return last;
   })();
+
+  it('reads the constraint from the last migration that defines it', () => {
+    // Guards the guard: if the scan above silently matched nothing it would
+    // have thrown, but if it matched only the *first* definition every
+    // assertion below would test a superseded constraint and pass while wrong.
+    expect(listed).toContain('quote_check');
+  });
 
   it.each(AI_USAGE_PURPOSES)('the database accepts %s', (purpose) => {
     expect(listed).toContain(purpose);

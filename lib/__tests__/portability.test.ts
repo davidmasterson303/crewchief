@@ -77,6 +77,38 @@ function resolveLocal(spec: string, from: string): string | null {
 }
 
 /** Why this module cannot move, following imports transitively. Null if it can. */
+/**
+ * A file's source with prose removed, for the browser-global check.
+ *
+ * `BROWSER_GLOBAL` matches `document.` — and it used to run against the raw
+ * file, so **any comment or string containing the words "the document." would
+ * have failed the portability check.** Latent since the rule was written and
+ * first hit by `packages/core/src/quote-check.ts`, whose model prompt says
+ * "copied from the document." That module is entirely portable; the detector
+ * was reading English.
+ *
+ * The fix is here rather than in the prompt. Rewording prose to satisfy a
+ * detector leaves the detector wrong and teaches the next person to work around
+ * it — and the next false positive will be in a docstring nobody wants to
+ * mangle either.
+ *
+ * **Template interpolations are kept.** `${window.innerWidth}` inside a string
+ * really is a browser global being read, so dropping template literals whole
+ * would turn a false positive into a false negative — the direction that
+ * matters in a guard. Only the literal text between the interpolations goes.
+ */
+function executableSource(file: string): string {
+  return (
+    readFileSync(file, 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .replace(/\/\/[^\n]*/g, ' ')
+      // Template literals: keep the `${...}` expressions, discard the prose.
+      .replace(/`(?:[^`\\]|\\.)*`/g, (literal) => (literal.match(/\$\{[^}]*\}/g) || []).join(' '))
+      .replace(/'(?:[^'\\]|\\.)*'/g, "''")
+      .replace(/"(?:[^"\\]|\\.)*"/g, '""')
+  );
+}
+
 function blocker(file: string, seen = new Set<string>()): string | null {
   if (seen.has(file)) return null;
   seen.add(file);
@@ -86,7 +118,7 @@ function blocker(file: string, seen = new Set<string>()): string | null {
   for (const spec of importsOf(file)) {
     if (NON_PORTABLE_IMPORT.test(spec)) return `${rel} imports ${spec}`;
   }
-  if (BROWSER_GLOBAL.test(readFileSync(file, 'utf8'))) {
+  if (BROWSER_GLOBAL.test(executableSource(file))) {
     return `${rel} uses a browser global`;
   }
   for (const spec of importsOf(file)) {
@@ -154,6 +186,15 @@ const NOT_PORTABLE: Record<string, string> = {
     anonymous front door on mobile and `cc-product-0001` says there will not be.
   */
   'lib/funnel-visitor.ts': 'next/headers, and Web Crypto on the Edge runtime',
+  /*
+    Same split once more. The prompt, the response contract and every bound on
+    the model's output are in `packages/core/src/quote-check.ts` and portable —
+    which matters more here than elsewhere, because those bounds are what stand
+    between an uploaded image and a number rendered as money. Only the
+    `@google/genai` call stays behind, and it must: `lib/gemini.ts` constructs
+    its client at module scope against a server-side key.
+  */
+  'lib/quote-check.ts': 'calls Gemini through lib/gemini — a build-time server key',
   'lib/sign-out.ts': 'Supabase types',
   /*
     The precedence rule — owner photo over stock, the unphotographed-demo
