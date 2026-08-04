@@ -128,7 +128,10 @@ export function holdScanInBackground(visitorId: string, check: QuoteCheck): void
         logger.warn('QUOTE_CHECK:HOLD_FAILED', 'Could not hold the scan for claiming', {
           message: error.message,
         });
+        return;
       }
+
+      sweepUnclaimedScans(client);
     } catch (err) {
       logger.warn('QUOTE_CHECK:HOLD_THREW', 'Holding the scan threw and was dropped', {
         message: err instanceof Error ? err.message : String(err),
@@ -175,4 +178,48 @@ export async function claimScansForVisitor(visitorId: string, userId: string): P
   if (error) throw new Error(`Could not claim scans: ${error.message}`);
 
   return data?.length ?? 0;
+}
+
+/**
+ * Delete unclaimed scans nobody can ever claim. Phase 2.97c's retention half.
+ *
+ * ── Opportunistic, on the same pattern as `cleanupExpiredWindows` ───────────
+ *
+ * There is no scheduled job in this project and adding a scheduler for one
+ * table would be a lot of new surface. `lib/rate-limit.ts` already solves this
+ * shape by sweeping on write, and the property that makes it sound here is
+ * pleasant: **cleanup frequency scales with the growth it is cleaning up.** A
+ * busy front door sweeps often; an idle one is not accumulating rows to sweep.
+ *
+ * ── Why 30 days when the cookie lives 24 hours ──────────────────────────────
+ *
+ * An unclaimed scan is unclaimable the moment its visitor cookie expires, so
+ * strictly 24 hours would do. 30 days is deliberate slack: this is a delete
+ * against real rows, the retention rule is new, and the failure mode of being
+ * too eager is destroying a scan someone was about to claim. Being late costs
+ * a few kilobytes.
+ *
+ * ── Claimed rows are never touched ──────────────────────────────────────────
+ *
+ * `claimed_by IS NULL` is the whole safety of this function. A claimed scan
+ * belongs to an account and is deleted with it by the FK cascade, never on a
+ * timer — someone's saved estimate must not evaporate at 30 days. Tested.
+ */
+export const UNCLAIMED_SCAN_TTL_DAYS = 30;
+
+function sweepUnclaimedScans(client: ReturnType<typeof getServiceRoleClient>): void {
+  const cutoff = new Date(Date.now() - UNCLAIMED_SCAN_TTL_DAYS * 24 * 60 * 60 * 1000);
+
+  void client
+    .from('front_door_scans')
+    .delete()
+    .is('claimed_by', null)
+    .lt('created_at', cutoff.toISOString())
+    .then(({ error }) => {
+      if (error) {
+        logger.warn('QUOTE_CHECK:SWEEP_FAILED', 'Could not sweep unclaimed scans', {
+          message: error.message,
+        });
+      }
+    });
 }

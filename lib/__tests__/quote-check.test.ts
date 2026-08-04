@@ -25,6 +25,8 @@ import {
   unreadableMessage,
 } from '@crewchief/core/quote-check';
 import { verdictTermsIn } from '@crewchief/core/advice-range';
+import { VISITOR_TTL_SECONDS } from '@crewchief/core/funnel';
+import { UNCLAIMED_SCAN_TTL_DAYS } from '@/lib/quote-check';
 
 const GOOD = {
   is_quote: true,
@@ -333,5 +335,61 @@ describe('2.97c — claiming a scan into an account', () => {
   it('is a pure addition, so the SQL Editor will not stall on it', () => {
     expect(schema).not.toMatch(/\bDROP\b/i);
     expect(schema).not.toMatch(/\bTRUNCATE\b/i);
+  });
+});
+
+describe('the retention sweep', () => {
+  const LIB = readFileSync(join(__dirname, '..', 'quote-check.ts'), 'utf8');
+  const code = LIB.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+
+  it('the stripped source survived — these checks are not vacuous', () => {
+    expect(code).toMatch(/function sweepUnclaimedScans/);
+  });
+
+  it('never touches a claimed scan', () => {
+    /*
+      The whole safety of the function. A claimed scan belongs to an account and
+      is removed with it by the FK cascade, never on a timer — someone's saved
+      estimate must not evaporate at 30 days because a sweep forgot to check.
+
+      Asserted structurally because the alternative is exercising a DELETE
+      against the live table, and a test whose failure mode is destroying real
+      rows is not one worth having. Same reasoning `app/dev/rls-check` records
+      for not running its DELETE probe.
+    */
+    const sweep = code.slice(code.indexOf('function sweepUnclaimedScans'));
+    const deleteCall = sweep.slice(sweep.indexOf('.delete()'), sweep.indexOf('.then('));
+    expect(deleteCall).toMatch(/\.is\(\s*['"]claimed_by['"]\s*,\s*null\s*\)/);
+  });
+
+  it('is bounded by age as well as by claim state', () => {
+    const sweep = code.slice(code.indexOf('function sweepUnclaimedScans'));
+    expect(sweep).toMatch(/\.lt\(\s*['"]created_at['"]/);
+  });
+
+  it('keeps rows well past the point they become unclaimable', () => {
+    /*
+      A scan is unclaimable the moment its 24-hour visitor cookie expires, so
+      strictly a day would do. The slack is deliberate: this is a delete against
+      real rows under a brand-new rule, and being too eager destroys a scan
+      someone was about to claim, where being late costs kilobytes.
+    */
+    expect(UNCLAIMED_SCAN_TTL_DAYS).toBe(30);
+    expect(UNCLAIMED_SCAN_TTL_DAYS * 24).toBeGreaterThan(VISITOR_TTL_SECONDS / 3600);
+  });
+
+  it('runs on write rather than on a schedule that does not exist', () => {
+    // There is no scheduler in this project. `cleanupExpiredWindows` in
+    // lib/rate-limit.ts already solves this shape, and the property that makes
+    // it sound is that cleanup frequency scales with the growth it cleans up.
+    expect(code).toMatch(/sweepUnclaimedScans\(client\)/);
+  });
+
+  it('cannot fail the write it rides on', () => {
+    // It is fire-and-forget inside an already fire-and-forget hold. A stranger
+    // got their answer; retention is not their problem.
+    const sweep = code.slice(code.indexOf('function sweepUnclaimedScans'));
+    expect(sweep).toMatch(/^\s*void client/m);
+    expect(sweep).toMatch(/SWEEP_FAILED/);
   });
 });
