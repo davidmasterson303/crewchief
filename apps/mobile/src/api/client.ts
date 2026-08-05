@@ -63,16 +63,30 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     throw new ApiRequestError({ status: 401, message: 'Not signed in' });
   }
 
+  /*
+    `FormData` is the invoice upload (Phase 3.3) and is deliberately not
+    serialised. Two things must not happen to it:
+
+      - `JSON.stringify(formData)` returns `"{}"`, silently uploading nothing.
+      - Setting `Content-Type: multipart/form-data` by hand omits the boundary
+        parameter that the runtime generates, and the server cannot parse the
+        body without it.
+
+    So a FormData body is passed through untouched and its header is left for
+    the platform to set. Everything else keeps the JSON path exactly as it was.
+  */
+  const isMultipart = typeof FormData !== 'undefined' && body instanceof FormData;
+
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
-  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  if (body !== undefined && !isMultipart) headers['Content-Type'] = 'application/json';
 
   let response: Response;
   try {
     response = await fetch(`${API_BASE_URL}${API_PREFIX}${path}`, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : isMultipart ? (body as FormData) : JSON.stringify(body),
     });
   } catch (error) {
     // Distinguished from an HTTP error on purpose: a phone loses connectivity
