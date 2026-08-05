@@ -9,8 +9,22 @@
     "userInterfaceStyle": "dark",
     "ios": {
       "bundleIdentifier": "co.davidmasterson.crewchief",
-      "supportsTablet": false
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSCameraUsageDescription": "CrewChief uses the camera so you can photograph a service invoice and have its line items read for you.",
+        "NSPhotoLibraryUsageDescription": "CrewChief needs your photo library so you can attach an invoice you have already photographed."
+      }
     },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "CrewChief needs your photo library so you can attach an invoice you have already photographed.",
+          "cameraPermission": "CrewChief uses the camera so you can photograph a service invoice and have its line items read for you."
+        }
+      ],
+      "expo-notifications"
+    ],
     "android": {
       "package": "co.davidmasterson.crewchief",
       "adaptiveIcon": {

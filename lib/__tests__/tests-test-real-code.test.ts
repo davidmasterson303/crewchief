@@ -49,6 +49,12 @@ const STATIC_ANALYSIS_SUITES = [
   // Supabase, and the property is which columns are *asked for* — a string
   // constant in each file.
   'vehicle-detail-not-poorer.test.ts',
+  // Reads apps/mobile's app.json, package.json and eas.json to prove a cloud
+  // build will not be wasted: native modules batched, and every iOS usage
+  // description present. There is nothing to import — the subject is three
+  // config files, and the failure they pin is only observable after a build has
+  // already been spent.
+  'mobile-native-build-inputs.test.ts',
   // Reads apps/mobile off disk for text colours below the AA floor. The web
   // guard `text-contrast-floor.test.ts` scans app/ and components/ for Tailwind
   // class names and structurally cannot see an rgba() in a React Native
