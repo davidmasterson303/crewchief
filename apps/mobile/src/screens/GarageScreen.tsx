@@ -507,7 +507,7 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   heading: { color: '#fff', fontSize: 30, fontWeight: '700', letterSpacing: -0.6 },
-  signOut: { color: 'rgba(255,255,255,0.45)', fontSize: 14, minHeight: 44, lineHeight: 44 },
+  signOut: { color: 'rgba(255,255,255,0.5)', fontSize: 14, minHeight: 44, lineHeight: 44 },
   deletedNotice: {
     position: 'absolute',
     top: 60,
@@ -529,18 +529,18 @@ const styles = StyleSheet.create({
   },
   photo: { width: '100%', height: 172, backgroundColor: 'rgba(255,255,255,0.04)' },
   photoEmpty: { alignItems: 'center', justifyContent: 'center' },
-  photoEmptyText: { color: 'rgba(255,255,255,0.25)', fontSize: 13 },
+  photoEmptyText: { color: 'rgba(255,255,255,0.5)', fontSize: 13 },
 
   cardBody: { padding: 16, gap: 10 },
   cardHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
   cardTitleBlock: { flex: 1 },
   name: { color: '#fff', fontSize: 17, fontWeight: '600' },
-  trim: { color: 'rgba(255,255,255,0.45)', fontSize: 13, marginTop: 2 },
+  trim: { color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 2 },
 
   healthBlock: { alignItems: 'flex-end' },
   score: { fontSize: 24, fontWeight: '700', lineHeight: 26 },
   bandLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.6 },
-  noScore: { color: 'rgba(255,255,255,0.3)', fontSize: 12 },
+  noScore: { color: 'rgba(255,255,255,0.5)', fontSize: 12 },
 
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
   meta: { color: 'rgba(255,255,255,0.5)', fontSize: 13 },
@@ -548,7 +548,7 @@ const styles = StyleSheet.create({
 
   centred: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 8 },
   errorTitle: { color: '#fff', fontSize: 17, fontWeight: '600' },
-  errorBody: { color: 'rgba(255,255,255,0.45)', fontSize: 14, textAlign: 'center' },
+  errorBody: { color: 'rgba(255,255,255,0.5)', fontSize: 14, textAlign: 'center' },
   button: {
     marginTop: 14,
     borderWidth: 1,

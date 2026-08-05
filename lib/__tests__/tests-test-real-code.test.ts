@@ -44,6 +44,12 @@ const STATIC_ANALYSIS_SUITES = [
   // and loading one under this runner would fail on the transform rather than
   // on the rule. Absence of `.from(` in the source is the whole signal.
   'mobile-api-only.test.ts',
+  // Reads apps/mobile off disk for text colours below the AA floor. The web
+  // guard `text-contrast-floor.test.ts` scans app/ and components/ for Tailwind
+  // class names and structurally cannot see an rgba() in a React Native
+  // StyleSheet, which is how the Expo client stayed outside the rule from Phase
+  // 3.1 until 5 Aug. The colour literal in the source is the whole signal.
+  'mobile-text-contrast.test.ts',
   // Reads SignInScreen and core-check.ts off disk to prove the on-device core
   // probe is still rendered by something. It spent Phase 3.2 onward imported by
   // nothing; the subject is React Native source this runner cannot load, and

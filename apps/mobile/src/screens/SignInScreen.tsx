@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#080808', justifyContent: 'center' },
   form: { padding: 28, gap: 14 },
   title: { color: '#fff', fontSize: 30, fontWeight: '700', letterSpacing: -0.5 },
-  subtitle: { color: 'rgba(255,255,255,0.45)', fontSize: 15, marginBottom: 14 },
+  subtitle: { color: 'rgba(255,255,255,0.5)', fontSize: 15, marginBottom: 14 },
   input: {
     backgroundColor: 'rgba(255,255,255,0.06)',
     borderWidth: 1,
@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
     should not compete with the sign-in button. #4ade80 and #f87171 both clear
     the AA floor on #080808 that `78eba74` made a rule.
   */
-  devCheckOk: { color: 'rgba(255,255,255,0.35)', fontSize: 12, textAlign: 'center' },
+  devCheckOk: { color: 'rgba(255,255,255,0.5)', fontSize: 12, textAlign: 'center' },
   devCheckFail: { color: '#f87171', fontSize: 13, fontWeight: '700', textAlign: 'center' },
   devCheckDetail: { color: '#f87171', fontSize: 11, textAlign: 'center' },
 });

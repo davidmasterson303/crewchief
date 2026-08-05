@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
   empty: { flex: 1, justifyContent: 'center', gap: 10, paddingHorizontal: 4 },
   emptyTitle: { color: '#fff', fontSize: 20, fontWeight: '700', letterSpacing: -0.3 },
   emptyBody: { color: 'rgba(255,255,255,0.5)', fontSize: 14, lineHeight: 20 },
-  emptyExample: { color: 'rgba(255,255,255,0.35)', fontSize: 14, lineHeight: 20 },
+  emptyExample: { color: 'rgba(255,255,255,0.5)', fontSize: 14, lineHeight: 20 },
 
   thinking: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18 },
   thinkingText: { color: 'rgba(255,255,255,0.5)', fontSize: 13 },

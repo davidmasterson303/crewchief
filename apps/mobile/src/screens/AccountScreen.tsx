@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
   body: { padding: 20, gap: 24 },
   section: { gap: 4 },
   label: {
-    color: 'rgba(255,255,255,0.4)',
+    color: 'rgba(255,255,255,0.5)',
     fontSize: 12,
     textTransform: 'uppercase',
     letterSpacing: 1,

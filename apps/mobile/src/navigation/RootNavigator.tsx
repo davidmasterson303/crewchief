@@ -1,4 +1,4 @@
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, type LinkingOptions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { AdvisorScreen } from '../screens/AdvisorScreen';
@@ -48,7 +48,13 @@ import { VehicleDetailScreen } from '../screens/VehicleDetailScreen';
 
 export type RootStackParamList = {
   Garage: undefined;
-  VehicleDetail: { vehicleId: string; title: string };
+  /*
+    `title` is optional because a deep link cannot supply one — see `linking`
+    below. It stays a param rather than being dropped: a tap from the garage
+    already knows the car's name, and passing it means the header is correct
+    during the fetch instead of appearing a second later. A link falls back.
+  */
+  VehicleDetail: { vehicleId: string; title?: string };
   /*
     3.4. Pushed from the detail screen rather than the garage, because the
     advisor answers about *one* car — `/api/v1/consultant` requires a
@@ -59,10 +65,67 @@ export type RootStackParamList = {
     the car during the first request rather than after it. Neither param is a
     secret; the token still is not one, and still is not here.
   */
-  Advisor: { vehicleId: string; title: string };
+  Advisor: { vehicleId: string; title?: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+
+/**
+ * Deep links into a specific car, and into its advisor.
+ *
+ * ── Why this exists, stated honestly ────────────────────────────────────────
+ *
+ * The immediate reason is verification. This project's most expensive recurring
+ * failure is a screen that typechecks, bundles, passes every test and **has
+ * never been rendered** — the 4 Aug handoff records three of those in one day,
+ * and both of these screens were written before anything could open them. A
+ * stack you can only reach by tapping is a stack that only gets exercised when
+ * someone is holding the phone.
+ *
+ * With this, `xcrun simctl openurl booted "crewchief://vehicle/<id>/advisor"`
+ * opens the screen directly, so it can be looked at in the state that matters
+ * without a session, a garage row and two taps standing in front of it.
+ *
+ * It is also ordinary product functionality rather than test scaffolding, which
+ * is the reason it is wired here rather than hacked in behind `__DEV__`: the
+ * scheme is already declared in `app.json`, push notifications and emailed
+ * links both land on exactly these two routes, and the alternative — a
+ * temporary `initialRouteName` edited in and out whenever something needs
+ * looking at — is throwaway work that leaves nothing behind.
+ *
+ * ── What is deliberately not linkable ───────────────────────────────────────
+ *
+ * The account surface. It is a modal inside `GarageScreen`, and deletion is
+ * behind it (5.1.1(v)) — a URL that opens the delete-my-account screen is a URL
+ * that can be put in front of someone who did not mean to go there.
+ *
+ * ── The dev client owns one path and it is not one of these ─────────────────
+ *
+ * `expo-dev-client` answers `crewchief://expo-development-client/?url=…`, which
+ * is how the simulator build is pointed at Metro. Nothing here claims that
+ * path, and the two coexist because the prefix is shared but the host is not.
+ *
+ * ── A link cannot carry a title, and must not ───────────────────────────────
+ *
+ * `title` is a convenience the garage row supplies because it has already drawn
+ * the car's name. A URL knows only the id, so both screens fall back rather
+ * than rendering "undefined" in the header. Putting the name in the URL would
+ * be worse than a fallback: it is the car's identity in a string anything can
+ * log, and the server is going to send the real one back within the second.
+ */
+const linking: LinkingOptions<RootStackParamList> = {
+  prefixes: ['crewchief://'],
+  config: {
+    screens: {
+      Garage: 'garage',
+      VehicleDetail: 'vehicle/:vehicleId',
+      Advisor: 'vehicle/:vehicleId/advisor',
+    },
+  },
+};
+
+/** What the header shows before the vehicle has loaded, or when a link brought us here. */
+const UNTITLED = 'Vehicle';
 
 const screenOptions = {
   headerStyle: { backgroundColor: '#080808' },
@@ -81,7 +144,7 @@ export function RootNavigator({
   onSignOut: () => void;
 }) {
   return (
-    <NavigationContainer>
+    <NavigationContainer linking={linking}>
       <Stack.Navigator screenOptions={screenOptions}>
         <Stack.Screen name="Garage" options={{ headerShown: false }}>
           {({ navigation }) => (
@@ -103,8 +166,11 @@ export function RootNavigator({
             vehicle, so the header is correct during the fetch instead of
             appearing a second later. The row already knows the car's name —
             it just drew it.
+
+            A deep link has no name to pass, so it falls back rather than
+            rendering "undefined" in the header.
           */
-          options={({ route }) => ({ title: route.params.title })}
+          options={({ route }) => ({ title: route.params.title || UNTITLED })}
         >
           {({ route, navigation }) => (
             <VehicleDetailScreen
@@ -123,9 +189,16 @@ export function RootNavigator({
 
         <Stack.Screen
           name="Advisor"
-          // "Advisor · M235i" rather than the car's name alone, which would
-          // read as a second copy of the screen behind it.
-          options={({ route }) => ({ title: `Advisor · ${route.params.title}` })}
+          /*
+            "Advisor · M235i" rather than the car's name alone, which would
+            read as a second copy of the screen behind it. Arriving by link
+            there is no name yet, and "Advisor · Vehicle" reads like a bug — so
+            the qualifier is dropped entirely rather than filled with a
+            placeholder.
+          */
+          options={({ route }) => ({
+            title: route.params.title ? `Advisor · ${route.params.title}` : 'Advisor',
+          })}
         >
           {({ route }) => (
             <AdvisorScreen vehicleId={route.params.vehicleId} onSignOut={onSignOut} />
