@@ -119,7 +119,18 @@ function humanise(value: string): string {
     .join(' ');
 }
 
-function VehicleCard({ vehicle }: { vehicle: Vehicle }) {
+function VehicleCard({
+  vehicle,
+  onOpen,
+}: {
+  vehicle: Vehicle;
+  /*
+    A callback, not a `navigation` prop. This screen stays ignorant of
+    react-navigation so it remains an ordinary component — the navigator is the
+    only file that knows how a route is reached.
+  */
+  onOpen: () => void;
+}) {
   /*
     ── Two exits from "loading", not one ──────────────────────────────────────
 
@@ -160,7 +171,12 @@ function VehicleCard({ vehicle }: { vehicle: Vehicle }) {
   const name = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ');
 
   return (
-    <View style={styles.card}>
+    <Pressable
+      style={styles.card}
+      onPress={onOpen}
+      accessibilityRole="button"
+      accessibilityLabel={`${name || 'Vehicle'}, open details`}
+    >
       {showPhoto ? (
         <Image
           source={{ uri: vehicle.photo_url! }}
@@ -222,7 +238,7 @@ function VehicleCard({ vehicle }: { vehicle: Vehicle }) {
           ) : null}
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -263,10 +279,13 @@ export function GarageScreen({
   accessToken,
   email,
   onSignOut,
+  onOpenVehicle,
 }: {
   accessToken: string;
   email: string | null;
   onSignOut: () => void;
+  /** Title travels with the id so the detail header is right during the fetch. */
+  onOpenVehicle: (vehicleId: string, title: string) => void;
 }) {
   /*
     App Store 5.1.1(v). The account surface is one tap from here because the
@@ -350,7 +369,17 @@ export function GarageScreen({
       data={state.vehicles}
       keyExtractor={(v) => v.id}
       contentContainerStyle={styles.list}
-      renderItem={({ item }) => <VehicleCard vehicle={item} />}
+      renderItem={({ item }) => (
+        <VehicleCard
+          vehicle={item}
+          onOpen={() =>
+            onOpenVehicle(
+              item.id,
+              [item.year, item.make, item.model].filter(Boolean).join(' ') || 'Vehicle'
+            )
+          }
+        />
+      )}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
