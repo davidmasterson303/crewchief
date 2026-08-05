@@ -23,7 +23,7 @@ import { QuoteRequestDialogV2 } from './QuoteRequestDialogV2';
 import { toast } from 'sonner';
 import { invalidateDashboardCache } from '@crewchief/core/query-invalidation';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
-import type { ContextKind } from '@/lib/consultant-context';
+import { CONTEXT_KIND_LABELS, type ContextKind } from '@crewchief/core/consultant-context-kinds';
 
 /*
  * These are the four collections this component *renders*, and no longer the
@@ -174,16 +174,14 @@ function renderMarkdownLine(line: string, key: number) {
  * `sources` and therefore show no chips: the honest rendering of "we no longer
  * know" is to claim nothing, not to recompute from today's garage and backdate
  * it onto an old answer.
+ *
+ * ── Where the words themselves live ────────────────────────────────────────
+ *
+ * `@crewchief/core/consultant-context-kinds`, since the Expo advisor screen
+ * renders this same row. The labels are a provenance claim, so a second copy on
+ * the phone would let the two clients describe one answer differently. Only the
+ * icons below are web — Lucide has no React Native build here.
  */
-const CONTEXT_LABELS: Record<ContextKind, string> = {
-  knowledge: 'Knowledge base',
-  service: 'Service records',
-  issues: 'Issue history',
-  mods: 'Mod profile',
-  wishlist: 'Wishlist',
-  recalls: 'Recall data',
-};
-
 function contextIcon(kind: ContextKind) {
   if (kind === 'issues' || kind === 'recalls') return <TriangleAlert className="h-2.5 w-2.5" />;
   if (kind === 'mods') return <Sparkles className="h-2.5 w-2.5" />;
@@ -579,7 +577,7 @@ export default function ConsultantChat({
         timestamp: new Date().toISOString(),
         wishlistActions: result.wishlistActions,
         /* Reported by the server from the context it loaded for this turn —
-         * see the note above CONTEXT_LABELS. What was put in front of the
+         * see the note above `contextIcon`. What was put in front of the
          * model, not what the model used, and deliberately absent on replayed
          * history. */
         sources: result.contextKinds ?? [],
@@ -946,7 +944,7 @@ export default function ConsultantChat({
                           className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/6 border border-white/10 text-xs text-white/50 font-medium"
                         >
                           {contextIcon(kind)}
-                          {CONTEXT_LABELS[kind]}
+                          {CONTEXT_KIND_LABELS[kind]}
                         </span>
                       ))}
                     </div>

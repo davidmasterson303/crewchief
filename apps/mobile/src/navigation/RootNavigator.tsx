@@ -1,6 +1,7 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
+import { AdvisorScreen } from '../screens/AdvisorScreen';
 import { GarageScreen } from '../screens/GarageScreen';
 import { VehicleDetailScreen } from '../screens/VehicleDetailScreen';
 
@@ -48,6 +49,17 @@ import { VehicleDetailScreen } from '../screens/VehicleDetailScreen';
 export type RootStackParamList = {
   Garage: undefined;
   VehicleDetail: { vehicleId: string; title: string };
+  /*
+    3.4. Pushed from the detail screen rather than the garage, because the
+    advisor answers about *one* car — `/api/v1/consultant` requires a
+    `vehicleId` and authorizes against it — so there is no sensible advisor
+    route without a vehicle already chosen.
+
+    `title` travels for the same reason it does above: the header should name
+    the car during the first request rather than after it. Neither param is a
+    secret; the token still is not one, and still is not here.
+  */
+  Advisor: { vehicleId: string; title: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -99,7 +111,24 @@ export function RootNavigator({
               vehicleId={route.params.vehicleId}
               onSignOut={onSignOut}
               onBack={() => navigation.goBack()}
+              onAskAdvisor={() =>
+                navigation.navigate('Advisor', {
+                  vehicleId: route.params.vehicleId,
+                  title: route.params.title,
+                })
+              }
             />
+          )}
+        </Stack.Screen>
+
+        <Stack.Screen
+          name="Advisor"
+          // "Advisor · M235i" rather than the car's name alone, which would
+          // read as a second copy of the screen behind it.
+          options={({ route }) => ({ title: `Advisor · ${route.params.title}` })}
+        >
+          {({ route }) => (
+            <AdvisorScreen vehicleId={route.params.vehicleId} onSignOut={onSignOut} />
           )}
         </Stack.Screen>
       </Stack.Navigator>

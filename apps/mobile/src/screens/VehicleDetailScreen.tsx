@@ -100,10 +100,17 @@ export function VehicleDetailScreen({
   vehicleId,
   onBack,
   onSignOut,
+  onAskAdvisor,
 }: {
   vehicleId: string;
   onBack: () => void;
   onSignOut: () => void;
+  /*
+    3.4's entry point, as a callback for the same reason `onOpenVehicle` is one
+    on the garage: this screen does not know react-navigation exists, and the
+    navigator is the only file that has to change if that stops being true.
+  */
+  onAskAdvisor: () => void;
 }) {
   const [state, setState] = useState<State>({ status: 'loading' });
   const [refreshing, setRefreshing] = useState(false);
@@ -219,6 +226,23 @@ export function VehicleDetailScreen({
           </Text>
         )}
       </View>
+
+      {/*
+        Above the health card, not below the details.
+
+        Guideline 4.2 is answered by what an app *does*, and everything else on
+        this screen is a rendering of stored values. Putting the one verb below
+        two cards of read-only data would bury it under exactly the material
+        that makes the app look like a database viewer. It is also the shortest
+        route to the flow with no other entry point: the garage row leads here,
+        and here leads to the advisor.
+      */}
+      <Pressable style={styles.advisorCta} onPress={onAskAdvisor} accessibilityRole="button">
+        <Text style={styles.advisorCtaText}>Ask the advisor</Text>
+        <Text style={styles.advisorCtaHint}>
+          It already knows this car's history — no need to explain it
+        </Text>
+      </Pressable>
 
       {score !== null && band && (
         <View style={styles.card}>
@@ -336,6 +360,23 @@ const styles = StyleSheet.create({
   rowValue: { color: '#fff', fontSize: 14, flexShrink: 1, textAlign: 'right' },
 
   recall: { color: '#e0a468', fontSize: 15, fontWeight: '600' },
+
+  /*
+    White on #080808 rather than the brand cyan. `bg-cyan-600` measures 3.68:1
+    and is an open decision on the web board — pulling it onto a new surface
+    would spread a known sub-floor colour to a second client while the call is
+    still being made. The hint below is 0.55 white on white: 8.6:1, above the
+    4.5:1 floor `78eba74` made a rule.
+  */
+  advisorCta: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    paddingVertical: 15,
+    paddingHorizontal: 16,
+    gap: 3,
+  },
+  advisorCtaText: { color: '#080808', fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
+  advisorCtaHint: { color: 'rgba(8,8,8,0.55)', fontSize: 13, lineHeight: 18 },
 
   centred: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 8 },
   errorTitle: { color: '#fff', fontSize: 17, fontWeight: '600' },
