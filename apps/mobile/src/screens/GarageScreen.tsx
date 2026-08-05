@@ -98,9 +98,29 @@ const miles = new Intl.NumberFormat('en-US');
  *   - A tiny inline PNG beside it rendered immediately. So `Image` is fine and
  *     this file specifically is not decodable here.
  *
- * The real fix is server-side: sign a *transformed* URL sized for a list rather
- * than the original. That fixes a real phone too, where this is 2.3 MB of
- * someone's data allowance per vehicle — the simulator just made it visible.
+ * **The fix this comment used to recommend does not exist.** It said to sign a
+ * *transformed* URL sized for a list. `47af5c4` tried that the next day and
+ * Supabase image transformation returns `FeatureNotEnabled` for this tenant —
+ * verified against the live API, not inferred from a pricing page. The server
+ * cannot re-encode either: `sharp` is a devDependency whose outputs are
+ * committed precisely because Netlify never runs it.
+ *
+ * What is actually true now:
+ *
+ *   - **This object is legacy.** 2,328,761 bytes, uploaded 2026-07-28 00:42
+ *     UTC, sixteen hours before `eb320f9` wired the browser downscale. It is
+ *     the one file the client-side fix could never have caught.
+ *   - **New uploads cannot repeat it.** `47af5c4` put a 1.5 MB ceiling at
+ *     `uploadVehiclePhoto`, the one chokepoint every upload passes, against a
+ *     150 KB target — so a file arriving above it means the downscale did not
+ *     run, which is the case worth refusing rather than storing forever.
+ *   - **The remaining instance is fixable by hand in about thirty seconds**:
+ *     re-upload the M235i photo in the web app and it downscales on the way in.
+ *
+ * So this timeout stays, because a phone on a weak connection produces the same
+ * shape as an undecodable file and both have to land somewhere. A genuinely
+ * card-sized image still needs either the paid transform feature or a
+ * derivative generated at upload — both decisions with a cost, neither taken.
  */
 const PHOTO_TIMEOUT_MS = 6000;
 

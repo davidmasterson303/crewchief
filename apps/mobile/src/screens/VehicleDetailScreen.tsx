@@ -22,14 +22,19 @@ import { getHealthBandJudgement, healthBandHex } from '@crewchief/core/health-ba
  *
  * `GET /api/v1/load-vehicle?vehicleId=…` returns the vehicle and its knowledge
  * base in one round trip, already stripped of `custom_image_url` and carrying a
- * signed `photo_url`. **This screen deliberately does not draw that photo.**
- * The garage card documents why at length: the signed URL points at the
- * original upload — 3000×4000, 2.3 MB on this account — which never decodes on
- * the simulator and costs a real phone 2.3 MB of someone's data allowance. The
- * card carries a timeout so it degrades to a plate. Repeating that machinery
- * here to show the same picture twice as large would double a known defect
- * rather than work around it. The photo belongs here once the server signs a
- * transformed URL; the row above already says so.
+ * signed `photo_url`. **This screen deliberately does not draw that photo yet.**
+ *
+ * The signed URL points at the stored original, and the one real photo on this
+ * account is a 2.3 MB legacy upload that predates the browser downscale — it
+ * never decodes on the simulator. The garage card carries a timeout so it
+ * degrades to a plate; repeating that machinery here to show the same picture
+ * twice as large would double a net rather than remove the need for one.
+ *
+ * **Not deferred pending a server-side transform** — that fix was tried on
+ * 2 Aug and Supabase image transformation is not enabled for this tenant. It is
+ * deferred pending either that paid feature or a derivative generated at
+ * upload, and until then the honest version of this screen has no photo on it.
+ * `GarageScreen`'s `PHOTO_TIMEOUT_MS` docblock carries the full measurement.
  *
  * ── States, and which ones are not errors ───────────────────────────────────
  *
