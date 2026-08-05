@@ -1,29 +1,4 @@
 {
-  "//": [
-    "EAS Build config. This exists to route around a local blocker rather than to",
-    "start using a cloud service for its own sake.",
-    "",
-    "THE BLOCKER: a native iOS build needs CocoaPods; CocoaPods needs Ruby >= 3.0;",
-    "this Mac ships Ruby 2.6.10 and has no Homebrew. Fixing that needs an admin",
-    "password and an hour, and the cause here has been misdiagnosed four times.",
-    "Xcode 16.3 IS installed and the simulator runtimes ARE present, so the only",
-    "missing piece is the step that compiles native code — which EAS does on its",
-    "own machines, where CocoaPods is already installed.",
-    "",
-    "WHY THE `simulator` PROFILE IS THE ONE THAT MATTERS: an iOS simulator build",
-    "is unsigned, so it needs no Apple Developer Program membership ($99/yr) and",
-    "no provisioning. It is the cheapest possible way to get a runnable app onto",
-    "the machine that is already sitting here with a booted iPhone 16e.",
-    "",
-    "WHY `developmentClient: true` IS LOAD-BEARING, NOT A PREFERENCE: the free",
-    "plan allows 15 iOS builds a month. A plain simulator build bakes the",
-    "JavaScript in, so every code change would cost one of those fifteen and the",
-    "month would be gone in two days. A development build loads JS from a local",
-    "Metro server instead, so ONE cloud build covers every subsequent code change",
-    "— you only spend another when a NATIVE dependency changes. That is what",
-    "makes the free plan sufficient rather than a trial."
-  ],
-
   "cli": {
     "version": ">= 12.0.0",
     "appVersionSource": "remote"
@@ -37,14 +12,6 @@
         "simulator": true
       }
     },
-
-    "//device": [
-      "Kept unconfigured on purpose. A build that runs on a physical iPhone must",
-      "be signed, which requires the $99/yr Apple Developer Program. That",
-      "membership is already a Phase 6 requirement, so it is cost pulled forward",
-      "rather than new — but nothing before submission needs it, and the",
-      "simulator profile above is what unblocks verification today."
-    ],
 
     "preview": {
       "distribution": "internal"
