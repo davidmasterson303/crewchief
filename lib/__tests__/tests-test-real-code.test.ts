@@ -44,6 +44,11 @@ const STATIC_ANALYSIS_SUITES = [
   // and loading one under this runner would fail on the transform rather than
   // on the rule. Absence of `.from(` in the source is the whole signal.
   'mobile-api-only.test.ts',
+  // Reads the two vehicle routes' column constants to prove the detail
+  // endpoint is a superset of the list endpoint. Executing either needs a live
+  // Supabase, and the property is which columns are *asked for* — a string
+  // constant in each file.
+  'vehicle-detail-not-poorer.test.ts',
   // Reads apps/mobile off disk for text colours below the AA floor. The web
   // guard `text-contrast-floor.test.ts` scans app/ and components/ for Tailwind
   // class names and structurally cannot see an rgba() in a React Native
