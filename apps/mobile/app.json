@@ -12,7 +12,8 @@
       "supportsTablet": false,
       "infoPlist": {
         "NSCameraUsageDescription": "CrewChief uses the camera so you can photograph a service invoice and have its line items read for you.",
-        "NSPhotoLibraryUsageDescription": "CrewChief needs your photo library so you can attach an invoice you have already photographed."
+        "NSPhotoLibraryUsageDescription": "CrewChief needs your photo library so you can attach an invoice you have already photographed.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "plugins": [

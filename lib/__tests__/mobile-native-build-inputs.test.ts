@@ -106,6 +106,62 @@ describe('iOS usage descriptions exist before the build is spent', () => {
   });
 });
 
+describe('declarations that only bite after the build', () => {
+  it('answers the export-compliance question in the binary', () => {
+    /*
+      EAS warned about this on build `29b4d76f` (5 Aug): without
+      `ITSAppUsesNonExemptEncryption`, App Store Connect stops and asks the
+      question by hand before the build can be distributed — a TestFlight
+      blocker that appears *after* a build has been spent, which is the whole
+      category this file exists for.
+
+      `false` is the correct answer and not a shortcut: the app's encryption is
+      HTTPS/TLS to Supabase and Netlify, plus Keychain via `expo-secure-store`,
+      and both are exempt. It would have to become `true` only if CrewChief
+      shipped its own cryptography.
+    */
+    const infoPlist = appJson.ios?.infoPlist ?? {};
+
+    // Explicitly `false`, not merely falsy — an absent key is exactly the
+    // state that produced the warning, and `undefined` would satisfy a
+    // truthiness check written carelessly.
+    expect(infoPlist.ITSAppUsesNonExemptEncryption).toBe(false);
+  });
+
+  it('does not upload a second copy of the repo on every build', () => {
+    /*
+      EAS flagged a 172 MB project archive on the same build. The cause was not
+      `node_modules` or `.next` — both already ignored — but `.claude/worktrees`
+      at 433 MB, agent worktrees which are full checkouts of this repo living
+      inside it. Untracked and unignored means EAS packs them into every upload,
+      and there are fifteen builds a month.
+
+      Ignoring them took the archive from 172 MB to 18 MB of tracked files.
+
+      `git check-ignore` rather than a substring search of `.gitignore`: the
+      question is whether git *actually* excludes the path, and a later negation
+      pattern would defeat a text match while leaving the upload fat.
+    */
+    const { execFileSync } = require('node:child_process') as typeof import('node:child_process');
+    const repoRoot = join(__dirname, '..', '..');
+
+    const ignored = (path: string) => {
+      try {
+        execFileSync('git', ['check-ignore', '-q', path], { cwd: repoRoot });
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    expect(ignored('.claude/worktrees')).toBe(true);
+
+    // The tracked file in the same directory must survive — it is what the
+    // preview tooling reads, and ignoring `.claude/` wholesale would take it.
+    expect(ignored('.claude/launch.json')).toBe(false);
+  });
+});
+
 describe('the build profile still targets the simulator', () => {
   it('keeps developmentClient, which is what makes 15 builds a month enough', () => {
     const eas = JSON.parse(readFileSync(join(MOBILE, 'eas.json'), 'utf8'));
