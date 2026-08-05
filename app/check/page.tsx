@@ -153,7 +153,7 @@ export default function CheckPage() {
 
             <div className="flex items-center gap-3 my-4" aria-hidden>
               <div className="h-px flex-1 bg-white/10" />
-              <span className="text-white/40 text-xs uppercase tracking-wider">or paste it</span>
+              <span className="text-white/50 text-xs uppercase tracking-wider">or paste it</span>
               <div className="h-px flex-1 bg-white/10" />
             </div>
 
@@ -167,7 +167,7 @@ export default function CheckPage() {
               disabled={busy}
               rows={3}
               placeholder="Front brake pads and rotors — $1,180 …"
-              className="w-full rounded-xl bg-slate-900/80 border border-white/10 focus:border-cyan-500/60 focus:outline-none text-white/90 placeholder:text-white/35 p-3 text-[15px] resize-y disabled:opacity-50"
+              className="w-full rounded-xl bg-slate-900/80 border border-white/10 focus:border-cyan-500/60 focus:outline-none text-white/90 placeholder:text-white/50 p-3 text-[15px] resize-y disabled:opacity-50"
             />
 
             <Button
@@ -197,7 +197,7 @@ export default function CheckPage() {
 
         {answer && <AnswerCard answer={answer} onReset={() => { setAnswer(null); setFile(null); setText(''); }} />}
 
-        <p className="mt-8 text-center text-white/40 text-xs leading-relaxed">
+        <p className="mt-8 text-center text-white/50 text-xs leading-relaxed">
           Typical prices are estimates for an independent shop in the US, not a quote.
           Your own shop&apos;s price can differ for good reasons.
         </p>
@@ -221,7 +221,7 @@ function ParseProgress({ stage }: { stage: Stage }) {
           <li
             key={label}
             className={`flex items-center gap-3 text-sm transition-colors ${
-              done ? 'text-white/45' : active ? 'text-cyan-300' : 'text-white/25'
+              done ? 'text-white/55' : active ? 'text-cyan-300' : 'text-white/50'
             }`}
           >
             <span

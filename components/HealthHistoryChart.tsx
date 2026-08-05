@@ -94,7 +94,7 @@ export default function HealthHistoryChart({ history, currentScore }: HealthHist
   const delta = lastScore - firstScore;
 
   const TrendIcon = delta > 3 ? TrendingUp : delta < -3 ? TrendingDown : Minus;
-  const trendColor = delta > 3 ? 'text-green-400' : delta < -3 ? 'text-red-400' : 'text-white/40';
+  const trendColor = delta > 3 ? 'text-green-400' : delta < -3 ? 'text-red-400' : 'text-white/50';
 
   return (
     <Card className="bg-slate-900/60 border-white/10">

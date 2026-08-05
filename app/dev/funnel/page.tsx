@@ -83,7 +83,7 @@ export default async function FunnelPage() {
             )}
 
             {r.rates && r.rates.visitors === 0 && (
-              <p className="mt-3 text-white/45 text-sm">
+              <p className="mt-3 text-white/50 text-sm">
                 No visitors in this window. Expected until the front door is promoted.
               </p>
             )}
@@ -91,7 +91,7 @@ export default async function FunnelPage() {
             {r.rates && r.rates.visitors > 0 && (
               <table className="mt-3 w-full text-sm border-collapse">
                 <thead>
-                  <tr className="text-white/45 text-left">
+                  <tr className="text-white/50 text-left">
                     <th scope="col" className="py-2 font-medium">Step</th>
                     <th scope="col" className="py-2 font-medium text-right">Visitors</th>
                     <th scope="col" className="py-2 font-medium text-right">From previous</th>

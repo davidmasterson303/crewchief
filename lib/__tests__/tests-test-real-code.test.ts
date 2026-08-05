@@ -60,6 +60,13 @@ const STATIC_ANALYSIS_SUITES = [
   // which implements neither `(hover: none)` nor the cascade that decides it.
   // Absence of an unpaired `group-hover:opacity-100` is the whole signal.
   'touch-parity.test.ts',
+  // Reads every .tsx off disk for body text below the AA contrast floor item 17
+  // set. The subject is a Tailwind alpha in a class string; rendering the
+  // component would prove what jsdom computes, which is not what a browser
+  // composites over a backdrop — and item 17's own rendered probe is what
+  // missed the front door, because it only sees routes someone remembered to
+  // visit. The class name in the source is the whole signal.
+  'text-contrast-floor.test.ts',
   'portability.test.ts',
   'ws-optional-deps.test.ts',
   'illustration-tokens.test.ts',
