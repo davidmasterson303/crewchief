@@ -345,29 +345,87 @@ export function GarageScreen({
     void load();
   }, [load]);
 
+  /*
+    ── The header is rendered in every state, and that is a compliance fix ────
+
+    Loading and error used to `return` before it, so both drew a bare centred
+    box with no "Account" on it. **That put account deletion behind the API
+    being up.** App Store 5.1.1(v) requires deletion to be initiated from inside
+    the app, and `AccountScreen` is one tap from here precisely so it is not
+    buried — but an early return buries it exactly when someone is most likely
+    to be leaving. A reviewer testing offline, or on a bad connection, would see
+    a screen with no way out of the account at all.
+
+    So the header and the account modal are hoisted above the branch, and only
+    the body below them changes with the state.
+  */
+  const header = (
+    <View style={styles.header}>
+      <Text style={styles.heading}>Garage</Text>
+      <Pressable
+        onPress={() => setAccountOpen(true)}
+        hitSlop={12}
+        accessibilityRole="button"
+        accessibilityLabel="Account"
+      >
+        <Text style={styles.signOut}>Account</Text>
+      </Pressable>
+    </View>
+  );
+
+  const account = (
+    <AccountScreen
+      visible={accountOpen}
+      email={email}
+      onClose={() => setAccountOpen(false)}
+      onSignOut={() => {
+        setAccountOpen(false);
+        onSignOut();
+      }}
+      onDeleted={(summary) => {
+        /*
+          Order matters. The notice is set before the session is cleared,
+          because clearing it unmounts this screen — showing the confirmation
+          after would show it to nobody.
+        */
+        setDeletedNotice(summary);
+        setAccountOpen(false);
+        onSignOut();
+      }}
+    />
+  );
+
   if (state.status === 'loading') {
     return (
-      <View style={styles.centred}>
-        <ActivityIndicator color="rgba(255,255,255,0.5)" />
+      <View style={styles.stateScreen}>
+        {header}
+        <View style={styles.centred}>
+          <ActivityIndicator color="rgba(255,255,255,0.5)" />
+        </View>
+        {account}
       </View>
     );
   }
 
   if (state.status === 'error') {
     return (
-      <View style={styles.centred}>
-        <Text style={styles.errorTitle}>
-          {state.unauthorized ? 'Signed out' : 'Could not load your garage'}
-        </Text>
-        <Text style={styles.errorBody}>
-          {state.unauthorized ? 'Your session has expired. Sign in again.' : state.message}
-        </Text>
-        <Pressable
-          style={styles.button}
-          onPress={() => (state.unauthorized ? onSignOut() : void load())}
-        >
-          <Text style={styles.buttonText}>{state.unauthorized ? 'Sign in' : 'Try again'}</Text>
-        </Pressable>
+      <View style={styles.stateScreen}>
+        {header}
+        <View style={styles.centred}>
+          <Text style={styles.errorTitle}>
+            {state.unauthorized ? 'Signed out' : 'Could not load your garage'}
+          </Text>
+          <Text style={styles.errorBody}>
+            {state.unauthorized ? 'Your session has expired. Sign in again.' : state.message}
+          </Text>
+          <Pressable
+            style={styles.button}
+            onPress={() => (state.unauthorized ? onSignOut() : void load())}
+          >
+            <Text style={styles.buttonText}>{state.unauthorized ? 'Sign in' : 'Try again'}</Text>
+          </Pressable>
+        </View>
+        {account}
       </View>
     );
   }
@@ -407,20 +465,18 @@ export function GarageScreen({
           tintColor="rgba(255,255,255,0.5)"
         />
       }
-      ListHeaderComponent={
-        <View style={styles.header}>
-          <Text style={styles.heading}>Garage</Text>
-          <Pressable
-            onPress={() => setAccountOpen(true)}
-            hitSlop={12}
-            accessibilityRole="button"
-            accessibilityLabel="Account"
-          >
-            <Text style={styles.signOut}>Account</Text>
-          </Pressable>
-        </View>
-      }
+      ListHeaderComponent={header}
       ListEmptyComponent={
+        /*
+          An account with no cars is the ordinary first-run state, not a
+          failure — so it says what to do next rather than apologising.
+
+          It sits in its own centring view because `styles.centred` is
+          `flex: 1`, and a flex child of a FlatList's content container has no
+          height to fill unless that container grows: `contentContainerStyle`
+          carries `flexGrow: 1` for exactly this. Without it the first thing a
+          new user ever sees is three lines crushed under the title.
+        */
         <View style={styles.centred}>
           <Text style={styles.errorTitle}>No vehicles yet</Text>
           <Text style={styles.errorBody}>
@@ -430,31 +486,20 @@ export function GarageScreen({
       }
       ListFooterComponent={<DevToken token={accessToken} />}
     />
-    <AccountScreen
-      visible={accountOpen}
-      email={email}
-      onClose={() => setAccountOpen(false)}
-      onSignOut={() => {
-        setAccountOpen(false);
-        onSignOut();
-      }}
-      onDeleted={(summary) => {
-        /*
-          Order matters. The notice is set before the session is cleared,
-          because clearing it unmounts this screen — showing the confirmation
-          after would show it to nobody.
-        */
-        setDeletedNotice(summary);
-        setAccountOpen(false);
-        onSignOut();
-      }}
-    />
+    {account}
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  list: { padding: 20, paddingTop: 68, gap: 14 },
+  /*
+    `flexGrow` so `ListEmptyComponent` has room to centre in — see its note.
+    It changes nothing once there is a car, because content past one screen
+    already exceeds the container.
+  */
+  list: { padding: 20, paddingTop: 68, gap: 14, flexGrow: 1 },
+  /* Loading and error draw the same header as the list, at the same inset. */
+  stateScreen: { flex: 1, padding: 20, paddingTop: 68 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
