@@ -65,4 +65,64 @@ config.resolver.extraNodeModules = {
   '@crewchief/core': path.resolve(workspaceRoot, 'packages/core'),
 };
 
+/*
+  ── The tsconfig alias that was never meant to reach the bundler ─────────────
+
+  `tsconfig.json` maps `react` to `./node_modules/@types/react` to settle the
+  *type-level* half of the React 18/19 split described above — react-navigation
+  resolving the hoisted React 18 types while this app resolves 19.
+
+  **Expo's Metro reads tsconfig `paths` too**, and honours them ahead of
+  `extraNodeModules`. So that alias silently became a runtime instruction, and
+  the bundle failed on the first launch of the first build:
+
+      While trying to resolve module `react` … the package
+      `apps/mobile/node_modules/@types/react/package.json` was successfully
+      found. However, this package itself specifies a `main` module field that
+      could not be resolved.
+
+  Correct, and exactly what was asked for: `@types/react` is declarations, so
+  there is nothing to execute. A type-checker alias had been handed to a
+  bundler. It typechecked clean and could not run — the same shape as the
+  eas.json that validated locally and was rejected on first use.
+
+  ── Why `experiments.tsconfigPaths: false` is not the fix ────────────────────
+
+  Because the *other* alias in that file is load-bearing at runtime.
+  `packages/core` declares `main: src/index.ts` and no `exports` map, so
+  `@crewchief/core/health-band` resolves through `@crewchief/core/*` →
+  `../../packages/core/src/*` — a tsconfig path. Turning tsconfig paths off
+  fixes React and breaks every shared-module import in the app.
+
+  So the two aliases are separated by what they are for, here, rather than by
+  switching off the mechanism they share.
+*/
+const PINNED_TO_THIS_APP = new Set(['react', 'react-dom', 'react-native']);
+
+const defaultResolveRequest = config.resolver.resolveRequest;
+
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  // `react`, and also `react/jsx-runtime`, `react-native/Libraries/...`.
+  const packageName = moduleName.startsWith('@')
+    ? moduleName.split('/').slice(0, 2).join('/')
+    : moduleName.split('/')[0];
+
+  if (PINNED_TO_THIS_APP.has(packageName)) {
+    try {
+      return {
+        type: 'sourceFile',
+        filePath: require.resolve(moduleName, { paths: [projectRoot] }),
+      };
+    } catch {
+      // Fall through rather than fail: a subpath this app does not have is a
+      // resolution question, and Metro's own resolver gives a better error for
+      // it than a rethrow from here would.
+    }
+  }
+
+  return defaultResolveRequest
+    ? defaultResolveRequest(context, moduleName, platform)
+    : context.resolveRequest(context, moduleName, platform);
+};
+
 module.exports = config;
