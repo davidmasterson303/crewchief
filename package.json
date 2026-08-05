@@ -22,6 +22,7 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "verify:mobile": "node scripts/verify-mobile-contract.mjs",
+    "verify:mobile:strict": "node scripts/verify-mobile-contract.mjs --strict",
     "build:images": "node scripts/build-image-derivatives.mjs"
   },
   "dependencies": {

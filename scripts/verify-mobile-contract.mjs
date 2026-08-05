@@ -17,6 +17,7 @@
  *
  *   node scripts/verify-mobile-contract.mjs                       # localhost:3000
  *   node scripts/verify-mobile-contract.mjs https://<site>        # a deployment
+ *   node scripts/verify-mobile-contract.mjs --strict              # a partial run exits 1
  *
  * Configuration, all optional, all read from the environment rather than argv
  * so a token never lands in the process table or shell history:
@@ -31,6 +32,18 @@
  * a gate that quietly reports success on a subset is exactly how §25's health
  * check degraded a 404 into a shrug.
  *
+ * **That paragraph was only true for a reader.** Until `--strict` existed this
+ * script exited 0 on a partial run, so anything reading the exit code — CI, a
+ * promote gate, a script chain — could not tell a partial from a clean pass.
+ * It disclaimed §25's failure in prose and reproduced it in the exit code.
+ *
+ * Worse, the two states are not symmetric: an *unset* token skips the
+ * credentialed checks, while a *set but expired* one fails them — the state
+ * this repo has been in since 02:58 UTC on 2 Aug. So the cheapest way to turn
+ * this check green was to delete the credential. `--strict` closes that;
+ * reasoning in `lib/run-outcome.mjs`, exit rules tested in
+ * `run-outcome.test.ts` rather than by running this.
+ *
  * Read-only. It never writes.
  */
 
@@ -42,6 +55,7 @@ import {
   findMissingFields,
   findLeakedFields,
 } from './lib/response-contract.mjs';
+import { classifyRun, exitCodeFor, parseArgs, OUTCOME } from './lib/run-outcome.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -78,7 +92,13 @@ function env(name) {
   }
 }
 
-const base = (process.argv[2] || 'http://localhost:3000').replace(/\/$/, '');
+const { base, strict, unknownFlags } = parseArgs(process.argv, {
+  defaultBase: 'http://localhost:3000',
+});
+if (unknownFlags.length) {
+  console.error(`Unknown flag(s): ${unknownFlags.join(', ')}. Only --strict is supported.`);
+  process.exit(2);
+}
 const token = env('MOBILE_TEST_TOKEN');
 const ownedVehicleId = env('MOBILE_TEST_VEHICLE_ID');
 const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1)(:|$)/.test(base);
@@ -418,16 +438,21 @@ await checkGarageNeedsCredential();
 await checkConsultant();
 
 console.log('\n' + '─'.repeat(60));
-if (failures > 0) {
+const outcome = classifyRun({ failures, notRun });
+
+if (outcome === OUTCOME.FAIL) {
   console.log(`\x1b[31mFAILED\x1b[0m — ${failures} blocking issue(s), ${notRun} not run`);
-  process.exit(1);
+  process.exit(exitCodeFor(outcome, { strict }));
 }
-if (notRun > 0) {
+if (outcome === OUTCOME.PARTIAL) {
   console.log(
     `\x1b[33mPARTIAL\x1b[0m — everything run passed, but ${notRun} check(s) did not run.`
   );
   console.log('This is not a green build. Set MOBILE_TEST_TOKEN and MOBILE_TEST_VEHICLE_ID');
   console.log('to exercise the credentialed half, and CORS_ALLOWED_ORIGINS for the preflight.');
-  process.exit(0);
+  if (strict) {
+    console.log('\x1b[31m--strict was passed, so this exits non-zero.\x1b[0m');
+  }
+  process.exit(exitCodeFor(outcome, { strict }));
 }
 console.log('\x1b[32mMobile client contract holds\x1b[0m — all checks ran and passed');
