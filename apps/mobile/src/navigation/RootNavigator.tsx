@@ -2,6 +2,8 @@ import { NavigationContainer, type LinkingOptions } from '@react-navigation/nati
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { AdvisorScreen } from '../screens/AdvisorScreen';
+import { InvoiceScanScreen } from '../screens/InvoiceScanScreen';
+import { pickInvoiceImage } from '../media/pick-invoice-image';
 import { GarageScreen } from '../screens/GarageScreen';
 import { VehicleDetailScreen } from '../screens/VehicleDetailScreen';
 
@@ -66,6 +68,14 @@ export type RootStackParamList = {
     secret; the token still is not one, and still is not here.
   */
   Advisor: { vehicleId: string; title?: string };
+  /*
+    3.3. Routed but **deliberately not linked from any screen yet** — the
+    picker behind it needs a native module that the installed dev client does
+    not contain, so a visible "Scan an invoice" button would be a control that
+    cannot work. Reachable by deep link so the screen can be rendered and
+    reviewed before then; the entry point lands with the picker.
+  */
+  InvoiceScan: { vehicleId: string; title?: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -120,6 +130,7 @@ const linking: LinkingOptions<RootStackParamList> = {
       Garage: 'garage',
       VehicleDetail: 'vehicle/:vehicleId',
       Advisor: 'vehicle/:vehicleId/advisor',
+      InvoiceScan: 'vehicle/:vehicleId/scan',
     },
   },
 };
@@ -202,6 +213,24 @@ export function RootNavigator({
         >
           {({ route }) => (
             <AdvisorScreen vehicleId={route.params.vehicleId} onSignOut={onSignOut} />
+          )}
+        </Stack.Screen>
+
+        <Stack.Screen
+          name="InvoiceScan"
+          options={{ title: 'Scan an invoice' }}
+        >
+          {({ route }) => (
+            <InvoiceScanScreen
+              vehicleId={route.params.vehicleId}
+              /*
+                The seam. `pick-invoice-image.ts` is the only module that will
+                import expo-image-picker, so this screen stays free of native
+                imports and one file changes when the build lands.
+              */
+              pickImage={pickInvoiceImage}
+              onSignOut={onSignOut}
+            />
           )}
         </Stack.Screen>
       </Stack.Navigator>
