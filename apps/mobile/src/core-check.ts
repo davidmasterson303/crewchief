@@ -1,7 +1,7 @@
 /**
  * Does `@crewchief/core` actually work inside Metro?
  *
- * The monorepo decision rests on shared logic being genuinely shared. Three
+ * The monorepo decision rests on shared logic being genuinely shared. Four
  * separate things have to hold for that, and only the first is obvious:
  *
  *   1. Metro resolves the workspace symlink at all.
@@ -10,11 +10,32 @@
  *      built-ins" — and React Native is where that promise gets tested, since
  *      an accidental `node:crypto` import throws at runtime rather than
  *      failing a build.
- *   3. They compute the same answers they compute on the server.
+ *   3. The **runtime features** that code relies on exist here. This is the one
+ *      no static check can reach — see below.
+ *   4. They compute the same answers they compute on the server.
  *
  * Each check calls real shared code with a known input and asserts a known
  * output. A check that only asserted "the import did not throw" would pass
  * against a module that had been quietly stubbed.
+ *
+ * ── Why this is not made redundant by `portability.test.ts` ─────────────────
+ *
+ * That suite walks every file in `packages/core/src` transitively and rejects
+ * `next/*`, `@supabase/*`, `node:*`, bare `fs`/`path`/`crypto` and browser
+ * globals. It is thorough, and it covers point 2 better than this file does.
+ *
+ * **It cannot cover point 3, because a runtime capability is not an import.**
+ * `formatting-utils.ts` calls `Intl.NumberFormat` and `toLocaleString` — Hermes
+ * has historically shipped without full Intl, and no import scan would ever
+ * mention it. On 5 Aug `Object.hasOwn` was added to
+ * `consultant-context-kinds.ts`; it is ES2022, Jest runs on Node where it
+ * always exists, and confirming it on the phone meant reading the builtin table
+ * out of `hermesvm.framework` by hand. That is the failure this file exists to
+ * make visible, and it is exactly the shape of the three "green but did not
+ * run" defects of 4 Aug.
+ *
+ * So the two are complementary: the Node suite proves core *may* be imported
+ * here, and this proves it *works* here. Deleting either leaves a real gap.
  */
 
 import { isDemoVehicleId } from '@crewchief/core/demo';
@@ -57,8 +78,34 @@ export function checkSharedCore(): CoreCheck[] {
     }),
 
     run('formatting — same output as the web', () => {
+      /*
+        Not just "did it return a string". `formatMileage` is
+        `toLocaleString('en-US')`, and a Hermes built without Intl returns the
+        *unseparated* digits rather than throwing — so a check for "94" would
+        pass against a garage rendering "94800 mi". The separator is the
+        assertion, because the separator is what would silently go missing.
+      */
       const formatted = formatMileage(94800);
-      return { ok: formatted.includes('94'), detail: formatted };
+      return { ok: formatted === '94,800', detail: `${formatted} (want 94,800)` };
+    }),
+
+    run('runtime — the ES2022 features core relies on', () => {
+      /*
+        The gap `portability.test.ts` cannot see, and the one that cost real
+        time on 5 Aug. `Object.hasOwn` is what `isContextKind` narrows with;
+        it exists in Node, so Jest can never fail on it, and its absence here
+        would throw inside the advisor's provenance row rather than anywhere
+        near this file.
+
+        Checked by calling it rather than by `typeof`, so a polyfill that is
+        present but wrong fails too.
+      */
+      const hasOwn = typeof Object.hasOwn === 'function' && Object.hasOwn({ a: 1 }, 'a');
+      const notInherited = typeof Object.hasOwn === 'function' && !Object.hasOwn({}, 'toString');
+      return {
+        ok: hasOwn && notInherited,
+        detail: `Object.hasOwn own=${hasOwn}, ignores-prototype=${notInherited}`,
+      };
     }),
   ];
 }

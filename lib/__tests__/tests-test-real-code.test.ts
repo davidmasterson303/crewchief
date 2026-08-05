@@ -44,6 +44,11 @@ const STATIC_ANALYSIS_SUITES = [
   // and loading one under this runner would fail on the transform rather than
   // on the rule. Absence of `.from(` in the source is the whole signal.
   'mobile-api-only.test.ts',
+  // Reads SignInScreen and core-check.ts off disk to prove the on-device core
+  // probe is still rendered by something. It spent Phase 3.2 onward imported by
+  // nothing; the subject is React Native source this runner cannot load, and
+  // "is it wired in" is structural.
+  'mobile-core-check-wired.test.ts',
   // Reads GarageScreen off disk to prove account deletion is reachable in
   // every state it can render — App Store 5.1.1(v). Same constraint as
   // `mobile-api-only`: the subject is a React Native component this runner
