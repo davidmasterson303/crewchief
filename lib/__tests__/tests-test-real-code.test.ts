@@ -44,6 +44,18 @@ const STATIC_ANALYSIS_SUITES = [
   // and loading one under this runner would fail on the transform rather than
   // on the rule. Absence of `.from(` in the source is the whole signal.
   'mobile-api-only.test.ts',
+  // Reads GarageScreen off disk to prove account deletion is reachable in
+  // every state it can render — App Store 5.1.1(v). Same constraint as
+  // `mobile-api-only`: the subject is a React Native component this runner
+  // cannot load, and the property is structural (does each return path carry
+  // the affordance) rather than behavioural.
+  'mobile-account-reachable.test.ts',
+  // Reads the upload route to prove it authorizes where the HTTP status is
+  // still available, rather than letting a denial fall through the error
+  // mapping as a 500. Executing it would need a live Supabase, a storage
+  // bucket and a vision model; the property that regressed is which function
+  // is called and in what order, which is on disk.
+  'upload-route-status-codes.test.ts',
   'vehicles-rls-posture.test.ts',
   // Replays the migration corpus to find blanket RLS policies a rebuild would
   // declare. There is nothing to import: the subject is the SQL on disk, and

@@ -49,7 +49,11 @@ function kindsTheServerCanEmit(): string[] {
   const body = source('lib', 'consultant-context.ts');
   const fn = body.slice(body.indexOf('export function loadedContextKinds'));
   const end = fn.indexOf('\n}');
-  return [...fn.slice(0, end).matchAll(/kinds\.push\('([a-z]+)'\)/g)].map((m) => m[1]);
+  // `Array.from`, not a spread: the web tsconfig targets below es2015, where
+  // spreading an iterator needs --downlevelIteration. Jest's transform accepts
+  // it and `tsc --noEmit` does not, so the spread version was green in the
+  // suite and red in the typecheck.
+  return Array.from(fn.slice(0, end).matchAll(/kinds\.push\('([a-z]+)'\)/g)).map((m) => m[1]);
 }
 
 describe('context kind labels', () => {

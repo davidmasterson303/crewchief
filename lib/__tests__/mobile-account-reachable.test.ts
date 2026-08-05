@@ -66,12 +66,16 @@ describe('GarageScreen — App Store 5.1.1(v)', () => {
     // test still covers three branches.
     expect(paths.length).toBeGreaterThanOrEqual(3);
 
-    for (const [index, path] of paths.entries()) {
+    // `forEach` rather than `for…of paths.entries()`: the web tsconfig targets
+    // below es2015 and iterating an IterableIterator there needs
+    // --downlevelIteration, which Jest's transform does not require and
+    // `tsc --noEmit` does.
+    paths.forEach((path, index) => {
       expect({
         path: index,
         rendersAccount: /\{account\}|<AccountScreen/.test(path),
       }).toEqual({ path: index, rendersAccount: true });
-    }
+    });
   });
 
   it('offers a way into the account, by an accessible name', () => {
