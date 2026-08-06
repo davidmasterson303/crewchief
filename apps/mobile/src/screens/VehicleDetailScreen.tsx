@@ -101,6 +101,7 @@ export function VehicleDetailScreen({
   onBack,
   onSignOut,
   onAskAdvisor,
+  onScanInvoice,
 }: {
   vehicleId: string;
   onBack: () => void;
@@ -111,6 +112,8 @@ export function VehicleDetailScreen({
     navigator is the only file that has to change if that stops being true.
   */
   onAskAdvisor: () => void;
+  /** 3.3's entry point, a callback for the same reason `onAskAdvisor` is one. */
+  onScanInvoice: () => void;
 }) {
   const [state, setState] = useState<State>({ status: 'loading' });
   const [refreshing, setRefreshing] = useState(false);
@@ -241,6 +244,18 @@ export function VehicleDetailScreen({
         <Text style={styles.advisorCtaText}>Ask the advisor</Text>
         <Text style={styles.advisorCtaHint}>
           It already knows this car's history — no need to explain it
+        </Text>
+      </Pressable>
+
+      {/*
+        Secondary to the advisor, deliberately. Both are native-only verbs that
+        answer guideline 4.2, but the advisor is the one someone opens without
+        already holding a piece of paper.
+      */}
+      <Pressable style={styles.scanCta} onPress={onScanInvoice} accessibilityRole="button">
+        <Text style={styles.scanCtaText}>Scan an invoice</Text>
+        <Text style={styles.scanCtaHint}>
+          Photograph a bill and its line items are added here
         </Text>
       </Pressable>
 
@@ -377,6 +392,18 @@ const styles = StyleSheet.create({
   },
   advisorCtaText: { color: '#080808', fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
   advisorCtaHint: { color: 'rgba(8,8,8,0.55)', fontSize: 13, lineHeight: 18 },
+
+  /* Outlined rather than filled, so it reads as the second verb on the screen. */
+  scanCta: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 16,
+    paddingVertical: 15,
+    paddingHorizontal: 16,
+    gap: 3,
+  },
+  scanCtaText: { color: '#fff', fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
+  scanCtaHint: { color: 'rgba(255,255,255,0.5)', fontSize: 13, lineHeight: 18 },
 
   centred: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 8 },
   errorTitle: { color: '#fff', fontSize: 17, fontWeight: '600' },

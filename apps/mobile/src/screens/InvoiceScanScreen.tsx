@@ -11,19 +11,20 @@ import {
 /**
  * Phase 3.3 — photograph an invoice and have its line items read.
  *
- * ── Why this compiles before the camera exists ──────────────────────────────
+ * ── Why the image is injected rather than imported ──────────────────────────
  *
- * It never imports `expo-image-picker`. The image arrives through a `pickImage`
- * prop, exactly as `GarageScreen` takes `onOpenVehicle` rather than importing
- * react-navigation.
+ * This file never imports `expo-image-picker`. The image arrives through a
+ * `pickImage` prop, exactly as `GarageScreen` takes `onOpenVehicle` rather than
+ * importing react-navigation.
  *
- * That is not only a style rule here, it is a scheduling constraint. The
- * development client currently on the simulator was built **before** the picker
- * was a dependency, so importing it anywhere in the module graph crashes the
- * app on launch — the working setup would be gone before its replacement
- * exists. With the picker injected, this screen can be written, routed and
- * looked at today, and wiring the real picker after build `29b4d76f` installs
- * is a few lines in the navigator.
+ * That began as a scheduling constraint and is now a design one. The dev client
+ * was built before the picker was a dependency, so importing it anywhere in the
+ * module graph would have crashed the app on launch — the screen was therefore
+ * written, routed and rendered *before* build `29b4d76f` existed, and wiring the
+ * real picker afterwards touched one file. The reason to keep the seam is what
+ * it bought: this screen is an ordinary component that can be rendered with a
+ * stub, which is the only reason it was ever looked at before the camera
+ * existed.
  *
  * ── The outcomes, and why two of them are not errors ────────────────────────
  *
@@ -77,11 +78,11 @@ export function InvoiceScanScreen({
   /**
    * Resolves to the chosen image, or `null` if the picker was dismissed.
    *
-   * Injected so this file stays free of native imports — see the header. The
-   * real implementation lands with `expo-image-picker` once the build that
-   * contains it is installed.
+   * Injected so this file stays free of native imports — see the header.
+   * `src/media/pick-invoice-image.ts` is the real implementation and the only
+   * module that imports `expo-image-picker`.
    */
-  pickImage: () => Promise<InvoiceFile | null>;
+  pickImage: (source: 'camera' | 'library') => Promise<InvoiceFile | null>;
   onSignOut: () => void;
   /** Lets the caller refresh the vehicle once line items have changed. */
   onFiled?: () => void;
@@ -132,11 +133,14 @@ export function InvoiceScanScreen({
     [vehicleId, onSignOut, onFiled]
   );
 
-  const choose = useCallback(async () => {
-    setState({ status: 'working', note: 'Opening the camera…' });
+  const choose = useCallback(async (source: 'camera' | 'library') => {
+    setState({
+      status: 'working',
+      note: source === 'camera' ? 'Opening the camera…' : 'Opening your photos…',
+    });
 
     try {
-      const chosen = await pickImage();
+      const chosen = await pickImage(source);
       if (!chosen) {
         // Dismissing the picker is not a failure and must not read as one.
         setState({ status: 'idle' });
@@ -158,8 +162,17 @@ export function InvoiceScanScreen({
             Photograph a service invoice and its line items are read and added to this car's
             history. A PDF works too.
           </Text>
-          <Pressable style={styles.primary} onPress={() => void choose()}>
+          <Pressable style={styles.primary} onPress={() => void choose('camera')}>
             <Text style={styles.primaryText}>Take a photo</Text>
+          </Pressable>
+          {/*
+            Not a fallback. Plenty of invoices arrive as an emailed PDF or a
+            photo taken days ago — and the simulator has no camera at all, so a
+            camera-only flow could never be exercised on the machine this is
+            developed on.
+          */}
+          <Pressable style={styles.secondary} onPress={() => void choose('library')}>
+            <Text style={styles.secondaryText}>Choose from library</Text>
           </Pressable>
         </View>
       )}
@@ -220,8 +233,11 @@ export function InvoiceScanScreen({
         <View style={styles.block}>
           <Text style={styles.title}>That does not look like an invoice</Text>
           <Text style={styles.body_}>{state.message}</Text>
-          <Pressable style={styles.primary} onPress={() => void choose()}>
+          <Pressable style={styles.primary} onPress={() => void choose('camera')}>
             <Text style={styles.primaryText}>Try another photo</Text>
+          </Pressable>
+          <Pressable style={styles.secondary} onPress={() => void choose('library')}>
+            <Text style={styles.secondaryText}>Choose from library</Text>
           </Pressable>
         </View>
       )}
@@ -237,7 +253,7 @@ export function InvoiceScanScreen({
           */}
           <Pressable
             style={styles.primary}
-            onPress={() => (file ? void send(file, false) : void choose())}
+            onPress={() => (file ? void send(file, false) : void choose('camera'))}
           >
             <Text style={styles.primaryText}>{file ? 'Try again' : 'Take a photo'}</Text>
           </Pressable>

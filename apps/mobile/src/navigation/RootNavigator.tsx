@@ -69,11 +69,11 @@ export type RootStackParamList = {
   */
   Advisor: { vehicleId: string; title?: string };
   /*
-    3.3. Routed but **deliberately not linked from any screen yet** — the
-    picker behind it needs a native module that the installed dev client does
-    not contain, so a visible "Scan an invoice" button would be a control that
-    cannot work. Reachable by deep link so the screen can be rendered and
-    reviewed before then; the entry point lands with the picker.
+    3.3. Linked from the vehicle detail screen since 5 Aug, once build
+    `29b4d76f` put `expo-image-picker` in the binary. Held back until then on
+    purpose: a visible "Scan an invoice" button that cannot open a camera is
+    worse than no button, and the screen was reachable by deep link in the
+    meantime so it could still be rendered and reviewed.
   */
   InvoiceScan: { vehicleId: string; title?: string };
 };
@@ -190,6 +190,12 @@ export function RootNavigator({
               onBack={() => navigation.goBack()}
               onAskAdvisor={() =>
                 navigation.navigate('Advisor', {
+                  vehicleId: route.params.vehicleId,
+                  title: route.params.title,
+                })
+              }
+              onScanInvoice={() =>
+                navigation.navigate('InvoiceScan', {
                   vehicleId: route.params.vehicleId,
                   title: route.params.title,
                 })
