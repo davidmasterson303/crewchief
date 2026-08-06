@@ -60,7 +60,14 @@ type State =
       expected: ExtractedVehicle | null;
     }
   | { status: 'not-invoice'; message: string }
-  | { status: 'error'; message: string };
+  /*
+    `retryable` is the fix for the 5 Aug dead end. A client-side rejection —
+    wrong type, too large — fails identically no matter how many times the same
+    file is resent, so offering "Try again" there stranded the user on an error
+    screen with no way back to the picker. Only a failure that *might* pass on a
+    second attempt gets a retry.
+  */
+  | { status: 'error'; message: string; retryable: boolean };
 
 function describeVehicle(vehicle: ExtractedVehicle | null): string {
   if (!vehicle) return 'an unrecognised vehicle';
@@ -122,7 +129,12 @@ export function InvoiceScanScreen({
         onFiled?.();
       } catch (caught) {
         const message = describeUploadError(caught);
-        setState({ status: 'error', message });
+        /*
+          Reached only from `uploadInvoice`'s network and server paths — a
+          timeout, a 500, a rate limit — all of which can succeed on a second
+          attempt with the same file.
+        */
+        setState({ status: 'error', message, retryable: true });
 
         // 401 is the one failure a retry cannot fix. `App.tsx` swaps to sign-in
         // the moment the session clears, so this reports it and lets that
@@ -149,7 +161,11 @@ export function InvoiceScanScreen({
       setFile(chosen);
       await send(chosen, false);
     } catch (caught) {
-      setState({ status: 'error', message: describeUploadError(caught) });
+      /*
+        A refused permission or a rejected file type. Resending changes
+        nothing, so this offers a different file rather than a doomed retry.
+      */
+      setState({ status: 'error', message: describeUploadError(caught), retryable: false });
     }
   }, [pickImage, send]);
 
@@ -158,9 +174,18 @@ export function InvoiceScanScreen({
       {state.status === 'idle' && (
         <View style={styles.block}>
           <Text style={styles.title}>Scan an invoice</Text>
+          {/*
+            **No PDF claim.** This said "A PDF works too", which the server
+            supports and this screen does not: the picker is `mediaTypes:
+            ['images']`, so a PDF cannot be selected at all. Promising a
+            capability the button in front of you cannot reach is worse than
+            not mentioning it. Picking documents needs `expo-document-picker` —
+            another native module, another cloud build — so it waits for the
+            next one rather than costing its own.
+          */}
           <Text style={styles.body_}>
             Photograph a service invoice and its line items are read and added to this car's
-            history. A PDF works too.
+            history.
           </Text>
           <Pressable style={styles.primary} onPress={() => void choose('camera')}>
             <Text style={styles.primaryText}>Take a photo</Text>
@@ -247,15 +272,31 @@ export function InvoiceScanScreen({
           <Text style={styles.title}>That did not upload</Text>
           <Text style={styles.body_}>{state.message}</Text>
           {/*
-            Resends the file already chosen rather than reopening the camera.
-            See the header: the photograph may be of a bill that is no longer
-            in front of the person holding the phone.
+            Retry resends the file already chosen rather than reopening the
+            camera — the photograph may be of a bill no longer in front of the
+            person holding the phone. But it is offered **only when a second
+            attempt could differ**: a rejected file type fails the same way
+            forever, and offering it there is what stranded a real tester.
+
+            A way back to the picker is always present, in every branch.
           */}
+          {state.retryable && file ? (
+            <Pressable style={styles.primary} onPress={() => void send(file, false)}>
+              <Text style={styles.primaryText}>Try again</Text>
+            </Pressable>
+          ) : null}
+
           <Pressable
-            style={styles.primary}
-            onPress={() => (file ? void send(file, false) : void choose('camera'))}
+            style={state.retryable && file ? styles.secondary : styles.primary}
+            onPress={() => void choose('library')}
           >
-            <Text style={styles.primaryText}>{file ? 'Try again' : 'Take a photo'}</Text>
+            <Text style={state.retryable && file ? styles.secondaryText : styles.primaryText}>
+              Choose a different file
+            </Text>
+          </Pressable>
+
+          <Pressable style={styles.secondary} onPress={() => void choose('camera')}>
+            <Text style={styles.secondaryText}>Take a photo</Text>
           </Pressable>
         </View>
       )}

@@ -105,6 +105,38 @@ export async function pickInvoiceImage(
     // Array form: `MediaTypeOptions` is deprecated in this version.
     mediaTypes: ['images'],
     quality: QUALITY,
+    /*
+      ── This line is the fix for the 5 Aug end-to-end failure ────────────────
+
+      **iPhones shoot HEIC by default**, and PHPicker hands back whatever the
+      asset already is. `expo-image-picker`'s own iOS source re-encodes most
+      formats but passes HEIC through untouched:
+
+          case UTType.heic.identifier:
+            return (rawData, ".heic")          // ImageUtils.swift:145
+
+      The mime type is derived from that extension, so the client received
+      `image/heic`, which is not in `ALLOWED_DOCUMENT_TYPES` — and the upload
+      was refused before it left the phone with "That file type cannot be read".
+
+      That was never a simulator quirk. Every stock simulator photo is HEIC
+      because every real iPhone photo is, so it would have failed for the first
+      person to photograph an invoice.
+
+      `Compatible` asks PHPicker for the most compatible representation, which
+      on iOS transcodes HEIC to JPEG before handing it over — done by the
+      system, on the device, needing no extra native module and therefore **no
+      second cloud build**. The registered type identifier becomes
+      `public.jpeg`, the switch above falls to its `default:` branch, and the
+      file arrives as `.jpg`.
+
+      Widening the allowlist to accept HEIC was the alternative and was
+      rejected: Gemini does accept HEIC, so it would have worked, but it would
+      store an Apple-only container browsers cannot render — moving the problem
+      into the web document library rather than solving it.
+    */
+    preferredAssetRepresentationMode:
+      ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
   };
 
   const result =
