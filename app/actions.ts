@@ -1778,10 +1778,34 @@ export async function generateVehicleHealthSummary(vehicleId: string, forceRefre
       }
     }
 
-    const [vehicleResult, knowledgeResult, serviceResult, issueTrackResult, modTrackResult, nhtsaResult] = await Promise.all([
+    const [vehicleResult, knowledgeResult, serviceResult, lineItemResult, issueTrackResult, modTrackResult, nhtsaResult] = await Promise.all([
       client.from('vehicles').select('*').eq('id', vehicleId).maybeSingle(),
       client.from('vehicle_knowledge_base').select('*').eq('vehicle_id', vehicleId).maybeSingle(),
       client.from('service_items').select('*').eq('vehicle_id', vehicleId).order('created_at', { ascending: false }),
+      /*
+        Filed invoices. **Added 5 Aug after a real end-to-end run exposed the
+        gap**: scanning an invoice writes `maintenance_line_items`, this
+        summary read only `service_items`, and the two never met. Five service
+        records were filed against the M235i and the score stayed at 70 with a
+        narrative citing a "complete lack of documented maintenance" —
+        immediately after the app accepted them.
+
+        It was never a caching problem. A forced recompute produced the same
+        answer, because the prompt below was told "None provided yet" either
+        way. That also means **the web has always had this**: its upload dialog
+        does force a refresh, and still got a summary that ignored the invoice
+        it had just processed.
+
+        Ordered newest-first and bounded, like the service query beside it: this
+        feeds a prompt, and an unbounded history would push the known-issues and
+        recall sections out of the model's attention.
+      */
+      client
+        .from('maintenance_line_items')
+        .select('item_description,service_date,shop_name,total_cost,category')
+        .eq('vehicle_id', vehicleId)
+        .order('service_date', { ascending: false })
+        .limit(20),
       client.from('known_issue_tracking').select('*').eq('vehicle_id', vehicleId),
       client.from('modification_tracking').select('*').eq('vehicle_id', vehicleId),
       client.from('nhtsa_data').select('*').eq('vehicle_id', vehicleId).maybeSingle(),
@@ -1790,6 +1814,7 @@ export async function generateVehicleHealthSummary(vehicleId: string, forceRefre
     const vehicle = vehicleResult.data;
     const knowledge = knowledgeResult.data;
     const serviceItems = serviceResult.data || [];
+    const lineItems = lineItemResult.data || [];
     const issueTracking = issueTrackResult.data || [];
     const modTracking = modTrackResult.data || [];
     const nhtsa = nhtsaResult.data;
@@ -1804,6 +1829,13 @@ export async function generateVehicleHealthSummary(vehicleId: string, forceRefre
     const completedService = serviceItems.filter((s: any) => s.status === 'completed').length;
     const pendingService = serviceItems.filter((s: any) => s.status !== 'completed').length;
 
+    /*
+      Work read off an invoice is **documented history, not a plan** — it has
+      already been done and paid for. It counts toward what the owner has
+      recorded, which is the number the score is meant to reflect.
+    */
+    const documentedWork = lineItems.length;
+
     const prompt = `You are an expert automotive consultant analyzing a vehicle's health based on the owner's provided service history and uploads.
 
 VEHICLE INFORMATION:
@@ -1817,6 +1849,10 @@ OWNER-PROVIDED SERVICE HISTORY:
 - Pending/Planned Service: ${pendingService}
 - Recent Service Items: ${serviceItems.slice(0, 5).map((s: any) => `${s.description} (${s.status})`).join(', ') || 'None provided yet'}
 
+DOCUMENTED WORK FROM UPLOADED INVOICES:
+- Line Items on File: ${documentedWork}
+${lineItems.slice(0, 12).map((l: any) => `  - ${l.service_date || 'undated'}: ${l.item_description}${l.shop_name ? ` at ${l.shop_name}` : ''}${l.total_cost ? ` ($${l.total_cost})` : ''}`).join('\n') || '  - None on file'}
+
 KNOWN ISSUES FOR THIS MODEL (Reference Only):
 ${knowledge?.known_issues?.slice(0, 5).map((i: any) => `- ${i.part}: ${i.description} (Severity: ${i.severity}, Typical mileage: ${i.mileage_range})`).join('\n') || 'None identified'}
 
@@ -1826,6 +1862,10 @@ ISSUE STATUS:
 RECALLS:
 - Active Recalls: ${activeRecalls}
 ${nhtsa?.recalls?.slice(0, 3).map((r: any) => `  - ${r.summary || r.description || 'Recall'}`).join('\n') || 'None'}
+
+Treat the invoice line items above as completed, documented work. An owner who
+has uploaded invoices has a documented history, and the assessment must not
+describe their records as absent.
 
 Based on the owner's provided service history, provide a concise health assessment in JSON format with:
 - healthScore (1-100 integer based on provided records, not assumptions)
@@ -3432,6 +3472,44 @@ export async function uploadInvoice(formData: FormData) {
 
     const itemsExtracted = parseResult.maintenanceItems?.length || 0;
     console.log(`[Upload Complete] Document ${document.id} processed with ${itemsExtracted} maintenance items`);
+
+    /*
+      ── The health score is refreshed here, on the server ────────────────────
+
+      It used to be refreshed by `components/DocumentUploadDialog.tsx` calling
+      `generateVehicleHealthSummary` after the upload returned — in the **web
+      client**. So the mobile app, which posts to the same endpoint, never
+      triggered it, and a phone could file five service records and be told its
+      car had a "complete lack of documented maintenance". Observed on a real
+      run, 5 Aug.
+
+      A capability living in one client's component is a capability the second
+      client silently lacks. That is this codebase's most repeated defect —
+      `VehicleCard`'s unauthorized delete, the health band, the context-kind
+      labels — and the fix is always the same: move it to the one place both
+      callers already go through.
+
+      **Awaited rather than fired and forgotten.** A serverless function is
+      frozen once it responds, so a floating promise here is a promise that may
+      simply never run. It costs the caller a few seconds; the alternative is a
+      score that updates only sometimes, which is worse than one that updates
+      slowly.
+
+      **Failure never fails the upload.** The invoice is stored and its line
+      items are written by this point. A stale score is a worse dashboard, not
+      a lost document — the same judgement `runVehicleResearch` makes at line
+      444 about a missing health summary.
+    */
+    if (itemsExtracted > 0) {
+      try {
+        const refreshed = await generateVehicleHealthSummary(vehicleId, true);
+        if (!refreshed.success) {
+          console.warn('[Upload] Health summary not refreshed:', refreshed.error);
+        }
+      } catch (healthError) {
+        console.warn('[Upload] Health summary threw:', healthError);
+      }
+    }
 
     await syncInvoiceWithDossier(vehicleId, parseResult.maintenanceItems || []);
 

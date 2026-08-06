@@ -60,6 +60,12 @@ const STATIC_ANALYSIS_SUITES = [
   // read compiles a real password into the release binary — a property of the
   // source, and one no runtime assertion could observe.
   'mobile-dev-session-stripped.test.ts',
+  // Reads app/actions.ts to prove the health summary queries the table an
+  // invoice actually writes, and that the refresh sits in the shared upload
+  // path rather than in one client component. Executing either half needs a
+  // live Supabase and a Gemini call; what regressed is which tables are read
+  // and where the trigger lives, both of which are on disk.
+  'health-sees-filed-invoices.test.ts',
   // Reads apps/mobile off disk for text colours below the AA floor. The web
   // guard `text-contrast-floor.test.ts` scans app/ and components/ for Tailwind
   // class names and structurally cannot see an rgba() in a React Native
