@@ -104,78 +104,6 @@ export class InvoiceFileError extends Error {
 
 const megabytes = (bytes: number) => Math.round(bytes / 1024 / 1024);
 
-/**
- * Turn a `file://` URI into something the runtime's `fetch` will actually send.
- *
- * ── The defect this replaces ────────────────────────────────────────────────
- *
- * This appended `{ uri, name, type }` — **React Native's** file-part
- * convention — and every upload died in 4–6ms with
- * `Unsupported FormDataPart implementation`, before a socket ever opened. Three
- * rounds of testing read that as a connectivity problem, because the client
- * reported it as one.
- *
- * The cause is that Expo replaces the global `fetch`, and its own multipart
- * encoder accepts **only** a string, a real `Blob`, or an object implementing
- * `bytes()`. Its source says so directly:
- *
- *     `uri` is not supported for React Native's FormData.
- *
- * So the two conventions are both real and mutually exclusive, and this app
- * had the wrong one. It is also why `components/DocumentUploadDialog.tsx`
- * posts to the same endpoint from the web without trouble: a browser hands
- * `fetch` a `File` already.
- *
- * ── Why a `File` and not a bare `Blob` ──────────────────────────────────────
- *
- * The filename has to survive. Expo's encoder writes `filename=` into the
- * content-disposition header only when the part has a `name`, and the server
- * builds its storage path from `file.name` — `vehicleStoragePath(vehicleId,
- * 'invoices', file.name)`. A nameless part would upload and then be stored
- * under a broken path. React Native's `File` extends `Blob` and exposes
- * `name`, so it satisfies both the `instanceof Blob` branch and the header.
- *
- * ── Why this needs no new native module ─────────────────────────────────────
- *
- * `Blob`, `File` and `XMLHttpRequest` are React Native globals, and
- * `BlobModule` is already compiled into the installed binary — verified by
- * reading it out of the app's dylib before writing this, because a module the
- * binary lacks crashes on launch. `expo-file-system` would have been the
- * tidier read and is **not** installed; using it would have cost a cloud build.
- */
-async function readAsUploadPart(file: InvoiceFile): Promise<File> {
-  const blob = await readBlob(file.uri);
-
-  /*
-    `file.type` rather than `blob.type`: the picker knows what it produced, and
-    a blob read from a cache URI can come back with an empty type. An empty
-    content-type is what makes the server's allowlist reject a perfectly good
-    JPEG.
-  */
-  return new File([blob], file.name, { type: file.type });
-}
-
-/**
- * Read a local URI into a `Blob`.
- *
- * `XMLHttpRequest` rather than `fetch`, deliberately: the global `fetch` here
- * is Expo's, and it is not required to understand `file://`. XHR is React
- * Native's own and does, which is the whole reason this path exists.
- */
-function readBlob(uri: string): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const request = new XMLHttpRequest();
-    request.responseType = 'blob';
-    request.onload = () => resolve(request.response as Blob);
-    request.onerror = () =>
-      // A file the picker just handed us and we cannot read is a device
-      // problem, not a network one — and must not be reported as "offline".
-      reject(new InvoiceFileError('That image could not be read from your device.'));
-    request.open('GET', uri, true);
-    request.send(null);
-  });
-}
-
 export async function uploadInvoice({
   vehicleId,
   file,
@@ -204,7 +132,16 @@ export async function uploadInvoice({
   }
 
   const form = new FormData();
-  form.append('file', await readAsUploadPart(file));
+  /*
+    React Native's file-part convention, which is what its own networking
+    understands — and `apiRequest` now sends multipart over XHR precisely so
+    this shape is the right one. See the note there for why the `Blob` route is
+    closed on this binary.
+
+    The cast is because the DOM lib types `append` against `Blob | string`.
+    RN reads exactly these three keys and streams the file from `uri`.
+  */
+  form.append('file', { uri: file.uri, name: file.name, type: file.type } as unknown as Blob);
   form.append('vehicleId', vehicleId);
   if (confirmVehicle) {
     // Sent only when true. The route reads `=== 'true'`, so a literal "false"
@@ -296,6 +233,39 @@ function asVehicle(value: unknown): ExtractedVehicle | null {
 }
 
 /**
+ * A technical line for **any** thrown value, for `__DEV__` builds.
+ *
+ * ── Why this is not `instanceof ApiRequestError` and nothing else ───────────
+ *
+ * Because that is exactly how the instrumentation went blind. The error screen
+ * rendered a diagnostic only for `ApiRequestError`, so the one branch that
+ * reached the generic "Something went wrong" — an error of some *other* type —
+ * was also the one branch with no detail. A tester hit it 2/2 and had nothing
+ * to report but a duration.
+ *
+ * The rule now: every failure says what it was, without exception. An error
+ * this code did not anticipate is precisely the one worth naming.
+ */
+export function diagnoseUploadError(error: unknown): string {
+  if (error instanceof ApiRequestError) return error.diagnostic;
+
+  if (error instanceof InvoiceFileError) return `file-rejected · ${error.message}`;
+
+  if (error instanceof Error) {
+    /*
+      Name *and* message. The name is what distinguishes a TypeError thrown
+      while building a request from an Error thrown by a module that refused
+      one, and it is the half usually dropped.
+    */
+    const where = error.stack?.split('\n')[1]?.trim();
+    return [`${error.name} · ${error.message}`, where].filter(Boolean).join(' · ');
+  }
+
+  // Something threw a non-Error. Rare, and unreadable without saying so.
+  return `non-error thrown · ${String(error)}`;
+}
+
+/**
  * How a failed upload should read to the person who just took the photograph.
  *
  * Kept beside the taxonomy rather than in the screen, so the wording is
@@ -354,5 +324,9 @@ export function describeUploadError(error: unknown): string {
     return error.message;
   }
 
+  /*
+    The generic fallback still exists, but it is no longer a dead end: the
+    `__DEV__` diagnostic beside it now names the thrown type either way.
+  */
   return 'Something went wrong uploading that invoice.';
 }

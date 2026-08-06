@@ -48,42 +48,104 @@ const fetchMock = jest.fn();
 global.fetch = fetchMock as unknown as typeof fetch;
 
 /**
- * `XMLHttpRequest`, because the upload client reads the picked file through it.
+ * `XMLHttpRequest`, because **multipart no longer goes over `fetch`**.
  *
- * Not an incidental detail: XHR is React Native's own networking and is what
- * understands `file://`, while the global `fetch` in the app is Expo's and is
- * not required to. Node has `Blob` and `File` but no XHR, so the transport is
- * stubbed and the conversion — uri → Blob → named `File` — is what gets tested.
+ * The global `fetch` in the app is Expo's, and its multipart encoder needs a
+ * real `Blob` — which React Native's `Blob` cannot produce here, since it
+ * implements no `arrayBuffer()` and `FileReaderModule` is not compiled into the
+ * installed binary. So `apiRequest` sends forms through React Native's own
+ * networking, which understands the `{ uri, name, type }` part and streams the
+ * file from disk.
+ *
+ * This fake stands in for that transport and records what was sent.
  */
 class FakeXHR {
-  responseType = '';
-  response: unknown = null;
+  static last: FakeXHR | null = null;
+  /** Queued reply for the next request. */
+  static next: { status: number; body: unknown } = { status: 200, body: {} };
+
+  method = '';
+  url = '';
+  headers: Record<string, string> = {};
+  body: FormData | null = null;
+  timeout = 0;
+  status = 0;
+  responseText = '';
+
   onload: (() => void) | null = null;
   onerror: (() => void) | null = null;
-  private uri = '';
+  ontimeout: (() => void) | null = null;
 
-  open(_method: string, uri: string) {
-    this.uri = uri;
+  constructor() {
+    FakeXHR.last = this;
   }
 
-  send() {
-    if (this.uri.startsWith('file://')) {
-      this.response = new Blob([new Uint8Array([0xff, 0xd8, 0xff])], { type: 'image/jpeg' });
-      this.onload?.();
-    } else {
-      this.onerror?.();
-    }
+  open(method: string, url: string) {
+    this.method = method;
+    this.url = url;
+  }
+
+  setRequestHeader(key: string, value: string) {
+    this.headers[key] = value;
+  }
+
+  send(body: FormData) {
+    this.body = body;
+    this.status = FakeXHR.next.status;
+    this.responseText = JSON.stringify(FakeXHR.next.body);
+    this.onload?.();
   }
 }
 
 (global as unknown as { XMLHttpRequest: unknown }).XMLHttpRequest = FakeXHR;
 
+/**
+ * React Native's `FormData`, not the browser's.
+ *
+ * Node's built-in `FormData` follows the web spec, where a value may only be a
+ * string or a `Blob` — so appending `{ uri, name, type }` **stringifies it to
+ * "[object Object]"**, and a test using it would assert against a shape the app
+ * never produces.
+ *
+ * React Native's implementation keeps whatever it is given and hands it to its
+ * networking layer through `getParts()`, which is the entire mechanism the
+ * upload depends on. Expo patches that class rather than replacing it, so this
+ * is what runs on the device.
+ */
+class RNFormData {
+  private parts: [string, unknown][] = [];
+
+  append(name: string, value: unknown) {
+    this.parts.push([name, value]);
+  }
+
+  get(name: string): unknown {
+    const found = this.parts.find(([key]) => key === name);
+    return found ? found[1] : null;
+  }
+
+  getParts() {
+    return this.parts;
+  }
+}
+
+(global as unknown as { FormData: unknown }).FormData = RNFormData;
+
+/** Queue the transport's reply, whichever transport the call ends up using. */
 function reply(status: number, body: unknown) {
+  FakeXHR.next = { status, body };
   return {
     ok: status >= 200 && status < 300,
     status,
+    text: async () => JSON.stringify(body),
     json: async () => body,
   };
+}
+
+/** What the upload actually sent, for assertions. */
+function sent(): FakeXHR {
+  if (!FakeXHR.last) throw new Error('No request was sent');
+  return FakeXHR.last;
 }
 
 const FILE = { uri: 'file:///tmp/invoice.jpg', name: 'invoice.jpg', type: 'image/jpeg' };
@@ -91,6 +153,8 @@ const VEHICLE = '11111111-1111-4111-8111-111111111111';
 
 beforeEach(() => {
   jest.clearAllMocks();
+  FakeXHR.last = null;
+  FakeXHR.next = { status: 200, body: {} };
   getAccessToken.mockResolvedValue('a-token');
 });
 
@@ -132,7 +196,7 @@ describe('uploadInvoice — the 200-with-success-false refusals', () => {
   it('raises rather than guesses when success is false for an unknown reason', async () => {
     // A server that has shipped a third refusal to a client that predates it.
     // Treating it as filed is the exact defect this module is shaped around.
-    fetchMock.mockResolvedValue(reply(200, { success: false, error: 'SOMETHING_NEW' }));
+    void (reply(200, { success: false, error: 'SOMETHING_NEW' }));
 
     await expect(uploadInvoice({ vehicleId: VEHICLE, file: FILE })).rejects.toThrow(
       'SOMETHING_NEW'
@@ -156,7 +220,7 @@ describe('uploadInvoice — success', () => {
   it('treats zero extracted items as filed, because it is', async () => {
     // An invoice whose lines could not be itemised is still stored. Reporting
     // it as a failure would lose a document the server kept.
-    fetchMock.mockResolvedValue(reply(200, { success: true, documentId: 'doc-2' }));
+    void (reply(200, { success: true, documentId: 'doc-2' }));
 
     const result = await uploadInvoice({ vehicleId: VEHICLE, file: FILE });
     expect(result).toEqual({ status: 'uploaded', documentId: 'doc-2', itemsExtracted: 0 });
@@ -165,42 +229,39 @@ describe('uploadInvoice — success', () => {
 
 describe('uploadInvoice — what is sent', () => {
   it('sends multipart without a hand-written Content-Type', async () => {
-    fetchMock.mockResolvedValue(reply(200, { success: true, documentId: 'd', itemsExtracted: 0 }));
+    reply(200, { success: true, documentId: 'd', itemsExtracted: 0 });
 
     await uploadInvoice({ vehicleId: VEHICLE, file: FILE });
 
-    const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe('https://example.test/api/v1/upload-document');
-    expect(init.method).toBe('POST');
+    expect(sent().url).toBe('https://example.test/api/v1/upload-document');
+    expect(sent().method).toBe('POST');
 
     /*
-      Two failures this pins at once. A hand-set multipart Content-Type omits
-      the boundary the runtime generates and the server cannot parse the body;
-      and `JSON.stringify(formData)` is `"{}"`, which uploads nothing while
-      looking entirely successful.
+      A hand-set multipart Content-Type omits the boundary the runtime
+      generates, leaving a body the server cannot parse. React Native writes
+      the header itself, so this must never appear.
     */
-    expect(init.headers['Content-Type']).toBeUndefined();
-    expect(init.body).toBeInstanceOf(FormData);
-    expect(typeof init.body).not.toBe('string');
+    expect(sent().headers['Content-Type']).toBeUndefined();
+    expect(sent().headers['content-type']).toBeUndefined();
+    expect(sent().body).toBeInstanceOf(RNFormData);
   });
 
   it('still sends the bearer token', async () => {
-    fetchMock.mockResolvedValue(reply(200, { success: true, documentId: 'd', itemsExtracted: 0 }));
+    reply(200, { success: true, documentId: 'd', itemsExtracted: 0 });
 
     await uploadInvoice({ vehicleId: VEHICLE, file: FILE });
 
-    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer a-token');
+    expect(sent().headers.Authorization).toBe('Bearer a-token');
   });
 
   it('omits the confirmation flag unless it was given', async () => {
-    fetchMock.mockResolvedValue(reply(200, { success: true, documentId: 'd', itemsExtracted: 0 }));
+    reply(200, { success: true, documentId: 'd', itemsExtracted: 0 });
 
     await uploadInvoice({ vehicleId: VEHICLE, file: FILE });
-    expect(fetchMock.mock.calls[0][1].body.get('bypassVehicleCheck')).toBeNull();
+    expect(sent().body?.get('bypassVehicleCheck')).toBeNull();
 
-    fetchMock.mockClear();
     await uploadInvoice({ vehicleId: VEHICLE, file: FILE, confirmVehicle: true });
-    expect(fetchMock.mock.calls[0][1].body.get('bypassVehicleCheck')).toBe('true');
+    expect(sent().body?.get('bypassVehicleCheck')).toBe('true');
   });
 });
 
@@ -225,7 +286,7 @@ describe('uploadInvoice — refused before anything is uploaded', () => {
   it('lets an unknown size through, because unknown is not oversized', async () => {
     // Not every picker reports a size. Refusing on absence would block a valid
     // upload to avoid a check the server performs anyway.
-    fetchMock.mockResolvedValue(reply(200, { success: true, documentId: 'd', itemsExtracted: 1 }));
+    void (reply(200, { success: true, documentId: 'd', itemsExtracted: 1 }));
 
     await expect(uploadInvoice({ vehicleId: VEHICLE, file: FILE })).resolves.toMatchObject({
       status: 'uploaded',
@@ -370,28 +431,33 @@ describe('the FormData part the runtime will actually accept', () => {
     accepts only a string, a real Blob, or something implementing `bytes()` —
     never React Native's `{ uri, name, type }` convention.
   */
-  it('appends a Blob, not a { uri } object', async () => {
-    fetchMock.mockResolvedValue(reply(200, { success: true, documentId: 'd', itemsExtracted: 0 }));
+  it("appends React Native's { uri, name, type } part", async () => {
+    reply(200, { success: true, documentId: 'd', itemsExtracted: 0 });
 
     await uploadInvoice({ vehicleId: VEHICLE, file: FILE });
 
-    const part = fetchMock.mock.calls[0][1].body.get('file');
-    expect(part).toBeInstanceOf(Blob);
-    // The exact shape that failed. A plain object with a `uri` is what Expo's
-    // encoder rejects outright.
-    expect(typeof part).not.toBe('string');
-    expect((part as unknown as { uri?: string }).uri).toBeUndefined();
+    const part = sent().body?.get('file') as unknown as {
+      uri?: string;
+      name?: string;
+      type?: string;
+    };
+
+    /*
+      The shape RN's networking streams from disk. A `Blob` here is the version
+      that cannot work on this binary at all — RN's Blob exposes no
+      `arrayBuffer()` and `FileReaderModule` is not compiled in.
+    */
+    expect(part.uri).toBe('file:///tmp/invoice.jpg');
   });
 
   it('keeps the filename, because the server builds a storage path from it', async () => {
-    // Expo writes `filename=` only when the part has a `name`, and the server
-    // calls vehicleStoragePath(..., file.name). A nameless part uploads and is
-    // then stored under a broken path.
-    fetchMock.mockResolvedValue(reply(200, { success: true, documentId: 'd', itemsExtracted: 0 }));
+    // The server calls vehicleStoragePath(..., file.name). A nameless part
+    // uploads and is then stored under a broken path.
+    reply(200, { success: true, documentId: 'd', itemsExtracted: 0 });
 
     await uploadInvoice({ vehicleId: VEHICLE, file: FILE });
 
-    const part = fetchMock.mock.calls[0][1].body.get('file') as File;
+    const part = sent().body?.get('file') as unknown as { name?: string; type?: string };
     expect(part.name).toBe('invoice.jpg');
     expect(part.type).toBe('image/jpeg');
   });

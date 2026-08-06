@@ -174,6 +174,39 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   if (body !== undefined && !isMultipart) headers['Content-Type'] = 'application/json';
 
   /*
+    ── Multipart goes over XMLHttpRequest, not fetch ─────────────────────────
+
+    The global `fetch` here is Expo's, and its multipart encoder needs a real
+    `Blob` — it calls `blobToArrayBufferAsync`, which falls back to
+    `FileReader.readAsArrayBuffer` for anything lacking `arrayBuffer()`.
+    **Neither half of that works on this binary**: React Native's `Blob`
+    implements only `slice`/`size`/`type`, and `FileReaderModule` is not
+    compiled into the installed app — verified by reading the dylib, where
+    `BlobModule` appears 8 times and `FileReaderModule` zero.
+
+    So the Blob route is closed without a new cloud build, and appending
+    React Native's `{ uri, name, type }` part to Expo's fetch is what produced
+    `Unsupported FormDataPart implementation` at 4ms.
+
+    XHR is React Native's own networking. It understands that part shape
+    natively, **streams the file from disk** rather than materialising it in
+    memory, and sets the multipart boundary itself. Expo only *patches* RN's
+    FormData rather than replacing it, so `new FormData()` still carries the
+    `getParts()` that XHR reads.
+
+    Everything else keeps the fetch path exactly as it was.
+  */
+  if (isMultipart) {
+    return sendMultipart<T>({
+      url: `${API_BASE_URL}${API_PREFIX}${path}`,
+      method,
+      headers,
+      form: body as FormData,
+      timeoutMs,
+    });
+  }
+
+  /*
     Timed, and abandoned deliberately rather than left to the platform's 60s.
     The elapsed number is the point: an instant failure is a phone with no
     route to the host, and a failure at a suspiciously round number of seconds
@@ -236,7 +269,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     clearTimeout(abandon);
   }
 
-  const payload = await readJson(response);
+  const { parsed: payload, raw } = await readBody(response);
 
   if (!response.ok) {
     throw new ApiRequestError({
@@ -246,6 +279,13 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       // platform ceiling and a 502 at fifty milliseconds is a bad deploy, and
       // the status alone does not distinguish them.
       elapsedMs: Date.now() - startedAt,
+      /*
+        The body, trimmed. A 400 from validation and a 500 from storage are the
+        same sentence on screen without it, and an HTML error page — which is
+        what an edge proxy returns — carries no `error` field at all, so the
+        parsed payload would be empty exactly when the raw text matters most.
+      */
+      cause: raw ? raw.slice(0, 300) : undefined,
       // The server's own message when it sent one — those are written to be
       // shown and are careful not to leak whether a resource exists.
       message: typeof payload?.error === 'string' ? payload.error : `Request failed (${response.status})`,
@@ -263,10 +303,153 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
  * matters. This is the cold-start symptom `STATUS` records against
  * `/api/version` — HTML where JSON was expected, moments after a deploy.
  */
-async function readJson(response: Response): Promise<Record<string, unknown> | null> {
+/**
+ * POST a multipart form through React Native's networking.
+ *
+ * Mirrors the fetch path's error contract exactly — same `kind`, same
+ * `elapsedMs`, same `cause`, same body capture — because a failure here must
+ * be as legible as one there. The whole reason this branch exists is that a
+ * failure on it was, for three rounds, indistinguishable from a network
+ * outage.
+ */
+function sendMultipart<T>({
+  url,
+  method,
+  headers,
+  form,
+  timeoutMs,
+}: {
+  url: string;
+  method: string;
+  headers: Record<string, string>;
+  form: FormData;
+  timeoutMs: number;
+}): Promise<T> {
+  const startedAt = Date.now();
+
+  return new Promise<T>((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open(method, url);
+
+    /*
+      Content-Type is deliberately not set. React Native generates the
+      multipart boundary when it serialises the form, and a hand-written
+      header omits it — leaving a body the server cannot parse.
+    */
+    for (const [key, value] of Object.entries(headers)) {
+      if (key.toLowerCase() === 'content-type') continue;
+      request.setRequestHeader(key, value);
+    }
+
+    request.timeout = timeoutMs;
+
+    request.onload = () => {
+      const elapsedMs = Date.now() - startedAt;
+      const raw = request.responseText ?? '';
+
+      let parsed: Record<string, unknown> | null = null;
+      try {
+        parsed = JSON.parse(raw) as Record<string, unknown>;
+      } catch {
+        // An edge proxy answers with HTML. The raw text is then the only clue,
+        // and it is exactly the case where the parsed body would be empty.
+      }
+
+      if (request.status < 200 || request.status >= 300) {
+        reject(
+          new ApiRequestError({
+            status: request.status,
+            kind: 'http',
+            elapsedMs,
+            cause: raw ? raw.slice(0, 300) : undefined,
+            message:
+              typeof parsed?.error === 'string'
+                ? parsed.error
+                : `Request failed (${request.status})`,
+          })
+        );
+        return;
+      }
+
+      resolve(parsed as T);
+    };
+
+    request.ontimeout = () =>
+      reject(
+        new ApiRequestError({
+          status: 0,
+          origin: 'device',
+          kind: 'timeout',
+          elapsedMs: Date.now() - startedAt,
+          cause: 'XMLHttpRequest timeout',
+          message: `CrewChief did not answer within ${Math.round(timeoutMs / 1000)} seconds.`,
+        })
+      );
+
+    request.onerror = () =>
+      reject(
+        new ApiRequestError({
+          status: 0,
+          origin: 'device',
+          kind: 'offline',
+          elapsedMs: Date.now() - startedAt,
+          cause: 'XMLHttpRequest error',
+          message: 'Could not reach CrewChief. Check your connection.',
+        })
+      );
+
+    try {
+      request.send(form);
+    } catch (error) {
+      // Building the request failed — our bug, not the network's.
+      reject(
+        new ApiRequestError({
+          status: 0,
+          origin: 'device',
+          kind: 'request',
+          elapsedMs: Date.now() - startedAt,
+          cause: (error as Error)?.message,
+          message: 'CrewChief could not send that request.',
+        })
+      );
+    }
+  });
+}
+
+async function readBody(
+  response: Response
+): Promise<{ parsed: Record<string, unknown> | null; raw: string | null }> {
+  /*
+    Text first, then parse. `response.json()` consumes the stream, so a failed
+    parse would leave nothing to look at — and a body that will not parse is
+    exactly the case where reading it matters, since an edge proxy answers with
+    HTML rather than JSON.
+  */
+  if (typeof response.text === 'function') {
+    let raw: string | null = null;
+    try {
+      raw = await response.text();
+    } catch {
+      return { parsed: null, raw: null };
+    }
+
+    try {
+      return { parsed: JSON.parse(raw) as Record<string, unknown>, raw };
+    } catch {
+      return { parsed: null, raw };
+    }
+  }
+
+  /*
+    Falls back to `json()` where `text()` is absent. Not defensive clutter: a
+    test double caught this, and the failure mode is the quiet one — the
+    server's own error message silently replaced by "Request failed (404)",
+    which is precisely the class of message-flattening this whole round has
+    been about.
+  */
   try {
-    return (await response.json()) as Record<string, unknown>;
+    return { parsed: (await response.json()) as Record<string, unknown>, raw: null };
   } catch {
-    return null;
+    return { parsed: null, raw: null };
   }
 }

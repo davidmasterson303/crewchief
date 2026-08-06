@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import {
   uploadInvoice,
   describeUploadError,
+  diagnoseUploadError,
   type ExtractedVehicle,
   type InvoiceFile,
 } from '../api/documents';
@@ -149,7 +150,9 @@ export function InvoiceScanScreen({
           // Instructing someone to sign in without giving them a way to is the
           // defect this pairs with — see the button below.
           signInMayHelp: caught instanceof ApiRequestError && caught.status === 401,
-          diagnostic: caught instanceof ApiRequestError ? caught.diagnostic : undefined,
+          // Unconditional. Gating this on the error *type* is what left the
+          // one unanticipated branch with nothing to report.
+          diagnostic: diagnoseUploadError(caught),
         });
 
         /*
@@ -195,7 +198,7 @@ export function InvoiceScanScreen({
         status: 'error',
         message: describeUploadError(caught),
         retryable: false,
-        diagnostic: caught instanceof ApiRequestError ? caught.diagnostic : undefined,
+        diagnostic: diagnoseUploadError(caught),
       });
     }
   }, [pickImage, send]);
