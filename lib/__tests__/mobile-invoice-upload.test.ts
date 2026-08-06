@@ -268,3 +268,65 @@ describe('describeUploadError', () => {
     );
   });
 });
+
+describe('the three failures that shared one sentence', () => {
+  /*
+    "Could not reach CrewChief. Check your connection." covered genuinely
+    offline, a request abandoned by us, and a server that never answered —
+    three different fixes behind one line. It cost three rounds of testing and
+    sent a tester to check their Wi-Fi while a serverless function was merely
+    cold.
+  */
+  it('says "too long" for a timeout, not "check your connection"', () => {
+    const timedOut = new ApiRequestError({
+      status: 0,
+      message: 'CrewChief did not answer within 45 seconds.',
+      origin: 'device',
+      kind: 'timeout',
+      elapsedMs: 45_000,
+    });
+
+    expect(describeUploadError(timedOut)).toMatch(/too long/i);
+    expect(describeUploadError(timedOut)).not.toMatch(/connection/i);
+    // The photo is still on the phone, and saying so is the difference
+    // between a retry and a reshoot.
+    expect(describeUploadError(timedOut)).toMatch(/not lost/i);
+  });
+
+  it('keeps "check your connection" for a genuine offline failure', () => {
+    const offline = new ApiRequestError({
+      status: 0,
+      message: 'Could not reach CrewChief. Check your connection.',
+      origin: 'device',
+      kind: 'offline',
+      elapsedMs: 120,
+    });
+
+    expect(describeUploadError(offline)).toMatch(/connection/i);
+  });
+
+  it('carries elapsed time and cause in the diagnostic', () => {
+    // The number that was missing every time: an instant failure and a
+    // failure at a platform ceiling are the same sentence without it.
+    const error = new ApiRequestError({
+      status: 0,
+      message: 'x',
+      origin: 'device',
+      kind: 'timeout',
+      elapsedMs: 10_042,
+      cause: 'Network request failed',
+    });
+
+    expect(error.diagnostic).toContain('10042ms');
+    expect(error.diagnostic).toContain('timeout');
+    expect(error.diagnostic).toContain('Network request failed');
+  });
+
+  it('records elapsed time on HTTP failures too', () => {
+    // A 502 at ten seconds is a platform ceiling; a 502 at fifty milliseconds
+    // is a bad deploy. The status alone cannot tell them apart.
+    const gatewayError = new ApiRequestError({ status: 502, message: 'Bad gateway', elapsedMs: 10_003 });
+    expect(gatewayError.diagnostic).toContain('10003ms');
+    expect(gatewayError.kind).toBe('http');
+  });
+});

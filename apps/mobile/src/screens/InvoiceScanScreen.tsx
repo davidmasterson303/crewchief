@@ -68,7 +68,14 @@ type State =
     screen with no way back to the picker. Only a failure that *might* pass on a
     second attempt gets a retry.
   */
-  | { status: 'error'; message: string; retryable: boolean; signInMayHelp?: boolean };
+  | {
+      status: 'error';
+      message: string;
+      retryable: boolean;
+      signInMayHelp?: boolean;
+      /** `__DEV__` only — kind, origin, status, elapsed ms, and the raw cause. */
+      diagnostic?: string;
+    };
 
 function describeVehicle(vehicle: ExtractedVehicle | null): string {
   if (!vehicle) return 'an unrecognised vehicle';
@@ -142,6 +149,7 @@ export function InvoiceScanScreen({
           // Instructing someone to sign in without giving them a way to is the
           // defect this pairs with — see the button below.
           signInMayHelp: caught instanceof ApiRequestError && caught.status === 401,
+          diagnostic: caught instanceof ApiRequestError ? caught.diagnostic : undefined,
         });
 
         /*
@@ -183,7 +191,12 @@ export function InvoiceScanScreen({
         A refused permission or a rejected file type. Resending changes
         nothing, so this offers a different file rather than a doomed retry.
       */
-      setState({ status: 'error', message: describeUploadError(caught), retryable: false });
+      setState({
+        status: 'error',
+        message: describeUploadError(caught),
+        retryable: false,
+        diagnostic: caught instanceof ApiRequestError ? caught.diagnostic : undefined,
+      });
     }
   }, [pickImage, send]);
 
@@ -289,6 +302,18 @@ export function InvoiceScanScreen({
         <View style={styles.block}>
           <Text style={styles.title}>That did not upload</Text>
           <Text style={styles.body_}>{state.message}</Text>
+
+          {/*
+            The line that ends the guessing. Three rounds of testing could not
+            answer "did the request reach the server, and how long did it take"
+            from this screen, so every report had to describe symptoms and every
+            reply had to hypothesise. `__DEV__` only — it is diagnostic text,
+            not product copy, and it compiles out exactly as the token panel
+            does.
+          */}
+          {__DEV__ && state.diagnostic ? (
+            <Text style={styles.diagnostic}>{state.diagnostic}</Text>
+          ) : null}
           {/*
             Retry resends the file already chosen rather than reopening the
             camera — the photograph may be of a bill no longer in front of the
@@ -366,4 +391,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   secondaryText: { color: '#fff', fontSize: 15 },
+
+  /* Monospace so an elapsed figure is scannable; dev builds only. */
+  diagnostic: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 12,
+    fontFamily: 'Menlo',
+    marginTop: -4,
+  },
 });

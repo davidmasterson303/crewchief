@@ -28,21 +28,60 @@ import { getAccessToken } from '../auth/session';
  */
 export type FailureOrigin = 'device' | 'server';
 
+/**
+ * What actually went wrong, when `status` cannot say.
+ *
+ * **"Could not reach CrewChief" covered three different fixes**: genuinely
+ * offline, a request that ran out of patience, and a server that accepted the
+ * request and never answered. On 5 Aug that ambiguity sent a tester to check
+ * their Wi-Fi while the real cause was a cold serverless function — and then
+ * hid an upload failure behind the same sentence twice more.
+ *
+ * `http` is the ordinary case where the status code is the whole story.
+ */
+export type FailureKind = 'http' | 'offline' | 'timeout';
+
 export interface ApiError {
   status: number;
   message: string;
   origin?: FailureOrigin;
+  kind?: FailureKind;
+  /** Wall-clock time until the failure. The single most diagnostic number. */
+  elapsedMs?: number;
+  /** The runtime's own words, for a dev build to show. Never shown in release. */
+  cause?: string;
 }
 
 export class ApiRequestError extends Error {
   readonly status: number;
   readonly origin: FailureOrigin;
+  readonly kind: FailureKind;
+  readonly elapsedMs: number | null;
+  readonly cause: string | null;
 
-  constructor({ status, message, origin = 'server' }: ApiError) {
+  constructor({ status, message, origin = 'server', kind = 'http', elapsedMs, cause }: ApiError) {
     super(message);
     this.name = 'ApiRequestError';
     this.status = status;
     this.origin = origin;
+    this.kind = kind;
+    this.elapsedMs = elapsedMs ?? null;
+    this.cause = cause ?? null;
+  }
+
+  /**
+   * A one-line technical summary for a development build.
+   *
+   * Exists because three separate rounds of testing could not answer "did the
+   * request reach the server, and how long did it take" from the screen. The
+   * elapsed time is what distinguishes an instant refusal from a platform
+   * ceiling, and it was the number missing every time.
+   */
+  get diagnostic(): string {
+    const parts = [`${this.kind}`, `origin=${this.origin}`, `status=${this.status}`];
+    if (this.elapsedMs !== null) parts.push(`${this.elapsedMs}ms`);
+    if (this.cause) parts.push(this.cause);
+    return parts.join(' · ');
   }
 
   /** The session is gone or was rejected. Callers send the user to sign in. */
@@ -75,10 +114,23 @@ interface RequestOptions {
   body?: unknown;
   /** Endpoints that serve demo data work without a session. */
   allowAnonymous?: boolean;
+  /**
+   * How long to wait before giving up, in ms.
+   *
+   * Explicit because the platform default is 60s, which is far longer than
+   * anyone will sit looking at a spinner, and because a request that is
+   * abandoned *by us* must be reported differently from one that could not be
+   * sent at all. An invoice upload legitimately takes longer than a read —
+   * measured: a comparable multipart-plus-vision call answers in ~7.7s warm.
+   */
+  timeoutMs?: number;
 }
 
+/** Reads are quick or something is wrong. */
+const DEFAULT_TIMEOUT_MS = 20_000;
+
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, allowAnonymous = false } = options;
+  const { method = 'GET', body, allowAnonymous = false, timeoutMs = DEFAULT_TIMEOUT_MS } = options;
 
   const token = await getAccessToken();
 
@@ -115,22 +167,47 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   if (token) headers.Authorization = `Bearer ${token}`;
   if (body !== undefined && !isMultipart) headers['Content-Type'] = 'application/json';
 
+  /*
+    Timed, and abandoned deliberately rather than left to the platform's 60s.
+    The elapsed number is the point: an instant failure is a phone with no
+    route to the host, and a failure at a suspiciously round number of seconds
+    is a ceiling somewhere in the middle. Three rounds of testing could not
+    tell those apart because neither the duration nor the cause was recorded.
+  */
+  const startedAt = Date.now();
+  const controller = new AbortController();
+  const abandon = setTimeout(() => controller.abort(), timeoutMs);
+
   let response: Response;
   try {
     response = await fetch(`${API_BASE_URL}${API_PREFIX}${path}`, {
       method,
       headers,
       body: body === undefined ? undefined : isMultipart ? (body as FormData) : JSON.stringify(body),
+      signal: controller.signal,
     });
   } catch (error) {
-    // Distinguished from an HTTP error on purpose: a phone loses connectivity
-    // constantly, and "check your connection" is actionable where "something
-    // went wrong" is not.
+    const elapsedMs = Date.now() - startedAt;
+    const timedOut = controller.signal.aborted;
+
+    /*
+      Three outcomes wore one sentence until now. "Check your connection" is
+      actionable when it is true and actively misleading when it is not — it
+      sent someone to look at their Wi-Fi while a serverless function was
+      merely cold.
+    */
     throw new ApiRequestError({
       status: 0,
-      message: 'Could not reach CrewChief. Check your connection.',
       origin: 'device',
+      kind: timedOut ? 'timeout' : 'offline',
+      elapsedMs,
+      cause: (error as Error)?.message,
+      message: timedOut
+        ? `CrewChief did not answer within ${Math.round(timeoutMs / 1000)} seconds.`
+        : 'Could not reach CrewChief. Check your connection.',
     });
+  } finally {
+    clearTimeout(abandon);
   }
 
   const payload = await readJson(response);
@@ -138,6 +215,11 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   if (!response.ok) {
     throw new ApiRequestError({
       status: response.status,
+      kind: 'http',
+      // Recorded on the success-shaped path too: a 502 at ten seconds is a
+      // platform ceiling and a 502 at fifty milliseconds is a bad deploy, and
+      // the status alone does not distinguish them.
+      elapsedMs: Date.now() - startedAt,
       // The server's own message when it sent one — those are written to be
       // shown and are careful not to leak whether a resource exists.
       message: typeof payload?.error === 'string' ? payload.error : `Request failed (${response.status})`,

@@ -154,7 +154,23 @@ export async function uploadInvoice({
     itemsExtracted?: unknown;
     extractedVehicle?: unknown;
     expectedVehicle?: unknown;
-  }>('/upload-document', { method: 'POST', body: form });
+  }>('/upload-document', {
+    method: 'POST',
+    body: form,
+    /*
+      Longer than a read, and chosen from a measurement rather than a guess: a
+      comparable multipart-plus-vision call on this infrastructure answered in
+      **7.7s warm** (the anonymous front-door check, 5 Aug). This endpoint does
+      strictly more — a storage write and a document row on top of the same
+      vision pass — so 45s leaves room for a cold function without leaving
+      someone watching a spinner indefinitely.
+
+      If uploads fail at a consistent number well under this, the ceiling is
+      the platform's and not ours, and the answer is a job plus a poll rather
+      than a larger number here.
+    */
+    timeoutMs: 45_000,
+  });
 
   /*
     The 200-with-`success: false` branch. Checked before the success branch
@@ -225,6 +241,19 @@ export function describeUploadError(error: unknown): string {
   if (error instanceof InvoiceFileError) return error.message;
 
   if (error instanceof ApiRequestError) {
+    /*
+      Reported before the status checks, because the three failures that share
+      status 0 are the ones that have cost the most time. Each names a
+      different fix: nothing was sent, or nothing came back.
+    */
+    if (error.kind === 'timeout') {
+      return 'CrewChief took too long to read that invoice. Your photo was not lost — try again.';
+    }
+
+    if (error.kind === 'offline') {
+      return 'Could not reach CrewChief. Check your connection.';
+    }
+
     if (error.status === 401) {
       /*
         The two 401s are different problems and now say so. Until 5 Aug both
