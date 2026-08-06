@@ -7,6 +7,7 @@ import {
   type ExtractedVehicle,
   type InvoiceFile,
 } from '../api/documents';
+import { ApiRequestError } from '../api/client';
 
 /**
  * Phase 3.3 — photograph an invoice and have its line items read.
@@ -67,7 +68,7 @@ type State =
     screen with no way back to the picker. Only a failure that *might* pass on a
     second attempt gets a retry.
   */
-  | { status: 'error'; message: string; retryable: boolean };
+  | { status: 'error'; message: string; retryable: boolean; signInMayHelp?: boolean };
 
 function describeVehicle(vehicle: ExtractedVehicle | null): string {
   if (!vehicle) return 'an unrecognised vehicle';
@@ -134,12 +135,29 @@ export function InvoiceScanScreen({
           timeout, a 500, a rate limit — all of which can succeed on a second
           attempt with the same file.
         */
-        setState({ status: 'error', message, retryable: true });
+        setState({
+          status: 'error',
+          message,
+          retryable: true,
+          // Instructing someone to sign in without giving them a way to is the
+          // defect this pairs with — see the button below.
+          signInMayHelp: caught instanceof ApiRequestError && caught.status === 401,
+        });
 
-        // 401 is the one failure a retry cannot fix. `App.tsx` swaps to sign-in
-        // the moment the session clears, so this reports it and lets that
-        // happen rather than offering a button that cannot work.
-        if ((caught as { status?: number })?.status === 401) onSignOut();
+        /*
+          **No longer signs the user out on any 401.** It used to, and that was
+          wrong twice over: a *server* 401 may be a token the server would
+          accept a second later, so clearing the session destroys a working one
+          over a single response — and when `signOut()` itself then failed, the
+          app sat on an error saying "sign in again" while every other screen
+          stayed happily authenticated. That is exactly what a real tester hit
+          on 5 Aug, three times out of three.
+
+          Only a device-side 401 — this client knowing it holds no session — is
+          acted on automatically, because there is nothing to preserve. Anything
+          else offers the button below and lets the person decide.
+        */
+        if (caught instanceof ApiRequestError && caught.isLocallySignedOut) onSignOut();
       }
     },
     [vehicleId, onSignOut, onFiled]
@@ -280,9 +298,26 @@ export function InvoiceScanScreen({
 
             A way back to the picker is always present, in every branch.
           */}
+          {/*
+            The affordance the copy used to assume. An error that says "sign in
+            again" while offering only Try again / Choose a file / Take a photo
+            is an instruction with nowhere to follow it — `onSignOut` clears the
+            session, which is what makes `App.tsx` show the sign-in screen.
+          */}
+          {state.signInMayHelp ? (
+            <Pressable style={styles.primary} onPress={onSignOut}>
+              <Text style={styles.primaryText}>Sign in again</Text>
+            </Pressable>
+          ) : null}
+
           {state.retryable && file ? (
-            <Pressable style={styles.primary} onPress={() => void send(file, false)}>
-              <Text style={styles.primaryText}>Try again</Text>
+            <Pressable
+              style={state.signInMayHelp ? styles.secondary : styles.primary}
+              onPress={() => void send(file, false)}
+            >
+              <Text style={state.signInMayHelp ? styles.secondaryText : styles.primaryText}>
+                Try again
+              </Text>
             </Pressable>
           ) : null}
 

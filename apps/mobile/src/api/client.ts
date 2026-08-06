@@ -15,23 +15,52 @@ import { getAccessToken } from '../auth/session';
  * send a token that was valid when it mounted.
  */
 
+/**
+ * Where a failure was decided.
+ *
+ * **A 401 means two completely different things and they were indistinguishable
+ * until 5 Aug.** `device` is this client refusing to send at all because it
+ * holds no session; `server` is CrewChief rejecting a token that *was* sent.
+ * Both produced "Your session ended", so a real upload failure could not be
+ * told from a request that never left the phone — which is exactly the
+ * question that mattered when the invoice upload started 401ing while every
+ * read on the same session kept working.
+ */
+export type FailureOrigin = 'device' | 'server';
+
 export interface ApiError {
   status: number;
   message: string;
+  origin?: FailureOrigin;
 }
 
 export class ApiRequestError extends Error {
   readonly status: number;
+  readonly origin: FailureOrigin;
 
-  constructor({ status, message }: ApiError) {
+  constructor({ status, message, origin = 'server' }: ApiError) {
     super(message);
     this.name = 'ApiRequestError';
     this.status = status;
+    this.origin = origin;
   }
 
   /** The session is gone or was rejected. Callers send the user to sign in. */
   get isUnauthorized(): boolean {
     return this.status === 401;
+  }
+
+  /**
+   * True only when **this device** decided it has no session.
+   *
+   * The distinction is worth acting on, not just logging: a `device` 401 is
+   * genuinely signed out and clearing the session is correct. A `server` 401
+   * may be a token the server would accept a second later, and destroying a
+   * working session over one response is how a spurious failure becomes a
+   * forced re-login.
+   */
+  get isLocallySignedOut(): boolean {
+    return this.status === 401 && this.origin === 'device';
   }
 }
 
@@ -60,7 +89,12 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       a slow connection it turns an instant "you are signed out" into several
       seconds of spinner.
     */
-    throw new ApiRequestError({ status: 401, message: 'Not signed in' });
+    throw new ApiRequestError({
+      status: 401,
+      message: 'Not signed in',
+      // Decided here. Nothing was sent, so this is never the server's verdict.
+      origin: 'device',
+    });
   }
 
   /*
@@ -95,6 +129,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     throw new ApiRequestError({
       status: 0,
       message: 'Could not reach CrewChief. Check your connection.',
+      origin: 'device',
     });
   }
 

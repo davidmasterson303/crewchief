@@ -203,9 +203,45 @@ describe('uploadInvoice — refused before anything is uploaded', () => {
 });
 
 describe('describeUploadError', () => {
-  it('tells someone with a dead session what will actually help', async () => {
-    expect(describeUploadError(new ApiRequestError({ status: 401, message: 'Unauthorized' })))
-      .toMatch(/sign in again/i);
+  /*
+    The two 401s say different things, and that difference is the whole reason
+    the 5 Aug upload failure took a second round trip to diagnose. Both read
+    "Your session ended", so an upload the phone refused to send was
+    indistinguishable from one the server rejected — while every read on the
+    same session kept working.
+  */
+  it('tells a genuinely signed-out device to sign in', () => {
+    const local = new ApiRequestError({
+      status: 401,
+      message: 'Not signed in',
+      origin: 'device',
+    });
+
+    expect(local.isLocallySignedOut).toBe(true);
+    expect(describeUploadError(local)).toMatch(/sign in again/i);
+  });
+
+  it('does not claim the session ended when the server rejected it', () => {
+    // Default origin is 'server'. Saying "your session ended" here is a claim
+    // this client cannot support — and was false in the real report, where
+    // every other screen stayed authenticated.
+    const remote = new ApiRequestError({ status: 401, message: 'Unauthorized' });
+
+    expect(remote.isLocallySignedOut).toBe(false);
+    expect(describeUploadError(remote)).not.toMatch(/session ended/i);
+    expect(describeUploadError(remote)).toMatch(/would not accept/i);
+  });
+
+  it('names no PDF anywhere, because the picker cannot select one', () => {
+    // The claim was removed from the scan screen and survived in this string,
+    // which is its own small lesson about copy living in two files.
+    const messages = [
+      describeUploadError(new ApiRequestError({ status: 401, message: 'x', origin: 'device' })),
+      describeUploadError(new ApiRequestError({ status: 500, message: 'x' })),
+      describeUploadError(new InvoiceFileError('That file type cannot be read. Choose a photo.')),
+    ];
+
+    for (const message of messages) expect(message).not.toMatch(/pdf/i);
   });
 
   it('says a rate limit is temporary rather than broken', () => {

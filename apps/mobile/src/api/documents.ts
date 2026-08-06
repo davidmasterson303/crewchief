@@ -13,14 +13,8 @@ import { MAX_FILE_SIZE, ALLOWED_DOCUMENT_TYPES } from '@crewchief/core/validatio
  * and covered first, and picking an image is the small piece that lands once
  * the build is spent.
  *
- * ⚠ **No screen imports this yet, and that is the one risk in staging it.**
- * `core-check.ts` sat exported-and-unimported from Phase 3.2 until 5 Aug for
- * exactly this reason, and nothing was loud when it happened. The difference
- * here is that the gap is deliberate, dated and written down: it closes when
- * the invoice screen lands, and until then
- * `lib/__tests__/mobile-invoice-upload.test.ts` is what exercises this file.
- * If a native build has been spent and there is still no caller, this module is
- * the thing to wire up rather than to rewrite.
+ * Staged with no caller for a few hours on 5 Aug and flagged as such at the
+ * time; `InvoiceScanScreen` closed that gap the same day.
  *
  * ── The failure that a normal error path cannot see ─────────────────────────
  *
@@ -116,10 +110,19 @@ export async function uploadInvoice({
   confirmVehicle = false,
 }: UploadInvoiceParams): Promise<InvoiceUploadResult> {
   if (!ALLOWED_DOCUMENT_TYPES.includes(file.type)) {
-    // Named rather than listed: "image/jpeg, image/png, image/jpg, image/webp,
-    // application/pdf" is the server's wording for a developer, and this one is
-    // read by someone who just took a photograph.
-    throw new InvoiceFileError('That file type cannot be read. Use a photo or a PDF.');
+    /*
+      Named rather than listed: the server's comma-separated MIME list is
+      wording for a developer, and this is read by someone who just took a
+      photograph.
+
+
+      No PDF in this sentence. The server accepts them; the picker is
+      `mediaTypes: ['images']` and cannot select one, so naming a PDF sends
+      someone looking for a control that does not exist. Same defect as the
+      scan screen's blurb, which lost the same claim — it survived here because
+      the string lives in a different file.
+    */
+    throw new InvoiceFileError('That file type cannot be read. Choose a photo.');
   }
 
   if (typeof file.size === 'number' && file.size > MAX_FILE_SIZE) {
@@ -222,7 +225,22 @@ export function describeUploadError(error: unknown): string {
   if (error instanceof InvoiceFileError) return error.message;
 
   if (error instanceof ApiRequestError) {
-    if (error.status === 401) return 'Your session ended. Sign in again to upload this.';
+    if (error.status === 401) {
+      /*
+        The two 401s are different problems and now say so. Until 5 Aug both
+        read "Your session ended", so an upload that never left the phone was
+        indistinguishable from one the server refused — which is precisely the
+        question that mattered when uploads began 401ing while every read on the
+        same session kept working.
+
+        The wording still avoids blaming the person. "This device" and "the
+        server" are the two places the answer can be, and naming which one is
+        what makes the next report useful rather than ambiguous.
+      */
+      return error.isLocallySignedOut
+        ? 'This device is signed out. Sign in again to upload this.'
+        : 'CrewChief would not accept this upload on your current session.';
+    }
     if (error.status === 404) return 'That vehicle is no longer in your garage.';
     if (error.status === 413) return 'That file is too large to upload.';
     if (error.status === 429) return 'Too many uploads just now. Try again in a minute.';
