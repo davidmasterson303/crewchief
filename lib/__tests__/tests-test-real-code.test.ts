@@ -55,6 +55,11 @@ const STATIC_ANALYSIS_SUITES = [
   // config files, and the failure they pin is only observable after a build has
   // already been spent.
   'mobile-native-build-inputs.test.ts',
+  // Reads dev-session.ts to prove every EXPO_PUBLIC read sits inside a __DEV__
+  // branch. EXPO_PUBLIC values are inlined at transform time, so an unguarded
+  // read compiles a real password into the release binary — a property of the
+  // source, and one no runtime assertion could observe.
+  'mobile-dev-session-stripped.test.ts',
   // Reads apps/mobile off disk for text colours below the AA floor. The web
   // guard `text-contrast-floor.test.ts` scans app/ and components/ for Tailwind
   // class names and structurally cannot see an rgba() in a React Native

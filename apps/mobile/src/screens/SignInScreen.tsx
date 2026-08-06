@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 
 import { signIn } from '../auth/session';
+import { hasDevCredentials, signInWithDevCredentials } from '../auth/dev-session';
 import { checkSharedCore } from '../core-check';
 
 /**
@@ -97,10 +98,61 @@ export function SignInScreen() {
           )}
         </Pressable>
 
+        <DevAutoSignIn />
         <DevCoreCheck />
       </View>
     </KeyboardAvoidingView>
   );
+}
+
+/**
+ * Sign a development build in without anyone typing a password.
+ *
+ * ── Why it is automatic ─────────────────────────────────────────────────────
+ *
+ * A button would not help. The reason this exists is that automated retests
+ * stall the moment the session lapses, and there is nobody there to tap — the
+ * session died mid-test on 5 Aug and blocked a verification run outright.
+ *
+ * It runs **once per launch**, only in a dev build, and only when
+ * `apps/mobile/.env` supplies credentials. Absent that file, nothing here does
+ * anything and this screen is exactly what it always was.
+ *
+ * ── It is never silent ──────────────────────────────────────────────────────
+ *
+ * An app that signs itself in with no explanation is indistinguishable from one
+ * that ignored a sign-out, so it says what it is doing and reports a failure
+ * with the reason. A wrong password in `.env` and an unreachable auth server
+ * look identical otherwise, and nobody is watching to tell them apart.
+ *
+ * To test the real sign-in form, remove the two variables from `.env`.
+ */
+function DevAutoSignIn() {
+  const [note, setNote] = useState<string | null>(null);
+  const attempted = useRef(false);
+
+  useEffect(() => {
+    if (!hasDevCredentials() || attempted.current) return;
+    // A ref, not state: React 18 mounts effects twice in development, and a
+    // second sign-in attempt races the first one's auth state change.
+    attempted.current = true;
+
+    setNote('Dev credentials found — signing in…');
+
+    void signInWithDevCredentials().then((result) => {
+      /*
+        No success branch. A successful sign-in fires `onAuthStateChange` and
+        the root swaps this screen out, so setting state here writes to an
+        unmounted component — the same reason `handleSubmit` above has none.
+      */
+      if (result.status === 'failed') setNote(`Dev sign-in failed — ${result.error}`);
+      if (result.status === 'unavailable') setNote(null);
+    });
+  }, []);
+
+  if (!__DEV__ || !note) return null;
+
+  return <Text style={styles.devCheckOk}>{note}</Text>;
 }
 
 /**
