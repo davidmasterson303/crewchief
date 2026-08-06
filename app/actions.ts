@@ -15,6 +15,7 @@ import { budgetMessage, demoBudgetMessage } from '@crewchief/core/ai/budget';
 import { VEHICLE_RESEARCH_PROMPT, POWERTRAIN_OPTIONS_PROMPT, CONSULTANT_SYSTEM_PROMPT, CONSULTANT_DOCUMENT_VALIDATION_PROMPT } from '@crewchief/core/prompts';
 import { logger } from '@crewchief/core/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { recomputePerformanceStats } from '@/lib/performance-stats';
 import { recordAiUsageInBackground } from '@/lib/ai-usage';
 import { downloadStoredFile } from '@/lib/storage-objects';
 import { loadConsultantContext, loadedContextKinds } from '@/lib/consultant-context';
@@ -3489,25 +3490,54 @@ export async function uploadInvoice(formData: FormData) {
       labels — and the fix is always the same: move it to the one place both
       callers already go through.
 
-      **Awaited rather than fired and forgotten.** A serverless function is
-      frozen once it responds, so a floating promise here is a promise that may
-      simply never run. It costs the caller a few seconds; the alternative is a
-      score that updates only sometimes, which is worse than one that updates
-      slowly.
+      **Not awaited, and that is a correction to this same commit.** Awaiting
+      it stacked a second Gemini call onto a request that already spends ~8s in
+      vision, against a serverless ceiling this project has no configured
+      override for. Timing out there would fail an upload whose document and
+      line items are *already written* — reporting a filing that actually
+      succeeded as a failure, which is the exact class of defect the last three
+      rounds were spent removing. A stale score is recoverable; a lost
+      confirmation is not.
+
+      This matches the precedent in `app/api/v1/wishlist/complete/route.ts`,
+      which recomputes stats the same way and for the same stated reason:
+      derived display data must not make the user wait on a model.
+
+      Best-effort is honest here rather than lazy, because the *other* half of
+      this fix does the heavy lifting — `generateVehicleHealthSummary` now reads
+      `maintenance_line_items`, so any later recompute (a web visit, the 24h
+      cache expiring) produces the right answer instead of the wrong one.
 
       **Failure never fails the upload.** The invoice is stored and its line
-      items are written by this point. A stale score is a worse dashboard, not
-      a lost document — the same judgement `runVehicleResearch` makes at line
-      444 about a missing health summary.
+      items are written by this point — the same judgement `runVehicleResearch`
+      makes at line 444 about a missing health summary.
     */
     if (itemsExtracted > 0) {
-      try {
-        const refreshed = await generateVehicleHealthSummary(vehicleId, true);
-        if (!refreshed.success) {
-          console.warn('[Upload] Health summary not refreshed:', refreshed.error);
-        }
-      } catch (healthError) {
-        console.warn('[Upload] Health summary threw:', healthError);
+      generateVehicleHealthSummary(vehicleId, true).catch((healthError: unknown) => {
+        console.warn('[Upload] Health summary refresh failed:', healthError);
+      });
+
+      /*
+        Performance stats read `maintenance_line_items` too
+        (`lib/performance-stats.ts:118`), so an invoice changes them as surely
+        as it changes the health score — and this was the *other* refresh the
+        web fired from `DocumentUploadDialog` and mobile never did.
+
+        `access.client` has already proven write access to this vehicle, which
+        is what the module's own docblock requires of callers; it authorizes
+        nothing itself. Rate limited on the AI tier before spending, as its
+        other in-process caller does.
+      */
+      const statsLimit = await checkRateLimit(access.userId ?? `vehicle:${vehicleId}`, 'ai');
+      if (statsLimit.allowed) {
+        recomputePerformanceStats({
+          vehicleId,
+          client,
+          isDemo: false,
+          forceRefresh: true,
+        }).catch((statsError: unknown) => {
+          console.warn('[Upload] Performance stats refresh failed:', statsError);
+        });
       }
     }
 

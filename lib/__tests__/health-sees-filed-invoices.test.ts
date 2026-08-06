@@ -106,10 +106,39 @@ describe('the refresh runs for every client', () => {
     expect(source).toMatch(/generateVehicleHealthSummary\(vehicleId,\s*true\)/);
   });
 
-  it('awaits it, because a serverless function freezes after responding', () => {
-    // A floating promise here is a promise that may never run — the score
-    // would then update only sometimes, which is worse than slowly.
-    expect(source).toMatch(/await generateVehicleHealthSummary/);
+  it('does NOT await it, so a model call cannot fail a filed invoice', () => {
+    /*
+      Reversed within the same session, deliberately. Awaiting stacked a second
+      Gemini call onto a request that already spends ~8s in vision, against a
+      serverless ceiling with no configured override. Timing out there fails an
+      upload whose document and line items are **already written** — reporting a
+      filing that succeeded as a failure, which is the class of defect the whole
+      night was spent removing.
+
+      A stale score is recoverable; a lost confirmation is not. And the other
+      half of this fix carries the weight: the summary now reads
+      `maintenance_line_items`, so any later recompute produces the right answer
+      rather than the wrong one.
+
+      Matches `app/api/v1/wishlist/complete/route.ts`, which recomputes stats
+      the same way for the same stated reason.
+    */
+    expect(source).not.toMatch(/await generateVehicleHealthSummary/);
+    expect(source).toMatch(/generateVehicleHealthSummary\(vehicleId,\s*true\)\.catch\(/);
+  });
+
+  it('refreshes performance stats too, which also read invoice line items', () => {
+    // `lib/performance-stats.ts:118` queries maintenance_line_items, so an
+    // invoice changes them as surely as it changes the health score. This was
+    // the other refresh the web fired and mobile never did.
+    expect(source).toMatch(/recomputePerformanceStats\(/);
+    expect(source).toMatch(/forceRefresh:\s*true/);
+  });
+
+  it('rate limits the stats recompute before spending on it', () => {
+    // Its own docblock puts authorization and rate limiting on the caller.
+    const refresh = source.slice(source.indexOf('itemsExtracted > 0'));
+    expect(refresh).toMatch(/checkRateLimit\([^)]*'ai'\)/);
   });
 
   it('never fails the upload over a stale score', () => {
@@ -119,8 +148,8 @@ describe('the refresh runs for every client', () => {
       judgement `runVehicleResearch` makes about its own health call.
     */
     const refresh = source.slice(source.indexOf('generateVehicleHealthSummary'));
-    expect(source.slice(0, source.indexOf('generateVehicleHealthSummary'))).toMatch(/try\s*\{/);
-    expect(refresh).toMatch(/catch/);
+    expect(refresh).toMatch(/\.catch\(/);
+    expect(source.slice(source.indexOf('recomputePerformanceStats'))).toMatch(/\.catch\(/);
   });
 
   it('does not leave the web as the only trigger', () => {
