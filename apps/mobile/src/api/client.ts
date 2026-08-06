@@ -37,9 +37,15 @@ export type FailureOrigin = 'device' | 'server';
  * their Wi-Fi while the real cause was a cold serverless function — and then
  * hid an upload failure behind the same sentence twice more.
  *
+ * `request` was added on David's observation after the FormData defect: a throw
+ * at 4ms, before any socket opens, is **not** "offline" — the request could not
+ * be built, which is a bug in this app rather than a condition of the network.
+ * Reporting it as connectivity is what hid that defect through three rounds of
+ * testing.
+ *
  * `http` is the ordinary case where the status code is the whole story.
  */
-export type FailureKind = 'http' | 'offline' | 'timeout';
+export type FailureKind = 'http' | 'offline' | 'timeout' | 'request';
 
 export interface ApiError {
   status: number;
@@ -191,6 +197,21 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     const timedOut = controller.signal.aborted;
 
     /*
+      A network failure says so. React Native and Expo both surface transport
+      problems as "Network request failed" or an abort; anything else reaching
+      here — an unencodable body, a malformed URL — never touched the network
+      and must not claim the network is at fault.
+
+      Matched on the message because that is the only signal the runtime gives,
+      and erring toward `request` is the safe direction: mislabelling a genuine
+      outage as a client bug sends someone to read a log, while the reverse
+      sends them to restart their router.
+    */
+    const cause = (error as Error)?.message ?? '';
+    const looksLikeTransport = /network request failed|timed out|connection|abort/i.test(cause);
+    const kind: FailureKind = timedOut ? 'timeout' : looksLikeTransport ? 'offline' : 'request';
+
+    /*
       Three outcomes wore one sentence until now. "Check your connection" is
       actionable when it is true and actively misleading when it is not — it
       sent someone to look at their Wi-Fi while a serverless function was
@@ -199,12 +220,17 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     throw new ApiRequestError({
       status: 0,
       origin: 'device',
-      kind: timedOut ? 'timeout' : 'offline',
+      kind,
       elapsedMs,
-      cause: (error as Error)?.message,
-      message: timedOut
-        ? `CrewChief did not answer within ${Math.round(timeoutMs / 1000)} seconds.`
-        : 'Could not reach CrewChief. Check your connection.',
+      cause,
+      message:
+        kind === 'timeout'
+          ? `CrewChief did not answer within ${Math.round(timeoutMs / 1000)} seconds.`
+          : kind === 'offline'
+            ? 'Could not reach CrewChief. Check your connection.'
+            : // Deliberately does not mention the connection. This is our bug,
+              // and telling someone to check their Wi-Fi wastes their time.
+              'CrewChief could not send that request.',
     });
   } finally {
     clearTimeout(abandon);

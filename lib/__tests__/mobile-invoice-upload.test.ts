@@ -47,6 +47,37 @@ const { ApiRequestError } = require('../../apps/mobile/src/api/client');
 const fetchMock = jest.fn();
 global.fetch = fetchMock as unknown as typeof fetch;
 
+/**
+ * `XMLHttpRequest`, because the upload client reads the picked file through it.
+ *
+ * Not an incidental detail: XHR is React Native's own networking and is what
+ * understands `file://`, while the global `fetch` in the app is Expo's and is
+ * not required to. Node has `Blob` and `File` but no XHR, so the transport is
+ * stubbed and the conversion — uri → Blob → named `File` — is what gets tested.
+ */
+class FakeXHR {
+  responseType = '';
+  response: unknown = null;
+  onload: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  private uri = '';
+
+  open(_method: string, uri: string) {
+    this.uri = uri;
+  }
+
+  send() {
+    if (this.uri.startsWith('file://')) {
+      this.response = new Blob([new Uint8Array([0xff, 0xd8, 0xff])], { type: 'image/jpeg' });
+      this.onload?.();
+    } else {
+      this.onerror?.();
+    }
+  }
+}
+
+(global as unknown as { XMLHttpRequest: unknown }).XMLHttpRequest = FakeXHR;
+
 function reply(status: number, body: unknown) {
   return {
     ok: status >= 200 && status < 300,
@@ -328,5 +359,60 @@ describe('the three failures that shared one sentence', () => {
     const gatewayError = new ApiRequestError({ status: 502, message: 'Bad gateway', elapsedMs: 10_003 });
     expect(gatewayError.diagnostic).toContain('10003ms');
     expect(gatewayError.kind).toBe('http');
+  });
+});
+
+describe('the FormData part the runtime will actually accept', () => {
+  /*
+    Every upload died in 4–6ms with `Unsupported FormDataPart implementation`,
+    before a socket opened, and was reported as a connectivity problem for
+    three rounds. Expo replaces the global `fetch`, and its multipart encoder
+    accepts only a string, a real Blob, or something implementing `bytes()` —
+    never React Native's `{ uri, name, type }` convention.
+  */
+  it('appends a Blob, not a { uri } object', async () => {
+    fetchMock.mockResolvedValue(reply(200, { success: true, documentId: 'd', itemsExtracted: 0 }));
+
+    await uploadInvoice({ vehicleId: VEHICLE, file: FILE });
+
+    const part = fetchMock.mock.calls[0][1].body.get('file');
+    expect(part).toBeInstanceOf(Blob);
+    // The exact shape that failed. A plain object with a `uri` is what Expo's
+    // encoder rejects outright.
+    expect(typeof part).not.toBe('string');
+    expect((part as unknown as { uri?: string }).uri).toBeUndefined();
+  });
+
+  it('keeps the filename, because the server builds a storage path from it', async () => {
+    // Expo writes `filename=` only when the part has a `name`, and the server
+    // calls vehicleStoragePath(..., file.name). A nameless part uploads and is
+    // then stored under a broken path.
+    fetchMock.mockResolvedValue(reply(200, { success: true, documentId: 'd', itemsExtracted: 0 }));
+
+    await uploadInvoice({ vehicleId: VEHICLE, file: FILE });
+
+    const part = fetchMock.mock.calls[0][1].body.get('file') as File;
+    expect(part.name).toBe('invoice.jpg');
+    expect(part.type).toBe('image/jpeg');
+  });
+});
+
+describe('a failure before the socket opens is not "offline"', () => {
+  it('blames neither the network nor the photo', () => {
+    // David's point after the FormData defect: a 4ms throw is a bug in this
+    // app. Reporting it as connectivity is what hid it for three rounds.
+    const unsendable = new ApiRequestError({
+      status: 0,
+      message: 'CrewChief could not send that request.',
+      origin: 'device',
+      kind: 'request',
+      elapsedMs: 4,
+      cause: 'Unsupported FormDataPart implementation',
+    });
+
+    const shown = describeUploadError(unsendable);
+    expect(shown).not.toMatch(/connection|wi-?fi|offline/i);
+    expect(shown).toMatch(/bug on our side/i);
+    expect(unsendable.diagnostic).toContain('4ms');
   });
 });
