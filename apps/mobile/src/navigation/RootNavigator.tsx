@@ -1,5 +1,14 @@
+import { useEffect } from 'react';
+import { Linking } from 'react-native';
 import { NavigationContainer, type LinkingOptions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+
+import {
+  configureNotificationHandler,
+  initialNotificationUrl,
+  requestPushPermission,
+  subscribeToNotificationTaps,
+} from '../notifications/push';
 
 import { AdvisorScreen } from '../screens/AdvisorScreen';
 import { InvoiceScanScreen } from '../screens/InvoiceScanScreen';
@@ -133,6 +142,36 @@ const linking: LinkingOptions<RootStackParamList> = {
       InvoiceScan: 'vehicle/:vehicleId/scan',
     },
   },
+
+  /*
+    ── Phase 5: a tapped notification is a deep link ──────────────────────────
+
+    Both overrides exist so push routing reuses the table above rather than
+    growing a second one. A route added to `screens` is reachable from a
+    notification without anyone remembering a mapping — the same argument as
+    the shared core modules, applied to navigation.
+
+    `getInitialURL` covers the **cold start**, which is the journey that gets
+    missed: an app opened *by* the tap has no `Linking` url, because it was not
+    opened by a link. Omitting this is the classic push bug — alerts route
+    perfectly while backgrounded and do nothing at all from cold.
+
+    The link is checked first. If both are present the user arrived by link
+    and that is the more recent intent.
+  */
+  async getInitialURL() {
+    return (await Linking.getInitialURL()) ?? (await initialNotificationUrl());
+  },
+
+  subscribe(listener) {
+    const link = Linking.addEventListener('url', ({ url }) => listener(url));
+    const tap = subscribeToNotificationTaps(listener);
+
+    return () => {
+      link.remove();
+      tap();
+    };
+  },
 };
 
 /** What the header shows before the vehicle has loaded, or when a link brought us here. */
@@ -154,6 +193,18 @@ export function RootNavigator({
   email: string | null;
   onSignOut: () => void;
 }) {
+  /*
+    Configured here rather than in `App.tsx` because this component only mounts
+    once someone is signed in — and an alert about a recall is meaningless to a
+    device with no garage. The permission prompt's *placement* is a product
+    decision with a note against it in `notifications/push.ts`: iOS allows it
+    once, so it deserves an explaining screen before submission.
+  */
+  useEffect(() => {
+    configureNotificationHandler();
+    void requestPushPermission();
+  }, []);
+
   return (
     <NavigationContainer linking={linking}>
       <Stack.Navigator screenOptions={screenOptions}>
