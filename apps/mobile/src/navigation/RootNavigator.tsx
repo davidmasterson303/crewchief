@@ -14,6 +14,7 @@ import { AdvisorScreen } from '../screens/AdvisorScreen';
 import { InvoiceScanScreen } from '../screens/InvoiceScanScreen';
 import { RecallDetailScreen } from '../screens/RecallDetailScreen';
 import { WishlistScreen } from '../screens/WishlistScreen';
+import { ServiceMilestoneScreen } from '../screens/ServiceMilestoneScreen';
 import { pickInvoiceImage } from '../media/pick-invoice-image';
 import { GarageScreen } from '../screens/GarageScreen';
 import { VehicleDetailScreen } from '../screens/VehicleDetailScreen';
@@ -113,6 +114,14 @@ export type RootStackParamList = {
     "people may want to add items to wishlist on the go."
   */
   Wishlist: { vehicleId: string; title?: string };
+  /*
+    5.6. Where a service-due notification lands. It opened the vehicle screen
+    until 7 Aug, on the reasoning that "your oil change is due" needs no
+    explaining — true, and it left nowhere to *act*. This screen confirms the
+    odometer first, then states the milestone, then offers each job to the
+    wishlist.
+  */
+  ServiceMilestone: { vehicleId: string; title?: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -170,6 +179,7 @@ const linking: LinkingOptions<RootStackParamList> = {
       InvoiceScan: 'vehicle/:vehicleId/scan',
       RecallDetail: 'vehicle/:vehicleId/recalls',
       Wishlist: 'vehicle/:vehicleId/wishlist',
+      ServiceMilestone: 'vehicle/:vehicleId/service',
     },
   },
 
@@ -360,6 +370,15 @@ export function RootNavigator({
         >
           {({ route }) => (
             <WishlistScreen vehicleId={route.params.vehicleId} onSignOut={onSignOut} />
+          )}
+        </Stack.Screen>
+
+        <Stack.Screen
+          name="ServiceMilestone"
+          options={{ title: 'Service due' }}
+        >
+          {({ route }) => (
+            <ServiceMilestoneScreen vehicleId={route.params.vehicleId} onSignOut={onSignOut} />
           )}
         </Stack.Screen>
 

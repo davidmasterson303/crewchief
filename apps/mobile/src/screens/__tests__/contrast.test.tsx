@@ -1,10 +1,11 @@
-import { render } from '@testing-library/react-native';
+import { fireEvent, render } from '@testing-library/react-native';
 
 import { GarageScreen } from '../GarageScreen';
 import { VehicleDetailScreen } from '../VehicleDetailScreen';
 import { InvoiceScanScreen } from '../InvoiceScanScreen';
 import { RecallDetailScreen } from '../RecallDetailScreen';
 import { WishlistScreen } from '../WishlistScreen';
+import { ServiceMilestoneScreen } from '../ServiceMilestoneScreen';
 import { apiRequest, ApiRequestError } from '../../api/client';
 import { auditText, belowFloor, contrastRatio, SCREEN_BACKGROUND } from '../../test-support/contrast';
 
@@ -432,6 +433,111 @@ describe('the wishlist', () => {
     );
 
     await view.findByText('Could not load the wishlist');
+    expect(belowFloor(auditText(view))).toEqual([]);
+  });
+});
+
+/**
+ * The service milestone screen, 5.6.
+ *
+ * Two states worth measuring separately: the mileage gate it opens on, and the
+ * milestone behind it. The gate has a white primary CTA with near-black ink —
+ * the construction that shipped at 4.47:1 on the advisor — and the milestone
+ * carries an "on the wishlist" state that uses an explicit dim fill rather than
+ * `opacity`, because this suite cannot see a parent alpha.
+ */
+describe('the service milestone screen', () => {
+  const CAR = {
+    vehicle: { year: 2015, make: 'BMW', model: 'M235i', current_mileage: 66000 },
+    knowledge: {
+      maintenance_schedule: [
+        {
+          service: 'Engine oil and filter',
+          interval_miles: 7500,
+          description: 'Drain the oil, replace the filter.',
+          priority: 'Critical',
+        },
+        {
+          service: 'Brake fluid flush',
+          interval_months: 24,
+          description: 'Absorbs water whether you drive it or not.',
+          priority: 'Critical',
+        },
+      ],
+    },
+  };
+
+  it('reads at AA on the mileage gate it opens on', async () => {
+    request.mockResolvedValue(CAR);
+
+    const view = await render(
+      <ServiceMilestoneScreen
+        vehicleId="db143cdc-e68c-46f0-849e-69f7a1873f58"
+        onSignOut={jest.fn()}
+      />
+    );
+
+    await view.findByText('Still around 66,000 miles?');
+    expect(belowFloor(auditText(view))).toEqual([]);
+  });
+
+  it('reads at AA on the milestone, once the reading is confirmed', async () => {
+    request.mockResolvedValue(CAR);
+
+    const view = await render(
+      <ServiceMilestoneScreen
+        vehicleId="db143cdc-e68c-46f0-849e-69f7a1873f58"
+        onSignOut={jest.fn()}
+      />
+    );
+
+    fireEvent.press(await view.findByText('That is right'));
+
+    // The oil interval lands the car inside a milestone; brake fluid has no
+    // recorded date, so it renders in the "timed by date" block rather than
+    // vanishing — the defect this whole screen's logic was rewritten for.
+    await view.findByText('Timed by date, not mileage');
+    expect(belowFloor(auditText(view))).toEqual([]);
+  });
+
+  it('reads at AA on its error state', async () => {
+    request.mockRejectedValue(new ApiRequestError({ status: 500, message: 'Upstream is down' }));
+
+    const view = await render(
+      <ServiceMilestoneScreen
+        vehicleId="db143cdc-e68c-46f0-849e-69f7a1873f58"
+        onSignOut={jest.fn()}
+      />
+    );
+
+    await view.findByText('Could not load this car');
+    expect(belowFloor(auditText(view))).toEqual([]);
+  });
+
+  it('surfaces a time-only service rather than dropping it', async () => {
+    // Not a contrast assertion. This is the brake-fluid regression, checked on
+    // a rendered screen: a car whose only structured entry is time-based must
+    // still show that entry somewhere.
+    request.mockResolvedValue({
+      vehicle: { year: 2018, make: 'Honda', model: 'Accord', current_mileage: 94800 },
+      knowledge: {
+        maintenance_schedule: [
+          { service: 'Brake fluid flush', interval_months: 36, priority: 'Critical' },
+        ],
+      },
+    });
+
+    const view = await render(
+      <ServiceMilestoneScreen
+        vehicleId="a1000000-0000-0000-0000-000000000001"
+        onSignOut={jest.fn()}
+      />
+    );
+
+    fireEvent.press(await view.findByText('That is right'));
+
+    await view.findByText('Timed by date, not mileage');
+    expect(view.queryByText(/Brake fluid flush/)).not.toBeNull();
     expect(belowFloor(auditText(view))).toEqual([]);
   });
 });

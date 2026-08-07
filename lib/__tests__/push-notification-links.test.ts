@@ -27,6 +27,7 @@ import {
   recallNotification,
   recallsUrl,
   serviceDueNotification,
+  serviceUrl,
   vehicleUrl,
 } from '@crewchief/core/notifications';
 
@@ -143,12 +144,18 @@ describe('serviceDueNotification', () => {
     reason: 'Due at 60,000 miles — you are at 60,300.',
   });
 
-  it('opens the car, not the advisor', () => {
-    // The asymmetry with the recall is the point: "your oil change is due" is
-    // already understood, and opening a chat to be told what an oil change is
-    // would be worse than opening the car.
-    expect(pathOf(notice.url)).toBe('vehicle/abc');
+  it('opens the milestone screen, not the car and not the advisor', () => {
+    // It opened `vehicle/:id` until 7 Aug, on the reasoning that "your oil
+    // change is due" needs no explaining. True — and it left nowhere to act.
+    // The milestone screen confirms the odometer, states what is due, and
+    // offers each job to the wishlist, which is the chain the advisor prices.
+    expect(pathOf(notice.url)).toBe('vehicle/abc/service');
     expect(isRegistered(notice.url)).toBe(true);
+  });
+
+  it('is routed by the navigator', () => {
+    expect(routes).toContain('vehicle/:vehicleId/service');
+    expect(isRegistered(serviceUrl('abc'))).toBe(true);
   });
 });
 

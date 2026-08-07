@@ -116,7 +116,18 @@ interface RequestOptions {
     verb here rather than working around it with a POST alias keeps the mobile
     client speaking the same contract the web app and the tests do.
   */
-  method?: 'GET' | 'POST' | 'DELETE';
+  /*
+    PATCH is here for `PATCH /api/v1/vehicles` — the odometer confirmation the
+    service milestone screen opens on. Added the same way DELETE was and for
+    the same reason: the route is PATCH because it updates one field of an
+    existing row, and aliasing it to POST to avoid touching this union would
+    give the mobile client a private contract that the web app and the tests do
+    not share.
+
+    Nothing below branches on the verb — `method` is passed straight to `fetch`
+    and to `request.open` — so widening this is genuinely the whole change.
+  */
+  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   body?: unknown;
   /** Endpoints that serve demo data work without a session. */
   allowAnonymous?: boolean;

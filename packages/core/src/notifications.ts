@@ -64,6 +64,11 @@ export function vehicleUrl(vehicleId: string): string {
   return `${APP_SCHEME}vehicle/${encodeURIComponent(vehicleId)}`;
 }
 
+/** The service milestone for one car. Mirrors `ServiceMilestone: 'vehicle/:vehicleId/service'`. */
+export function serviceUrl(vehicleId: string): string {
+  return `${APP_SCHEME}vehicle/${encodeURIComponent(vehicleId)}/service`;
+}
+
 /** The recall screen for one car. Mirrors `RecallDetail: 'vehicle/:vehicleId/recalls'`. */
 export function recallsUrl(vehicleId: string): string {
   return `${APP_SCHEME}vehicle/${encodeURIComponent(vehicleId)}/recalls`;
@@ -123,7 +128,7 @@ export function serviceDueNotification(params: {
   return {
     title: `${serviceName} due — ${vehicleName}`,
     body: truncate(reason, 160),
-    url: vehicleUrl(vehicleId),
+    url: serviceUrl(vehicleId),
   };
 }
 
