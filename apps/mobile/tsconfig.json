@@ -2,6 +2,14 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+
+    // `@types/jest` hoists to the repo root, and TypeScript's default typeRoots
+    // walk stops finding it once `paths` above pins a nested resolution for
+    // React. Named explicitly so the screen tests typecheck; without it every
+    // `jest.mock` reads as "Cannot use namespace 'jest' as a value" — a message
+    // that sounds like a syntax problem and is a missing type package.
+    "types": ["jest"],
+    "typeRoots": ["../../node_modules/@types", "./node_modules/@types"],
     "paths": {
       "@crewchief/core/*": ["../../packages/core/src/*"],
 
