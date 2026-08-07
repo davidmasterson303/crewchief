@@ -4,29 +4,57 @@ import { z } from 'zod';
  * Is this schedule entry usable for deciding a service is due?
  *
  * The one question that matters, asked in one place. A "yes" means the entry
- * carries a mileage number that can be compared against an odometer; a "no"
- * means it does not, whatever else it holds.
+ * carries **either** a mileage number that can be compared against an odometer
+ * **or** a month interval that can be compared against a date.
  *
- * **Legacy rows answer "no", and that is the point.** Every vehicle onboarded
- * before 7 Aug 2026 holds `{item, interval: "every 30,000 miles"}`. Parsing
- * that prose back into a number is possible and is deliberately not done: the
- * formats are open-ended ("annually", "every 2 years or 24k"), a parser would
- * be right most of the time, and *most of the time* is the wrong standard for
- * a notification that tells someone their car needs work. Those vehicles are
- * ineligible for service notifications until `scripts/` regenerates them.
+ * ── This required miles until 7 Aug 2026, and that was a half-fix ───────────
+ *
+ * `c09ccf8` taught `service-due.ts` — the *read* side — that a service can be
+ * time-based, because all four cars in the product carry a time-only brake
+ * fluid entry and every one of them was being dropped. **The write side never
+ * moved.** So the read side could evaluate a time-only entry and the schema
+ * that guards onboarding would never let one be stored, and because the array
+ * is filtered by `preprocess` rather than validated, it failed **silently** —
+ * no error, no warning, the entry simply gone.
+ *
+ * It is the same disappearance `c09ccf8` was written to stop, one layer up, and
+ * it survived because the fix was applied where the symptom was seen rather
+ * than at both ends of the contract. Found by Cowork on 7 Aug, building the
+ * backfill against a handoff of mine that asserted this already worked. It did
+ * not; I had not checked.
+ *
+ * **Legacy prose rows still answer "no", and that is still the point.** Every
+ * vehicle onboarded before 7 Aug holds `{item, interval: "every 30,000 miles"}`.
+ * Parsing that back into a number is deliberately not done here: the formats are
+ * open-ended ("annually", "every 2 years or 24k"), a parser would be right most
+ * of the time, and *most of the time* is the wrong standard for a notification
+ * that tells someone their car needs work.
+ *
+ * ── Both intervals are checked for finiteness, and months was not ───────────
+ *
+ * `Number.isFinite` was applied to miles and nothing at all to months, and
+ * zod's `.positive()` accepts `Infinity`. Harmless while nothing read the
+ * field; `c09ccf8` made it load-bearing. The read side happens to guard
+ * (`service-due.ts`'s own `positive()` checks finiteness), so the effect was
+ * not a service reading as "fine forever" — it was the entry vanishing from
+ * evaluation entirely, which is the failure this whole function exists to stop.
  */
 export function isUsableScheduleEntry(entry: unknown): boolean {
   if (typeof entry !== 'object' || entry === null) return false;
 
-  const { service, interval_miles: miles } = entry as Record<string, unknown>;
+  const record = entry as Record<string, unknown>;
+  const { service } = record;
+
+  if (typeof service !== 'string' || service.trim().length === 0) return false;
 
   return (
-    typeof service === 'string' &&
-    service.trim().length > 0 &&
-    typeof miles === 'number' &&
-    Number.isFinite(miles) &&
-    miles > 0
+    isPositiveInterval(record.interval_miles) || isPositiveInterval(record.interval_months)
   );
+}
+
+/** A real, comparable interval. `Infinity` is a number and is not one. */
+function isPositiveInterval(value: unknown): boolean {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }
 
 export const VehicleDataSchema = z.object({
@@ -68,13 +96,26 @@ export const VehicleDataSchema = z.object({
     Dropping the entry instead degrades in the right direction: the car gets a
     schedule with eleven services on it, and the twelfth is absent rather than
     wrong. Absent is recoverable and visible; wrong is neither.
+
+    ── Either interval, not both ──────────────────────────────────────────────
+
+    `interval_miles` is nullable because **a brake fluid flush has no mileage
+    interval**, on any of the four cars in this product. Requiring one was a
+    half-fix: the read side learned about time on 7 Aug and this did not, so a
+    time-only entry could be evaluated but never stored. `isUsableScheduleEntry`
+    holds the "at least one real interval" rule; these types describe the shape
+    of whatever survives it.
+
+    `.finite()` on both, because `.positive()` accepts `Infinity` — which is a
+    number, passes every check written here before today, and describes a
+    service that is never due.
   */
   maintenance_schedule: z.preprocess(
     (raw) => (Array.isArray(raw) ? raw.filter(isUsableScheduleEntry) : []),
     z.array(z.object({
-      service: z.string(),
-      interval_miles: z.number().positive(),
-      interval_months: z.number().positive().nullable().optional(),
+      service: z.string().min(1),
+      interval_miles: z.number().positive().finite().nullable().optional(),
+      interval_months: z.number().positive().finite().nullable().optional(),
       description: z.string().optional().default(''),
       priority: z.enum(['Critical', 'Recommended', 'Optional']),
     }))

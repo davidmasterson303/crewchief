@@ -41,6 +41,28 @@ const OIL_CHANGE = {
   priority: 'Critical' as const,
 };
 
+/*
+  Miles and nothing else.
+
+  The bad-interval cases below have to use this rather than `OIL_CHANGE`: since
+  7 Aug an entry is usable if it carries *either* a mileage or a month interval,
+  so `{...OIL_CHANGE, interval_miles: 0}` is still perfectly usable on its
+  12-month interval. Asserting rejection with a fixture that carries a valid
+  second interval would test nothing and pass for the wrong reason.
+*/
+const MILES_ONLY = {
+  service: 'Engine oil and filter',
+  interval_miles: 7500,
+  priority: 'Critical' as const,
+};
+
+/** Time and nothing else — every car in the product has one of these. */
+const TIME_ONLY = {
+  service: 'Brake fluid flush',
+  interval_months: 24,
+  priority: 'Critical' as const,
+};
+
 describe('isUsableScheduleEntry', () => {
   it('accepts an entry carrying a comparable mileage number', () => {
     expect(isUsableScheduleEntry(OIL_CHANGE)).toBe(true);
@@ -54,20 +76,53 @@ describe('isUsableScheduleEntry', () => {
     ).toBe(false);
   });
 
+  it('accepts a time-only entry, which every car in the product has', () => {
+    /*
+      The half-fix this closes. `c09ccf8` taught the *read* side that a service
+      can be time-based; this — the write side — still required miles, so a
+      time-only brake fluid entry could be evaluated and never stored. Because
+      the array is filtered by `preprocess` rather than validated, it vanished
+      with no error. Found by Cowork building the backfill.
+    */
+    expect(isUsableScheduleEntry(TIME_ONLY)).toBe(true);
+  });
+
   it('rejects a zero interval, which would be overdue on every car forever', () => {
     // The prompt's own "0 for numbers" fallback produces exactly this.
-    expect(isUsableScheduleEntry({ ...OIL_CHANGE, interval_miles: 0 })).toBe(false);
+    expect(isUsableScheduleEntry({ ...MILES_ONLY, interval_miles: 0 })).toBe(false);
+  });
+
+  it('keeps an entry whose mileage is junk but whose months are real', () => {
+    // Not a contradiction of the case above: "either interval" means a valid
+    // month interval carries the entry. `service-due.ts` then ignores the junk
+    // mileage on its own `Number.isFinite` guard and evaluates on time.
+    expect(isUsableScheduleEntry({ ...TIME_ONLY, interval_miles: 0 })).toBe(true);
   });
 
   it.each([
-    ['a negative interval', { ...OIL_CHANGE, interval_miles: -5000 }],
-    ['a stringified number', { ...OIL_CHANGE, interval_miles: '7500' }],
-    ['an infinite interval', { ...OIL_CHANGE, interval_miles: Infinity }],
-    ['a NaN interval', { ...OIL_CHANGE, interval_miles: NaN }],
-    ['a blank service name', { ...OIL_CHANGE, service: '   ' }],
+    ['a negative interval', { ...MILES_ONLY, interval_miles: -5000 }],
+    ['a stringified number', { ...MILES_ONLY, interval_miles: '7500' }],
+    ['an infinite interval', { ...MILES_ONLY, interval_miles: Infinity }],
+    ['a NaN interval', { ...MILES_ONLY, interval_miles: NaN }],
+    ['a blank service name', { ...MILES_ONLY, service: '   ' }],
     ['null', null],
     ['a string', 'Engine oil every 7500 miles'],
   ])('rejects %s', (_label, entry) => {
+    expect(isUsableScheduleEntry(entry)).toBe(false);
+  });
+
+  it.each([
+    ['an infinite month interval', { ...TIME_ONLY, interval_months: Infinity }],
+    ['a NaN month interval', { ...TIME_ONLY, interval_months: NaN }],
+    ['a zero month interval', { ...TIME_ONLY, interval_months: 0 }],
+    ['a stringified month interval', { ...TIME_ONLY, interval_months: '24' }],
+  ])('rejects %s', (_label, entry) => {
+    /*
+      `Number.isFinite` was applied to miles and to nothing else, and zod's
+      `.positive()` accepts `Infinity` — a number that passes every check and
+      describes a service that is never due. Harmless until `c09ccf8` made the
+      field load-bearing. Caught by Cowork, 7 Aug.
+    */
     expect(isUsableScheduleEntry(entry)).toBe(false);
   });
 });
@@ -83,7 +138,7 @@ describe('VehicleDataSchema.maintenance_schedule', () => {
     // The property this whole design turns on. Eleven services and an absent
     // twelfth is recoverable; a failed onboarding is not.
     const parsed = VehicleDataSchema.parse(
-      research([OIL_CHANGE, { ...OIL_CHANGE, service: 'Guesswork', interval_miles: 0 }])
+      research([OIL_CHANGE, { service: 'Guesswork', interval_miles: 0, priority: 'Critical' }])
     );
 
     expect(parsed.maintenance_schedule).toHaveLength(1);
