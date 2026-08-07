@@ -391,7 +391,17 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   advisorCtaText: { color: '#080808', fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
-  advisorCtaHint: { color: 'rgba(8,8,8,0.55)', fontSize: 13, lineHeight: 18 },
+  /*
+    0.60, not 0.55. **The comment that shipped with this claimed "8.6:1, above
+    the 4.5:1 floor" and was wrong**: it measured white-on-white by mistake,
+    when this is near-black ink on a white button. The real figure was 4.47:1,
+    a hair *under* the floor, and no source scan could have caught it — the
+    scan only reads `rgba(255,255,255,α)` and this is dark text.
+
+    Found by the rendered-contrast suite, which measures each run against the
+    surface it truly lands on. 0.60 gives 5.35:1.
+  */
+  advisorCtaHint: { color: 'rgba(8,8,8,0.6)', fontSize: 13, lineHeight: 18 },
 
   /* Outlined rather than filled, so it reads as the second verb on the screen. */
   scanCta: {

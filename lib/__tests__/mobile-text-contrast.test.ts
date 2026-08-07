@@ -16,6 +16,26 @@
  * By 5 Aug that had produced nine sub-floor text styles across four screens,
  * two of them written the same day by the session that added this file.
  *
+ * ── What this suite structurally cannot see ────────────────────────────────
+ *
+ * Three things, and `apps/mobile/src/screens/__tests__/contrast.test.tsx`
+ * covers them by mounting screens instead:
+ *
+ *   - **A colour that is not a literal.** `healthBandHex()` returns the health
+ *     score's colour, so the largest number on two screens is invisible here.
+ *   - **The surface behind the text.** This assumes `#080808`, and the regex
+ *     below matches only `rgba(255,255,255,α)` — so the advisor CTA's
+ *     near-black ink on a *white* button is not merely mismeasured, it is never
+ *     examined. One such run shipped at **4.47:1** against a 4.5 floor, with a
+ *     comment confidently claiming 8.6:1, and was caught only once a render
+ *     test measured it against its real backdrop.
+ *   - **Styles merged at runtime.** React Native flattens arrays and later
+ *     entries win; each declaration is read here in isolation.
+ *
+ * Kept anyway: it covers **every** style in the app, including screens no
+ * render test mounts, and it runs on every `npm test` from the repo root.
+ * Neither suite is a superset of the other.
+ *
  * ── The floor is the same number, deliberately ─────────────────────────────
  *
  * The web guard's `FLOOR = 50` means `text-white/50`. Measured against this
