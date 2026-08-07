@@ -200,6 +200,14 @@ const NOT_PORTABLE: Record<string, string> = {
   */
   'lib/push-send.ts': 'reads push tokens with the service role — reaches Supabase through lib/supabase',
   /*
+    The split again, and the portable half is again the one carrying the
+    judgement. `recallsWorthRaising` — what counts as new, what counts as an
+    escalation worth re-raising, what a recall with no campaign number does — is
+    exported from here and tested without a database precisely because those are
+    rules rather than queries. What stays is the iteration and the writes.
+  */
+  'lib/notification-triggers.ts': 'reads vehicles and recall state with the service role — reaches Supabase through lib/supabase',
+  /*
     Same split once more. The prompt, the response contract and every bound on
     the model's output are in `packages/core/src/quote-check.ts` and portable —
     which matters more here than elsewhere, because those bounds are what stand
