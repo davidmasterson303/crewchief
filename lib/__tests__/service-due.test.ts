@@ -209,6 +209,121 @@ describe('nextMilestone', () => {
   });
 });
 
+/**
+ * The defect this section exists for.
+ *
+ * `ScheduleEntry` declared `interval_months` and `evaluateSchedule` never read
+ * it — the filter tested `interval_miles` alone. **All four cars in the product
+ * carry a time-only brake-fluid entry**, so brake fluid vanished from every
+ * milestone: a safety item, missing from the screen written to replace a
+ * generic table precisely because that table could not be trusted.
+ *
+ * It is also the exact failure this module's own commit message derided one
+ * layer up — `MaintenanceScheduleItem` declaring an `interval_miles` that
+ * nothing produced. Declaring a field and never reading it is the same bug
+ * pointing the other way.
+ */
+describe('time-based services', () => {
+  const BRAKE_FLUID: ScheduleEntry = {
+    service: 'Brake fluid flush',
+    interval_months: 24,
+    description: 'Bleed and replace. Absorbs water whether you drive it or not.',
+    priority: 'Critical',
+  };
+
+  it('is evaluated at all — a time-only entry survives', () => {
+    // The one-line regression test. Under the original filter this was [].
+    const due = evaluateSchedule({ schedule: [BRAKE_FLUID], currentMileage: 60_000 });
+
+    expect(due).toHaveLength(1);
+    expect(due[0].service).toBe('Brake fluid flush');
+  });
+
+  it('reports unknown when nothing records the last flush', () => {
+    // Honest rather than dropped. There is no odometer-style running total for
+    // time, so an unknown date cannot be inferred the way mileage can.
+    const [due] = evaluateSchedule({ schedule: [BRAKE_FLUID], currentMileage: 60_000 });
+
+    expect(due.status).toBe('unknown');
+    expect(due.dueOn).toBeNull();
+  });
+
+  it('computes a due date from a recorded service date', () => {
+    const [due] = evaluateSchedule({
+      schedule: [BRAKE_FLUID],
+      currentMileage: 60_000,
+      lastServiceDate: () => '2024-03-15',
+      today: '2026-01-01',
+    });
+
+    expect(due.dueOn).toBe('2026-03-15');
+    expect(due.drivenBy).toBe('time');
+    expect(due.status).toBe('soon');
+  });
+
+  it('reports overdue when the interval has elapsed', () => {
+    const [due] = evaluateSchedule({
+      schedule: [BRAKE_FLUID],
+      currentMileage: 60_000,
+      lastServiceDate: () => '2023-01-10',
+      today: '2026-08-07',
+    });
+
+    expect(due.status).toBe('overdue');
+    expect(due.monthsRemaining).toBeLessThan(0);
+  });
+
+  it('does not roll a short month forward', () => {
+    // `setMonth` on 31 January + 1 gives 3 March, which would report a service
+    // due two days late every time the arithmetic crossed February.
+    const [due] = evaluateSchedule({
+      schedule: [{ service: 'Inspection', interval_months: 1 }],
+      currentMileage: 0,
+      lastServiceDate: () => '2026-01-31',
+      today: '2026-02-01',
+    });
+
+    expect(due.dueOn).toBe('2026-02-28');
+  });
+});
+
+describe('whichever comes first', () => {
+  const OIL_BOTH: ScheduleEntry = {
+    service: 'Engine oil and filter',
+    interval_miles: 10_000,
+    interval_months: 12,
+    priority: 'Critical',
+  };
+
+  it('lets time win when the calendar gets there first', () => {
+    // 400 miles driven in 14 months. The mileage interval says "plenty left";
+    // the oil does not care.
+    const [due] = evaluateSchedule({
+      schedule: [OIL_BOTH],
+      currentMileage: 60_400,
+      lastServiceMileage: () => 60_000,
+      lastServiceDate: () => '2025-06-01',
+      today: '2026-08-07',
+    });
+
+    expect(due.status).toBe('overdue');
+    expect(due.drivenBy).toBe('time');
+  });
+
+  it('lets mileage win when the odometer gets there first', () => {
+    const [due] = evaluateSchedule({
+      schedule: [OIL_BOTH],
+      currentMileage: 70_500,
+      lastServiceMileage: () => 60_000,
+      lastServiceDate: () => '2026-07-01',
+      today: '2026-08-07',
+    });
+
+    expect(due.status).toBe('overdue');
+    expect(due.drivenBy).toBe('miles');
+  });
+});
+
 describe('isWorthNotifying', () => {
   it('fires on overdue work', () => {
     const due = evaluateSchedule({
@@ -237,6 +352,72 @@ describe('isWorthNotifying', () => {
 
   it('does not fire on nothing', () => {
     expect(isWorthNotifying(null)).toBe(false);
+  });
+
+  it('does not fire on a service whose history is simply unknown', () => {
+    // "We cannot tell when this was last done" belongs on a screen someone
+    // opened. It is not something to wake anyone up for.
+    const due = evaluateSchedule({
+      schedule: [{ service: 'Brake fluid flush', interval_months: 24 }],
+      currentMileage: 60_000,
+    });
+
+    expect(due[0].status).toBe('unknown');
+    expect(isWorthNotifying(nextMilestone(due))).toBe(false);
+  });
+});
+
+describe('a milestone that includes time-based work', () => {
+  it('brings an overdue flush into the visit it belongs to', () => {
+    // The flush has no dueAtMiles, so the mileage window cannot see it. It
+    // joins on status: work already on you is work you would book together.
+    const due = evaluateSchedule({
+      schedule: [
+        { service: 'Spark plugs', interval_miles: 30_000 },
+        { service: 'Brake fluid flush', interval_months: 24, priority: 'Critical' },
+      ],
+      currentMileage: 59_500,
+      lastServiceMileage: (s) => (s === 'Spark plugs' ? 30_000 : null),
+      lastServiceDate: (s) => (s === 'Brake fluid flush' ? '2023-01-01' : null),
+      today: '2026-08-07',
+    });
+
+    const milestone = nextMilestone(due, { horizonMiles: 5_000 });
+
+    expect(milestone?.services.map((s) => s.service)).toEqual(
+      expect.arrayContaining(['Spark plugs', 'Brake fluid flush'])
+    );
+  });
+
+  it('names a date-driven visit without inventing a mileage', () => {
+    // "Due in 0 miles" would be both wrong and alarming.
+    const due = evaluateSchedule({
+      schedule: [{ service: 'Brake fluid flush', interval_months: 24 }],
+      currentMileage: 60_000,
+      lastServiceDate: () => '2023-01-01',
+      today: '2026-08-07',
+    });
+
+    const milestone = nextMilestone(due)!;
+
+    expect(milestone.mileage).toBeNull();
+    expect(milestoneReason(milestone, 60_000)).toContain('Brake fluid flush');
+    expect(milestoneReason(milestone, 60_000)).toMatch(/months? overdue/);
+  });
+
+  it('leaves unknown work off the bookable list', () => {
+    const due = evaluateSchedule({
+      schedule: [
+        { service: 'Spark plugs', interval_miles: 30_000 },
+        { service: 'Brake fluid flush', interval_months: 24 },
+      ],
+      currentMileage: 59_500,
+      lastServiceMileage: (s) => (s === 'Spark plugs' ? 30_000 : null),
+    });
+
+    const milestone = nextMilestone(due, { horizonMiles: 5_000 })!;
+
+    expect(milestone.services.map((s) => s.service)).toEqual(['Spark plugs']);
   });
 });
 

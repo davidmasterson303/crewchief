@@ -29,11 +29,21 @@
  * sending: one alert about a visit, rather than four about filters.
  */
 
-export type DueStatus = 'overdue' | 'due' | 'soon' | 'later';
+/**
+ * `unknown` is not a fifth severity — it means **we cannot say**.
+ *
+ * A time-based service with no recorded service date has no computable due
+ * point. The first version of this module had no such state and filtered those
+ * entries out, which is how brake fluid disappeared from all four cars in the
+ * product. Saying "we don't know when this was last done" keeps a safety item
+ * on the screen; dropping it silently does not.
+ */
+export type DueStatus = 'overdue' | 'due' | 'soon' | 'later' | 'unknown';
 
 export interface ScheduleEntry {
   service: string;
-  interval_miles: number;
+  /** Absent on time-only services — brake fluid, most commonly. */
+  interval_miles?: number | null;
   interval_months?: number | null;
   description?: string;
   priority?: 'Critical' | 'Recommended' | 'Optional';
@@ -43,19 +53,32 @@ export interface ServiceDue {
   service: string;
   description: string;
   priority: 'Critical' | 'Recommended' | 'Optional';
-  intervalMiles: number;
-  /** The odometer reading this service is next wanted at. */
-  dueAtMiles: number;
-  /** Negative when overdue. */
-  milesRemaining: number;
+  intervalMiles: number | null;
+  intervalMonths: number | null;
+  /** The odometer reading this is next wanted at, or null when time-only. */
+  dueAtMiles: number | null;
+  /** Negative when overdue. Null when this service is not mileage-based. */
+  milesRemaining: number | null;
+  /** ISO `YYYY-MM-DD` the time interval elapses, when one can be computed. */
+  dueOn: string | null;
+  /** Negative when overdue. Null when not time-based or no date is recorded. */
+  monthsRemaining: number | null;
+  /** Which interval is driving `status` — "whichever comes first". */
+  drivenBy: 'miles' | 'time' | null;
   status: DueStatus;
   /** Whether a completed service was found to count from. */
   basedOnHistory: boolean;
 }
 
 export interface Milestone {
-  /** The reading the milestone is named for — "the 60,000 service". */
-  mileage: number;
+  /**
+   * The reading the milestone is named for — "the 60,000 service".
+   *
+   * **Null when the visit is driven purely by a date.** A brake-fluid flush due
+   * by calendar has no odometer figure, and naming the visit after an invented
+   * one would be the same lie as inventing the interval.
+   */
+  mileage: number | null;
   /** Everything due at it, most urgent first. */
   services: ServiceDue[];
 }
@@ -114,11 +137,66 @@ export function nextDueMileage(
   return (intervalsElapsed + 1) * intervalMiles;
 }
 
-function statusFor(milesRemaining: number): DueStatus {
+/** Within this many months, a time-based service is due rather than approaching. */
+const DUE_WINDOW_MONTHS = 1;
+
+/** Within this many months, worth mentioning but not worth a trip. */
+const SOON_WINDOW_MONTHS = 3;
+
+function statusForMiles(milesRemaining: number): DueStatus {
   if (milesRemaining < OVERDUE_AT) return 'overdue';
   if (milesRemaining <= DUE_WINDOW_MILES) return 'due';
   if (milesRemaining <= SOON_WINDOW_MILES) return 'soon';
   return 'later';
+}
+
+function statusForMonths(monthsRemaining: number): DueStatus {
+  if (monthsRemaining < OVERDUE_AT) return 'overdue';
+  if (monthsRemaining <= DUE_WINDOW_MONTHS) return 'due';
+  if (monthsRemaining <= SOON_WINDOW_MONTHS) return 'soon';
+  return 'later';
+}
+
+/** Ordered by how much attention each state deserves. `unknown` sorts last. */
+const STATUS_URGENCY: Record<DueStatus, number> = {
+  overdue: 0,
+  due: 1,
+  soon: 2,
+  later: 3,
+  unknown: 4,
+};
+
+/**
+ * Add whole months to a date without letting the runtime roll a short month.
+ *
+ * `setMonth` on 31 January + 1 gives 3 March, which would report a service due
+ * two days late every time the arithmetic crossed February. Clamped to the last
+ * valid day instead.
+ */
+function addMonths(iso: string, months: number): string | null {
+  const start = new Date(`${iso.slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(start.getTime())) return null;
+
+  const day = start.getUTCDate();
+  const shifted = new Date(start);
+  shifted.setUTCDate(1);
+  shifted.setUTCMonth(shifted.getUTCMonth() + months);
+
+  const lastDayOfMonth = new Date(
+    Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth() + 1, 0)
+  ).getUTCDate();
+
+  shifted.setUTCDate(Math.min(day, lastDayOfMonth));
+  return shifted.toISOString().slice(0, 10);
+}
+
+/** Fractional months between two ISO dates. Negative when `to` is past. */
+function monthsBetween(from: string, to: string): number {
+  const a = new Date(`${from.slice(0, 10)}T00:00:00Z`).getTime();
+  const b = new Date(`${to.slice(0, 10)}T00:00:00Z`).getTime();
+
+  // 30.44 days is the mean month, and matches `mileage-tracking.ts`'s constant.
+  return (b - a) / (1000 * 60 * 60 * 24 * 30.44);
 }
 
 /**
@@ -129,37 +207,127 @@ function statusFor(milesRemaining: number): DueStatus {
  * this module deliberately does not do. `maintenance-sync.ts` already holds
  * that matching logic.
  *
- * **Entries without a usable interval are skipped, not guessed at.** Every
+ * **Entries with no usable interval at all are skipped, not guessed at.** Every
  * vehicle onboarded before 7 Aug 2026 carries prose intervals, and inventing a
  * number for them would produce confident notifications from data that cannot
  * support one.
+ *
+ * ── "Whichever comes first", which is how a real schedule reads ─────────────
+ *
+ * A service carrying both intervals — "every 10,000 miles or 12 months" — is
+ * due when *either* elapses, and the status reflects whichever is more urgent.
+ * `drivenBy` records which one, because "due in 400 miles" and "due next month"
+ * are different sentences and the screen should say the true one.
+ *
+ * ── Why time-only services are kept even when unanswerable ──────────────────
+ *
+ * The first version of this module filtered on `interval_miles` alone, and
+ * **every one of the four cars in the product has a time-only brake-fluid
+ * entry** — so brake fluid, a safety item, silently vanished from every
+ * milestone. That is the same defect as the hardcoded `COMMON_INTERVALS` table
+ * this module was written to replace, only worse: that table at least mentioned
+ * it.
+ *
+ * A time-based service with no recorded service date has no computable due
+ * point, so it comes back `unknown` rather than being dropped. The screen shows
+ * it and says why; `isWorthNotifying` ignores it, because "we cannot tell when
+ * this is due" is not something to wake someone up for.
  */
 export function evaluateSchedule(params: {
   schedule: ScheduleEntry[];
   currentMileage: number;
   lastServiceMileage?: (service: string) => number | null;
+  lastServiceDate?: (service: string) => string | null;
+  /** Injectable so a test is not at the mercy of the clock. */
+  today?: string;
 }): ServiceDue[] {
-  const { schedule, currentMileage, lastServiceMileage } = params;
+  const { schedule, currentMileage, lastServiceMileage, lastServiceDate } = params;
+  const today = params.today ?? new Date().toISOString().slice(0, 10);
 
   return schedule
-    .filter((entry) => typeof entry?.interval_miles === 'number' && entry.interval_miles > 0)
+    .filter((entry) => usableMiles(entry) !== null || usableMonths(entry) !== null)
     .map((entry) => {
+      const intervalMiles = usableMiles(entry);
+      const intervalMonths = usableMonths(entry);
+
       const lastMileage = lastServiceMileage ? lastServiceMileage(entry.service) : null;
-      const dueAtMiles = nextDueMileage(entry.interval_miles, currentMileage, lastMileage);
-      const milesRemaining = dueAtMiles - currentMileage;
+      const lastDate = lastServiceDate ? lastServiceDate(entry.service) : null;
+
+      let dueAtMiles: number | null = null;
+      let milesRemaining: number | null = null;
+      if (intervalMiles !== null) {
+        dueAtMiles = nextDueMileage(intervalMiles, currentMileage, lastMileage);
+        milesRemaining = dueAtMiles - currentMileage;
+      }
+
+      /*
+        A time interval needs a date to count from and there is no odometer
+        equivalent to fall back on — the "next boundary above current" trick
+        works for mileage because the odometer *is* a running total. Nothing
+        plays that role for time, so an unknown date stays unknown.
+      */
+      let dueOn: string | null = null;
+      let monthsRemaining: number | null = null;
+      if (intervalMonths !== null && lastDate) {
+        dueOn = addMonths(lastDate, intervalMonths);
+        if (dueOn) monthsRemaining = monthsBetween(today, dueOn);
+      }
+
+      const byMiles = milesRemaining !== null ? statusForMiles(milesRemaining) : null;
+      const byMonths = monthsRemaining !== null ? statusForMonths(monthsRemaining) : null;
+
+      let status: DueStatus;
+      let drivenBy: 'miles' | 'time' | null;
+
+      if (byMiles !== null && byMonths !== null) {
+        // Whichever comes first.
+        const monthsWins = STATUS_URGENCY[byMonths] < STATUS_URGENCY[byMiles];
+        status = monthsWins ? byMonths : byMiles;
+        drivenBy = monthsWins ? 'time' : 'miles';
+      } else if (byMiles !== null) {
+        status = byMiles;
+        drivenBy = 'miles';
+      } else if (byMonths !== null) {
+        status = byMonths;
+        drivenBy = 'time';
+      } else {
+        // Time-only, and nothing records when it was last done.
+        status = 'unknown';
+        drivenBy = null;
+      }
 
       return {
         service: entry.service,
         description: entry.description ?? '',
         priority: entry.priority ?? 'Recommended',
-        intervalMiles: entry.interval_miles,
+        intervalMiles,
+        intervalMonths,
         dueAtMiles,
         milesRemaining,
-        status: statusFor(milesRemaining),
-        basedOnHistory: lastMileage !== null,
+        dueOn,
+        monthsRemaining,
+        drivenBy,
+        status,
+        basedOnHistory: lastMileage !== null || lastDate !== null,
       };
     })
-    .sort((a, b) => a.milesRemaining - b.milesRemaining);
+    .sort(
+      (a, b) =>
+        STATUS_URGENCY[a.status] - STATUS_URGENCY[b.status] ||
+        (a.milesRemaining ?? Number.MAX_SAFE_INTEGER) - (b.milesRemaining ?? Number.MAX_SAFE_INTEGER)
+    );
+}
+
+function positive(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function usableMiles(entry: ScheduleEntry): number | null {
+  return positive(entry?.interval_miles);
+}
+
+function usableMonths(entry: ScheduleEntry): number | null {
+  return positive(entry?.interval_months);
 }
 
 /**
@@ -173,6 +341,17 @@ export function evaluateSchedule(params: {
  * Returns `null` when nothing is due within the horizon, which is a real
  * answer: a car with nothing coming up should produce no notification rather
  * than an empty screen.
+ *
+ * ── Time-based work joins the visit it belongs to ───────────────────────────
+ *
+ * A brake-fluid flush that is due by date has no `dueAtMiles` to group on, so
+ * the mileage window cannot see it. It joins the milestone on **status**
+ * instead: anything already overdue or due is work you would have done at the
+ * same appointment, whatever calendar or odometer said so.
+ *
+ * `unknown` entries never join. They belong on the screen — see
+ * `evaluateSchedule` — but a milestone is a list of work to book, and "we
+ * cannot tell when this was last done" is not bookable.
  */
 export function nextMilestone(
   services: ServiceDue[],
@@ -180,26 +359,47 @@ export function nextMilestone(
 ): Milestone | null {
   const horizon = options.horizonMiles ?? SOON_WINDOW_MILES;
 
+  const bookable = services.filter((service) => service.status !== 'unknown');
+
   // Already sorted by `evaluateSchedule`, but callers may hand us anything.
-  const ordered = [...services].sort((a, b) => a.milesRemaining - b.milesRemaining);
-  const anchor = ordered[0];
-
-  if (!anchor || anchor.milesRemaining > horizon) return null;
-
-  const grouped = ordered.filter(
-    (item) => Math.abs(item.dueAtMiles - anchor.dueAtMiles) <= MILESTONE_WINDOW_MILES
+  const ordered = [...bookable].sort(
+    (a, b) =>
+      STATUS_URGENCY[a.status] - STATUS_URGENCY[b.status] ||
+      (a.milesRemaining ?? Number.MAX_SAFE_INTEGER) - (b.milesRemaining ?? Number.MAX_SAFE_INTEGER)
   );
+
+  const anchor = ordered[0];
+  if (!anchor) return null;
+
+  // Beyond the horizon in both dimensions is nothing to raise.
+  const anchorMiles = anchor.milesRemaining;
+  if (anchorMiles !== null && anchorMiles > horizon && anchor.status !== 'overdue') return null;
+  if (anchorMiles === null && STATUS_URGENCY[anchor.status] > STATUS_URGENCY.due) return null;
+
+  const grouped = ordered.filter((item) => {
+    // Anything already on you is part of this visit, however it got there.
+    if (item.status === 'overdue' || item.status === 'due') return true;
+
+    if (item.dueAtMiles === null || anchor.dueAtMiles === null) return false;
+    return Math.abs(item.dueAtMiles - anchor.dueAtMiles) <= MILESTONE_WINDOW_MILES;
+  });
 
   return {
     /*
       Named for the anchor's reading rather than an average or a round number.
       "The 62,300 service" is odd phrasing but it is the truth; rounding it to
       60,000 would name a milestone the car has already passed.
+
+      Null when the visit is driven purely by a date — there is no mileage to
+      name it after, and inventing one would be the same lie as inventing an
+      interval.
     */
     mileage: anchor.dueAtMiles,
     services: grouped.sort(
       (a, b) =>
-        a.milesRemaining - b.milesRemaining ||
+        STATUS_URGENCY[a.status] - STATUS_URGENCY[b.status] ||
+        (a.milesRemaining ?? Number.MAX_SAFE_INTEGER) -
+          (b.milesRemaining ?? Number.MAX_SAFE_INTEGER) ||
         (PRIORITY_ORDER[a.priority] ?? 1) - (PRIORITY_ORDER[b.priority] ?? 1)
     ),
   };
@@ -236,15 +436,52 @@ export function milestoneReason(milestone: Milestone, currentMileage: number): s
   const overdue = milestone.services.filter((service) => service.status === 'overdue');
 
   if (overdue.length > 0) {
-    const worst = overdue[overdue.length - 1];
-    const by = Math.abs(worst.milesRemaining).toLocaleString('en-US');
+    /*
+      The *most* overdue, and it has to be found rather than taken off an end.
+      The list is sorted by status then by miles remaining, and a time-driven
+      entry sorts with a null distance — so `overdue[overdue.length - 1]` was
+      picking whichever happened to land last, not the worst one.
+    */
+    const worst = overdue.reduce((a, b) => (overdueBy(b) > overdueBy(a) ? b : a));
+
+    if (worst.drivenBy === 'time' && worst.monthsRemaining !== null) {
+      const months = Math.max(1, Math.round(Math.abs(worst.monthsRemaining)));
+      return `${worst.service} is ${months} month${months === 1 ? '' : 's'} overdue.`;
+    }
+
+    const by = Math.abs(worst.milesRemaining ?? 0).toLocaleString('en-US');
     return `${worst.service} is ${by} miles overdue.`;
   }
 
-  const remaining = Math.max(0, milestone.mileage - currentMileage).toLocaleString('en-US');
   const count = milestone.services.length;
+
+  /*
+    A visit with no mileage to name it after is driven by a date, and saying
+    "due in 0 miles" would be both wrong and alarming.
+  */
+  if (milestone.mileage === null) {
+    const soonest = milestone.services[0];
+    const when = soonest?.dueOn ? ` by ${soonest.dueOn}` : '';
+
+    return count === 1
+      ? `${soonest.service} is due${when}.`
+      : `${count} services are due${when}.`;
+  }
+
+  const remaining = Math.max(0, milestone.mileage - currentMileage).toLocaleString('en-US');
 
   return count === 1
     ? `${milestone.services[0].service} is due in ${remaining} miles.`
     : `${count} services are due in ${remaining} miles.`;
+}
+
+/** How far past due, in whichever unit drove it. Used only for ranking. */
+function overdueBy(service: ServiceDue): number {
+  if (service.drivenBy === 'time' && service.monthsRemaining !== null) {
+    // Roughly a thousand miles a month, so the two rank against each other
+    // sensibly rather than months always losing to miles.
+    return Math.abs(service.monthsRemaining) * 1_000;
+  }
+
+  return Math.abs(service.milesRemaining ?? 0);
 }
