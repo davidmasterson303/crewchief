@@ -187,6 +187,19 @@ const NOT_PORTABLE: Record<string, string> = {
   */
   'lib/funnel-visitor.ts': 'next/headers, and Web Crypto on the Edge runtime',
   /*
+    The split once more, and here the portable half is the one that matters.
+    What a notification *says* and where tapping it *lands* is in
+    `packages/core/src/notifications.ts`, because that is a contract with the
+    mobile navigator and a second copy of it drifts silently — a push naming an
+    unregistered route opens the app to whatever screen was last on top, with
+    no error anywhere. Only the sending is here.
+
+    And sending is the half that must never be portable: this reads every push
+    address on the account with the service role. A client that could originate
+    a push could push to any device it could name.
+  */
+  'lib/push-send.ts': 'reads push tokens with the service role — reaches Supabase through lib/supabase',
+  /*
     Same split once more. The prompt, the response contract and every bound on
     the model's output are in `packages/core/src/quote-check.ts` and portable —
     which matters more here than elsewhere, because those bounds are what stand
