@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -82,9 +82,21 @@ function nextId(): string {
 
 export function AdvisorScreen({
   vehicleId,
+  initialQuestion,
   onSignOut,
 }: {
   vehicleId: string;
+  /**
+   * A question the screen was opened *with* — from a notification tap or a
+   * deep link — asked once, automatically.
+   *
+   * The recall notification says "Tap to ask the advisor what it means"; before
+   * this it opened an empty composer and made the person retype the question it
+   * had just posed. It also unblocks testing this flow at all: synthetic
+   * keystrokes do not reach a React Native `TextInput`, so the advisor was the
+   * one screen that could not be exercised without a human.
+   */
+  initialQuestion?: string;
   onSignOut: () => void;
 }) {
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -94,15 +106,21 @@ export function AdvisorScreen({
 
   const sessionId = useRef<string | null>(null);
   const listRef = useRef<FlatList<Turn>>(null);
+  const askedOnOpen = useRef(false);
 
   const trimmed = draft.trim();
   const overLength = trimmed.length > MAX_MESSAGE_LENGTH;
   const canSend = trimmed.length > 0 && !overLength && !busy;
 
-  const send = useCallback(async () => {
-    if (!canSend) return;
-
-    const question = trimmed;
+  /**
+   * Send one question.
+   *
+   * Takes the text rather than reading `draft`, so an automatic opening
+   * question can be asked on the same tick it arrives — state set moments
+   * earlier has not committed, and reading it here would send an empty string.
+   */
+  const ask = useCallback(
+    async (question: string) => {
     setBusy(true);
     setError(null);
     setTurns((current) => [...current, { id: nextId(), role: 'you', text: question }]);
@@ -152,7 +170,31 @@ export function AdvisorScreen({
     } finally {
       setBusy(false);
     }
-  }, [canSend, trimmed, vehicleId, onSignOut]);
+    },
+    [vehicleId, onSignOut]
+  );
+
+  /** The composer's send. Guards on what the user may do; `ask` does the work. */
+  const send = useCallback(() => {
+    if (!canSend) return;
+    void ask(trimmed);
+  }, [canSend, trimmed, ask]);
+
+  /*
+    Asked once per mount, guarded by a ref rather than state: React mounts
+    effects twice in development, and a second automatic send would fork the
+    thread and spend a second model call on the same question.
+  */
+  useEffect(() => {
+    const question = initialQuestion?.trim();
+    if (!question || askedOnOpen.current) return;
+
+    askedOnOpen.current = true;
+    setDraft(question);
+    // Deliberately not routed through `send`, which reads `trimmed` from state
+    // that has not committed yet on this tick.
+    void ask(question);
+  }, [initialQuestion, ask]);
 
   return (
     <KeyboardAvoidingView

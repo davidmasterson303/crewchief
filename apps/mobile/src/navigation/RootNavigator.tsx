@@ -76,7 +76,19 @@ export type RootStackParamList = {
     the car during the first request rather than after it. Neither param is a
     secret; the token still is not one, and still is not here.
   */
-  Advisor: { vehicleId: string; title?: string };
+  /*
+    `ask` lets a link arrive with a question already in hand.
+
+    Product, not scaffolding: the recall notification this app sends says "Tap
+    to ask the advisor what it means", and until now tapping it opened an empty
+    composer and left the person to retype the question the notification had
+    just posed. A push that promises an answer should deliver the question.
+
+    It also removes a real testing blocker — the advisor was the one flow that
+    could not be exercised without a human typing, and synthetic keystrokes do
+    not reach a React Native `TextInput`.
+  */
+  Advisor: { vehicleId: string; title?: string; ask?: string };
   /*
     3.3. Linked from the vehicle detail screen since 5 Aug, once build
     `29b4d76f` put `expo-image-picker` in the binary. Held back until then on
@@ -269,7 +281,16 @@ export function RootNavigator({
           })}
         >
           {({ route }) => (
-            <AdvisorScreen vehicleId={route.params.vehicleId} onSignOut={onSignOut} />
+            <AdvisorScreen
+              vehicleId={route.params.vehicleId}
+              /*
+                React Navigation maps a query string onto params, so
+                `crewchief://vehicle/<id>/advisor?ask=...` arrives here already
+                decoded.
+              */
+              initialQuestion={route.params.ask}
+              onSignOut={onSignOut}
+            />
           )}
         </Stack.Screen>
 
