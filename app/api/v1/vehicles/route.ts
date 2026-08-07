@@ -2,7 +2,8 @@ import { logger } from '@crewchief/core/logger';
 import { type NextRequest } from 'next/server';
 import type { ApiResponse } from '@crewchief/core/types';
 import { checkRateLimit, getClientIdentifier, rateLimitResponse } from '@/lib/rate-limit';
-import { requireCaller } from '@/lib/api-auth';
+import { authorizeVehicleAccess, requireCaller } from '@/lib/api-auth';
+import { validateMileageUpdate } from '@crewchief/core/mileage-tracking';
 import { getServiceRoleClient } from '@/lib/supabase';
 import { resolveVehiclePhotos } from '@/lib/vehicle-photo';
 
@@ -126,4 +127,124 @@ export async function GET(request: NextRequest): Promise<Response> {
       { status: 500 }
     );
   }
+}
+
+/**
+ * Record an odometer reading.
+ *
+ * ── Why this route exists at all ────────────────────────────────────────────
+ *
+ * `current_mileage` has been read over HTTP since Phase 2.1 and **never
+ * written** — the web app updates it through a server action, which a React
+ * Native client cannot call. Phase 5.6's service notification opens on a
+ * mileage confirmation, so the phone needs a way to answer. This is the first
+ * mobile write against `vehicles`.
+ *
+ * ── Why it is a method here rather than `/api/v1/vehicles/[vehicleId]` ──────
+ *
+ * No v1 route uses a path parameter. The id travels in the query string on
+ * `load-vehicle` and in the body on `wishlist`, and inventing a dynamic segment
+ * for one method would make this the only endpoint whose shape has to be
+ * explained. The route that already owns this table gains a verb.
+ *
+ * ── Why the caller says whether it is a correction ──────────────────────────
+ *
+ * `validateMileageUpdate` carries the reasoning: a purely monotonic rule locks
+ * a fat-fingered reading in permanently, and the wrong number then feeds every
+ * service-due calculation after it. The flag is how confirming a reading and
+ * fixing a typo stay distinguishable, rather than the rule guessing.
+ */
+export async function PATCH(request: NextRequest): Promise<Response> {
+  const identifier = getClientIdentifier(request);
+  const rateLimit = await checkRateLimit(identifier, 'default');
+  if (!rateLimit.allowed) {
+    logger.warn('API:PATCH_VEHICLE', 'Rate limit exceeded', { identifier });
+    return rateLimitResponse(rateLimit);
+  }
+
+  let body: { vehicleId?: unknown; currentMileage?: unknown; isCorrection?: unknown };
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ success: false, error: 'Invalid JSON body' } as ApiResponse, {
+      status: 400,
+    });
+  }
+
+  const vehicleId = typeof body.vehicleId === 'string' ? body.vehicleId : '';
+  if (!vehicleId) {
+    return Response.json({ success: false, error: 'Missing vehicleId' } as ApiResponse, {
+      status: 400,
+    });
+  }
+
+  /*
+    `intent: 'write'` rather than a read authorization plus an update. The
+    demo vehicles are readable by anyone and must not be writable by anyone —
+    `auth-posture.test.ts` enforces this shape on every route that touches a
+    vehicle-scoped table, and a mileage write to a seeded demo car would
+    change what every visitor sees.
+  */
+  const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+  if (!access.ok) return access.response;
+
+  const { data: vehicle, error: readError } = await access.client
+    .from('vehicles')
+    .select('current_mileage')
+    .eq('id', vehicleId)
+    .maybeSingle();
+
+  if (readError || !vehicle) {
+    logger.error(
+      'API:PATCH_VEHICLE',
+      readError ? new Error(readError.message) : new Error('Vehicle not found after authorization'),
+      { vehicleId }
+    );
+    return Response.json({ success: false, error: 'Vehicle not found' } as ApiResponse, {
+      status: 404,
+    });
+  }
+
+  const decision = validateMileageUpdate({
+    current: vehicle.current_mileage ?? 0,
+    next: body.currentMileage,
+    isCorrection: body.isCorrection === true,
+  });
+
+  if (!decision.ok) {
+    /*
+      422 rather than 400. The request is well-formed and the caller is
+      authorized — what failed is a rule about the value, and the message is
+      written to be shown to the person who typed it. A 400 would read as a
+      client bug and get logged rather than displayed.
+    */
+    return Response.json(
+      { success: false, error: decision.message, reason: decision.reason } as ApiResponse,
+      { status: 422 }
+    );
+  }
+
+  const currentMileage = body.currentMileage as number;
+
+  const { error: writeError } = await access.client
+    .from('vehicles')
+    .update({
+      current_mileage: currentMileage,
+      last_mileage_update_date: new Date().toISOString(),
+    })
+    .eq('id', vehicleId);
+
+  if (writeError) {
+    logger.error('API:PATCH_VEHICLE', new Error(writeError.message), { vehicleId });
+    return Response.json({ success: false, error: 'Could not save the reading' } as ApiResponse, {
+      status: 500,
+    });
+  }
+
+  logger.info('API:PATCH_VEHICLE', 'Mileage recorded', {
+    vehicleId,
+    isCorrection: body.isCorrection === true,
+  });
+
+  return Response.json({ success: true, currentMileage } as ApiResponse);
 }
