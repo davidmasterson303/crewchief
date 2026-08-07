@@ -24,6 +24,7 @@ import { toast } from 'sonner';
 import { invalidateDashboardCache } from '@crewchief/core/query-invalidation';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
 import { CONTEXT_KIND_LABELS, type ContextKind } from '@crewchief/core/consultant-context-kinds';
+import { parseAnswerLine } from '@crewchief/core/answer-markup';
 
 /*
  * These are the four collections this component *renders*, and no longer the
@@ -125,18 +126,26 @@ function getFollowUps(lastMessage: string): string[] {
   return FOLLOW_UP_SUGGESTIONS.default;
 }
 
+/**
+ * Draws the runs `@crewchief/core/answer-markup` identifies.
+ *
+ * The tokenising moved to core on 5 Aug because the Expo advisor had none of
+ * it: the same answer rendered as literal `**$1,461**` on the phone while the
+ * web showed it bold. One-client capability, second client silently without —
+ * the same shape as the health band and the context-kind labels.
+ *
+ * Only the drawing is web. React Native has no `<strong>`.
+ */
 function renderMarkdownLine(line: string, key: number) {
-  const parts: React.ReactNode[] = [];
-  const regex = /\*\*(.+?)\*\*/g;
-  let last = 0;
-  let match;
-  while ((match = regex.exec(line)) !== null) {
-    if (match.index > last) parts.push(line.slice(last, match.index));
-    parts.push(<strong key={`b-${key}-${match.index}`} className="font-semibold text-white">{match[1]}</strong>);
-    last = match.index + match[0].length;
-  }
-  if (last < line.length) parts.push(line.slice(last));
-  return parts.length > 0 ? parts : line;
+  const tokens = parseAnswerLine(line);
+
+  return tokens.map((token, index) =>
+    token.bold ? (
+      <strong key={`b-${key}-${index}`} className="font-semibold text-white">{token.text}</strong>
+    ) : (
+      <span key={`t-${key}-${index}`}>{token.text}</span>
+    )
+  );
 }
 
 /*

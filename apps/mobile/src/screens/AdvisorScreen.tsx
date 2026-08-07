@@ -14,6 +14,7 @@ import {
 import { askAdvisor, MAX_MESSAGE_LENGTH } from '../api/consultant';
 import { ApiRequestError } from '../api/client';
 import { CONTEXT_KIND_LABELS, type ContextKind } from '@crewchief/core/consultant-context-kinds';
+import { parseAnswer } from '@crewchief/core/answer-markup';
 
 /**
  * Phase 3.4 — ask the advisor about one car.
@@ -226,6 +227,56 @@ export function AdvisorScreen({
 }
 
 /**
+ * The advisor's answer, with the small amount of markup it actually emits.
+ *
+ * It rendered as raw text until 5 Aug, so a real answer showed literal
+ * `**$1,461**` and `* **Front Brakes & Rotors:**` on screen. The web had a bold
+ * renderer and the phone had nothing — the same one-client capability gap as
+ * the health band and the context-kind labels, which is why the parsing now
+ * lives in `@crewchief/core/answer-markup` and only the drawing is here.
+ *
+ * Bullets get a real bullet glyph and a hanging indent rather than the
+ * asterisk the model wrote, because a list on a phone should look like a list.
+ */
+function AnswerText({ answer }: { answer: string }) {
+  return (
+    <View style={styles.answer}>
+      {parseAnswer(answer).map((line, index) => {
+        /*
+          An empty line is spacing the model asked for. Rendering it as an
+          empty `Text` would collapse it, so it becomes a fixed gap — otherwise
+          paragraphs run together and a long answer becomes a wall.
+        */
+        if (line.tokens.length === 1 && line.tokens[0].text.trim() === '' && line.kind === 'text') {
+          return <View key={index} style={styles.answerGap} />;
+        }
+
+        const content = line.tokens.map((token, tokenIndex) => (
+          <Text key={tokenIndex} style={token.bold ? styles.advisorBold : undefined}>
+            {token.text}
+          </Text>
+        ));
+
+        if (line.kind === 'bullet') {
+          return (
+            <View key={index} style={styles.bulletRow}>
+              <Text style={styles.bulletMark}>{'\u2022'}</Text>
+              <Text style={styles.advisorText}>{content}</Text>
+            </View>
+          );
+        }
+
+        return (
+          <Text key={index} style={styles.advisorText}>
+            {content}
+          </Text>
+        );
+      })}
+    </View>
+  );
+}
+
+/**
  * One turn.
  *
  * The provenance row renders only under an advisor turn that carried kinds, and
@@ -247,7 +298,7 @@ function TurnView({ turn }: { turn: Turn }) {
 
   return (
     <View style={styles.advisorRow}>
-      <Text style={styles.advisorText}>{turn.text}</Text>
+      <AnswerText answer={turn.text} />
       {turn.kinds.length > 0 ? (
         <View style={styles.chipRow}>
           <Text style={styles.chipPrefix}>Based on</Text>
@@ -301,6 +352,13 @@ const styles = StyleSheet.create({
 
   advisorRow: { gap: 8 },
   advisorText: { color: 'rgba(255,255,255,0.92)', fontSize: 15, lineHeight: 22 },
+  /* Weight only. A brighter colour as well would make ordinary text read as dimmed. */
+  advisorBold: { fontWeight: '700' },
+  answer: { gap: 2 },
+  answerGap: { height: 8 },
+  /* Hanging indent: the glyph sits outside the text column so wrapped lines align. */
+  bulletRow: { flexDirection: 'row', gap: 8, paddingRight: 4 },
+  bulletMark: { color: 'rgba(255,255,255,0.5)', fontSize: 15, lineHeight: 22 },
 
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
   chipPrefix: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '600' },

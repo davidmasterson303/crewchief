@@ -3323,7 +3323,39 @@ Return ONLY valid JSON, no markdown code blocks, no explanations.`;
       console.warn('[Warning] No maintenance line items to insert');
     }
 
-    const totalCost = lineItemsToInsert.reduce((sum: number, item: any) => sum + item.total_price, 0);
+    /*
+      ── The invoice's own total, not a sum of what we kept ────────────────────
+
+      `total_cost` was `lineItemsToInsert.reduce(...)`, and that is **not what
+      the invoice says**. Tax lines are deliberately skipped during extraction —
+      correctly, since tax is not a service performed — so summing the surviving
+      items silently drops it.
+
+      Caught on 5 Aug by a real reading: a $1,519.44 invoice was stored as
+      $1,461, and the advisor reported that figure as "all-in". The advisor was
+      innocent; it read a stored number that was already wrong. **Understating
+      what a car costs is the wrong direction to be wrong for a product whose
+      pitch is knowing what your car costs you.**
+
+      `grand_total` was already extracted and already logged — it was simply
+      never persisted. Both numbers are stored now, because they answer
+      different questions: what the work cost, and what was actually paid. The
+      difference is tax and fees, and it is derivable rather than guessed.
+    */
+    const lineItemsTotal = lineItemsToInsert.reduce(
+      (sum: number, item: any) => sum + item.total_price,
+      0
+    );
+
+    /*
+      Trusted when present and sane. A grand total *below* the line items it
+      contains is a misread rather than a discount, and falling back to the sum
+      is the conservative direction: it is the number we can prove.
+    */
+    const statedTotal =
+      typeof invoiceData.grand_total === 'number' && invoiceData.grand_total >= lineItemsTotal
+        ? invoiceData.grand_total
+        : null;
 
     await client
       .from('vehicle_documents')
@@ -3331,7 +3363,16 @@ Return ONLY valid JSON, no markdown code blocks, no explanations.`;
         extracted_data: {
           vendor_name: invoiceData.shop_name,
           service_date: invoiceData.service_date,
-          total_cost: totalCost,
+          /* What was actually paid. The headline figure for cost questions. */
+          total_cost: statedTotal ?? lineItemsTotal,
+          /* What the itemised work came to, before tax and fees. */
+          line_items_total: lineItemsTotal,
+          /*
+            Recorded rather than inferred at read time, so a consumer never has
+            to guess whether a difference is tax or a missing line item.
+          */
+          tax_and_fees: statedTotal === null ? null : Number((statedTotal - lineItemsTotal).toFixed(2)),
+          total_source: statedTotal === null ? 'summed_line_items' : 'invoice_grand_total',
           service_type: 'invoice',
           item_count: lineItemsToInsert.length,
         },

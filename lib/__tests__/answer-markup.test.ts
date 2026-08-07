@@ -1,0 +1,122 @@
+/**
+ * The advisor's answer renders as an answer, not as its own source.
+ *
+ * @jest-environment node
+ *
+ * Found by hand on 5 Aug: a real reply displayed literal `**$1,461**` and
+ * `* **Front Brakes & Rotors:**` on the phone. The web had a bold renderer and
+ * the Expo client had nothing — the same one-client capability gap as the
+ * health band and the context-kind labels, on the screen that carries the App
+ * Store 4.2 argument.
+ *
+ * The tokenising is in `@crewchief/core/answer-markup` so both clients agree on
+ * what a line *means*; only the drawing is per-platform, since React Native has
+ * no `<strong>` and the web has no `<Text>`.
+ */
+
+import { parseAnswer, parseAnswerLine } from '@crewchief/core/answer-markup';
+
+/** The bold runs of a line, in order — what a renderer will emphasise. */
+function boldRuns(line: string): string[] {
+  return parseAnswerLine(line)
+    .filter((token) => token.bold)
+    .map((token) => token.text);
+}
+
+/** The line reassembled, to prove nothing is dropped on the way through. */
+function plain(line: string): string {
+  return parseAnswerLine(line)
+    .map((token) => token.text)
+    .join('');
+}
+
+describe('bold runs', () => {
+  it('reads the exact string that shipped raw', () => {
+    expect(boldRuns('That last trip ran you **$1,461** all-in.')).toEqual(['$1,461']);
+  });
+
+  it('is non-greedy across two runs', () => {
+    // A greedy match swallows the middle and emphasises "a** and **b".
+    expect(boldRuns('**a** and **b**')).toEqual(['a', 'b']);
+  });
+
+  it('leaves an unclosed marker as text rather than eating the rest', () => {
+    expect(boldRuns('torque to **25 ft-lb')).toEqual([]);
+    expect(plain('torque to **25 ft-lb')).toBe('torque to **25 ft-lb');
+  });
+
+  it('leaves a lone asterisk alone, because it is arithmetic', () => {
+    // "25 ft-lb * 2" is a multiplication sign. Stripping it would be a worse
+    // failure than showing it.
+    expect(plain('torque to 25 ft-lb * 2 bolts')).toBe('torque to 25 ft-lb * 2 bolts');
+  });
+
+  it('never loses characters', () => {
+    for (const line of [
+      'plain text',
+      '**all bold**',
+      'mixed **bold** and plain',
+      '',
+      '**',
+      'a**b**c',
+    ]) {
+      expect(plain(line)).toBe(line.replace(/\*\*(.+?)\*\*/g, '$1'));
+    }
+  });
+});
+
+describe('bullets', () => {
+  it('recognises the exact line that shipped raw, and strips its marker', () => {
+    const [line] = parseAnswer('* **Front Brakes & Rotors:** $678');
+
+    expect(line.kind).toBe('bullet');
+    // The marker is consumed here so no renderer draws it twice — once from
+    // the text and once from its own glyph.
+    expect(line.tokens.map((t) => t.text).join('')).toBe('Front Brakes & Rotors: $678');
+    expect(line.tokens.filter((t) => t.bold).map((t) => t.text)).toEqual([
+      'Front Brakes & Rotors:',
+    ]);
+  });
+
+  it.each(['* item', '- item', '• item', '  * indented'])('accepts %s', (raw) => {
+    expect(parseAnswer(raw)[0].kind).toBe('bullet');
+  });
+
+  it('does not treat emphasis at the start of a line as a bullet', () => {
+    // `**Bold:** text` begins with an asterisk but is a sentence, not a list.
+    const [line] = parseAnswer('**Total:** $1,519.44');
+
+    expect(line.kind).toBe('text');
+    expect(line.tokens.filter((t) => t.bold).map((t) => t.text)).toEqual(['Total:']);
+  });
+});
+
+describe('whole answers', () => {
+  it('keeps blank lines, so paragraphs do not run together', () => {
+    // A renderer needs to know the model asked for a gap; collapsing them
+    // turns a structured answer into a wall of text on a phone.
+    const lines = parseAnswer('First paragraph.\n\nSecond paragraph.');
+
+    expect(lines).toHaveLength(3);
+    expect(lines[1].tokens.map((t) => t.text).join('')).toBe('');
+  });
+
+  it('parses the real answer that exposed this', () => {
+    const answer = [
+      'That last trip to Blackmarket Motorsports ran you **$1,461** all-in.',
+      '',
+      '* **Front Brakes & Rotors:** $678',
+      '* **NGK Spark Plugs:** $294',
+    ].join('\n');
+
+    const lines = parseAnswer(answer);
+
+    expect(lines.map((l) => l.kind)).toEqual(['text', 'text', 'bullet', 'bullet']);
+    // Nothing anywhere still carries markup syntax.
+    for (const line of lines) {
+      for (const token of line.tokens) {
+        expect(token.text).not.toMatch(/\*\*/);
+      }
+    }
+  });
+});

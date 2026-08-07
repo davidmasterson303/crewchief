@@ -162,3 +162,50 @@ describe('the refresh runs for every client', () => {
     expect(uploadInvoiceSource()).toMatch(/generateVehicleHealthSummary/);
   });
 });
+
+describe('the stored invoice total is what the invoice says', () => {
+  /*
+    A $1,519.44 invoice was stored as $1,461 and the advisor reported that as
+    "all-in". The advisor was innocent — it read a stored number that was
+    already wrong, because `total_cost` was `reduce((sum, item) => ...)` over
+    line items, and tax lines are deliberately skipped during extraction.
+
+    Summing what survives that filter cannot equal what was paid. **Understating
+    spend is the wrong direction to be wrong** for a product whose pitch is
+    knowing what a car costs you.
+
+    `grand_total` was already extracted and already logged. It was never
+    persisted.
+  */
+  const parseSource = (() => {
+    const start = actions.indexOf('async function parseInvoiceLineItems');
+    expect(start).toBeGreaterThan(-1);
+    const end = actions.indexOf('\nexport ', start);
+    return actions.slice(start, end === -1 ? undefined : end);
+  })();
+
+  it('persists the invoice grand total, not only a sum', () => {
+    expect(parseSource).toMatch(/invoiceData\.grand_total/);
+    expect(parseSource).toMatch(/total_cost:\s*statedTotal/);
+  });
+
+  it('keeps the line-item sum too, as a separate figure', () => {
+    // The two answer different questions — what the work cost, and what was
+    // paid — and the gap between them is tax and fees.
+    expect(parseSource).toMatch(/line_items_total:/);
+    expect(parseSource).toMatch(/tax_and_fees:/);
+  });
+
+  it('records which number it used, so no consumer has to guess', () => {
+    expect(parseSource).toMatch(/total_source:/);
+  });
+
+  it('falls back to the sum when the stated total is impossible', () => {
+    /*
+      A grand total *below* the items it contains is a misread, not a discount.
+      Falling back to the sum is the conservative direction: it is the number
+      that can be proven from the rows.
+    */
+    expect(parseSource).toMatch(/grand_total\s*>=\s*lineItemsTotal/);
+  });
+});
