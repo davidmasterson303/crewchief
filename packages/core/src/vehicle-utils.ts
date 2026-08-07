@@ -1,5 +1,34 @@
 import { z } from 'zod';
 
+/**
+ * Is this schedule entry usable for deciding a service is due?
+ *
+ * The one question that matters, asked in one place. A "yes" means the entry
+ * carries a mileage number that can be compared against an odometer; a "no"
+ * means it does not, whatever else it holds.
+ *
+ * **Legacy rows answer "no", and that is the point.** Every vehicle onboarded
+ * before 7 Aug 2026 holds `{item, interval: "every 30,000 miles"}`. Parsing
+ * that prose back into a number is possible and is deliberately not done: the
+ * formats are open-ended ("annually", "every 2 years or 24k"), a parser would
+ * be right most of the time, and *most of the time* is the wrong standard for
+ * a notification that tells someone their car needs work. Those vehicles are
+ * ineligible for service notifications until `scripts/` regenerates them.
+ */
+export function isUsableScheduleEntry(entry: unknown): boolean {
+  if (typeof entry !== 'object' || entry === null) return false;
+
+  const { service, interval_miles: miles } = entry as Record<string, unknown>;
+
+  return (
+    typeof service === 'string' &&
+    service.trim().length > 0 &&
+    typeof miles === 'number' &&
+    Number.isFinite(miles) &&
+    miles > 0
+  );
+}
+
 export const VehicleDataSchema = z.object({
   known_issues: z.array(z.object({
     part: z.string(),
@@ -7,11 +36,49 @@ export const VehicleDataSchema = z.object({
     severity: z.enum(['Low', 'Medium', 'High']),
     description: z.string(),
   })).default([]),
-  maintenance_schedule: z.array(z.object({
-    item: z.string(),
-    interval: z.string(),
-    priority: z.enum(['Critical', 'Recommended', 'Optional']),
-  })).default([]),
+  /*
+    Structured, and that is a recent and deliberate change.
+
+    This used to be `{item, interval: string, priority}` — an interval like
+    "every 30,000 miles" as prose. `MaintenanceScheduleItem` in `types.ts` has
+    declared the structured shape the whole time and **nothing produced it**;
+    `app/actions.ts` reconciled the two with `item.item || item.service`. A type
+    that describes a contract nothing satisfies is the same failure as
+    `build_assets.py` being referenced everywhere and never committed.
+
+    It is structured now because a service-due notification has to compare an
+    interval against an odometer reading, and prose cannot be compared to
+    anything. `performance_stats` in the same prompt already forces numerics out
+    of the model for the same reason — this finishes that pattern rather than
+    inventing one.
+
+    `interval_miles` is `positive()` rather than `nonnegative()` on purpose. The
+    prompt's own "0 for numbers" fallback would otherwise produce a service due
+    at zero miles — that is, overdue on every car, forever. A model that does
+    not know an interval must omit the entry, and the schema is what holds it
+    to that.
+
+    ── Why the entries are filtered before validation, not validated ──────────
+
+    Because this schema guards **onboarding**, and `parse` throws on the whole
+    object. One hallucinated interval in a list of twelve would otherwise fail
+    the entire knowledge base and leave a new user staring at a broken first
+    screen — the strictness would cost more than the bad row it caught.
+
+    Dropping the entry instead degrades in the right direction: the car gets a
+    schedule with eleven services on it, and the twelfth is absent rather than
+    wrong. Absent is recoverable and visible; wrong is neither.
+  */
+  maintenance_schedule: z.preprocess(
+    (raw) => (Array.isArray(raw) ? raw.filter(isUsableScheduleEntry) : []),
+    z.array(z.object({
+      service: z.string(),
+      interval_miles: z.number().positive(),
+      interval_months: z.number().positive().nullable().optional(),
+      description: z.string().optional().default(''),
+      priority: z.enum(['Critical', 'Recommended', 'Optional']),
+    }))
+  ).default([]),
   fluid_specs: z.object({
     engine_oil: z.string().optional().default('Unknown'),
     transmission_fluid: z.string().optional().default('Unknown'),

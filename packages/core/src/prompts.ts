@@ -10,8 +10,10 @@ For the ${year} ${make} ${model}, research and compile comprehensive ownership i
    - Brief description of symptoms or consequences
 
 2. **Maintenance Schedule**: List manufacturer-recommended and enthusiast-recommended maintenance intervals. Include:
-   - Service item name
-   - Mileage or time interval
+   - Service name
+   - Mileage interval as a numeric value only (e.g. 30000, not "every 30,000 miles")
+   - Time interval in months as a numeric value only, if the service has one (e.g. 12, not "annually")
+   - What the service actually involves, in one sentence an owner would understand
    - Priority level (Critical, Recommended, Optional)
 
 3. **Fluid Specifications**: Provide exact fluid specifications:
@@ -48,6 +50,8 @@ CRITICAL INSTRUCTIONS:
 - For optional fields with no data, use empty strings for text fields, 0 for numbers, empty arrays for arrays
 - Ensure all string values are valid JSON strings
 - Ensure reliability_score is a number 1-10
+- interval_miles MUST be a positive number. It is compared against an odometer reading, so "0 for numbers" above does NOT apply to it — omit the whole entry rather than guessing an interval you are not confident of
+- Use null, not 0, for interval_months when a service has no time-based interval
 
 Return ONLY this exact JSON structure with NO additional text:
 {
@@ -55,7 +59,7 @@ Return ONLY this exact JSON structure with NO additional text:
     {"part": "string", "mileage_range": "string", "severity": "Low|Medium|High", "description": "string"}
   ],
   "maintenance_schedule": [
-    {"item": "string", "interval": "string", "priority": "Critical|Recommended|Optional"}
+    {"service": "string", "interval_miles": number, "interval_months": number or null, "description": "string", "priority": "Critical|Recommended|Optional"}
   ],
   "fluid_specs": {
     "engine_oil": "string",

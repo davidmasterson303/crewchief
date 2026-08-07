@@ -13,6 +13,7 @@ import { checkDemoBudget, checkMonthlyBudget } from '@/lib/ai-budget';
 import { checkStoredPhotoSize } from '@crewchief/core/image-resize';
 import { budgetMessage, demoBudgetMessage } from '@crewchief/core/ai/budget';
 import { VEHICLE_RESEARCH_PROMPT, POWERTRAIN_OPTIONS_PROMPT, CONSULTANT_SYSTEM_PROMPT, CONSULTANT_DOCUMENT_VALIDATION_PROMPT } from '@crewchief/core/prompts';
+import { VehicleDataSchema } from '@crewchief/core/vehicle-utils';
 import { logger } from '@crewchief/core/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { recomputePerformanceStats } from '@/lib/performance-stats';
@@ -63,42 +64,19 @@ export async function getWishlistItems(vehicleId: string) {
   return _getWishlistItems(vehicleId);
 }
 
-const VehicleDataSchema = z.object({
-  known_issues: z.array(z.object({
-    part: z.string(),
-    mileage_range: z.string(),
-    severity: z.enum(['Low', 'Medium', 'High']),
-    description: z.string(),
-  })).default([]),
-  maintenance_schedule: z.array(z.object({
-    item: z.string(),
-    interval: z.string(),
-    priority: z.enum(['Critical', 'Recommended', 'Optional']),
-  })).default([]),
-  fluid_specs: z.object({
-    engine_oil: z.string().optional().default('Unknown'),
-    transmission_fluid: z.string().optional().default('Unknown'),
-    coolant: z.string().optional().default('Unknown'),
-    brake_fluid: z.string().optional().default('Unknown'),
-  }).default({}),
-  common_mods: z.array(z.object({
-    name: z.string(),
-    purpose: z.string(),
-    difficulty: z.enum(['Easy', 'Moderate', 'Hard']),
-  })).default([]),
-  powertrain: z.object({
-    engine_type: z.string().nullable().optional(),
-    transmission_type: z.string().nullable().optional(),
-    drivetrain: z.string().nullable().optional(),
-  }).optional().default({}),
-  performance_stats: z.object({
-    horsepower: z.number().nullable().optional(),
-    torque: z.number().nullable().optional(),
-    zero_to_sixty: z.number().nullable().optional(),
-  }).optional().default({}),
-  interesting_facts: z.array(z.string()).default([]),
-  reliability_score: z.number().min(1).max(10).default(5),
-});
+/*
+  The schema this file validates the research response against lives in
+  `@crewchief/core/vehicle-utils`, and used to be **defined twice** — here and
+  there, identically, both parsing the output of one prompt.
+
+  Two copies of one contract is a drift hazard rather than a tidiness
+  complaint, and the direction it drifts matters: the structured
+  `maintenance_schedule` work would have changed one copy and left the other
+  accepting prose, so whichever path ran second would either reject a valid
+  response or store an unusable one. Neither failure names its cause.
+
+  One definition, next to the prompt whose output it describes.
+*/
 
 function extractJSON(text: string): Record<string, unknown> {
   try {
@@ -1096,9 +1074,33 @@ export async function sendConsultantMessage(params: {
       `${r.Component || 'Unknown'}: ${r.Summary || r.description || 'No details'}${r.NHTSACampaignNumber ? ` (Campaign: ${r.NHTSACampaignNumber})` : ''}`
     );
 
-    const maintenanceSchedule = (knowledge?.maintenance_schedule || []).map((item: any) =>
-      `${item.item || item.service} every ${item.interval || item.interval_miles} - ${item.priority || 'Recommended'}`
-    );
+    /*
+      Both shapes, deliberately, and this is not the old `||` papering over a
+      contract nobody satisfied — it is a real migration window.
+
+      Vehicles onboarded from 7 Aug 2026 carry `{service, interval_miles}`;
+      everything before that carries `{item, interval: "every 30,000 miles"}`
+      and keeps carrying it until `scripts/` regenerates them. The advisor must
+      answer correctly about a car in either state, so it reads either.
+
+      What it must NOT do is what the previous line did: emit
+      `every every 30,000 miles` for a legacy row and `every 30000` — no unit —
+      for a structured one. The prose already contains its own preposition and
+      unit; the number contains neither.
+    */
+    const maintenanceSchedule = (knowledge?.maintenance_schedule || []).map((item: any) => {
+      const name = item.service || item.item || 'Service';
+      const priority = item.priority || 'Recommended';
+
+      const cadence =
+        typeof item.interval_miles === 'number'
+          ? `every ${item.interval_miles.toLocaleString('en-US')} miles${
+              item.interval_months ? ` or ${item.interval_months} months` : ''
+            }`
+          : item.interval || 'interval unknown';
+
+      return `${name} ${cadence} - ${priority}`;
+    });
 
     const fluidSpecs = knowledge?.fluid_specs
       ? `Oil: ${knowledge.fluid_specs.engine_oil || '?'} | Trans: ${knowledge.fluid_specs.transmission_fluid || '?'} | Coolant: ${knowledge.fluid_specs.coolant || '?'} | Brake: ${knowledge.fluid_specs.brake_fluid || '?'}`
