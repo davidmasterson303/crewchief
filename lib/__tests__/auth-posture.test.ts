@@ -171,6 +171,14 @@ const ROUTE_POSTURE: Record<string, 'vehicle-scoped' | 'session' | 'public' | 's
     route needs no auth code of its own.
   */
   'app/api/v1/account/route.ts': 'session',
+  /*
+    Push-token registration, Phase 5. 'session' for the same reason as
+    `/api/v1/account`: the resource is the caller's own device, so there is no
+    vehicle to authorize against and inventing one would be worse than having
+    none. `requireCaller` resolves bearer tokens as well as cookies, which is
+    what lets the phone register at all.
+  */
+  'app/api/v1/push-token/route.ts': 'session',
   'app/api/v1/load-vehicle/route.ts': 'vehicle-scoped',
   'app/api/v1/load-maintenance-data/route.ts': 'vehicle-scoped',
   'app/api/v1/wishlist/route.ts': 'vehicle-scoped',

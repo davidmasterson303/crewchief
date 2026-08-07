@@ -6,9 +6,9 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import {
   configureNotificationHandler,
   initialNotificationUrl,
-  requestPushPermission,
   subscribeToNotificationTaps,
 } from '../notifications/push';
+import { registerForPush } from '../notifications/register';
 
 import { AdvisorScreen } from '../screens/AdvisorScreen';
 import { InvoiceScanScreen } from '../screens/InvoiceScanScreen';
@@ -214,7 +214,17 @@ export function RootNavigator({
   */
   useEffect(() => {
     configureNotificationHandler();
-    void requestPushPermission();
+
+    /*
+      Registration asks for permission itself and then files the device's push
+      token against this account — the half that was missing until the
+      `device_push_tokens` table existed. Permission alone was never enough:
+      the server had nowhere to send.
+
+      Fire-and-forget on purpose. Push is an enhancement, and a signed-in
+      person with a working garage must not wait on it or see it fail.
+    */
+    void registerForPush();
   }, []);
 
   return (

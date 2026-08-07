@@ -6,6 +6,7 @@ import type { Session } from '@supabase/supabase-js';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { onSessionChange, signOut, startSessionAutoRefresh } from './src/auth/session';
+import { unregisterPush } from './src/notifications/register';
 import { supabase } from './src/auth/supabase';
 import { SignInScreen } from './src/screens/SignInScreen';
 import { RootNavigator } from './src/navigation/RootNavigator';
@@ -68,7 +69,19 @@ export default function App() {
           <RootNavigator
             accessToken={session.access_token}
             email={session.user?.email ?? null}
-            onSignOut={() => void signOut()}
+            /*
+              Unregister *before* signing out, while the bearer token is still
+              valid — `/api/v1/push-token` authorizes like every other route,
+              so the order is load-bearing rather than cosmetic. A handed-on
+              phone must stop receiving the previous owner's notices at once.
+
+              Awaited only as far as the request; a failure is swallowed inside
+              `unregisterPush` so nobody is ever held back from signing out by
+              a network call.
+            */
+            onSignOut={() => {
+              void unregisterPush().finally(() => void signOut());
+            }}
           />
         ) : (
           <SignInScreen />
