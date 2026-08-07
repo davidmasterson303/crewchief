@@ -4,6 +4,7 @@ import { GarageScreen } from '../GarageScreen';
 import { VehicleDetailScreen } from '../VehicleDetailScreen';
 import { InvoiceScanScreen } from '../InvoiceScanScreen';
 import { RecallDetailScreen } from '../RecallDetailScreen';
+import { WishlistScreen } from '../WishlistScreen';
 import { apiRequest, ApiRequestError } from '../../api/client';
 import { auditText, belowFloor, contrastRatio, SCREEN_BACKGROUND } from '../../test-support/contrast';
 
@@ -87,6 +88,7 @@ describe('the health score colour — never checked by the source scan', () => {
         onAskAdvisor={jest.fn()}
         onScanInvoice={jest.fn()}
         onViewRecalls={jest.fn()}
+        onOpenWishlist={jest.fn()}
       />
     );
 
@@ -140,6 +142,7 @@ describe('failure states, which are where sub-floor text hides', () => {
         onAskAdvisor={jest.fn()}
         onScanInvoice={jest.fn()}
         onViewRecalls={jest.fn()}
+        onOpenWishlist={jest.fn()}
       />
     );
 
@@ -175,6 +178,7 @@ describe('the advisor CTA, which is dark text on white', () => {
         onAskAdvisor={jest.fn()}
         onScanInvoice={jest.fn()}
         onViewRecalls={jest.fn()}
+        onOpenWishlist={jest.fn()}
       />
     );
 
@@ -354,6 +358,80 @@ describe('the recall screen and its severity banners', () => {
 
     await view.findByText('BACK OVER PREVENTION');
     expect(view.queryByText('How it gets fixed')).toBeNull();
+    expect(belowFloor(auditText(view))).toEqual([]);
+  });
+});
+
+/**
+ * The wishlist, 5.6 — the one screen that widens the mobile surface.
+ *
+ * Its "Add to wishlist" button is near-black text on white, the same
+ * construction as the advisor CTA that shipped at 4.47:1.
+ *
+ * ⚠ **This suite cannot see `opacity` either.** `auditText` derives each text's
+ * surface from the style tree, and a parent alpha never reaches the comparison
+ * — measured, by dropping the disabled CTA's original `opacity: 0.55` to
+ * `0.12`: all 39 tests stayed green while the label became unreadable. So the
+ * disabled state uses an explicit fill instead, which *is* measured. Anything
+ * greyed out with `opacity` in this app is outside both contrast guards.
+ */
+describe('the wishlist', () => {
+  it('reads at AA with items on the list', async () => {
+    request.mockResolvedValue({
+      wishlistItems: [
+        {
+          id: 'w1',
+          item_name: 'CVT fluid flush',
+          item_type: 'maintenance',
+          category: 'Transmission',
+          description: 'Due at the next service.',
+          estimated_cost_parts: 120,
+          estimated_cost_labor: 180,
+        },
+      ],
+    });
+
+    const view = await render(
+      <WishlistScreen vehicleId="db143cdc-e68c-46f0-849e-69f7a1873f58" onSignOut={jest.fn()} />
+    );
+
+    await view.findByText('CVT fluid flush');
+    expect(belowFloor(auditText(view))).toEqual([]);
+  });
+
+  it('reads at AA in its empty state, which is what a new user sees', async () => {
+    request.mockResolvedValue({ wishlistItems: [] });
+
+    const view = await render(
+      <WishlistScreen vehicleId="db143cdc-e68c-46f0-849e-69f7a1873f58" onSignOut={jest.fn()} />
+    );
+
+    await view.findByText('Nothing on the list yet');
+    expect(belowFloor(auditText(view))).toEqual([]);
+  });
+
+  it('reads at AA with the add button disabled', async () => {
+    // The composer is empty on load, so the CTA renders in its disabled fill.
+    // This assertion only means something because that state is an explicit
+    // colour rather than an opacity — see the warning above.
+    request.mockResolvedValue({ wishlistItems: [] });
+
+    const view = await render(
+      <WishlistScreen vehicleId="db143cdc-e68c-46f0-849e-69f7a1873f58" onSignOut={jest.fn()} />
+    );
+
+    await view.findByText('Add to wishlist');
+    expect(belowFloor(auditText(view))).toEqual([]);
+  });
+
+  it('reads at AA on its error state', async () => {
+    request.mockRejectedValue(new ApiRequestError({ status: 500, message: 'Upstream is down' }));
+
+    const view = await render(
+      <WishlistScreen vehicleId="db143cdc-e68c-46f0-849e-69f7a1873f58" onSignOut={jest.fn()} />
+    );
+
+    await view.findByText('Could not load the wishlist');
     expect(belowFloor(auditText(view))).toEqual([]);
   });
 });

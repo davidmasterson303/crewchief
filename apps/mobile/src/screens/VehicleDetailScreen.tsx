@@ -103,6 +103,7 @@ export function VehicleDetailScreen({
   onAskAdvisor,
   onScanInvoice,
   onViewRecalls,
+  onOpenWishlist,
 }: {
   vehicleId: string;
   onBack: () => void;
@@ -116,6 +117,7 @@ export function VehicleDetailScreen({
   /** 3.3's entry point, a callback for the same reason `onAskAdvisor` is one. */
   onScanInvoice: () => void;
   onViewRecalls: () => void;
+  onOpenWishlist: () => void;
 }) {
   const [state, setState] = useState<State>({ status: 'loading' });
   const [refreshing, setRefreshing] = useState(false);
@@ -254,6 +256,13 @@ export function VehicleDetailScreen({
         answer guideline 4.2, but the advisor is the one someone opens without
         already holding a piece of paper.
       */}
+      <Pressable style={styles.scanCta} onPress={onOpenWishlist} accessibilityRole="button">
+        <Text style={styles.scanCtaText}>Wishlist</Text>
+        <Text style={styles.scanCtaHint}>
+          What this car needs, so the advisor can price it
+        </Text>
+      </Pressable>
+
       <Pressable style={styles.scanCta} onPress={onScanInvoice} accessibilityRole="button">
         <Text style={styles.scanCtaText}>Scan an invoice</Text>
         <Text style={styles.scanCtaHint}>

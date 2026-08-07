@@ -13,6 +13,7 @@ import { registerForPush } from '../notifications/register';
 import { AdvisorScreen } from '../screens/AdvisorScreen';
 import { InvoiceScanScreen } from '../screens/InvoiceScanScreen';
 import { RecallDetailScreen } from '../screens/RecallDetailScreen';
+import { WishlistScreen } from '../screens/WishlistScreen';
 import { pickInvoiceImage } from '../media/pick-invoice-image';
 import { GarageScreen } from '../screens/GarageScreen';
 import { VehicleDetailScreen } from '../screens/VehicleDetailScreen';
@@ -105,6 +106,13 @@ export type RootStackParamList = {
     The advisor is still reachable from here, per recall.
   */
   RecallDetail: { vehicleId: string; title?: string };
+  /*
+    5.6, and the one route here that widens the mobile surface rather than
+    completing a flow. `cc-product-0001` makes mobile three flows and defaults
+    new features to `mobile: n/a`; David agreed to the widening on 7 Aug —
+    "people may want to add items to wishlist on the go."
+  */
+  Wishlist: { vehicleId: string; title?: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -161,6 +169,7 @@ const linking: LinkingOptions<RootStackParamList> = {
       Advisor: 'vehicle/:vehicleId/advisor',
       InvoiceScan: 'vehicle/:vehicleId/scan',
       RecallDetail: 'vehicle/:vehicleId/recalls',
+      Wishlist: 'vehicle/:vehicleId/wishlist',
     },
   },
 
@@ -288,6 +297,12 @@ export function RootNavigator({
                   title: route.params.title,
                 })
               }
+              onOpenWishlist={() =>
+                navigation.navigate('Wishlist', {
+                  vehicleId: route.params.vehicleId,
+                  title: route.params.title,
+                })
+              }
             />
           )}
         </Stack.Screen>
@@ -336,6 +351,15 @@ export function RootNavigator({
                 })
               }
             />
+          )}
+        </Stack.Screen>
+
+        <Stack.Screen
+          name="Wishlist"
+          options={{ title: 'Wishlist' }}
+        >
+          {({ route }) => (
+            <WishlistScreen vehicleId={route.params.vehicleId} onSignOut={onSignOut} />
           )}
         </Stack.Screen>
 
