@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServiceRoleClient, getServerClient, createServerActionClient } from '@/lib/supabase';
+import { getServiceRoleClient, getServerClient } from '@/lib/supabase';
 import { logger } from '@crewchief/core/logger';
 import { checkRateLimit, getClientIdentifier, rateLimitResponse } from '@/lib/rate-limit';
-import { isDemoVehicleId } from '@crewchief/core/demo';
 import { authorizeVehicleAccess, authorizeVehicleScopedRow } from '@/lib/api-auth';
 
 export const dynamic = 'force-dynamic';
@@ -23,22 +22,46 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'vehicleId is required' }, { status: 400 });
     }
 
-    if (!isDemoVehicleId(vehicleId)) {
-      const authClient = createServerActionClient();
-      const { data: { user }, error: authError } = await authClient.auth.getUser();
-      if (authError || !user) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
-      const { data: ownership } = await authClient
-        .from('vehicles').select('id').eq('id', vehicleId).eq('user_id', user.id).maybeSingle();
-      if (!ownership) {
-        return NextResponse.json({ error: 'Vehicle not found' }, { status: 404 });
-      }
+    /*
+      ── This was cookie-only, and that is the vehicles-route bug again ───────
+
+      It hand-rolled `createServerActionClient()` + `auth.getUser()`, which reads
+      `next/headers` cookies and nothing else. A React Native client presents
+      `Authorization: Bearer <jwt>` and carries no cookies, so **GET returned 401
+      to the mobile app** while POST and DELETE — which already used the shared
+      helpers — worked. A wishlist you can add to and delete from but never read.
+
+      `app/api/v1/vehicles/route.ts:43` records the identical defect being fixed
+      there. The posture ratchet did not catch this one because the file *does*
+      import and use `authorizeVehicleAccess` — just not in this handler.
+
+      The helper already does everything the hand-rolled block did: demo ids get
+      the anon client and are read-only, everything else resolves a caller from
+      a cookie **or** a bearer token, and ownership is checked through the
+      caller's own client so RLS applies to the check.
+    */
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'read' });
+    if (!access.ok) {
+      return access.response;
     }
 
-    // Demo vehicles: use anon client — SELECT policy allows public reads for is_demo=true rows.
-    // Real vehicles: use service role (auth already verified above).
-    const client = isDemoVehicleId(vehicleId) ? getServerClient() : getServiceRoleClient();
+    /*
+      The data read deliberately keeps today's clients rather than adopting
+      `access.client`.
+
+      For a real vehicle `access.client` is the caller's RLS-scoped client, and
+      whether `wishlist_items` carries a SELECT policy for an authenticated owner
+      is not answerable from this repo: four migrations grant, revoke and drop
+      policies on that table in sequence, and this project's standing rule is
+      that the live database is the authority over its own migration files.
+
+      Swapping the read as well would risk trading a 401 for a silently empty
+      list, which is the worse failure — it looks like "you have no wishlist
+      items" rather than like an error. Authorization is fixed here; adopting
+      the caller's client is a separate change that needs the live policies read
+      first.
+    */
+    const client = access.isDemo ? getServerClient() : getServiceRoleClient();
 
     const { data: wishlistItems, error } = await client
       .from('wishlist_items')

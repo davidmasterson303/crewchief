@@ -150,6 +150,14 @@ const STATIC_ANALYSIS_SUITES = [
   // behavioural assertion. jsdom also reports no media-query match, so a
   // rendered test cannot tell a component that asked from one that did not.
   'reduced-motion.test.ts',
+  // Walks every route.ts under app/api/v1 to prove none authenticates through
+  // the cookie-only client. There is nothing to import: the subject is the
+  // *absence* of a call across seventeen files, and importing a route would
+  // execute Next's module graph rather than answer the question. The property
+  // is also invisible at runtime in the only environment tests run in — a
+  // cookie-authenticated handler behaves perfectly until a client with no
+  // cookies calls it, which is the mobile app and not this runner.
+  'v1-accepts-bearer.test.ts',
 ];
 
 /**
