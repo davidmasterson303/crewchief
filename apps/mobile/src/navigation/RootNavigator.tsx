@@ -12,6 +12,7 @@ import { registerForPush } from '../notifications/register';
 
 import { AdvisorScreen } from '../screens/AdvisorScreen';
 import { InvoiceScanScreen } from '../screens/InvoiceScanScreen';
+import { RecallDetailScreen } from '../screens/RecallDetailScreen';
 import { pickInvoiceImage } from '../media/pick-invoice-image';
 import { GarageScreen } from '../screens/GarageScreen';
 import { VehicleDetailScreen } from '../screens/VehicleDetailScreen';
@@ -97,6 +98,13 @@ export type RootStackParamList = {
     meantime so it could still be rendered and reviewed.
   */
   InvoiceScan: { vehicleId: string; title?: string };
+  /*
+    5.6. Where a recall notification lands. It used to open the advisor with
+    the question pre-typed, which explained a notice well and gave no way to
+    act on it — David's call on 7 Aug was that driving an action is the point.
+    The advisor is still reachable from here, per recall.
+  */
+  RecallDetail: { vehicleId: string; title?: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -152,6 +160,7 @@ const linking: LinkingOptions<RootStackParamList> = {
       VehicleDetail: 'vehicle/:vehicleId',
       Advisor: 'vehicle/:vehicleId/advisor',
       InvoiceScan: 'vehicle/:vehicleId/scan',
+      RecallDetail: 'vehicle/:vehicleId/recalls',
     },
   },
 
@@ -273,6 +282,12 @@ export function RootNavigator({
                   title: route.params.title,
                 })
               }
+              onViewRecalls={() =>
+                navigation.navigate('RecallDetail', {
+                  vehicleId: route.params.vehicleId,
+                  title: route.params.title,
+                })
+              }
             />
           )}
         </Stack.Screen>
@@ -300,6 +315,26 @@ export function RootNavigator({
               */
               initialQuestion={route.params.ask}
               onSignOut={onSignOut}
+            />
+          )}
+        </Stack.Screen>
+
+        <Stack.Screen
+          name="RecallDetail"
+          options={{ title: 'Recalls' }}
+        >
+          {({ route, navigation }) => (
+            <RecallDetailScreen
+              vehicleId={route.params.vehicleId}
+              title={route.params.title}
+              onSignOut={onSignOut}
+              onAskAdvisor={(vehicleId, ask) =>
+                navigation.navigate('Advisor', {
+                  vehicleId,
+                  title: route.params.title,
+                  ask,
+                })
+              }
             />
           )}
         </Stack.Screen>

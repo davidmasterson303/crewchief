@@ -102,6 +102,7 @@ export function VehicleDetailScreen({
   onSignOut,
   onAskAdvisor,
   onScanInvoice,
+  onViewRecalls,
 }: {
   vehicleId: string;
   onBack: () => void;
@@ -114,6 +115,7 @@ export function VehicleDetailScreen({
   onAskAdvisor: () => void;
   /** 3.3's entry point, a callback for the same reason `onAskAdvisor` is one. */
   onScanInvoice: () => void;
+  onViewRecalls: () => void;
 }) {
   const [state, setState] = useState<State>({ status: 'loading' });
   const [refreshing, setRefreshing] = useState(false);
@@ -310,14 +312,22 @@ export function VehicleDetailScreen({
       </View>
 
       {recalls > 0 && (
-        <View style={styles.card}>
+        <Pressable
+          style={styles.card}
+          accessibilityRole="button"
+          accessibilityLabel={`View ${recalls} open ${recalls === 1 ? 'recall' : 'recalls'}`}
+          onPress={onViewRecalls}
+        >
           <Text style={styles.recall}>
             {recalls} open {recalls === 1 ? 'recall' : 'recalls'}
           </Text>
-          <Text style={styles.errorBody}>
-            Recall detail is on the web for now.
-          </Text>
-        </View>
+          {/*
+            5.6 replaced "Recall detail is on the web for now." A notification
+            about a recall that lands on a screen telling you to go and use a
+            different device is not a notification worth sending.
+          */}
+          <Text style={styles.errorBody}>What it means, and what to do about it</Text>
+        </Pressable>
       )}
     </ScrollView>
   );

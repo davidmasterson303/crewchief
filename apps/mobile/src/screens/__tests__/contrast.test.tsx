@@ -3,6 +3,7 @@ import { render } from '@testing-library/react-native';
 import { GarageScreen } from '../GarageScreen';
 import { VehicleDetailScreen } from '../VehicleDetailScreen';
 import { InvoiceScanScreen } from '../InvoiceScanScreen';
+import { RecallDetailScreen } from '../RecallDetailScreen';
 import { apiRequest, ApiRequestError } from '../../api/client';
 import { auditText, belowFloor, contrastRatio, SCREEN_BACKGROUND } from '../../test-support/contrast';
 
@@ -85,6 +86,7 @@ describe('the health score colour — never checked by the source scan', () => {
         onSignOut={jest.fn()}
         onAskAdvisor={jest.fn()}
         onScanInvoice={jest.fn()}
+        onViewRecalls={jest.fn()}
       />
     );
 
@@ -137,6 +139,7 @@ describe('failure states, which are where sub-floor text hides', () => {
         onSignOut={jest.fn()}
         onAskAdvisor={jest.fn()}
         onScanInvoice={jest.fn()}
+        onViewRecalls={jest.fn()}
       />
     );
 
@@ -171,6 +174,7 @@ describe('the advisor CTA, which is dark text on white', () => {
         onSignOut={jest.fn()}
         onAskAdvisor={jest.fn()}
         onScanInvoice={jest.fn()}
+        onViewRecalls={jest.fn()}
       />
     );
 
@@ -224,5 +228,132 @@ describe('the measurement itself', () => {
 
     await view.findByText('2015 BMW M235i');
     expect(auditText(view).length).toBeGreaterThan(4);
+  });
+});
+
+/**
+ * The recall screen, 5.6.
+ *
+ * Two severity banners carry the only time-critical instructions in the app —
+ * "do not drive this vehicle" and "park outside, away from buildings" — on
+ * solid coloured fills. That is the same shape as the advisor CTA, which
+ * shipped at **4.47:1** against a 4.5 floor with a comment claiming 8.6:1: the
+ * measurement had been taken white-on-white when the text was near-black ink.
+ * A banner nobody can read is not a banner.
+ */
+describe('the recall screen and its severity banners', () => {
+  const RECALLS = (extra: Record<string, unknown> = {}) => ({
+    vehicle: {
+      year: 2015,
+      make: 'BMW',
+      model: 'M235i',
+      nhtsa_data: {
+        recalls: [
+          {
+            NHTSACampaignNumber: '20V123000',
+            Component: 'FUEL SYSTEM',
+            Summary: 'The fuel pump may fail without warning.',
+            Consequence: 'A stall increases the risk of a crash.',
+            Remedy: 'Dealers will replace the fuel pump, free of charge.',
+            ReportReceivedDate: '06/15/2020',
+            ...extra,
+          },
+        ],
+      },
+    },
+  });
+
+  it('reads at AA with an ordinary recall', async () => {
+    request.mockResolvedValue(RECALLS());
+
+    const view = await render(
+      <RecallDetailScreen
+        vehicleId="db143cdc-e68c-46f0-849e-69f7a1873f58"
+        onSignOut={jest.fn()}
+        onAskAdvisor={jest.fn()}
+      />
+    );
+
+    await view.findByText('FUEL SYSTEM');
+    expect(belowFloor(auditText(view))).toEqual([]);
+  });
+
+  it('reads at AA on the do-not-drive banner', async () => {
+    request.mockResolvedValue(RECALLS({ parkIt: true }));
+
+    const view = await render(
+      <RecallDetailScreen
+        vehicleId="db143cdc-e68c-46f0-849e-69f7a1873f58"
+        onSignOut={jest.fn()}
+        onAskAdvisor={jest.fn()}
+      />
+    );
+
+    await view.findByText('Do not drive this vehicle');
+    expect(belowFloor(auditText(view))).toEqual([]);
+  });
+
+  it('reads at AA on the park-outside banner', async () => {
+    request.mockResolvedValue(RECALLS({ parkOutSide: true }));
+
+    const view = await render(
+      <RecallDetailScreen
+        vehicleId="db143cdc-e68c-46f0-849e-69f7a1873f58"
+        onSignOut={jest.fn()}
+        onAskAdvisor={jest.fn()}
+      />
+    );
+
+    await view.findByText('Park outside, away from buildings');
+    expect(belowFloor(auditText(view))).toEqual([]);
+  });
+
+  it('reads at AA with no recalls on record', async () => {
+    request.mockResolvedValue({ vehicle: { year: 2015, make: 'BMW', model: 'M235i', nhtsa_data: null } });
+
+    const view = await render(
+      <RecallDetailScreen
+        vehicleId="db143cdc-e68c-46f0-849e-69f7a1873f58"
+        onSignOut={jest.fn()}
+        onAskAdvisor={jest.fn()}
+      />
+    );
+
+    await view.findByText('No recalls on record');
+    expect(belowFloor(auditText(view))).toEqual([]);
+  });
+
+  it('does not draw a remedy section the data cannot fill', async () => {
+    // The stored payloads predate `Remedy`. A "How it gets fixed" heading over
+    // an empty box reads as "nobody knows how to fix this".
+    request.mockResolvedValue({
+      vehicle: {
+        year: 2015,
+        make: 'BMW',
+        model: 'M235i',
+        nhtsa_data: {
+          recalls: [
+            {
+              NHTSACampaignNumber: '19V098000',
+              Component: 'BACK OVER PREVENTION',
+              Summary: 'The rearview camera image may fail to display.',
+              ReportReceivedDate: '03/02/2019',
+            },
+          ],
+        },
+      },
+    });
+
+    const view = await render(
+      <RecallDetailScreen
+        vehicleId="db143cdc-e68c-46f0-849e-69f7a1873f58"
+        onSignOut={jest.fn()}
+        onAskAdvisor={jest.fn()}
+      />
+    );
+
+    await view.findByText('BACK OVER PREVENTION');
+    expect(view.queryByText('How it gets fixed')).toBeNull();
+    expect(belowFloor(auditText(view))).toEqual([]);
   });
 });

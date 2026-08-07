@@ -25,6 +25,7 @@ import { join } from 'node:path';
 import {
   advisorUrl,
   recallNotification,
+  recallsUrl,
   serviceDueNotification,
   vehicleUrl,
 } from '@crewchief/core/notifications';
@@ -88,6 +89,14 @@ describe('the navigator registers the routes notifications point at', () => {
   it('routes the vehicle url', () => {
     expect(isRegistered(vehicleUrl('abc'))).toBe(true);
   });
+
+  it('routes the recalls url', () => {
+    // Added 7 Aug with `RecallDetailScreen`. This is the assertion that fails
+    // if the screen is registered under a different path than the notification
+    // points at — the silent break this whole file exists for.
+    expect(isRegistered(recallsUrl('abc'))).toBe(true);
+    expect(routes).toContain('vehicle/:vehicleId/recalls');
+  });
 });
 
 describe('recallNotification', () => {
@@ -97,17 +106,20 @@ describe('recallNotification', () => {
     recallSummary: 'The rearview camera image may fail to display, reducing visibility.',
   });
 
-  it('opens the advisor, because a recall notice is the thing nobody can read', () => {
-    // "FMVSS 111 rear visibility" tells an owner nothing. Explaining it is the
-    // one thing this product does that a recall lookup does not, so the
-    // notification opens the surface that explains it.
+  it('opens the recall screen, because the point is to act rather than only understand', () => {
+    // Until 7 Aug this opened the advisor with the question pre-typed, which
+    // explained a notice well and gave nobody a way to do anything about it.
+    // The destination now carries the remedy, the severity and the fact that
+    // the repair is free — and the advisor is one tap from there, per recall.
     expect(isRegistered(notice.url)).toBe(true);
-    expect(pathOf(notice.url)).toBe('vehicle/abc/advisor');
+    expect(pathOf(notice.url)).toBe('vehicle/abc/recalls');
   });
 
-  it('arrives with the question already asked', () => {
-    expect(notice.url).toContain('ask=');
-    expect(decodeURIComponent(notice.url.split('ask=')[1])).toContain('Accord');
+  it('carries no query string, because the screen loads the car’s own recalls', () => {
+    // The `?ask=` payload belonged to the advisor destination. Leaving it on a
+    // url the recall screen ignores is a parameter that looks meaningful and
+    // is not.
+    expect(notice.url).not.toContain('ask=');
   });
 
   it('names the owner’s car, not the model', () => {
@@ -152,7 +164,7 @@ describe('a long recall summary', () => {
 
     expect(body).toContain('…');
     expect(body).not.toContain('wor…');
-    expect(body).toContain('Tap to ask the advisor');
+    expect(body).toContain('Tap to see what it means');
   });
 
   it('leaves a short summary alone', () => {
@@ -162,6 +174,6 @@ describe('a long recall summary', () => {
       recallSummary: 'Brake line corrosion.',
     });
 
-    expect(body).toBe('Brake line corrosion. Tap to ask the advisor what it means.');
+    expect(body).toBe('Brake line corrosion. Tap to see what it means and what to do.');
   });
 });

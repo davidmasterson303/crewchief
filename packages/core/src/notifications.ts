@@ -64,15 +64,25 @@ export function vehicleUrl(vehicleId: string): string {
   return `${APP_SCHEME}vehicle/${encodeURIComponent(vehicleId)}`;
 }
 
+/** The recall screen for one car. Mirrors `RecallDetail: 'vehicle/:vehicleId/recalls'`. */
+export function recallsUrl(vehicleId: string): string {
+  return `${APP_SCHEME}vehicle/${encodeURIComponent(vehicleId)}/recalls`;
+}
+
 /**
  * A recall was issued for this car.
  *
- * **Lands on the advisor, not on the vehicle screen.** A recall notice from
- * NHTSA is written for a regulator, not an owner — "FMVSS 111 rear visibility"
- * tells someone nothing about whether they can drive to work. The one thing
- * this product does that a recall lookup does not is explain it, so the
- * notification opens the surface that explains it, with the question already
- * asked.
+ * **Lands on the recall screen, not the advisor.** It opened the advisor with
+ * the question pre-typed until 7 Aug 2026, which explained a notice well and
+ * gave nobody a way to act on it. David's call: the point of the alert is to
+ * drive an action. So the destination carries the notice, what it means, what
+ * NHTSA says the remedy is, and the fact that the repair is free — and the
+ * advisor is reachable from there, per recall, still carrying the question.
+ *
+ * The old reasoning was not wrong, only incomplete: "FMVSS 111 rear visibility"
+ * genuinely does tell an owner nothing, and explaining it is the thing this
+ * product does that a recall lookup does not. That explanation is now one tap
+ * away from the answer instead of being the whole answer.
  *
  * `vehicleName` is what the owner calls the car, so the title reads as being
  * about *their* car rather than about a model. A notification that says
@@ -88,8 +98,8 @@ export function recallNotification(params: {
 
   return {
     title: `Recall notice — ${vehicleName}`,
-    body: `${truncate(recallSummary, 140)} Tap to ask the advisor what it means.`,
-    url: advisorUrl(vehicleId, `What does this recall mean for my ${vehicleName}? ${recallSummary}`),
+    body: `${truncate(recallSummary, 140)} Tap to see what it means and what to do.`,
+    url: recallsUrl(vehicleId),
   };
 }
 
