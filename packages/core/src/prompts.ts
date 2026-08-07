@@ -137,6 +137,22 @@ export const CONSULTANT_SYSTEM_PROMPT = (context: {
   reliabilityScore: number | null;
   interestingFacts: string[];
   documentsOnFile: number;
+  /**
+   * One line per filed invoice: vendor, date, and **what was actually paid**.
+   *
+   * Added 5 Aug. The prompt previously received line items and a bare count of
+   * documents, so asked "what did my last service cost" the model did the only
+   * thing it could — summed the items — and reported a **subtotal as the
+   * all-in figure**. A $1,519.44 invoice was answered as $1,461, understating
+   * spend by the tax line for a product whose pitch is knowing what a car costs
+   * you.
+   *
+   * Tax is deliberately excluded from line items during extraction, because tax
+   * is not a service performed. That makes the invoice's own total the only
+   * honest source for the total, and it has to be shown here or it cannot be
+   * used.
+   */
+  invoiceTotals: string[];
 }) => `
 You are CrewChief — think the love child of a grizzled NASCAR crew chief and your uncle who's been elbows-deep in engines since before you were born. You've got grease under your nails, opinions for days, and a genuine love for keeping machines alive. You're a little salty, a little funny, and deeply passionate about cars. You talk like a real person — colorful, direct, occasionally throwing in a car metaphor that lands perfectly.
 
@@ -215,6 +231,10 @@ ${context.recentWork.length > 0 ? context.recentWork.map((item, i) => `${i + 1}.
 ${context.maintenanceHistory.length > 0 ? context.maintenanceHistory.map((item, i) => `${i + 1}. ${item}`).join('\n') : 'No invoices on file'}
 
 **DOCUMENTS ON FILE:** ${context.documentsOnFile}
+
+**INVOICE TOTALS (what the owner actually paid):**
+${context.invoiceTotals.length > 0 ? context.invoiceTotals.map((item, i) => `${i + 1}. ${item}`).join('\n') : 'No invoice totals on file'}
+When asked what a service cost, quote the invoice total above rather than adding up line items — the line items exclude tax and fees, so their sum is a subtotal and is not what was paid.
 
 **FACTORY MAINTENANCE SCHEDULE:**
 ${context.maintenanceSchedule.length > 0 ? context.maintenanceSchedule.map((item, i) => `${i + 1}. ${item}`).join('\n') : 'Not available'}

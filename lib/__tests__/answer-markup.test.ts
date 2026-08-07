@@ -120,3 +120,50 @@ describe('whole answers', () => {
     }
   });
 });
+
+/**
+ * The advisor can only quote a total it is shown.
+ *
+ * The fix that stored the invoice's grand total was **not enough on its own**:
+ * the consultant prompt received line items and a bare *count* of documents, so
+ * asked "what did my last service cost" the model did the only thing available
+ * to it — added the items up — and reported a subtotal as the all-in figure.
+ *
+ * That is the shape this project keeps producing: a value corrected at rest and
+ * never carried to the place that reads it. Storing it and prompting with it are
+ * two separate defects, and only fixing both changes the answer.
+ */
+describe('invoice totals reach the consultant prompt', () => {
+  const fs = require('node:fs') as typeof import('node:fs');
+  const path = require('node:path') as typeof import('node:path');
+  const root = path.join(__dirname, '..', '..');
+
+  const prompts = fs.readFileSync(path.join(root, 'packages', 'core', 'src', 'prompts.ts'), 'utf8');
+  const actions = fs.readFileSync(path.join(root, 'app', 'actions.ts'), 'utf8');
+
+  it('declares and renders an invoice-totals section', () => {
+    expect(prompts).toMatch(/invoiceTotals:\s*string\[\]/);
+    expect(prompts).toMatch(/INVOICE TOTALS/);
+    // A count alone is what produced the wrong answer.
+    expect(prompts).toMatch(/context\.invoiceTotals/);
+  });
+
+  it('tells the model not to add up line items for a total', () => {
+    // The instruction matters as much as the data: the items are right there,
+    // and summing them is the intuitive move.
+    expect(prompts).toMatch(/rather than adding up line items|exclude tax/i);
+  });
+
+  it('is actually populated from the stored documents', () => {
+    const send = actions.slice(actions.indexOf('export async function sendConsultantMessage'));
+    expect(send).toMatch(/invoiceTotals:/);
+    expect(send).toMatch(/extracted_data/);
+  });
+
+  it('skips documents with no recorded total rather than reporting zero', () => {
+    // Older documents predate the total being stored. "$0" would be a
+    // confident lie about a real bill.
+    const send = actions.slice(actions.indexOf('export async function sendConsultantMessage'));
+    expect(send).toMatch(/typeof data\.total_cost !== 'number'/);
+  });
+});

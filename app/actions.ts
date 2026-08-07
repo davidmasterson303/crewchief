@@ -1140,6 +1140,35 @@ export async function sendConsultantMessage(params: {
       reliabilityScore: knowledge?.reliability_score || null,
       interestingFacts: knowledge?.interesting_facts || [],
       documentsOnFile: documents.length,
+      /*
+        What was actually paid, per invoice. Without this the model can only
+        sum line items — which excludes tax by design — and reports a subtotal
+        as the all-in figure. Observed 5 Aug: $1,461 quoted for a $1,519.44
+        invoice.
+
+        `tax_and_fees` is stated rather than left implicit so the model does not
+        have to infer whether a gap is tax or a line item it failed to read.
+        Older documents have no `total_cost` and are skipped entirely rather
+        than reported as $0, which would be a confident lie about a real bill.
+      */
+      invoiceTotals: documents
+        .map((doc: any) => {
+          const data = doc.extracted_data || {};
+          if (typeof data.total_cost !== 'number') return null;
+
+          const parts = [
+            data.vendor_name || 'Unknown shop',
+            data.service_date || 'undated',
+            `paid $${data.total_cost}`,
+          ];
+
+          if (typeof data.line_items_total === 'number' && typeof data.tax_and_fees === 'number') {
+            parts.push(`(work $${data.line_items_total} + tax/fees $${data.tax_and_fees})`);
+          }
+
+          return parts.join(' | ');
+        })
+        .filter((line: string | null): line is string => line !== null),
     });
 
     const conversationHistory = messageHistory.slice(-20);
