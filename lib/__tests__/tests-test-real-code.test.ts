@@ -188,8 +188,10 @@ const STATIC_ANALYSIS_SUITES = [
   // Reads the A2a migration against the modules that name its column and its
   // source value. Same class as `mod-details-goal-key`: an agreement between
   // SQL and TypeScript that no runtime here checks, because Postgres rejects
-  // the write and the error is swallowed. `LogServiceModal` has been inserting
-  // a non-existent column with an illegal source for months without a symptom.
+  // the write and the error is swallowed. `LogServiceModal` inserted a
+  // non-existent column with an illegal source for months without a symptom —
+  // it has since been deleted, and the suite now scans the tree for the next
+  // writer to spell that source rather than watching the one file.
   'service-baseline-schema.test.ts',
   // Reads the sweep route and its Netlify scheduler. The route sends a push to
   // every account in the product, so its authorization is the most abusable

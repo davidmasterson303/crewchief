@@ -569,6 +569,9 @@ Add to `app/globals.css` and to the DS spec, then reference by name in review.
 > **David's call, and it is a scope decision rather than a fix:** delete
 > `MaintenanceHistory.tsx` and `UpcomingMaintenance.tsx`, or wire them up if
 > they were meant to be reached. R13 and R14 only become real after that.
+>
+> **Taken for `UpcomingMaintenance.tsx` — deleted, see R14.** This file is the
+> one left, and the decision is still open on it.
 - **Problem:** `MaintenanceHistory.tsx:347–376` keeps one line and pays for it — date `hidden sm:flex`, part number `hidden sm:inline`, description `truncate`, beside a category badge and a right-aligned cost. A maintenance record with its date hidden has the second-most-important fact removed, on the screen whose whole job is "what was done, when, for how much."
 - **Change:** two lines below `sm`, one line above —
   ```
@@ -578,14 +581,24 @@ Add to `app/globals.css` and to the DS spec, then reference by name in review.
 - **Effort:** ~2 hours.
 
 ### R14. A 260px carousel that fits neither phone nor desktop — MEDIUM
-> **INVALID AS WRITTEN — `components/UpcomingMaintenance.tsx` is not rendered
-> anywhere either.** Same evidence as R13, and the claim that it "is the only
-> horizontally-scrolling region in the app" is the tell: the only live
-> `overflow-x-auto` in `app/` or `components/` outside it are the dashboard's
-> tab strip, which carries `edge-fade-x` deliberately, and `EmailDraftDisplay`.
-> There is no carousel on any screen a user can reach.
+> **CLOSED BY DELETION — `components/UpcomingMaintenance.tsx` is gone.** The
+> item was invalid as written: the component was not rendered anywhere either.
+> Same evidence as R13, and the claim that it "is the only horizontally-
+> scrolling region in the app" was the tell — the only live `overflow-x-auto` in
+> `app/` or `components/` outside it are the dashboard's tab strip, which carries
+> `edge-fade-x` deliberately, and `EmailDraftDisplay`. There was no carousel on
+> any screen a user could reach.
 >
-> Fix written and reverted, for the reason under R13. Same decision needed.
+> A fix was written and reverted first, for the reason under R13. The decision
+> that entry asked for has now been taken in the delete direction: the component
+> and `LogServiceModal.tsx`, its only child and the sole reason that file
+> existed, are both removed. `packages/core/src/service-due.ts` already replaces
+> the approach — it reads the vehicle's own schedule rather than the hardcoded
+> `COMMON_INTERVALS` table this component carried, which is the argument for
+> deleting rather than wiring up.
+>
+> **`MaintenanceHistory.tsx` is still there**, so R13 is still open on the same
+> terms.
 - **Problem:** `UpcomingMaintenance.tsx:136`, `:415` — fixed `w-[260px]` cards in a snap scroller. At 375px that leaves a 19px sliver of the next card: too little to read as "more," too much to read as an edge. At 1440px the same strip scrolls through four items while 600px of row sits empty. It is the only horizontally-scrolling region in the app and it scrolls at *every* width.
 - **Change:** below `sm` → `w-[78vw] max-w-[300px] snap-start` (a legible next-card peek); `md`+ → `grid grid-cols-2 xl:grid-cols-3`, no scroller.
 - **Effort:** ~1 hour.
@@ -1047,9 +1060,11 @@ at once, and `tsc` is perfectly happy about it. Always go through
    changed — `bg-cyan-600` is at 36 sites, so it is the brand colour on every
    primary button, and that is a design decision rather than something to slip
    into an accessibility pass.
-3. **The two dead components.** Delete `MaintenanceHistory.tsx` and
-   `UpcomingMaintenance.tsx`, or wire them up. R13 and R14 only become real
-   after that.
+3. **The dead components — one down.** `UpcomingMaintenance.tsx` is deleted,
+   and `LogServiceModal.tsx` with it: nothing else rendered the modal, and its
+   only insert named a column that has never existed under a `source` the CHECK
+   forbids. R14 is closed. `MaintenanceHistory.tsx` is the remaining one —
+   delete it or wire it up, and R13 only becomes real after that.
 4. **D2 (price) after two weeks of meter data**, per Addendum A. The first rows
    already show thinking at 5–8× the visible answer *at `LOW`*, which argues for
    re-testing `MINIMAL` on the non-prose paths once there is a fortnight to read.

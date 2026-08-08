@@ -8,13 +8,18 @@
  *
  * ── Why this is not `UpcomingMaintenance.tsx` ───────────────────────────────
  *
- * That component exists, renders nowhere, and carries a hardcoded
- * `COMMON_INTERVALS` table: oil every 5,000 miles, plugs every 30,000, for
- * every car in the product. A generic table is a reasonable placeholder on a
- * screen someone chose to open and a bad basis for an unprompted notification —
- * "your transmission fluid is due" is a claim about *this* car, and a Honda and
- * a BMW do not share an interval. R14 recorded the component as unrendered; the
- * table is the likelier reason it never was.
+ * That component rendered nowhere and carried a hardcoded `COMMON_INTERVALS`
+ * table: oil every 5,000 miles, plugs every 30,000, for every car in the
+ * product. A generic table is a reasonable placeholder on a screen someone
+ * chose to open and a bad basis for an unprompted notification — "your
+ * transmission fluid is due" is a claim about *this* car, and a Honda and a BMW
+ * do not share an interval. R14 recorded the component as unrendered; the table
+ * is the likelier reason it never was.
+ *
+ * It has since been deleted, so the table is no longer in the tree to be
+ * reached for. The heading stays because the argument is about *approach* and
+ * outlives the file: a schedule this module cannot source from the vehicle is a
+ * schedule it should decline to assert, not one to fill in from an average.
  *
  * This reads the vehicle's own schedule instead, which is why `81022f9` had to
  * make that schedule structured first.

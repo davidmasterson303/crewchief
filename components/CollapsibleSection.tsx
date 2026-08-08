@@ -16,9 +16,9 @@ import { ChevronDown } from 'lucide-react';
  *
  *   - **Remembers per section and per vehicle.** Collapsing the dossier on one
  *     car should not collapse it on another, and it certainly should not come
- *     back open on every navigation. Keyed storage, following the idiom already
- *     in `UpcomingMaintenance` (`localStorage`, read in a lazy initialiser,
- *     writes wrapped in try/catch because storage can be unavailable outright).
+ *     back open on every navigation. Keyed storage: `localStorage`, read in a
+ *     lazy initialiser, with writes wrapped in try/catch because storage can be
+ *     unavailable outright — Safari private browsing throws on `setItem`.
  *   - **Renders children only when open.** These sections mount charts, run
  *     count-up animations and fire queries; keeping a collapsed one mounted
  *     would pay for work nobody asked to see. The trade is that expanding is a
