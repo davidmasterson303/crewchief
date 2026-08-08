@@ -68,7 +68,17 @@ interface Vehicle {
   current_mileage?: number | null;
   avg_miles_per_month?: number | null;
   vehicle_status?: string | null;
-  performance_goal?: string | null;
+  /*
+    The owner's actual answer, not `performance_goal`.
+
+    This screen rendered `performance_goal` until 7 Aug 2026 — a column with a
+    `NOT NULL DEFAULT 'moderate'` that **no screen has ever written**. So the
+    phone displayed "Moderate" for every car regardless of what its owner
+    picked in onboarding, while their real choice sat in a column the mobile
+    API did not select. `app/actions.ts:2062` records the same column causing
+    the same class of bug in the modification analysis.
+  */
+  performance_mindedness?: string | null;
   ownership_objective?: string | null;
   /* Both embedded shapes accepted, for the reason GarageScreen sets out. */
   vehicle_health_summary?: HealthSummary | HealthSummary[] | null;
@@ -312,7 +322,7 @@ export function VehicleDetailScreen({
         />
         <Row
           label="Goal"
-          value={vehicle.performance_goal ? humanise(vehicle.performance_goal) : null}
+          value={vehicle.performance_mindedness ? humanise(vehicle.performance_mindedness) : null}
         />
         <Row
           label="Objective"

@@ -41,7 +41,7 @@ export const dynamic = 'force-dynamic';
 */
 const VEHICLE_COLUMNS =
   'id,year,make,model,trim,color,vin,current_mileage,avg_miles_per_month,' +
-  'image_url,custom_image_url,performance_goal,ownership_objective,' +
+  'image_url,custom_image_url,performance_mindedness,ownership_objective,' +
   'vehicle_status,focal_point_x,focal_point_y,created_at,updated_at,' +
   'nhtsa_data(recalls),' +
   'vehicle_health_summary(health_score,summary,red_flags)';
