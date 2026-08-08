@@ -78,7 +78,7 @@ export default function ServiceCostSummary({ maintenanceLineItems = [] }: Servic
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-3 gap-3 mb-5">
+        <div className="grid grid-cols-1 gap-3 mb-5 sm:grid-cols-3">
           <div className="p-4 bg-white/4 rounded-xl border border-white/8 text-center">
             <p className="label-uppercase mb-2">Total Spent</p>
             <p className="text-xl font-bold text-white tabular-nums">{fmt(stats.totalSpent)}</p>

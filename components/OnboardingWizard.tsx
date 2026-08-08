@@ -27,9 +27,45 @@ interface OnboardingWizardProps {
 
 const STEP_LABELS = ['Vehicle', 'Powertrain', 'Mileage', 'Ownership', 'Performance'];
 
+/**
+ * Progress through the wizard.
+ *
+ * ── Two presentations, because the rail does not survive a phone ────────────
+ *
+ * R7: five 32px circles with `whitespace-nowrap` labels beneath them. Below
+ * about 420px "Powertrain" and "Performance" are wider than their circles, so
+ * the labels overlap each other and the rail reads as damage rather than as
+ * progress.
+ *
+ * **The dotted rail is a desktop affordance, not a small one.** Shrinking it
+ * would keep a decoration at the cost of legibility, so below `sm` it is
+ * replaced outright by the two facts it was conveying — where you are and what
+ * this step is — plus a progress bar. Above `sm` it is exactly as it was.
+ */
 function StepIndicator({ currentStep, totalSteps, labels }: { currentStep: number; totalSteps: number; labels: string[] }) {
   return (
-    <div className="flex items-center gap-0 mb-8">
+    <>
+      {/* Below sm. The same information, in a line that fits. */}
+      <div className="sm:hidden mb-6">
+        <p className="text-xs font-medium text-white/70">
+          Step {currentStep} of {totalSteps}
+          {labels[currentStep - 1] ? ` · ${labels[currentStep - 1]}` : ''}
+        </p>
+        <div
+          className="mt-2 h-0.5 w-full rounded-full bg-white/10"
+          role="progressbar"
+          aria-valuenow={currentStep}
+          aria-valuemin={1}
+          aria-valuemax={totalSteps}
+        >
+          <div
+            className="h-0.5 rounded-full bg-cyan-500 transition-all duration-300"
+            style={{ width: `${(currentStep / totalSteps) * 100}%` }}
+          />
+        </div>
+      </div>
+
+    <div className="hidden sm:flex items-center gap-0 mb-8">
       {Array.from({ length: totalSteps }).map((_, i) => {
         const stepNum = i + 1;
         const isCompleted = stepNum < currentStep;
@@ -61,6 +97,7 @@ function StepIndicator({ currentStep, totalSteps, labels }: { currentStep: numbe
         );
       })}
     </div>
+    </>
   );
 }
 
@@ -421,7 +458,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
           <p className="text-white/50 text-sm">Vehicle Setup</p>
         </div>
 
-        <div className="glass-panel rounded-2xl p-8">
+        <div className="glass-panel rounded-2xl p-5 sm:p-8">
           <StepIndicator
             currentStep={step}
             totalSteps={powertrainSkipped ? 4 : 5}
@@ -435,7 +472,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
 
           {step === 1 && (
             <div className="space-y-5">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <Label className="text-white/70 text-xs font-semibold uppercase tracking-widest mb-1.5 block">Year</Label>
                   <Input
@@ -583,7 +620,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
               </div>
               <div>
                 <Label className="text-white/70 text-xs font-semibold uppercase tracking-widest mb-1.5 block">Average Miles Per Month <span className="text-red-400">*</span></Label>
-                <div className="grid grid-cols-4 gap-2 mb-3">
+                <div className="grid grid-cols-2 gap-2 mb-3 sm:grid-cols-4">
                   {[500, 1000, 1500, 2000].map((miles) => (
                     <button
                       key={miles}
@@ -806,7 +843,18 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
             </div>
           )}
 
-          <div className="flex gap-3 mt-7">
+          {/*
+            Stacked and full-width below `sm`, side by side above it. Two
+            buttons sharing a narrow row leaves "Back" wide enough to hit by
+            accident while reaching for the primary action, which on the last
+            step is the one that creates the car.
+
+            `flex-col-reverse` so the primary keeps its position in the DOM —
+            and therefore in the tab order and for a screen reader — while
+            appearing above "Back" on a phone, where the thumb reaches the
+            bottom first.
+          */}
+          <div className="flex flex-col-reverse gap-3 mt-7 sm:flex-row">
             {step > 1 && (
               <Button
                 type="button"

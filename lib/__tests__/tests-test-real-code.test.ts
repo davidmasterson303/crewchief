@@ -112,6 +112,12 @@ const STATIC_ANALYSIS_SUITES = [
   // missed the front door, because it only sees routes someone remembered to
   // visit. The class name in the source is the whole signal.
   'text-contrast-floor.test.ts',
+  // Reads every .tsx off disk for a 3+ column grid with no breakpoint — R3's
+  // shape, where 231px split three ways left the text cell at roughly zero and
+  // "8-speed automatic" wrapped one character per line. jsdom has no layout, so
+  // no rendered assertion in this repo can observe a column's resolved width;
+  // the class string is deterministic and is the whole signal.
+  'responsive-grid-floor.test.ts',
   'portability.test.ts',
   'ws-optional-deps.test.ts',
   'illustration-tokens.test.ts',
