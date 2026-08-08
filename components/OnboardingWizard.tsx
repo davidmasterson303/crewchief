@@ -535,7 +535,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
                         <>
                           <Upload className="h-7 w-7" />
                           <span className="text-sm font-medium">Click to upload or drag and drop</span>
-                          <span className="text-xs opacity-70">JPEG, PNG, or WebP up to 5MB</span>
+                          <span className="text-xs text-white/50">JPEG, PNG, or WebP up to 5MB</span>
                         </>
                       )}
                     </div>
@@ -658,16 +658,36 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
           {step === performanceStep && (
             <div className="space-y-5">
               <div>
-                <Label className="text-white/70 text-xs font-semibold uppercase tracking-widest mb-3 block">Performance Mindset</Label>
+                <Label className="text-white/70 text-xs font-semibold uppercase tracking-widest mb-3 block">Modifications</Label>
+                {/*
+                  ── Two options, not three ────────────────────────────────────
+
+                  This asked for a level — stock, mild, or aggressive — and a
+                  level is an end state. David, 7 Aug: *"I don't like the idea
+                  of end states anymore. It's a continuum. There's almost always
+                  something more you can do."* The build dial shows where a car
+                  sits now, so nobody has to declare where they intend to stop
+                  in the first sixty seconds of using the product.
+
+                  What is left is the only question that changes anything: does
+                  this person want the surface at all.
+
+                  ⚠ **`performance_mindedness` is a Postgres enum**
+                  `('stock','mild','aggressive')`, so "yes" is stored as `mild`
+                  rather than a truer word — a new value needs `ALTER TYPE`, and
+                  a migration is not worth spending on a label. `mild` now means
+                  *interested*; `aggressive` is legacy and read-only. Nothing
+                  branches on the difference any more: `showsModifications` is
+                  the whole of it.
+                */}
                 <RadioGroup
                   value={formData.performance_mindedness}
                   onValueChange={(value) => updateFormData('performance_mindedness', value)}
                   className="space-y-2"
                 >
                   {[
-                    { value: 'stock', label: 'Stock and reliable', desc: 'Keep it factory, prioritize dependability' },
-                    { value: 'mild', label: 'Mild upgrades', desc: 'Tasteful improvements, nothing crazy' },
-                    { value: 'aggressive', label: 'Aggressive performance', desc: 'Track-ready, high-performance builds' },
+                    { value: 'mild', label: 'Yes, show me modifications', desc: 'A running list of what this car could have done next' },
+                    { value: 'stock', label: 'Not interested', desc: 'Keep it factory — you can turn this on later' },
                   ].map(({ value, label, desc }) => (
                     <div
                       key={value}

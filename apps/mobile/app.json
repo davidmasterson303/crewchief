@@ -9,8 +9,23 @@
     "userInterfaceStyle": "dark",
     "ios": {
       "bundleIdentifier": "co.davidmasterson.crewchief",
-      "supportsTablet": false
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSCameraUsageDescription": "CrewChief uses the camera so you can photograph a service invoice and have its line items read for you.",
+        "NSPhotoLibraryUsageDescription": "CrewChief needs your photo library so you can attach an invoice you have already photographed.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "CrewChief needs your photo library so you can attach an invoice you have already photographed.",
+          "cameraPermission": "CrewChief uses the camera so you can photograph a service invoice and have its line items read for you."
+        }
+      ],
+      "expo-notifications"
+    ],
     "android": {
       "package": "co.davidmasterson.crewchief",
       "adaptiveIcon": {
@@ -24,7 +39,11 @@
     "extra": {
       "apiBaseUrl": "https://effulgent-blancmange-6adfdf.netlify.app",
       "supabaseUrl": "https://hcldnnfwnrerznpruazf.supabase.co",
-      "supabasePublishableKey": "sb_publishable_cojGPM6Cxjwg8G4VoybnEA_vq-qvIjN"
-    }
+      "supabasePublishableKey": "sb_publishable_cojGPM6Cxjwg8G4VoybnEA_vq-qvIjN",
+      "eas": {
+        "projectId": "55451053-dc1a-481a-8257-76b476799f57"
+      }
+    },
+    "owner": "masterson303"
   }
 }

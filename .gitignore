@@ -52,3 +52,19 @@ TECH_DEBT_ASSESSMENT.md
 
 # scratch screenshots
 public/image*.png
+
+# agent worktrees — full checkouts of this repo, living inside it
+#
+# EAS flagged the project archive at 172 MB on build 29b4d76f (5 Aug). It was
+# not node_modules or .next, both of which are already ignored: it was this
+# directory at 433 MB, 428 MB of which is one spent worktree. Untracked and
+# unignored means EAS packs it into the upload on **every** build, and there
+# are only fifteen a month.
+#
+# `.claude/worktrees/` and not `.claude/`, because `.claude/launch.json` is
+# tracked and is what the preview tooling reads.
+#
+# jest.config.js already excludes this path from both discovery and module
+# resolution, for the same underlying reason: a full second copy of the repo
+# sitting inside the repo is something every tool has to be told to ignore.
+.claude/worktrees/

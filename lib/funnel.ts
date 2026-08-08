@@ -3,8 +3,11 @@ import { logger } from '@crewchief/core/logger';
 import {
   FUNNEL_STEPS,
   type FunnelStep,
+  type FunnelRates,
   isRecordableVisitorId,
   funnelCounts,
+  funnelRates,
+  groupByVisitor,
 } from '@crewchief/core/funnel';
 
 /**
@@ -41,8 +44,41 @@ import {
  * than at four call sites is why the constraint is in the schema.
  */
 
-export type { FunnelStep };
-export { FUNNEL_STEPS, funnelCounts };
+export type { FunnelStep, FunnelRates };
+export { FUNNEL_STEPS, funnelCounts, funnelRates };
+
+/**
+ * Rebuild the funnel over a window. Phase 2.97d, the last piece.
+ *
+ * Reads rows and groups them in memory rather than aggregating in SQL. That is
+ * the right trade at this size and is worth stating so it gets revisited rather
+ * than inherited: the table holds at most one row per visitor per step, so a
+ * month of a surface doing a few hundred visits a day is tens of thousands of
+ * rows of two short columns. When that stops being true the fix is a SQL
+ * `GROUP BY` behind this same signature, and `groupByVisitor` plus `funnelRates`
+ * keep their tests either way.
+ *
+ * **Not fire-and-forget, and not silent.** Unlike every write in this module,
+ * this is a read nobody's request depends on — it feeds a report. So it throws
+ * on failure rather than returning an empty funnel. An empty funnel and a
+ * broken query look identical, and the whole purpose of this instrument is to
+ * be believed: `0%` conversion reported by a failed read is worse than an
+ * error, because someone would act on it.
+ */
+export async function readFunnel(since: Date): Promise<FunnelRates> {
+  const client = getServiceRoleClient();
+
+  const { data, error } = await client
+    .from('funnel_events')
+    .select('visitor_id, step')
+    .gte('created_at', since.toISOString());
+
+  if (error) {
+    throw new Error(`Could not read the funnel: ${error.message}`);
+  }
+
+  return funnelRates(groupByVisitor(data ?? []));
+}
 
 export interface FunnelEvent {
   /**

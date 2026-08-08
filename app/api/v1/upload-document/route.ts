@@ -4,6 +4,7 @@ import { logger } from '@crewchief/core/logger';
 import { MAX_FILE_SIZE, ALLOWED_DOCUMENT_TYPES } from '@crewchief/core/validation';
 import type { ApiResponse } from '@crewchief/core/types';
 import { checkRateLimit, getClientIdentifier, rateLimitResponse } from '@/lib/rate-limit';
+import { authorizeVehicleAccess } from '@/lib/api-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,6 +39,35 @@ export async function POST(request: NextRequest): Promise<Response> {
         { success: false, error: 'Missing file or vehicleId' } as ApiResponse,
         { status: 400 }
       );
+    }
+
+    /*
+      ── Authorized here as well as in the action, and for the status code ─────
+
+      Not redundancy, and not distrust of `uploadInvoice` — it authorizes
+      because a server action is an independently reachable POST endpoint and
+      always must. This route authorizes because it needs the **HTTP status**,
+      which is the same argument `/api/v1/consultant` sets out at length.
+
+      What it was doing instead: the action returns `{ success: false, error }`
+      with no status, and the mapping below falls through to **500** for
+      anything it does not recognise. So a caller whose session had expired got
+      `500 Unauthorized`, and a caller reaching for someone else's vehicle got
+      500 rather than 404.
+
+      That is not cosmetic for Phase 3.3. The mobile client keys sign-out off
+      `status === 401` (`apps/mobile/src/api/client.ts`), so on a 500 it would
+      never fire — an expired session would show "try again" forever, and
+      trying again cannot help. This is the one flow where that matters most:
+      an invoice upload is the end of a photograph someone just took.
+
+      Placed after the field check and before the file checks deliberately.
+      Reading and validating a file body for a caller who may not touch the
+      vehicle is work done on behalf of someone with no claim to it.
+    */
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return access.response;
     }
 
     if (file.size > MAX_FILE_SIZE) {

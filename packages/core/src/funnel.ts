@@ -72,6 +72,83 @@ export function isRecordableVisitorId(visitorId: unknown): visitorId is string {
   return trimmed.length >= 8 && trimmed.length <= 128 && trimmed === visitorId;
 }
 
+export interface FunnelRates {
+  counts: Record<FunnelStep, number>;
+  /**
+   * Step-to-step conversion, each keyed by the step being *entered*.
+   *
+   * `landed` has no predecessor, so it is always 1 when anyone landed at all —
+   * present rather than omitted so the shape is uniform and a caller iterating
+   * `FUNNEL_STEPS` does not have to special-case the first one.
+   */
+  stepConversion: Record<FunnelStep, number>;
+  /** Landed → saved. The number the phase is actually judged on. */
+  overallConversion: number;
+  /** Visitors who reached at least `landed`. The denominator for everything. */
+  visitors: number;
+}
+
+/**
+ * Turn counts into rates.
+ *
+ * **This is the line that stops 2.97d being four counters nobody can act on** —
+ * the failure mode the roadmap names explicitly. Counts answer "how many"; a
+ * funnel exists to answer "where do people leave", and that is a division
+ * nobody performs consistently by hand.
+ *
+ * Every denominator is guarded. A zero-visitor window is the *normal* state of
+ * this table until the door opens, so returning `NaN` here would put `NaN%` on
+ * whatever reads it and make the instrument look broken on the day it is
+ * correct. Zero visitors means zero conversion, which is true and is not an
+ * error.
+ */
+export function funnelRates(visitors: readonly (readonly FunnelStep[])[]): FunnelRates {
+  const counts = funnelCounts(visitors);
+  const landed = counts.landed;
+
+  const rate = (numerator: number, denominator: number) =>
+    denominator > 0 ? numerator / denominator : 0;
+
+  const stepConversion = Object.fromEntries(
+    FUNNEL_STEPS.map((step, i) => {
+      if (i === 0) return [step, landed > 0 ? 1 : 0];
+      return [step, rate(counts[step], counts[FUNNEL_STEPS[i - 1]])];
+    })
+  ) as Record<FunnelStep, number>;
+
+  return {
+    counts,
+    stepConversion,
+    overallConversion: rate(counts.saved, landed),
+    visitors: landed,
+  };
+}
+
+/**
+ * Collapse raw `(visitor_id, step)` rows into per-visitor step sets.
+ *
+ * Separated from the database read so the grouping — the part with an easy
+ * off-by-one in it — is testable without a client. Unknown step values are
+ * dropped rather than trusted: the CHECK constraint should make them
+ * impossible, and a value that got past it is corrupt rather than interesting.
+ */
+export function groupByVisitor(
+  rows: readonly { visitor_id: string; step: string }[]
+): FunnelStep[][] {
+  const byVisitor = new Map<string, FunnelStep[]>();
+
+  for (const row of rows) {
+    if (!FUNNEL_STEPS.includes(row.step as FunnelStep)) continue;
+    const steps = byVisitor.get(row.visitor_id);
+    if (steps) steps.push(row.step as FunnelStep);
+    else byVisitor.set(row.visitor_id, [row.step as FunnelStep]);
+  }
+
+  // `Array.from` rather than a spread: this package targets a low `lib` for the
+  // React Native client, where spreading a Map iterator needs downlevelIteration.
+  return Array.from(byVisitor.values());
+}
+
 /* ─── Visitor identity ──────────────────────────────────────────────────────
  *
  * The half of 2.97d that costs real effort, and the reason the item was

@@ -2,8 +2,38 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+
+    // `@types/jest` hoists to the repo root, and TypeScript's default typeRoots
+    // walk stops finding it once `paths` above pins a nested resolution for
+    // React. Named explicitly so the screen tests typecheck; without it every
+    // `jest.mock` reads as "Cannot use namespace 'jest' as a value" — a message
+    // that sounds like a syntax problem and is a missing type package.
+    "types": ["jest"],
+    "typeRoots": ["../../node_modules/@types", "./node_modules/@types"],
     "paths": {
-      "@crewchief/core/*": ["../../packages/core/src/*"]
+      "@crewchief/core/*": ["../../packages/core/src/*"],
+
+      // The type-level half of the problem metro.config.js solves for the
+      // bundler. The web app is React 18 and Expo SDK 57 requires 19, so npm
+      // hoists @types/react 18.2.22 to the repo root and nests 19.2.18 here.
+      //
+      // A dependency that imports React types resolves the hoisted 18 while
+      // this app resolves 19, and TypeScript then reports that ReactNode is
+      // not assignable to ReactNode. The message names the same type twice and
+      // is genuinely about two different types that share a name.
+      // @react-navigation/native-stack is what surfaced it; anything else
+      // pulling React types would have done the same.
+      //
+      // Pinned here rather than deduped at the root: the two majors are a
+      // deliberate consequence of the web app and the phone app being on
+      // different React versions, and flattening them is what metro.config.js
+      // explains at length this install cannot do.
+      //
+      // Comments belong out here rather than as a "//" key — inside `paths`,
+      // TypeScript reads a key as a module pattern and its value as a mapping,
+      // so a JSON-style comment there produces one TS5090 per line.
+      "react": ["./node_modules/@types/react"],
+      "react/*": ["./node_modules/@types/react/*"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx"],

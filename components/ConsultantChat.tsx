@@ -23,7 +23,8 @@ import { QuoteRequestDialogV2 } from './QuoteRequestDialogV2';
 import { toast } from 'sonner';
 import { invalidateDashboardCache } from '@crewchief/core/query-invalidation';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
-import type { ContextKind } from '@/lib/consultant-context';
+import { CONTEXT_KIND_LABELS, type ContextKind } from '@crewchief/core/consultant-context-kinds';
+import { parseAnswerLine } from '@crewchief/core/answer-markup';
 
 /*
  * These are the four collections this component *renders*, and no longer the
@@ -125,18 +126,26 @@ function getFollowUps(lastMessage: string): string[] {
   return FOLLOW_UP_SUGGESTIONS.default;
 }
 
+/**
+ * Draws the runs `@crewchief/core/answer-markup` identifies.
+ *
+ * The tokenising moved to core on 5 Aug because the Expo advisor had none of
+ * it: the same answer rendered as literal `**$1,461**` on the phone while the
+ * web showed it bold. One-client capability, second client silently without —
+ * the same shape as the health band and the context-kind labels.
+ *
+ * Only the drawing is web. React Native has no `<strong>`.
+ */
 function renderMarkdownLine(line: string, key: number) {
-  const parts: React.ReactNode[] = [];
-  const regex = /\*\*(.+?)\*\*/g;
-  let last = 0;
-  let match;
-  while ((match = regex.exec(line)) !== null) {
-    if (match.index > last) parts.push(line.slice(last, match.index));
-    parts.push(<strong key={`b-${key}-${match.index}`} className="font-semibold text-white">{match[1]}</strong>);
-    last = match.index + match[0].length;
-  }
-  if (last < line.length) parts.push(line.slice(last));
-  return parts.length > 0 ? parts : line;
+  const tokens = parseAnswerLine(line);
+
+  return tokens.map((token, index) =>
+    token.bold ? (
+      <strong key={`b-${key}-${index}`} className="font-semibold text-white">{token.text}</strong>
+    ) : (
+      <span key={`t-${key}-${index}`}>{token.text}</span>
+    )
+  );
 }
 
 /*
@@ -174,16 +183,14 @@ function renderMarkdownLine(line: string, key: number) {
  * `sources` and therefore show no chips: the honest rendering of "we no longer
  * know" is to claim nothing, not to recompute from today's garage and backdate
  * it onto an old answer.
+ *
+ * ── Where the words themselves live ────────────────────────────────────────
+ *
+ * `@crewchief/core/consultant-context-kinds`, since the Expo advisor screen
+ * renders this same row. The labels are a provenance claim, so a second copy on
+ * the phone would let the two clients describe one answer differently. Only the
+ * icons below are web — Lucide has no React Native build here.
  */
-const CONTEXT_LABELS: Record<ContextKind, string> = {
-  knowledge: 'Knowledge base',
-  service: 'Service records',
-  issues: 'Issue history',
-  mods: 'Mod profile',
-  wishlist: 'Wishlist',
-  recalls: 'Recall data',
-};
-
 function contextIcon(kind: ContextKind) {
   if (kind === 'issues' || kind === 'recalls') return <TriangleAlert className="h-2.5 w-2.5" />;
   if (kind === 'mods') return <Sparkles className="h-2.5 w-2.5" />;
@@ -579,7 +586,7 @@ export default function ConsultantChat({
         timestamp: new Date().toISOString(),
         wishlistActions: result.wishlistActions,
         /* Reported by the server from the context it loaded for this turn —
-         * see the note above CONTEXT_LABELS. What was put in front of the
+         * see the note above `contextIcon`. What was put in front of the
          * model, not what the model used, and deliberately absent on replayed
          * history. */
         sources: result.contextKinds ?? [],
@@ -887,7 +894,19 @@ export default function ConsultantChat({
                                 <Heart className="h-3.5 w-3.5 flex-shrink-0" />
                               )}
                               <span className="flex-1 font-medium text-xs">{action.name}</span>
-                              <span className="text-xs opacity-50 capitalize">{action.type}</span>
+                              {/*
+                                An explicit colour per state, not `opacity-50`.
+                                An alpha multiplier is the one form of de-emphasis
+                                `text-contrast-floor.test.ts` structurally cannot
+                                measure — it reads colour classes — so a faded
+                                label is an unaudited one. Same rule R10 states:
+                                contrast, not size, makes a label recede.
+                              */}
+                              <span
+                                className={`text-xs capitalize ${isAdded ? 'text-green-300/60' : 'text-info/60'}`}
+                              >
+                                {action.type}
+                              </span>
                               {!isAdded && !isAdding && <span className="text-xs text-cyan-400 font-semibold">+ Add</span>}
                             </button>
                           );
@@ -921,7 +940,7 @@ export default function ConsultantChat({
                             >
                               <FileText className="h-3.5 w-3.5 flex-shrink-0" />
                               <span className="flex-1 font-medium text-xs">Get competing quotes</span>
-                              <span className="text-xs opacity-60">
+                              <span className="text-xs text-amber-300/60">
                                 {pullable.length} item{pullable.length > 1 ? 's' : ''}
                               </span>
                             </button>
@@ -946,7 +965,7 @@ export default function ConsultantChat({
                           className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/6 border border-white/10 text-xs text-white/50 font-medium"
                         >
                           {contextIcon(kind)}
-                          {CONTEXT_LABELS[kind]}
+                          {CONTEXT_KIND_LABELS[kind]}
                         </span>
                       ))}
                     </div>

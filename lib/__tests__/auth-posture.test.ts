@@ -171,6 +171,14 @@ const ROUTE_POSTURE: Record<string, 'vehicle-scoped' | 'session' | 'public' | 's
     route needs no auth code of its own.
   */
   'app/api/v1/account/route.ts': 'session',
+  /*
+    Push-token registration, Phase 5. 'session' for the same reason as
+    `/api/v1/account`: the resource is the caller's own device, so there is no
+    vehicle to authorize against and inventing one would be worse than having
+    none. `requireCaller` resolves bearer tokens as well as cookies, which is
+    what lets the phone register at all.
+  */
+  'app/api/v1/push-token/route.ts': 'session',
   'app/api/v1/load-vehicle/route.ts': 'vehicle-scoped',
   'app/api/v1/load-maintenance-data/route.ts': 'vehicle-scoped',
   'app/api/v1/wishlist/route.ts': 'vehicle-scoped',
@@ -226,6 +234,60 @@ const ROUTE_POSTURE: Record<string, 'vehicle-scoped' | 'session' | 'public' | 's
     neither of which has a user session.
   */
   'app/api/health/consultant/route.ts': 'secret-gated',
+  /*
+    The anonymous front door (Phase 2.97b, decision D9). It spends Gemini
+    tokens on request, from an unauthenticated caller, on an uploaded image.
+
+    **Read the entry directly above before accepting this one.** By that
+    reasoning `/api/health/consultant` is secret-gated precisely because a
+    public endpoint that spends tokens on request is the unbounded-cost bug
+    this project has already shipped once. That reasoning is right, and it
+    does not exempt this route — it sets the bar it has to clear.
+
+    The difference is what the endpoint is *for*, and therefore what the fix
+    can be. The consultant health check had no reason to be reachable by the
+    public, so closing it cost nothing and "cost stops being a design problem
+    once the caller must authenticate" was available. This route's entire
+    product purpose is that a stranger with no account can use it — that is
+    Phase 2.97, and closing it would delete the feature. So the cost problem
+    cannot be dissolved by authentication and has to be *carried*, by controls
+    built for it:
+
+      - a global daily spend ceiling keyed on surface = 'anonymous', with a
+        manual kill switch checked before it (D8, `lib/ai-budget.ts`);
+      - per-IP bucketing on the platform-supplied address only, never a
+        forwarded header (erratum T1, `packages/core/src/client-ip.ts`);
+      - a set thinking level, unlike `parseInvoiceLineItems`, because default
+        thinking on an anonymous endpoint is the money faucet 2.95a closed;
+      - no dossier generation, ever (D6) — asserted as an absence in
+        `front-door-gate.test.ts` and `quote-check.test.ts`;
+      - bounded upload size and bounded pasted text.
+
+    'public' is the honest label and it is the uncomfortable one. It is chosen
+    over inventing a softer category because the exposure is real and should
+    read as real every time someone opens this file. If the controls above are
+    ever weakened, this entry is the thing that should stop them.
+  */
+  'app/api/v1/front-door/check/route.ts': 'public',
+  /*
+    Phase 2.97c — the seam where an anonymous session becomes an account, and
+    the **only** authenticated route on the front-door path. Everything else
+    there is deliberately open; this one moves rows onto a user id, so it has to
+    know who is asking.
+
+    `session` rather than `vehicle-scoped`: there is no vehicle. The rows being
+    claimed were produced by someone with no account and no car on file, which
+    is the entire premise of 2.97.
+
+    **The authorization that matters here is not the session.** `requireSession`
+    establishes *who* is claiming; what decides *what* they may claim is that
+    the visitor id is read from the httpOnly `cc_fv` cookie and never from the
+    request. Accepting an id from a body would let any signed-in user claim any
+    visitor's scan by replaying an id — and ids appear in the database and in
+    logs, so they are not secrets. There is no UPDATE policy on the table for
+    `authenticated` either, so a client cannot reassign a row directly.
+  */
+  'app/api/v1/front-door/claim/route.ts': 'session',
 };
 
 /**

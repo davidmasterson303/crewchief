@@ -44,6 +44,51 @@ const STATIC_ANALYSIS_SUITES = [
   // and loading one under this runner would fail on the transform rather than
   // on the rule. Absence of `.from(` in the source is the whole signal.
   'mobile-api-only.test.ts',
+  // Reads the two vehicle routes' column constants to prove the detail
+  // endpoint is a superset of the list endpoint. Executing either needs a live
+  // Supabase, and the property is which columns are *asked for* — a string
+  // constant in each file.
+  'vehicle-detail-not-poorer.test.ts',
+  // Reads apps/mobile's app.json, package.json and eas.json to prove a cloud
+  // build will not be wasted: native modules batched, and every iOS usage
+  // description present. There is nothing to import — the subject is three
+  // config files, and the failure they pin is only observable after a build has
+  // already been spent.
+  'mobile-native-build-inputs.test.ts',
+  // Reads dev-session.ts to prove every EXPO_PUBLIC read sits inside a __DEV__
+  // branch. EXPO_PUBLIC values are inlined at transform time, so an unguarded
+  // read compiles a real password into the release binary — a property of the
+  // source, and one no runtime assertion could observe.
+  'mobile-dev-session-stripped.test.ts',
+  // Reads app/actions.ts to prove the health summary queries the table an
+  // invoice actually writes, and that the refresh sits in the shared upload
+  // path rather than in one client component. Executing either half needs a
+  // live Supabase and a Gemini call; what regressed is which tables are read
+  // and where the trigger lives, both of which are on disk.
+  'health-sees-filed-invoices.test.ts',
+  // Reads apps/mobile off disk for text colours below the AA floor. The web
+  // guard `text-contrast-floor.test.ts` scans app/ and components/ for Tailwind
+  // class names and structurally cannot see an rgba() in a React Native
+  // StyleSheet, which is how the Expo client stayed outside the rule from Phase
+  // 3.1 until 5 Aug. The colour literal in the source is the whole signal.
+  'mobile-text-contrast.test.ts',
+  // Reads SignInScreen and core-check.ts off disk to prove the on-device core
+  // probe is still rendered by something. It spent Phase 3.2 onward imported by
+  // nothing; the subject is React Native source this runner cannot load, and
+  // "is it wired in" is structural.
+  'mobile-core-check-wired.test.ts',
+  // Reads GarageScreen off disk to prove account deletion is reachable in
+  // every state it can render — App Store 5.1.1(v). Same constraint as
+  // `mobile-api-only`: the subject is a React Native component this runner
+  // cannot load, and the property is structural (does each return path carry
+  // the affordance) rather than behavioural.
+  'mobile-account-reachable.test.ts',
+  // Reads the upload route to prove it authorizes where the HTTP status is
+  // still available, rather than letting a denial fall through the error
+  // mapping as a 500. Executing it would need a live Supabase, a storage
+  // bucket and a vision model; the property that regressed is which function
+  // is called and in what order, which is on disk.
+  'upload-route-status-codes.test.ts',
   'vehicles-rls-posture.test.ts',
   // Replays the migration corpus to find blanket RLS policies a rebuild would
   // declare. There is nothing to import: the subject is the SQL on disk, and
@@ -60,6 +105,13 @@ const STATIC_ANALYSIS_SUITES = [
   // which implements neither `(hover: none)` nor the cascade that decides it.
   // Absence of an unpaired `group-hover:opacity-100` is the whole signal.
   'touch-parity.test.ts',
+  // Reads every .tsx off disk for body text below the AA contrast floor item 17
+  // set. The subject is a Tailwind alpha in a class string; rendering the
+  // component would prove what jsdom computes, which is not what a browser
+  // composites over a backdrop — and item 17's own rendered probe is what
+  // missed the front door, because it only sees routes someone remembered to
+  // visit. The class name in the source is the whole signal.
+  'text-contrast-floor.test.ts',
   'portability.test.ts',
   'ws-optional-deps.test.ts',
   'illustration-tokens.test.ts',
@@ -98,6 +150,14 @@ const STATIC_ANALYSIS_SUITES = [
   // behavioural assertion. jsdom also reports no media-query match, so a
   // rendered test cannot tell a component that asked from one that did not.
   'reduced-motion.test.ts',
+  // Walks every route.ts under app/api/v1 to prove none authenticates through
+  // the cookie-only client. There is nothing to import: the subject is the
+  // *absence* of a call across seventeen files, and importing a route would
+  // execute Next's module graph rather than answer the question. The property
+  // is also invisible at runtime in the only environment tests run in — a
+  // cookie-authenticated handler behaves perfectly until a client with no
+  // cookies calls it, which is the mobile app and not this runner.
+  'v1-accepts-bearer.test.ts',
 ];
 
 /**

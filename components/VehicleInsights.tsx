@@ -16,11 +16,11 @@ import {
   getModNamesOnly,
   getDetailedModsWithCachedDetails,
   getCachedPerformanceModifications,
-  getTierProgress,
-  getModsForEarnedTier,
+  getModsForVehicle,
   ensureAggressiveModMinimum,
   generateVehicleDossier,
   generateVehicleHealthSummary,
+  setModificationsVisible,
 } from '@/app/actions';
 import { useWishlistData } from '@/hooks/useWishlistData';
 import { toast } from 'sonner';
@@ -31,7 +31,7 @@ import MaintenanceHistoryDialog from './MaintenanceHistoryDialog';
 import IssuesTab from './insights/IssuesTab';
 import MaintenanceTab from './insights/MaintenanceTab';
 import ModificationsTab from './insights/ModificationsTab';
-import type { TierProgress, Tier } from './TierProgressCard';
+import { showsModifications } from '@crewchief/core/mod-progression';
 
 interface VehicleInsightsProps {
   vehicle: any;
@@ -57,10 +57,50 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
     const [selectedMaintenanceItem, setSelectedMaintenanceItem] = useState<string>('');
     const [selectedModForInstall, setSelectedModForInstall] = useState<string>('');
     const [performanceMods, setPerformanceMods] = useState<any[]>([]);
-    const [earnedTier, setEarnedTier] = useState<Tier>((vehicle.earned_tier || 'mild') as Tier);
-    const [tierProgress, setTierProgress] = useState<TierProgress | null>(null);
-    const [tierProgressLoading, setTierProgressLoading] = useState(false);
-    const [dossierTab, setDossierTab] = useState('issues');
+    /*
+      `earnedTier` and its progress card lived here. Both are gone (7 Aug): the
+      build dial shows where a car sits directly, so a tier the owner had to
+      unlock was a second, coarser answer to the same question — and one that
+      gated the mod list while it was at it.
+    */
+    /*
+      ── Which dossier tabs exist, and in what order ─────────────────────────
+
+      Driven by the owner's own onboarding answer rather than fixed.
+
+      `stock` has hidden the mods tab since it was written, and that gate has
+      **never once fired** — no vehicle in the product has ever been `stock`,
+      because until now the onboarding answer only ever narrowed what was shown
+      and nothing made the choice consequential. It stays.
+
+      What is new (7 Aug, David) is that anyone who wants modifications gets
+      them **first**. Someone who asked for the surface is not opening the
+      dossier to read the maintenance schedule, and making them scroll past two
+      tabs to reach the one they came for is the same clutter complaint pointing
+      the other way.
+
+      This briefly keyed on `aggressive` versus `mild`. Those levels are gone —
+      onboarding asks a yes/no now, because a level is an end state — so the
+      rule is simply: asked for it, sees it first.
+    */
+    /*
+      Held locally so turning modifications on reveals the tab immediately.
+      The server action persists it; waiting for a refetch to show a tab the
+      person just asked for reads as the button not having worked.
+    */
+    const [modsVisible, setModsVisible] = useState(
+      showsModifications(vehicle.performance_mindedness)
+    );
+
+    const dossierTabs = modsVisible
+      ? ['mods', 'issues', 'maintenance']
+      : ['issues', 'maintenance'];
+
+    /*
+      The default follows the order rather than being pinned to 'issues'. A
+      first tab that is not the selected one reads as a rendering bug.
+    */
+    const [dossierTab, setDossierTab] = useState(dossierTabs[0]);
     const [loadingModNames, setLoadingModNames] = useState(false);
     const [isAutoResearching, setIsAutoResearching] = useState(false);
     const autoResearchRef = useRef(false);
@@ -75,12 +115,11 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
     }, [vehicle.id]);
 
     useEffect(() => {
-      loadTierProgress();
     }, [vehicle.id]);
 
     useEffect(() => {
-      loadPerformanceMods(earnedTier);
-    }, [earnedTier, vehicle.id]);
+      loadPerformanceMods();
+    }, [vehicle.id]);
 
     useEffect(() => {
       onWishlistStateUpdate?.(savedItemNames);
@@ -106,18 +145,6 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
       }
     }, [vehicle.id, vehicle.year, vehicle.make, vehicle.model, knowledge?.research_status, router]);
 
-    const loadTierProgress = async () => {
-      setTierProgressLoading(true);
-      const result = await getTierProgress(vehicle.id);
-      if (result.success && result.progress) {
-        setTierProgress(result.progress);
-        if (result.tier && result.tier !== earnedTier) {
-          setEarnedTier(result.tier);
-        }
-      }
-      setTierProgressLoading(false);
-    };
-
     const loadTracking = async () => {
       const [issueResult, modResult] = await Promise.all([
         getIssueTracking(vehicle.id),
@@ -140,11 +167,11 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
       }
     };
 
-    const loadPerformanceMods = async (tier: Tier) => {
+    const loadPerformanceMods = async () => {
       setLoadingModNames(true);
 
       // Try tier-specific mod list first
-      const tierResult = await getModsForEarnedTier(vehicle.id, tier);
+      const tierResult = await getModsForVehicle(vehicle.id);
       if (tierResult.success && tierResult.data.length > 0) {
         setPerformanceMods(tierResult.data);
         const detailsMap: Record<string, any> = {};
@@ -157,13 +184,13 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
       }
 
       // Fallback: load from names cache then details cache
-      const namesResult = await getModNamesOnly(vehicle.id, tier);
+      const namesResult = await getModNamesOnly(vehicle.id, 'mild');
       if (namesResult.success && namesResult.data.length > 0) {
         setPerformanceMods(namesResult.data);
       }
       setLoadingModNames(false);
 
-      const detailsResult = await getDetailedModsWithCachedDetails(vehicle.id, tier);
+      const detailsResult = await getDetailedModsWithCachedDetails(vehicle.id, 'mild');
       if (detailsResult.success && detailsResult.data.length > 0) {
         setPerformanceMods(detailsResult.data);
         const detailsMap: Record<string, any> = {};
@@ -172,7 +199,7 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
         }
         setModDetails((prev) => ({ ...prev, ...detailsMap }));
       } else {
-        const fallbackResult = await getCachedPerformanceModifications(vehicle.id, tier);
+        const fallbackResult = await getCachedPerformanceModifications(vehicle.id, 'mild');
         if (fallbackResult.success && fallbackResult.data.length > 0) {
           setPerformanceMods(fallbackResult.data);
           const detailsMap: Record<string, any> = {};
@@ -183,10 +210,13 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
         }
       }
 
-      // If aggressive, ensure perpetual backfill minimum
-      if (tier === 'aggressive') {
-        ensureAggressiveModMinimum(vehicle.id).catch(() => {});
-      }
+      /*
+        Backfill top-up. This was gated on `tier === 'aggressive'` — so the
+        owners most likely to exhaust a list were the only ones who ever got
+        more generated, and everyone else quietly ran out. With tiers gone it
+        runs for any car showing modifications.
+      */
+      ensureAggressiveModMinimum(vehicle.id).catch(() => {});
     };
 
     const handleIssueStatusUpdate = async (
@@ -230,8 +260,7 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
 
     const handleModStatusUpdate = async (
       modName: string,
-      status: 'pending' | 'completed' | 'not_interested',
-      tier: Tier
+      status: 'pending' | 'completed' | 'not_interested'
     ) => {
       if (status === 'completed') {
         setSelectedModForInstall(modName);
@@ -239,7 +268,7 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
         return;
       }
       setLoading(true);
-      const result = await updateModificationStatusWithTier(vehicle.id, modName, status, tier);
+      const result = await updateModificationStatusWithTier(vehicle.id, modName, status);
       if (result.success) {
         if (status === 'not_interested' && result.backfillTriggered) {
           toast.success('Skipped — a replacement mod is being generated');
@@ -247,14 +276,8 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
           toast.success('Modification status updated');
         }
 
-        if (result.newTier && result.newTier !== earnedTier) {
-          setEarnedTier(result.newTier);
-          toast.success(`Tier unlocked: ${result.newTier.charAt(0).toUpperCase() + result.newTier.slice(1)}!`);
-        }
-
         await loadTracking();
-        await loadTierProgress();
-        await loadPerformanceMods(result.newTier || earnedTier);
+        await loadPerformanceMods();
         invalidateDashboardCache(vehicle.id);
         triggerPerfStatsRecalc();
         router.refresh();
@@ -324,7 +347,6 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
           vehicle.id,
           selectedModForInstall,
           'completed',
-          earnedTier,
           data.notes,
           data.dateCompleted
         );
@@ -332,11 +354,6 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
           toast.error('Failed to update modification status');
           setLoading(false);
           return;
-        }
-
-        if (modResult.newTier && modResult.newTier !== earnedTier) {
-          setEarnedTier(modResult.newTier);
-          toast.success(`Tier unlocked: ${modResult.newTier.charAt(0).toUpperCase() + modResult.newTier.slice(1)}!`);
         }
       }
       const result = await addMaintenanceHistory(
@@ -358,8 +375,7 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
         setMaintenanceDialogOpen(false);
         setSelectedMaintenanceItem('');
         await loadTracking();
-        await loadTierProgress();
-        await loadPerformanceMods(earnedTier);
+        await loadPerformanceMods();
         generateVehicleHealthSummary(vehicle.id, true).then(() => {
           invalidateDashboardCache(vehicle.id);
           router.refresh();
@@ -474,8 +490,43 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
           </CardHeader>
           <CardContent>
             <Tabs value={dossierTab} onValueChange={setDossierTab} className="w-full">
-              <TabsList className={`grid w-full ${vehicle.performance_mindedness === 'stock' ? 'grid-cols-2' : 'grid-cols-3'} mb-4 bg-white/4 border border-white/8 p-0.5 rounded-xl`}>
-                {(['issues', 'maintenance', ...(vehicle.performance_mindedness !== 'stock' ? ['mods'] : [])] as string[]).map((tabVal) => {
+              {/*
+                The way back.
+
+                Answering "not interested" in onboarding hides this whole
+                surface, and that answer is given in the first sixty seconds
+                before anyone knows what it turns off. Without this it is
+                irreversible, which makes a preference into a trap — and it is
+                the reason the onboarding question can stay a single yes/no
+                rather than having to be got right first time.
+
+                Quiet on purpose. It sits under the tabs rather than in them:
+                someone who said no should not be sold to every time they open
+                the dossier, only shown that the door is unlocked.
+              */}
+              {!modsVisible && (
+                <button
+                  type="button"
+                  className="mb-4 text-xs text-white/50 hover:text-white/75 transition-colors underline underline-offset-2 decoration-white/20"
+                  onClick={async () => {
+                    setModsVisible(true);
+                    setDossierTab('mods');
+                    const result = await setModificationsVisible(vehicle.id as string, true);
+                    if (!result.success) {
+                      // Put it back rather than leaving a tab that will vanish
+                      // on the next load — a silent revert is worse than none.
+                      setModsVisible(false);
+                      setDossierTab('issues');
+                      toast.error(result.error || 'Could not turn modifications on');
+                    }
+                  }}
+                >
+                  Interested in modifications for this car? Turn them on
+                </button>
+              )}
+
+              <TabsList className={`grid w-full ${dossierTabs.length === 2 ? 'grid-cols-2' : 'grid-cols-3'} mb-4 bg-white/4 border border-white/8 p-0.5 rounded-xl`}>
+                {dossierTabs.map((tabVal) => {
                   const isActive = dossierTab === tabVal;
                   const tabConfig = {
                     issues:      { Icon: AlertCircle, label: 'Issues',      count: knownIssues.length },
@@ -533,7 +584,7 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
                 />
               </TabsContent>
 
-              {vehicle.performance_mindedness !== 'stock' && (
+              {modsVisible && (
                 <TabsContent value="mods">
                   <ModificationsTab
                     vehicle={vehicle}
@@ -543,9 +594,6 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
                     savedItemNames={savedItemNames}
                     loading={loading}
                     loadingModNames={loadingModNames}
-                    earnedTier={earnedTier}
-                    tierProgress={tierProgress}
-                    tierProgressLoading={tierProgressLoading}
                     onModStatusUpdate={handleModStatusUpdate}
                     onWishlistToggleComplete={handleWishlistToggleComplete}
                   />

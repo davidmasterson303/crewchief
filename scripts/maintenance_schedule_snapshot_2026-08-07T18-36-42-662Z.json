@@ -1,0 +1,230 @@
+{
+  "taken_at": "2026-08-07T18:36:42.662Z",
+  "source": "PostgREST, SUPABASE_SECRET_KEY",
+  "project_ref": "hcldnnfwnrerznpruazf",
+  "row_count": 4,
+  "entry_count": 29,
+  "rows": [
+    {
+      "vehicle_id": "a1000000-0000-0000-0000-000000000001",
+      "identity": {
+        "year": 2018,
+        "make": "Honda",
+        "model": "Accord",
+        "trim": "Sport 1.5T",
+        "current_mileage": 94800
+      },
+      "powertrain_at_snapshot": {
+        "engine_type": "Turbocharged 2.0L 4-cylinder",
+        "transmission_type": "CVT",
+        "drivetrain": "FWD"
+      },
+      "research_status": "completed",
+      "last_research_date": "2026-03-14T14:22:42.291113+00:00",
+      "maintenance_schedule": [
+        {
+          "item": "Engine Oil (0W-20 Full Synthetic)",
+          "interval": "5,000-7,500 mi",
+          "priority": "Critical"
+        },
+        {
+          "item": "CVT Fluid Flush",
+          "interval": "30,000 mi",
+          "priority": "Critical"
+        },
+        {
+          "item": "Air Filter",
+          "interval": "30,000 mi",
+          "priority": "Recommended"
+        },
+        {
+          "item": "Cabin Air Filter",
+          "interval": "15,000 mi",
+          "priority": "Recommended"
+        },
+        {
+          "item": "Spark Plugs",
+          "interval": "100,000 mi",
+          "priority": "Recommended"
+        },
+        {
+          "item": "Brake Fluid Flush",
+          "interval": "3 years",
+          "priority": "Recommended"
+        },
+        {
+          "item": "Tire Rotation",
+          "interval": "7,500 mi",
+          "priority": "Critical"
+        }
+      ]
+    },
+    {
+      "vehicle_id": "a2000000-0000-0000-0000-000000000002",
+      "identity": {
+        "year": 2020,
+        "make": "Subaru",
+        "model": "WRX",
+        "trim": "Base",
+        "current_mileage": 41200
+      },
+      "powertrain_at_snapshot": {
+        "engine_type": "Turbocharged FA20DIT 2.0L Boxer 4-cylinder",
+        "transmission_type": "6-speed Manual",
+        "drivetrain": "AWD (Symmetrical)"
+      },
+      "research_status": "completed",
+      "last_research_date": "2026-03-14T14:22:42.291113+00:00",
+      "maintenance_schedule": [
+        {
+          "item": "Engine Oil (5W-30 Full Synthetic)",
+          "interval": "3,000-5,000 mi (aggressive driving)",
+          "priority": "Critical"
+        },
+        {
+          "item": "Spark Plugs (NGK Iridium)",
+          "interval": "30,000 mi",
+          "priority": "Critical"
+        },
+        {
+          "item": "Diff Fluid (Front + Rear)",
+          "interval": "15,000 mi",
+          "priority": "Critical"
+        },
+        {
+          "item": "Coolant Flush",
+          "interval": "30,000 mi",
+          "priority": "Recommended"
+        },
+        {
+          "item": "Brake Fluid Flush (DOT 4)",
+          "interval": "2 years / before track day",
+          "priority": "Critical"
+        },
+        {
+          "item": "Air Filter",
+          "interval": "15,000 mi",
+          "priority": "Recommended"
+        },
+        {
+          "item": "Transmission Fluid",
+          "interval": "30,000 mi",
+          "priority": "Recommended"
+        }
+      ]
+    },
+    {
+      "vehicle_id": "a3000000-0000-0000-0000-000000000003",
+      "identity": {
+        "year": 2019,
+        "make": "BMW",
+        "model": "M3",
+        "trim": "Competition",
+        "current_mileage": 67400
+      },
+      "powertrain_at_snapshot": {
+        "engine_type": "Twin-turbocharged S55 3.0L Inline-6",
+        "transmission_type": "7-speed DCT (M-DCT)",
+        "drivetrain": "RWD"
+      },
+      "research_status": "completed",
+      "last_research_date": "2026-03-14T14:22:42.291113+00:00",
+      "maintenance_schedule": [
+        {
+          "item": "Engine Oil (0W-30 or 0W-40 Full Synthetic)",
+          "interval": "5,000-7,500 mi (or OLM)",
+          "priority": "Critical"
+        },
+        {
+          "item": "Water Pump & Thermostat (proactive)",
+          "interval": "60,000 mi",
+          "priority": "Critical"
+        },
+        {
+          "item": "DCT Transmission Fluid",
+          "interval": "40,000 mi",
+          "priority": "Critical"
+        },
+        {
+          "item": "Spark Plugs",
+          "interval": "40,000 mi (NGK Iridium)",
+          "priority": "Critical"
+        },
+        {
+          "item": "Brake Fluid (DOT 4)",
+          "interval": "2 years",
+          "priority": "Recommended"
+        },
+        {
+          "item": "Differential Fluid",
+          "interval": "40,000 mi",
+          "priority": "Recommended"
+        },
+        {
+          "item": "Cabin + Engine Air Filters",
+          "interval": "20,000 mi",
+          "priority": "Recommended"
+        }
+      ]
+    },
+    {
+      "vehicle_id": "db143cdc-e68c-46f0-849e-69f7a1873f58",
+      "identity": {
+        "year": 2015,
+        "make": "BMW",
+        "model": "M235i",
+        "trim": "xDrive",
+        "current_mileage": 66000
+      },
+      "powertrain_at_snapshot": {
+        "engine_type": "3.0L TwinPower Turbo I6",
+        "transmission_type": "8-speed Automatic",
+        "drivetrain": "AWD"
+      },
+      "research_status": "completed",
+      "last_research_date": "2026-07-28T00:43:27.413+00:00",
+      "maintenance_schedule": [
+        {
+          "item": "Engine Oil & Filter Change",
+          "interval": "5,000 - 7,500 miles or 6-12 months",
+          "priority": "Critical"
+        },
+        {
+          "item": "Spark Plugs",
+          "interval": "30,000 - 40,000 miles (more frequently if tuned)",
+          "priority": "Recommended"
+        },
+        {
+          "item": "Engine Air Filter",
+          "interval": "15,000 - 30,000 miles",
+          "priority": "Recommended"
+        },
+        {
+          "item": "Cabin Air Filter",
+          "interval": "15,000 - 20,000 miles",
+          "priority": "Recommended"
+        },
+        {
+          "item": "Brake Fluid Flush",
+          "interval": "Every 2 years",
+          "priority": "Critical"
+        },
+        {
+          "item": "Differential Fluid Change",
+          "interval": "30,000 - 60,000 miles",
+          "priority": "Recommended"
+        },
+        {
+          "item": "Automatic Transmission Fluid & Filter Change",
+          "interval": "60,000 - 80,000 miles",
+          "priority": "Recommended"
+        },
+        {
+          "item": "Coolant Flush",
+          "interval": "50,000 - 80,000 miles or 5 years",
+          "priority": "Recommended"
+        }
+      ]
+    }
+  ]
+}

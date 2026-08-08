@@ -103,7 +103,7 @@ CREATE TABLE IF NOT EXISTS public.ai_usage_events (
 -- ─── 2. The purpose vocabulary ────────────────────────────────────────────────
 --
 -- One value per Gemini call site as of 2 Aug 2026. Kept in step by
--- `ai-usage-purposes.test.ts`, which fails the build if the application knows a
+-- `ai-usage.test.ts`, which fails the build if the application knows a
 -- purpose this constraint does not.
 
 DO $$

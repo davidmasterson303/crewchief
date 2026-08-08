@@ -13,8 +13,11 @@ import { checkDemoBudget, checkMonthlyBudget } from '@/lib/ai-budget';
 import { checkStoredPhotoSize } from '@crewchief/core/image-resize';
 import { budgetMessage, demoBudgetMessage } from '@crewchief/core/ai/budget';
 import { VEHICLE_RESEARCH_PROMPT, POWERTRAIN_OPTIONS_PROMPT, CONSULTANT_SYSTEM_PROMPT, CONSULTANT_DOCUMENT_VALIDATION_PROMPT } from '@crewchief/core/prompts';
+import { VehicleDataSchema } from '@crewchief/core/vehicle-utils';
+import { showsModifications } from '@crewchief/core/mod-progression';
 import { logger } from '@crewchief/core/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { recomputePerformanceStats } from '@/lib/performance-stats';
 import { recordAiUsageInBackground } from '@/lib/ai-usage';
 import { downloadStoredFile } from '@/lib/storage-objects';
 import { loadConsultantContext, loadedContextKinds } from '@/lib/consultant-context';
@@ -62,42 +65,19 @@ export async function getWishlistItems(vehicleId: string) {
   return _getWishlistItems(vehicleId);
 }
 
-const VehicleDataSchema = z.object({
-  known_issues: z.array(z.object({
-    part: z.string(),
-    mileage_range: z.string(),
-    severity: z.enum(['Low', 'Medium', 'High']),
-    description: z.string(),
-  })).default([]),
-  maintenance_schedule: z.array(z.object({
-    item: z.string(),
-    interval: z.string(),
-    priority: z.enum(['Critical', 'Recommended', 'Optional']),
-  })).default([]),
-  fluid_specs: z.object({
-    engine_oil: z.string().optional().default('Unknown'),
-    transmission_fluid: z.string().optional().default('Unknown'),
-    coolant: z.string().optional().default('Unknown'),
-    brake_fluid: z.string().optional().default('Unknown'),
-  }).default({}),
-  common_mods: z.array(z.object({
-    name: z.string(),
-    purpose: z.string(),
-    difficulty: z.enum(['Easy', 'Moderate', 'Hard']),
-  })).default([]),
-  powertrain: z.object({
-    engine_type: z.string().nullable().optional(),
-    transmission_type: z.string().nullable().optional(),
-    drivetrain: z.string().nullable().optional(),
-  }).optional().default({}),
-  performance_stats: z.object({
-    horsepower: z.number().nullable().optional(),
-    torque: z.number().nullable().optional(),
-    zero_to_sixty: z.number().nullable().optional(),
-  }).optional().default({}),
-  interesting_facts: z.array(z.string()).default([]),
-  reliability_score: z.number().min(1).max(10).default(5),
-});
+/*
+  The schema this file validates the research response against lives in
+  `@crewchief/core/vehicle-utils`, and used to be **defined twice** — here and
+  there, identically, both parsing the output of one prompt.
+
+  Two copies of one contract is a drift hazard rather than a tidiness
+  complaint, and the direction it drifts matters: the structured
+  `maintenance_schedule` work would have changed one copy and left the other
+  accepting prose, so whichever path ran second would either reject a valid
+  response or store an unusable one. Neither failure names its cause.
+
+  One definition, next to the prompt whose output it describes.
+*/
 
 function extractJSON(text: string): Record<string, unknown> {
   try {
@@ -1095,9 +1075,33 @@ export async function sendConsultantMessage(params: {
       `${r.Component || 'Unknown'}: ${r.Summary || r.description || 'No details'}${r.NHTSACampaignNumber ? ` (Campaign: ${r.NHTSACampaignNumber})` : ''}`
     );
 
-    const maintenanceSchedule = (knowledge?.maintenance_schedule || []).map((item: any) =>
-      `${item.item || item.service} every ${item.interval || item.interval_miles} - ${item.priority || 'Recommended'}`
-    );
+    /*
+      Both shapes, deliberately, and this is not the old `||` papering over a
+      contract nobody satisfied — it is a real migration window.
+
+      Vehicles onboarded from 7 Aug 2026 carry `{service, interval_miles}`;
+      everything before that carries `{item, interval: "every 30,000 miles"}`
+      and keeps carrying it until `scripts/` regenerates them. The advisor must
+      answer correctly about a car in either state, so it reads either.
+
+      What it must NOT do is what the previous line did: emit
+      `every every 30,000 miles` for a legacy row and `every 30000` — no unit —
+      for a structured one. The prose already contains its own preposition and
+      unit; the number contains neither.
+    */
+    const maintenanceSchedule = (knowledge?.maintenance_schedule || []).map((item: any) => {
+      const name = item.service || item.item || 'Service';
+      const priority = item.priority || 'Recommended';
+
+      const cadence =
+        typeof item.interval_miles === 'number'
+          ? `every ${item.interval_miles.toLocaleString('en-US')} miles${
+              item.interval_months ? ` or ${item.interval_months} months` : ''
+            }`
+          : item.interval || 'interval unknown';
+
+      return `${name} ${cadence} - ${priority}`;
+    });
 
     const fluidSpecs = knowledge?.fluid_specs
       ? `Oil: ${knowledge.fluid_specs.engine_oil || '?'} | Trans: ${knowledge.fluid_specs.transmission_fluid || '?'} | Coolant: ${knowledge.fluid_specs.coolant || '?'} | Brake: ${knowledge.fluid_specs.brake_fluid || '?'}`
@@ -1112,7 +1116,7 @@ export async function sendConsultantMessage(params: {
       objective: vehicle.ownership_objective || 'Not specified',
       ownershipDetails: vehicle.usage_profile || '',
       drivingStyle: vehicle.driving_style || '',
-      performanceGoal: vehicle.performance_mindedness || vehicle.performance_goal || '',
+      performanceGoal: vehicle.performance_mindedness || '',
       avgMilesPerMonth: vehicle.avg_miles_per_month || 0,
       color: vehicle.color || '',
       engineType: vehicle.engine_type || knowledge?.engine_type || '',
@@ -1139,6 +1143,35 @@ export async function sendConsultantMessage(params: {
       reliabilityScore: knowledge?.reliability_score || null,
       interestingFacts: knowledge?.interesting_facts || [],
       documentsOnFile: documents.length,
+      /*
+        What was actually paid, per invoice. Without this the model can only
+        sum line items — which excludes tax by design — and reports a subtotal
+        as the all-in figure. Observed 5 Aug: $1,461 quoted for a $1,519.44
+        invoice.
+
+        `tax_and_fees` is stated rather than left implicit so the model does not
+        have to infer whether a gap is tax or a line item it failed to read.
+        Older documents have no `total_cost` and are skipped entirely rather
+        than reported as $0, which would be a confident lie about a real bill.
+      */
+      invoiceTotals: documents
+        .map((doc: any) => {
+          const data = doc.extracted_data || {};
+          if (typeof data.total_cost !== 'number') return null;
+
+          const parts = [
+            data.vendor_name || 'Unknown shop',
+            data.service_date || 'undated',
+            `paid $${data.total_cost}`,
+          ];
+
+          if (typeof data.line_items_total === 'number' && typeof data.tax_and_fees === 'number') {
+            parts.push(`(work $${data.line_items_total} + tax/fees $${data.tax_and_fees})`);
+          }
+
+          return parts.join(' | ');
+        })
+        .filter((line: string | null): line is string => line !== null),
     });
 
     const conversationHistory = messageHistory.slice(-20);
@@ -1329,7 +1362,7 @@ export async function fetchAllVehicles() {
     const { data, error } = await client
       .from('vehicles')
       .select(`
-        id,year,make,model,trim,color,current_mileage,image_url,custom_image_url,performance_goal,ownership_objective,created_at,
+        id,year,make,model,trim,color,current_mileage,image_url,custom_image_url,performance_mindedness,ownership_objective,created_at,
         nhtsa_data(recalls),
         vehicle_health_summary(health_score,summary,red_flags)
       `)
@@ -1352,7 +1385,7 @@ export async function fetchDemoVehicles() {
     const { data, error } = await client
       .from('vehicles')
       .select(`
-        id,year,make,model,trim,color,current_mileage,image_url,custom_image_url,performance_goal,ownership_objective,created_at,
+        id,year,make,model,trim,color,current_mileage,image_url,custom_image_url,performance_mindedness,ownership_objective,created_at,
         nhtsa_data(recalls),
         vehicle_health_summary(health_score,summary,red_flags)
       `)
@@ -1778,10 +1811,34 @@ export async function generateVehicleHealthSummary(vehicleId: string, forceRefre
       }
     }
 
-    const [vehicleResult, knowledgeResult, serviceResult, issueTrackResult, modTrackResult, nhtsaResult] = await Promise.all([
+    const [vehicleResult, knowledgeResult, serviceResult, lineItemResult, issueTrackResult, modTrackResult, nhtsaResult] = await Promise.all([
       client.from('vehicles').select('*').eq('id', vehicleId).maybeSingle(),
       client.from('vehicle_knowledge_base').select('*').eq('vehicle_id', vehicleId).maybeSingle(),
       client.from('service_items').select('*').eq('vehicle_id', vehicleId).order('created_at', { ascending: false }),
+      /*
+        Filed invoices. **Added 5 Aug after a real end-to-end run exposed the
+        gap**: scanning an invoice writes `maintenance_line_items`, this
+        summary read only `service_items`, and the two never met. Five service
+        records were filed against the M235i and the score stayed at 70 with a
+        narrative citing a "complete lack of documented maintenance" —
+        immediately after the app accepted them.
+
+        It was never a caching problem. A forced recompute produced the same
+        answer, because the prompt below was told "None provided yet" either
+        way. That also means **the web has always had this**: its upload dialog
+        does force a refresh, and still got a summary that ignored the invoice
+        it had just processed.
+
+        Ordered newest-first and bounded, like the service query beside it: this
+        feeds a prompt, and an unbounded history would push the known-issues and
+        recall sections out of the model's attention.
+      */
+      client
+        .from('maintenance_line_items')
+        .select('item_description,service_date,shop_name,total_cost,category')
+        .eq('vehicle_id', vehicleId)
+        .order('service_date', { ascending: false })
+        .limit(20),
       client.from('known_issue_tracking').select('*').eq('vehicle_id', vehicleId),
       client.from('modification_tracking').select('*').eq('vehicle_id', vehicleId),
       client.from('nhtsa_data').select('*').eq('vehicle_id', vehicleId).maybeSingle(),
@@ -1790,6 +1847,7 @@ export async function generateVehicleHealthSummary(vehicleId: string, forceRefre
     const vehicle = vehicleResult.data;
     const knowledge = knowledgeResult.data;
     const serviceItems = serviceResult.data || [];
+    const lineItems = lineItemResult.data || [];
     const issueTracking = issueTrackResult.data || [];
     const modTracking = modTrackResult.data || [];
     const nhtsa = nhtsaResult.data;
@@ -1804,6 +1862,13 @@ export async function generateVehicleHealthSummary(vehicleId: string, forceRefre
     const completedService = serviceItems.filter((s: any) => s.status === 'completed').length;
     const pendingService = serviceItems.filter((s: any) => s.status !== 'completed').length;
 
+    /*
+      Work read off an invoice is **documented history, not a plan** — it has
+      already been done and paid for. It counts toward what the owner has
+      recorded, which is the number the score is meant to reflect.
+    */
+    const documentedWork = lineItems.length;
+
     const prompt = `You are an expert automotive consultant analyzing a vehicle's health based on the owner's provided service history and uploads.
 
 VEHICLE INFORMATION:
@@ -1817,6 +1882,10 @@ OWNER-PROVIDED SERVICE HISTORY:
 - Pending/Planned Service: ${pendingService}
 - Recent Service Items: ${serviceItems.slice(0, 5).map((s: any) => `${s.description} (${s.status})`).join(', ') || 'None provided yet'}
 
+DOCUMENTED WORK FROM UPLOADED INVOICES:
+- Line Items on File: ${documentedWork}
+${lineItems.slice(0, 12).map((l: any) => `  - ${l.service_date || 'undated'}: ${l.item_description}${l.shop_name ? ` at ${l.shop_name}` : ''}${l.total_cost ? ` ($${l.total_cost})` : ''}`).join('\n') || '  - None on file'}
+
 KNOWN ISSUES FOR THIS MODEL (Reference Only):
 ${knowledge?.known_issues?.slice(0, 5).map((i: any) => `- ${i.part}: ${i.description} (Severity: ${i.severity}, Typical mileage: ${i.mileage_range})`).join('\n') || 'None identified'}
 
@@ -1826,6 +1895,10 @@ ISSUE STATUS:
 RECALLS:
 - Active Recalls: ${activeRecalls}
 ${nhtsa?.recalls?.slice(0, 3).map((r: any) => `  - ${r.summary || r.description || 'Recall'}`).join('\n') || 'None'}
+
+Treat the invoice line items above as completed, documented work. An owner who
+has uploaded invoices has a documented history, and the assessment must not
+describe their records as absent.
 
 Based on the owner's provided service history, provide a concise health assessment in JSON format with:
 - healthScore (1-100 integer based on provided records, not assumptions)
@@ -2007,12 +2080,18 @@ export async function generateModificationDetails(vehicleId: string, modName: st
       got mod analysis at all. That is the reported disagreement between the two
       fields: they never disagreed so much as one of them was never consulted.
 
-      Preferring the parameter fixes it. `performance_goal` stays as the
-      fallback so a caller that has not been updated still behaves as before
-      rather than losing context entirely.
+      Preferring the parameter fixed it. **The `vehicles.performance_goal`
+      fallback is now gone too** (7 Aug): that column was never written by any
+      screen, so falling back to it meant falling back to a default nobody
+      chose. It was the last reader, and removing it is what makes the column
+      droppable.
+
+      Note the `performance_goal` further down this function is a *different
+      column* on `mod_detail_queue` and `performance_mod_cache`, where it is
+      NOT NULL and part of a UNIQUE key. That one stays.
     */
     const performanceGoal: GoalKey = normaliseGoal(
-      performanceMindset || vehicle.performance_mindedness || vehicle.performance_goal
+      performanceMindset || vehicle.performance_mindedness
     );
 
     const prompt = `You are an expert automotive consultant analyzing a modification for a specific vehicle owner.
@@ -2384,6 +2463,60 @@ export async function updateVehicleAvgMileage(vehicleId: string, avgMilesPerMont
   } catch (error: any) {
     console.error('[Update Avg Mileage Exception]:', error);
     return { success: false, error: `Failed to update average mileage: ${error.message || 'Unknown error'}` };
+  }
+}
+
+/**
+ * Turn the modifications surface on or off for one car.
+ *
+ * ── Why this exists, and why it is not optional ─────────────────────────────
+ *
+ * Onboarding asks one yes/no about modifications, and answering "not
+ * interested" hides the whole surface — the dossier tab, the ladder, the build
+ * dial. That answer is given in the first sixty seconds of using the product,
+ * before anyone knows what they are switching off, and it used to be
+ * **irreversible**: nothing anywhere could set it back.
+ *
+ * A choice with no way back is not a preference, it is a trap. It also made the
+ * onboarding question far weightier than it reads — David flagged wanting "some
+ * subtle CTA if user wants to bring it back later" the moment he proposed the
+ * hiding, and this is that.
+ *
+ * ── The enum, and why "yes" is stored as `mild` ─────────────────────────────
+ *
+ * `performance_mindedness` is a Postgres enum `('stock','mild','aggressive')`.
+ * A truer word for "interested" would need `ALTER TYPE` and a hand-applied
+ * migration, which is not worth spending on a label. `mild` means interested;
+ * `aggressive` is legacy and read-only. Nothing branches on the difference —
+ * `showsModifications` in `@crewchief/core/mod-progression` is the whole rule,
+ * and this writes the values that rule reads.
+ */
+export async function setModificationsVisible(vehicleId: string, visible: boolean) {
+  try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
+    const client = getServiceRoleClient();
+    const { error } = await client
+      .from('vehicles')
+      .update({
+        performance_mindedness: visible ? 'mild' : 'stock',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', vehicleId);
+
+    if (error) {
+      return { success: false, error: 'Failed to update modification preference' };
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    return {
+      success: false,
+      error: `Failed to update modification preference: ${error.message || 'Unknown error'}`,
+    };
   }
 }
 
@@ -3282,7 +3415,39 @@ Return ONLY valid JSON, no markdown code blocks, no explanations.`;
       console.warn('[Warning] No maintenance line items to insert');
     }
 
-    const totalCost = lineItemsToInsert.reduce((sum: number, item: any) => sum + item.total_price, 0);
+    /*
+      ── The invoice's own total, not a sum of what we kept ────────────────────
+
+      `total_cost` was `lineItemsToInsert.reduce(...)`, and that is **not what
+      the invoice says**. Tax lines are deliberately skipped during extraction —
+      correctly, since tax is not a service performed — so summing the surviving
+      items silently drops it.
+
+      Caught on 5 Aug by a real reading: a $1,519.44 invoice was stored as
+      $1,461, and the advisor reported that figure as "all-in". The advisor was
+      innocent; it read a stored number that was already wrong. **Understating
+      what a car costs is the wrong direction to be wrong for a product whose
+      pitch is knowing what your car costs you.**
+
+      `grand_total` was already extracted and already logged — it was simply
+      never persisted. Both numbers are stored now, because they answer
+      different questions: what the work cost, and what was actually paid. The
+      difference is tax and fees, and it is derivable rather than guessed.
+    */
+    const lineItemsTotal = lineItemsToInsert.reduce(
+      (sum: number, item: any) => sum + item.total_price,
+      0
+    );
+
+    /*
+      Trusted when present and sane. A grand total *below* the line items it
+      contains is a misread rather than a discount, and falling back to the sum
+      is the conservative direction: it is the number we can prove.
+    */
+    const statedTotal =
+      typeof invoiceData.grand_total === 'number' && invoiceData.grand_total >= lineItemsTotal
+        ? invoiceData.grand_total
+        : null;
 
     await client
       .from('vehicle_documents')
@@ -3290,7 +3455,16 @@ Return ONLY valid JSON, no markdown code blocks, no explanations.`;
         extracted_data: {
           vendor_name: invoiceData.shop_name,
           service_date: invoiceData.service_date,
-          total_cost: totalCost,
+          /* What was actually paid. The headline figure for cost questions. */
+          total_cost: statedTotal ?? lineItemsTotal,
+          /* What the itemised work came to, before tax and fees. */
+          line_items_total: lineItemsTotal,
+          /*
+            Recorded rather than inferred at read time, so a consumer never has
+            to guess whether a difference is tax or a missing line item.
+          */
+          tax_and_fees: statedTotal === null ? null : Number((statedTotal - lineItemsTotal).toFixed(2)),
+          total_source: statedTotal === null ? 'summed_line_items' : 'invoice_grand_total',
           service_type: 'invoice',
           item_count: lineItemsToInsert.length,
         },
@@ -3432,6 +3606,73 @@ export async function uploadInvoice(formData: FormData) {
 
     const itemsExtracted = parseResult.maintenanceItems?.length || 0;
     console.log(`[Upload Complete] Document ${document.id} processed with ${itemsExtracted} maintenance items`);
+
+    /*
+      ── The health score is refreshed here, on the server ────────────────────
+
+      It used to be refreshed by `components/DocumentUploadDialog.tsx` calling
+      `generateVehicleHealthSummary` after the upload returned — in the **web
+      client**. So the mobile app, which posts to the same endpoint, never
+      triggered it, and a phone could file five service records and be told its
+      car had a "complete lack of documented maintenance". Observed on a real
+      run, 5 Aug.
+
+      A capability living in one client's component is a capability the second
+      client silently lacks. That is this codebase's most repeated defect —
+      `VehicleCard`'s unauthorized delete, the health band, the context-kind
+      labels — and the fix is always the same: move it to the one place both
+      callers already go through.
+
+      **Not awaited, and that is a correction to this same commit.** Awaiting
+      it stacked a second Gemini call onto a request that already spends ~8s in
+      vision, against a serverless ceiling this project has no configured
+      override for. Timing out there would fail an upload whose document and
+      line items are *already written* — reporting a filing that actually
+      succeeded as a failure, which is the exact class of defect the last three
+      rounds were spent removing. A stale score is recoverable; a lost
+      confirmation is not.
+
+      This matches the precedent in `app/api/v1/wishlist/complete/route.ts`,
+      which recomputes stats the same way and for the same stated reason:
+      derived display data must not make the user wait on a model.
+
+      Best-effort is honest here rather than lazy, because the *other* half of
+      this fix does the heavy lifting — `generateVehicleHealthSummary` now reads
+      `maintenance_line_items`, so any later recompute (a web visit, the 24h
+      cache expiring) produces the right answer instead of the wrong one.
+
+      **Failure never fails the upload.** The invoice is stored and its line
+      items are written by this point — the same judgement `runVehicleResearch`
+      makes at line 444 about a missing health summary.
+    */
+    if (itemsExtracted > 0) {
+      generateVehicleHealthSummary(vehicleId, true).catch((healthError: unknown) => {
+        console.warn('[Upload] Health summary refresh failed:', healthError);
+      });
+
+      /*
+        Performance stats read `maintenance_line_items` too
+        (`lib/performance-stats.ts:118`), so an invoice changes them as surely
+        as it changes the health score — and this was the *other* refresh the
+        web fired from `DocumentUploadDialog` and mobile never did.
+
+        `access.client` has already proven write access to this vehicle, which
+        is what the module's own docblock requires of callers; it authorizes
+        nothing itself. Rate limited on the AI tier before spending, as its
+        other in-process caller does.
+      */
+      const statsLimit = await checkRateLimit(access.userId ?? `vehicle:${vehicleId}`, 'ai');
+      if (statsLimit.allowed) {
+        recomputePerformanceStats({
+          vehicleId,
+          client,
+          isDemo: false,
+          forceRefresh: true,
+        }).catch((statsError: unknown) => {
+          console.warn('[Upload] Performance stats refresh failed:', statsError);
+        });
+      }
+    }
 
     await syncInvoiceWithDossier(vehicleId, parseResult.maintenanceItems || []);
 
@@ -5007,186 +5248,21 @@ const FREE_SKIPS_PER_TIER = 2;
 // in the aggressive tier before we generate more.
 const AGGRESSIVE_MIN_ACTIONABLE = 3;
 
-function getModTier(difficulty: string): 'mild' | 'moderate' | 'aggressive' {
-  if (difficulty === 'Easy') return 'mild';
-  if (difficulty === 'Moderate') return 'moderate';
-  return 'aggressive';
-}
-
-export async function recomputeVehicleTier(vehicleId: string): Promise<{
-  success: boolean;
-  tier?: 'mild' | 'moderate' | 'aggressive';
-  progress?: {
-    currentTier: 'mild' | 'moderate' | 'aggressive';
-    completed: number;
-    skipped: number;
-    total: number;
-    backfillsRequired: number;
-    backfillsPending: number;
-    canAdvance: boolean;
-  };
-}> {
-  try {
-    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
-    if (!access.ok) {
-      return { success: false };
-    }
-
-    const client = getServiceRoleClient();
-
-    const [vehicleRes, knowledgeRes, trackingRes, backfillRes] = await Promise.all([
-      client.from('vehicles').select('earned_tier').eq('id', vehicleId).maybeSingle(),
-      client.from('vehicle_knowledge_base').select('common_mods').eq('vehicle_id', vehicleId).maybeSingle(),
-      client.from('modification_tracking').select('mod_name, status, tier, is_backfill').eq('vehicle_id', vehicleId),
-      client.from('tier_backfill_queue').select('tier, status, skipped_mod_name').eq('vehicle_id', vehicleId),
-    ]);
-
-    if (!knowledgeRes.data) return { success: false };
-
-    const allMods: any[] = knowledgeRes.data.common_mods || [];
-    const tracking: any[] = trackingRes.data || [];
-    const backfillQueue: any[] = backfillRes.data || [];
-
-    const trackingByName = new Map(tracking.map((t) => [t.mod_name, t]));
-
-    const currentEarnedTier = (vehicleRes.data?.earned_tier || 'mild') as 'mild' | 'moderate' | 'aggressive';
-
-    // Compute what tier we're actually at by checking gates bottom-up
-    let earnedTier: 'mild' | 'moderate' | 'aggressive' = 'mild';
-
-    for (const tier of TIER_ORDER) {
-      const tierMods = allMods.filter((m: any) => getModTier(m.difficulty) === tier);
-      // Include backfill mods that belong to this tier
-      const backfillMods = tracking.filter((t) => t.is_backfill && t.tier === tier);
-
-      const allTierModNames = [
-        ...tierMods.map((m: any) => m.name),
-        ...backfillMods.map((t) => t.mod_name),
-      ];
-
-      const completed = allTierModNames.filter((n) => trackingByName.get(n)?.status === 'completed').length;
-      const skipped = allTierModNames.filter((n) => trackingByName.get(n)?.status === 'not_interested').length;
-      const total = allTierModNames.length;
-
-      const pendingBackfills = backfillQueue.filter(
-        (b) => b.tier === tier && b.status !== 'completed'
-      ).length;
-
-      const netSkips = Math.max(0, skipped - FREE_SKIPS_PER_TIER);
-      const backfillsRequired = netSkips;
-      const completedBackfills = backfillQueue.filter(
-        (b) => b.tier === tier && b.status === 'completed'
-      ).length;
-      const backfillsSatisfied = completedBackfills >= backfillsRequired;
-
-      const actionableDone = completed + skipped;
-      const canAdvance = actionableDone >= total && backfillsSatisfied && pendingBackfills === 0;
-
-      if (tier === currentEarnedTier) {
-        if (!canAdvance) {
-          earnedTier = tier;
-
-          // Persist if changed
-          if (earnedTier !== currentEarnedTier) {
-            await client.from('vehicles').update({ earned_tier: earnedTier }).eq('id', vehicleId);
-          }
-
-          return {
-            success: true,
-            tier: earnedTier,
-            progress: {
-              currentTier: tier,
-              completed,
-              skipped,
-              total,
-              backfillsRequired,
-              backfillsPending: pendingBackfills,
-              canAdvance: false,
-            },
-          };
-        }
-
-        // Can advance — find next tier
-        const nextIndex = TIER_ORDER.indexOf(tier) + 1;
-        if (nextIndex < TIER_ORDER.length) {
-          earnedTier = TIER_ORDER[nextIndex];
-        } else {
-          earnedTier = 'aggressive';
-        }
-      }
-    }
-
-    // If we made it through all tiers, cap at aggressive
-    if (TIER_ORDER.indexOf(earnedTier) > TIER_ORDER.indexOf(currentEarnedTier)) {
-      earnedTier = earnedTier;
-    }
-
-    // Persist updated tier
-    if (earnedTier !== currentEarnedTier) {
-      await client.from('vehicles').update({ earned_tier: earnedTier }).eq('id', vehicleId);
-    }
-
-    // Recompute progress for the new current tier
-    const tier = earnedTier;
-    const tierMods = allMods.filter((m: any) => getModTier(m.difficulty) === tier);
-    const backfillMods = tracking.filter((t) => t.is_backfill && t.tier === tier);
-    const allTierModNames = [
-      ...tierMods.map((m: any) => m.name),
-      ...backfillMods.map((t) => t.mod_name),
-    ];
-    const completed = allTierModNames.filter((n) => trackingByName.get(n)?.status === 'completed').length;
-    const skipped = allTierModNames.filter((n) => trackingByName.get(n)?.status === 'not_interested').length;
-    const total = allTierModNames.length;
-    const netSkips = Math.max(0, skipped - FREE_SKIPS_PER_TIER);
-    const completedBackfills = backfillQueue.filter(
-      (b) => b.tier === tier && b.status === 'completed'
-    ).length;
-    const pendingBackfills = backfillQueue.filter(
-      (b) => b.tier === tier && b.status !== 'completed'
-    ).length;
-    const backfillsRequired = netSkips;
-    const backfillsSatisfied = completedBackfills >= backfillsRequired;
-    const actionableDone = completed + skipped;
-    const canAdvance = tier !== 'aggressive' && actionableDone >= total && backfillsSatisfied && pendingBackfills === 0;
-
-    return {
-      success: true,
-      tier: earnedTier,
-      progress: {
-        currentTier: tier,
-        completed,
-        skipped,
-        total,
-        backfillsRequired,
-        backfillsPending: pendingBackfills,
-        canAdvance,
-      },
-    };
-  } catch (error: any) {
-    console.error('[TIER] recomputeVehicleTier error:', error.message);
-    return { success: false };
-  }
-}
-
-export async function getTierProgress(vehicleId: string): Promise<{
-  success: boolean;
-  tier?: 'mild' | 'moderate' | 'aggressive';
-  progress?: {
-    currentTier: 'mild' | 'moderate' | 'aggressive';
-    completed: number;
-    skipped: number;
-    total: number;
-    backfillsRequired: number;
-    backfillsPending: number;
-    canAdvance: boolean;
-  };
-}> {
-  return recomputeVehicleTier(vehicleId);
-}
-
-export async function getModsForEarnedTier(
-  vehicleId: string,
-  tier: 'mild' | 'moderate' | 'aggressive'
+/**
+ * Every modification this car's knowledge base knows about.
+ *
+ * Was `getModsForEarnedTier(vehicleId, tier)`, and the tier did two jobs, both
+ * now gone. It filtered the visible list to *exactly* that difficulty — the bug
+ * that showed the WRX owner one mod out of five — and it scoped the cache and
+ * tracking reads.
+ *
+ * The scoping went with the tiers (7 Aug). Cached analysis is a property of
+ * (vehicle, mod), not of a tier the owner happened to occupy when it was
+ * generated, so filtering it by tier meant a mod carried no analysis the moment
+ * the tier moved underneath it.
+ */
+export async function getModsForVehicle(
+  vehicleId: string
 ): Promise<{ success: boolean; data: any[] }> {
   try {
     const access = await authorizeVehicleAccess(vehicleId, { intent: 'read' });
@@ -5196,21 +5272,60 @@ export async function getModsForEarnedTier(
 
     const client = getServiceRoleClient();
 
-    const [knowledgeRes, trackingRes, cacheRes] = await Promise.all([
+    const [knowledgeRes, trackingRes, cacheRes, vehicleRes] = await Promise.all([
       client.from('vehicle_knowledge_base').select('common_mods').eq('vehicle_id', vehicleId).maybeSingle(),
-      client.from('modification_tracking').select('mod_name, status, tier, is_backfill').eq('vehicle_id', vehicleId).eq('tier', tier),
-      client.from('performance_mod_cache').select('mods_data').eq('vehicle_id', vehicleId).eq('performance_goal', tier).maybeSingle(),
+      client.from('modification_tracking').select('mod_name, status, tier, is_backfill').eq('vehicle_id', vehicleId),
+      client.from('performance_mod_cache').select('mods_data').eq('vehicle_id', vehicleId).limit(1).maybeSingle(),
+      client.from('vehicles').select('performance_mindedness').eq('id', vehicleId).maybeSingle(),
     ]);
 
     const allMods: any[] = knowledgeRes.data?.common_mods || [];
     const tracking: any[] = trackingRes.data || [];
 
-    // Base mods for this tier
-    const tierMods = allMods.filter((m: any) => getModTier(m.difficulty) === tier);
+    /*
+      ── The ceiling is what the owner asked for, not what they have earned ────
+
+      This filtered `getModTier(m.difficulty) === tier` against
+      `vehicles.earned_tier` — **exactly** that tier rather than up to it.
+
+      Measured on the live database, 7 Aug: every vehicle sits at
+      `earned_tier: 'mild'` bar one, so the WRX owner — who answered
+      "track-ready, high-performance builds" in onboarding — was shown **one
+      modification out of five**. Its downpipe, brake kit, sway bars and rod
+      bolts were all filtered out as too difficult for a tier they had no way to
+      leave: you advance by completing mods, and `modification_tracking` is
+      empty across the entire product, so nobody ever advanced.
+
+      A progression that cannot progress is a gate.
+
+      **And there is no ceiling either** — David, 7 Aug: a build is a continuum,
+      not a set of end states, so nothing is withheld on the strength of one
+      onboarding answer. `performance_mindedness` decides *whether* there is a
+      mods surface at all and, through `nextRungs`, what surfaces first.
+      `earned_tier` marks progress rather than withholding.
+
+      `tier` still scopes the tracking and cache reads below, because those are
+      genuinely per-tier records. Only the *visible list* is widened, so a mod
+      above the earned tier renders without cached analysis rather than not at
+      all — "No analysis yet" is a true statement and an invisible mod is not.
+    */
+    const tierMods = showsModifications(vehicleRes.data?.performance_mindedness)
+      ? allMods
+      : [];
 
     // Backfill mods that were generated for this tier
     const backfillTracking = tracking.filter((t) => t.is_backfill);
-    const backfillMods = backfillTracking.map((t) => ({ name: t.mod_name, difficulty: tier === 'mild' ? 'Easy' : tier === 'moderate' ? 'Moderate' : 'Hard', is_backfill: true }));
+    /*
+      Backfill rows carry the tier they were generated under. That column is on
+      its way out and is read here only to keep an existing row's difficulty
+      sensible; a row without one reads Moderate, which is what `effortOf` also
+      assumes for an unknown.
+    */
+    const backfillMods = backfillTracking.map((t) => ({
+      name: t.mod_name,
+      difficulty: t.tier === 'mild' ? 'Easy' : t.tier === 'aggressive' ? 'Hard' : 'Moderate',
+      is_backfill: true,
+    }));
 
     const combinedMods = [...tierMods, ...backfillMods];
 
@@ -5430,13 +5545,7 @@ export async function processSkipAndBackfill(
       }).catch(() => {});
     }
 
-    const tierResult = await recomputeVehicleTier(vehicleId);
-
-    return {
-      success: true,
-      backfillTriggered,
-      newTier: tierResult.tier,
-    };
+    return { success: true, backfillTriggered };
   } catch (error: any) {
     console.error('[BACKFILL] processSkipAndBackfill error:', error.message);
     return { success: false, backfillTriggered: false };
@@ -5466,8 +5575,18 @@ export async function ensureAggressiveModMinimum(vehicleId: string): Promise<{ s
 
     const trackingByName = new Map(tracking.map((t: any) => [t.mod_name, t]));
 
-    const aggressiveMods = allMods.filter((m: any) => getModTier(m.difficulty) === 'aggressive');
-    const aggressiveBackfills = tracking.filter((t: any) => t.is_backfill && t.tier === 'aggressive');
+    /*
+      Every mod, not only the Hard ones.
+
+      This counted `getModTier(m.difficulty) === 'aggressive'` — so the top-up
+      only ever considered a car's hardest work, and a list exhausted at the
+      easy end never refilled. With tiers gone the pool is the whole list, which
+      is also what the function's own name should now say: it keeps a car from
+      running out, not from running out *of a tier*. Renaming it is worth doing
+      and not in the same change as removing a subsystem.
+    */
+    const aggressiveMods = allMods;
+    const aggressiveBackfills = tracking.filter((t: any) => t.is_backfill);
 
     const allAggressiveNames = [
       ...aggressiveMods.map((m: any) => m.name),
@@ -5571,16 +5690,30 @@ Respond with ONLY valid JSON:
   }
 }
 
+/**
+ * Mark a modification pending, installed, or not wanted.
+ *
+ * The `tier` parameter is gone with the tiers (7 Aug), and removing it fixed a
+ * live bug rather than only tidying: `VehicleInsights` called this as
+ * `(vehicleId, modName, 'completed', data.notes, data.dateCompleted)`, so the
+ * **notes were passed as the tier and the completion date as the notes**. The
+ * date never reached the row. The typecheck could not see it while `tier` sat
+ * in that position accepting a string.
+ *
+ * Name kept rather than dropping the `WithTier` suffix, only because
+ * `updateModificationStatus` already exists at :1505 and is a different
+ * function. Worth reconciling, and not in the same change as ripping out a
+ * subsystem.
+ */
 export async function updateModificationStatusWithTier(
   vehicleId: string,
   modName: string,
   status: 'pending' | 'completed' | 'not_interested',
-  tier: 'mild' | 'moderate' | 'aggressive',
   notes?: string,
   installedDate?: string,
   costParts?: number,
   costLabor?: number
-): Promise<{ success: boolean; newTier?: 'mild' | 'moderate' | 'aggressive'; backfillTriggered?: boolean }> {
+): Promise<{ success: boolean; backfillTriggered?: boolean }> {
   try {
     const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
     if (!access.ok) {
@@ -5588,10 +5721,16 @@ export async function updateModificationStatusWithTier(
     }
 
     if (status === 'not_interested') {
-      const result = await processSkipAndBackfill(vehicleId, modName, tier);
+      /*
+        `processSkipAndBackfill` still takes a tier — it writes one onto the
+        backfill row it generates. Passed as 'moderate' rather than threading a
+        dead concept back through this signature: the column is on its way out,
+        and a middle value keeps an existing row's difficulty sensible in the
+        meantime.
+      */
+      const result = await processSkipAndBackfill(vehicleId, modName, 'moderate');
       return {
         success: result.success,
-        newTier: result.newTier,
         backfillTriggered: result.backfillTriggered,
       };
     }
@@ -5603,7 +5742,8 @@ export async function updateModificationStatusWithTier(
         vehicle_id: vehicleId,
         mod_name: modName,
         status,
-        tier,
+        // See above: the tier column is vestigial and awaits its migration.
+        tier: 'moderate',
         notes: notes || null,
         installed_date: installedDate || null,
         cost_parts: costParts || 0,
@@ -5618,18 +5758,21 @@ export async function updateModificationStatusWithTier(
       return { success: false };
     }
 
-    // If completing an aggressive mod, check if we need to top up
-    if (status === 'completed' && tier === 'aggressive') {
+    /*
+      Top up the list on any completion, not only an "aggressive" one. The old
+      gate meant the owners most likely to exhaust their list were the only ones
+      who ever got more generated.
+
+      `recomputeVehicleTier` used to run here and its result was returned as
+      `newTier` so the client could pop a "Tier unlocked!" toast. Both are gone:
+      the build dial shows where a car sits directly, so an unlockable tier was
+      a second, coarser answer to the same question.
+    */
+    if (status === 'completed') {
       ensureAggressiveModMinimum(vehicleId).catch(() => {});
     }
 
-    const tierResult = await recomputeVehicleTier(vehicleId);
-
-    return {
-      success: true,
-      newTier: tierResult.tier,
-      backfillTriggered: false,
-    };
+    return { success: true, backfillTriggered: false };
   } catch (error: any) {
     console.error('[TIER] updateModificationStatusWithTier error:', error.message);
     return { success: false };

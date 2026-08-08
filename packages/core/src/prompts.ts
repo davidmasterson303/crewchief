@@ -10,8 +10,10 @@ For the ${year} ${make} ${model}, research and compile comprehensive ownership i
    - Brief description of symptoms or consequences
 
 2. **Maintenance Schedule**: List manufacturer-recommended and enthusiast-recommended maintenance intervals. Include:
-   - Service item name
-   - Mileage or time interval
+   - Service name
+   - Mileage interval as a numeric value only (e.g. 30000, not "every 30,000 miles")
+   - Time interval in months as a numeric value only, if the service has one (e.g. 12, not "annually")
+   - What the service actually involves, in one sentence an owner would understand
    - Priority level (Critical, Recommended, Optional)
 
 3. **Fluid Specifications**: Provide exact fluid specifications:
@@ -48,6 +50,8 @@ CRITICAL INSTRUCTIONS:
 - For optional fields with no data, use empty strings for text fields, 0 for numbers, empty arrays for arrays
 - Ensure all string values are valid JSON strings
 - Ensure reliability_score is a number 1-10
+- interval_miles MUST be a positive number. It is compared against an odometer reading, so "0 for numbers" above does NOT apply to it — omit the whole entry rather than guessing an interval you are not confident of
+- Use null, not 0, for interval_months when a service has no time-based interval
 
 Return ONLY this exact JSON structure with NO additional text:
 {
@@ -55,7 +59,7 @@ Return ONLY this exact JSON structure with NO additional text:
     {"part": "string", "mileage_range": "string", "severity": "Low|Medium|High", "description": "string"}
   ],
   "maintenance_schedule": [
-    {"item": "string", "interval": "string", "priority": "Critical|Recommended|Optional"}
+    {"service": "string", "interval_miles": number, "interval_months": number or null, "description": "string", "priority": "Critical|Recommended|Optional"}
   ],
   "fluid_specs": {
     "engine_oil": "string",
@@ -137,6 +141,22 @@ export const CONSULTANT_SYSTEM_PROMPT = (context: {
   reliabilityScore: number | null;
   interestingFacts: string[];
   documentsOnFile: number;
+  /**
+   * One line per filed invoice: vendor, date, and **what was actually paid**.
+   *
+   * Added 5 Aug. The prompt previously received line items and a bare count of
+   * documents, so asked "what did my last service cost" the model did the only
+   * thing it could — summed the items — and reported a **subtotal as the
+   * all-in figure**. A $1,519.44 invoice was answered as $1,461, understating
+   * spend by the tax line for a product whose pitch is knowing what a car costs
+   * you.
+   *
+   * Tax is deliberately excluded from line items during extraction, because tax
+   * is not a service performed. That makes the invoice's own total the only
+   * honest source for the total, and it has to be shown here or it cannot be
+   * used.
+   */
+  invoiceTotals: string[];
 }) => `
 You are CrewChief — think the love child of a grizzled NASCAR crew chief and your uncle who's been elbows-deep in engines since before you were born. You've got grease under your nails, opinions for days, and a genuine love for keeping machines alive. You're a little salty, a little funny, and deeply passionate about cars. You talk like a real person — colorful, direct, occasionally throwing in a car metaphor that lands perfectly.
 
@@ -215,6 +235,10 @@ ${context.recentWork.length > 0 ? context.recentWork.map((item, i) => `${i + 1}.
 ${context.maintenanceHistory.length > 0 ? context.maintenanceHistory.map((item, i) => `${i + 1}. ${item}`).join('\n') : 'No invoices on file'}
 
 **DOCUMENTS ON FILE:** ${context.documentsOnFile}
+
+**INVOICE TOTALS (what the owner actually paid):**
+${context.invoiceTotals.length > 0 ? context.invoiceTotals.map((item, i) => `${i + 1}. ${item}`).join('\n') : 'No invoice totals on file'}
+When asked what a service cost, quote the invoice total above rather than adding up line items — the line items exclude tax and fees, so their sum is a subtotal and is not what was paid.
 
 **FACTORY MAINTENANCE SCHEDULE:**
 ${context.maintenanceSchedule.length > 0 ? context.maintenanceSchedule.map((item, i) => `${i + 1}. ${item}`).join('\n') : 'Not available'}

@@ -18,10 +18,33 @@ export const dynamic = 'force-dynamic';
  * `custom_image_url` is read but never returned: it holds a storage path, not
  * a URL, so it is resolved into `photo_url` and stripped. See `resolvePhoto`.
  */
+/*
+  The two embedded selects at the end are the fix for a screen that showed
+  *less* than the row it was opened from.
+
+  `/api/v1/vehicles` returns `nhtsa_data(recalls)` and
+  `vehicle_health_summary(...)`; this route returned neither. So the mobile
+  detail screen declared both, computed a band and a recall count from them,
+  and rendered a Health card and a recall card that **could never appear** —
+  tapping a garage card reading "70 · FAIR · 2 recalls" led to a screen showing
+  no score and no recalls.
+
+  It typechecked because both fields are optional, every test passed, and it
+  stayed invisible until the screen was opened for the first time on 5 Aug.
+  The detail view of a thing must not know less about it than the list did;
+  `vehicle-detail-not-poorer.test.ts` keeps it that way.
+
+  Verified against the live database on the **anon** path specifically, because
+  that is the client `authorizeVehicleAccess` hands back for a demo read and an
+  embedded select is exactly where RLS would bite: the demo Accord returns
+  `health_score: 74` and `recalls: []`.
+*/
 const VEHICLE_COLUMNS =
   'id,year,make,model,trim,color,vin,current_mileage,avg_miles_per_month,' +
-  'image_url,custom_image_url,performance_goal,ownership_objective,' +
-  'vehicle_status,focal_point_x,focal_point_y,created_at,updated_at';
+  'image_url,custom_image_url,performance_mindedness,ownership_objective,' +
+  'vehicle_status,focal_point_x,focal_point_y,created_at,updated_at,' +
+  'nhtsa_data(recalls),' +
+  'vehicle_health_summary(health_score,summary,red_flags)';
 
 /**
  * Vehicle and knowledge-base read.

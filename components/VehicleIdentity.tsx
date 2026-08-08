@@ -297,6 +297,20 @@ export function VehicleIdentity({
                 prop, and passes unrecognised lowercase attributes straight
                 through. React 19 adds the camelCase one — change it then, not
                 before, or it silently stops being emitted.
+
+                **You will see a console warning in `next dev`, and it is
+                expected.** React DOM logs *"Invalid DOM property
+                `fetchpriority`. Did you mean `fetchPriority`?"* on the client.
+                Do not act on it. Measured against react-dom 18.2 directly:
+
+                  lowercase -> <img src="x.jpg" fetchpriority="high"/>   no warning
+                  camelCase -> <img src="x.jpg" fetchPriority="high"/>   warns, and
+                               that casing is not the attribute browsers read
+
+                So the suggestion in the warning is the regression, not the fix,
+                and it is silent — the hint simply stops applying while the
+                console goes quiet. The warning is development-only; React
+                strips it from production builds, so the live site logs nothing.
               */
               {...({ fetchpriority: isBand ? 'high' : 'auto' } as Record<string, string>)}
               className="absolute w-0 h-0 opacity-0 pointer-events-none"

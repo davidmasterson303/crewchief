@@ -98,9 +98,29 @@ const miles = new Intl.NumberFormat('en-US');
  *   - A tiny inline PNG beside it rendered immediately. So `Image` is fine and
  *     this file specifically is not decodable here.
  *
- * The real fix is server-side: sign a *transformed* URL sized for a list rather
- * than the original. That fixes a real phone too, where this is 2.3 MB of
- * someone's data allowance per vehicle — the simulator just made it visible.
+ * **The fix this comment used to recommend does not exist.** It said to sign a
+ * *transformed* URL sized for a list. `47af5c4` tried that the next day and
+ * Supabase image transformation returns `FeatureNotEnabled` for this tenant —
+ * verified against the live API, not inferred from a pricing page. The server
+ * cannot re-encode either: `sharp` is a devDependency whose outputs are
+ * committed precisely because Netlify never runs it.
+ *
+ * What is actually true now:
+ *
+ *   - **This object is legacy.** 2,328,761 bytes, uploaded 2026-07-28 00:42
+ *     UTC, sixteen hours before `eb320f9` wired the browser downscale. It is
+ *     the one file the client-side fix could never have caught.
+ *   - **New uploads cannot repeat it.** `47af5c4` put a 1.5 MB ceiling at
+ *     `uploadVehiclePhoto`, the one chokepoint every upload passes, against a
+ *     150 KB target — so a file arriving above it means the downscale did not
+ *     run, which is the case worth refusing rather than storing forever.
+ *   - **The remaining instance is fixable by hand in about thirty seconds**:
+ *     re-upload the M235i photo in the web app and it downscales on the way in.
+ *
+ * So this timeout stays, because a phone on a weak connection produces the same
+ * shape as an undecodable file and both have to land somewhere. A genuinely
+ * card-sized image still needs either the paid transform feature or a
+ * derivative generated at upload — both decisions with a cost, neither taken.
  */
 const PHOTO_TIMEOUT_MS = 6000;
 
@@ -119,7 +139,18 @@ function humanise(value: string): string {
     .join(' ');
 }
 
-function VehicleCard({ vehicle }: { vehicle: Vehicle }) {
+function VehicleCard({
+  vehicle,
+  onOpen,
+}: {
+  vehicle: Vehicle;
+  /*
+    A callback, not a `navigation` prop. This screen stays ignorant of
+    react-navigation so it remains an ordinary component — the navigator is the
+    only file that knows how a route is reached.
+  */
+  onOpen: () => void;
+}) {
   /*
     ── Two exits from "loading", not one ──────────────────────────────────────
 
@@ -160,7 +191,12 @@ function VehicleCard({ vehicle }: { vehicle: Vehicle }) {
   const name = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ');
 
   return (
-    <View style={styles.card}>
+    <Pressable
+      style={styles.card}
+      onPress={onOpen}
+      accessibilityRole="button"
+      accessibilityLabel={`${name || 'Vehicle'}, open details`}
+    >
       {showPhoto ? (
         <Image
           source={{ uri: vehicle.photo_url! }}
@@ -222,7 +258,7 @@ function VehicleCard({ vehicle }: { vehicle: Vehicle }) {
           ) : null}
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -263,10 +299,13 @@ export function GarageScreen({
   accessToken,
   email,
   onSignOut,
+  onOpenVehicle,
 }: {
   accessToken: string;
   email: string | null;
   onSignOut: () => void;
+  /** Title travels with the id so the detail header is right during the fetch. */
+  onOpenVehicle: (vehicleId: string, title: string) => void;
 }) {
   /*
     App Store 5.1.1(v). The account surface is one tap from here because the
@@ -306,29 +345,87 @@ export function GarageScreen({
     void load();
   }, [load]);
 
+  /*
+    ── The header is rendered in every state, and that is a compliance fix ────
+
+    Loading and error used to `return` before it, so both drew a bare centred
+    box with no "Account" on it. **That put account deletion behind the API
+    being up.** App Store 5.1.1(v) requires deletion to be initiated from inside
+    the app, and `AccountScreen` is one tap from here precisely so it is not
+    buried — but an early return buries it exactly when someone is most likely
+    to be leaving. A reviewer testing offline, or on a bad connection, would see
+    a screen with no way out of the account at all.
+
+    So the header and the account modal are hoisted above the branch, and only
+    the body below them changes with the state.
+  */
+  const header = (
+    <View style={styles.header}>
+      <Text style={styles.heading}>Garage</Text>
+      <Pressable
+        onPress={() => setAccountOpen(true)}
+        hitSlop={12}
+        accessibilityRole="button"
+        accessibilityLabel="Account"
+      >
+        <Text style={styles.signOut}>Account</Text>
+      </Pressable>
+    </View>
+  );
+
+  const account = (
+    <AccountScreen
+      visible={accountOpen}
+      email={email}
+      onClose={() => setAccountOpen(false)}
+      onSignOut={() => {
+        setAccountOpen(false);
+        onSignOut();
+      }}
+      onDeleted={(summary) => {
+        /*
+          Order matters. The notice is set before the session is cleared,
+          because clearing it unmounts this screen — showing the confirmation
+          after would show it to nobody.
+        */
+        setDeletedNotice(summary);
+        setAccountOpen(false);
+        onSignOut();
+      }}
+    />
+  );
+
   if (state.status === 'loading') {
     return (
-      <View style={styles.centred}>
-        <ActivityIndicator color="rgba(255,255,255,0.5)" />
+      <View style={styles.stateScreen}>
+        {header}
+        <View style={styles.centred}>
+          <ActivityIndicator color="rgba(255,255,255,0.5)" />
+        </View>
+        {account}
       </View>
     );
   }
 
   if (state.status === 'error') {
     return (
-      <View style={styles.centred}>
-        <Text style={styles.errorTitle}>
-          {state.unauthorized ? 'Signed out' : 'Could not load your garage'}
-        </Text>
-        <Text style={styles.errorBody}>
-          {state.unauthorized ? 'Your session has expired. Sign in again.' : state.message}
-        </Text>
-        <Pressable
-          style={styles.button}
-          onPress={() => (state.unauthorized ? onSignOut() : void load())}
-        >
-          <Text style={styles.buttonText}>{state.unauthorized ? 'Sign in' : 'Try again'}</Text>
-        </Pressable>
+      <View style={styles.stateScreen}>
+        {header}
+        <View style={styles.centred}>
+          <Text style={styles.errorTitle}>
+            {state.unauthorized ? 'Signed out' : 'Could not load your garage'}
+          </Text>
+          <Text style={styles.errorBody}>
+            {state.unauthorized ? 'Your session has expired. Sign in again.' : state.message}
+          </Text>
+          <Pressable
+            style={styles.button}
+            onPress={() => (state.unauthorized ? onSignOut() : void load())}
+          >
+            <Text style={styles.buttonText}>{state.unauthorized ? 'Sign in' : 'Try again'}</Text>
+          </Pressable>
+        </View>
+        {account}
       </View>
     );
   }
@@ -350,7 +447,17 @@ export function GarageScreen({
       data={state.vehicles}
       keyExtractor={(v) => v.id}
       contentContainerStyle={styles.list}
-      renderItem={({ item }) => <VehicleCard vehicle={item} />}
+      renderItem={({ item }) => (
+        <VehicleCard
+          vehicle={item}
+          onOpen={() =>
+            onOpenVehicle(
+              item.id,
+              [item.year, item.make, item.model].filter(Boolean).join(' ') || 'Vehicle'
+            )
+          }
+        />
+      )}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
@@ -358,20 +465,18 @@ export function GarageScreen({
           tintColor="rgba(255,255,255,0.5)"
         />
       }
-      ListHeaderComponent={
-        <View style={styles.header}>
-          <Text style={styles.heading}>Garage</Text>
-          <Pressable
-            onPress={() => setAccountOpen(true)}
-            hitSlop={12}
-            accessibilityRole="button"
-            accessibilityLabel="Account"
-          >
-            <Text style={styles.signOut}>Account</Text>
-          </Pressable>
-        </View>
-      }
+      ListHeaderComponent={header}
       ListEmptyComponent={
+        /*
+          An account with no cars is the ordinary first-run state, not a
+          failure — so it says what to do next rather than apologising.
+
+          It sits in its own centring view because `styles.centred` is
+          `flex: 1`, and a flex child of a FlatList's content container has no
+          height to fill unless that container grows: `contentContainerStyle`
+          carries `flexGrow: 1` for exactly this. Without it the first thing a
+          new user ever sees is three lines crushed under the title.
+        */
         <View style={styles.centred}>
           <Text style={styles.errorTitle}>No vehicles yet</Text>
           <Text style={styles.errorBody}>
@@ -381,31 +486,20 @@ export function GarageScreen({
       }
       ListFooterComponent={<DevToken token={accessToken} />}
     />
-    <AccountScreen
-      visible={accountOpen}
-      email={email}
-      onClose={() => setAccountOpen(false)}
-      onSignOut={() => {
-        setAccountOpen(false);
-        onSignOut();
-      }}
-      onDeleted={(summary) => {
-        /*
-          Order matters. The notice is set before the session is cleared,
-          because clearing it unmounts this screen — showing the confirmation
-          after would show it to nobody.
-        */
-        setDeletedNotice(summary);
-        setAccountOpen(false);
-        onSignOut();
-      }}
-    />
+    {account}
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  list: { padding: 20, paddingTop: 68, gap: 14 },
+  /*
+    `flexGrow` so `ListEmptyComponent` has room to centre in — see its note.
+    It changes nothing once there is a car, because content past one screen
+    already exceeds the container.
+  */
+  list: { padding: 20, paddingTop: 68, gap: 14, flexGrow: 1 },
+  /* Loading and error draw the same header as the list, at the same inset. */
+  stateScreen: { flex: 1, padding: 20, paddingTop: 68 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -413,7 +507,7 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   heading: { color: '#fff', fontSize: 30, fontWeight: '700', letterSpacing: -0.6 },
-  signOut: { color: 'rgba(255,255,255,0.45)', fontSize: 14, minHeight: 44, lineHeight: 44 },
+  signOut: { color: 'rgba(255,255,255,0.5)', fontSize: 14, minHeight: 44, lineHeight: 44 },
   deletedNotice: {
     position: 'absolute',
     top: 60,
@@ -435,18 +529,18 @@ const styles = StyleSheet.create({
   },
   photo: { width: '100%', height: 172, backgroundColor: 'rgba(255,255,255,0.04)' },
   photoEmpty: { alignItems: 'center', justifyContent: 'center' },
-  photoEmptyText: { color: 'rgba(255,255,255,0.25)', fontSize: 13 },
+  photoEmptyText: { color: 'rgba(255,255,255,0.5)', fontSize: 13 },
 
   cardBody: { padding: 16, gap: 10 },
   cardHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
   cardTitleBlock: { flex: 1 },
   name: { color: '#fff', fontSize: 17, fontWeight: '600' },
-  trim: { color: 'rgba(255,255,255,0.45)', fontSize: 13, marginTop: 2 },
+  trim: { color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 2 },
 
   healthBlock: { alignItems: 'flex-end' },
   score: { fontSize: 24, fontWeight: '700', lineHeight: 26 },
   bandLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.6 },
-  noScore: { color: 'rgba(255,255,255,0.3)', fontSize: 12 },
+  noScore: { color: 'rgba(255,255,255,0.5)', fontSize: 12 },
 
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
   meta: { color: 'rgba(255,255,255,0.5)', fontSize: 13 },
@@ -454,7 +548,7 @@ const styles = StyleSheet.create({
 
   centred: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 8 },
   errorTitle: { color: '#fff', fontSize: 17, fontWeight: '600' },
-  errorBody: { color: 'rgba(255,255,255,0.45)', fontSize: 14, textAlign: 'center' },
+  errorBody: { color: 'rgba(255,255,255,0.5)', fontSize: 14, textAlign: 'center' },
   button: {
     marginTop: 14,
     borderWidth: 1,

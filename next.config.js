@@ -98,9 +98,33 @@ const nextConfig = {
 
     BUILD_TIME is evaluated when this config loads, i.e. once per build.
   */
+  /*
+    Defaulted to '' rather than left undefined, which is a lint fix and not a
+    behaviour change. Next validates this block against `Record<string, string>`
+    and printed two warnings on **every dev start and every build** off a
+    machine without Netlify's variables:
+
+      "env.COMMIT_REF" is missing, expected string
+      "env.BRANCH" is missing, expected string
+
+    Real noise with a real cost: a build log that always contains warnings is a
+    build log nobody reads, which is how the next genuine warning gets missed.
+
+    `/api/version` reads these with `|| 'unknown'` (route.ts:45 and :52), and an
+    empty string is falsy, so it still answers "unknown" locally exactly as
+    before.
+
+    That citation is a file and a line rather than a test name on purpose: the
+    first draft of this comment cited `version-endpoint.test.ts`, which **does
+    not exist**. Two places in this repo already named a `ai-usage-purposes.test.ts`
+    that was never written, and both were corrected on 3 Aug — adding a third
+    phantom guard on the same day would have been careless in a way this project
+    has a documented history with. There is no test on this; the fallback is
+    verifiable by reading two lines, and that is what is claimed.
+  */
   env: {
-    COMMIT_REF: process.env.COMMIT_REF,
-    BRANCH: process.env.BRANCH,
+    COMMIT_REF: process.env.COMMIT_REF ?? '',
+    BRANCH: process.env.BRANCH ?? '',
     BUILD_TIME: new Date().toISOString(),
   },
 };

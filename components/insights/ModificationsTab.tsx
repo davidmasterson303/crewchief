@@ -4,9 +4,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Check, CircleCheck as CheckCircle, ThumbsDown, ChevronDown, ChevronUp } from 'lucide-react';
 import { useState } from 'react';
+import { nextRungs, progressionSummary } from '@crewchief/core/mod-progression';
+import { buildPosition, buildSummary } from '@crewchief/core/build-progress';
+import { BuildGauge } from '@/components/BuildGauge';
 import ModificationDetailsCard from '@/components/ModificationDetailsCard';
 import ModWishlistButton from '@/components/ModWishlistButton';
-import TierProgressCard, { type TierProgress, type Tier } from '@/components/TierProgressCard';
 
 interface Mod {
   name: string;
@@ -29,10 +31,7 @@ interface ModificationsTabProps {
   savedItemNames: Set<string>;
   loading: boolean;
   loadingModNames: boolean;
-  earnedTier: Tier;
-  tierProgress: TierProgress | null;
-  tierProgressLoading: boolean;
-  onModStatusUpdate: (modName: string, status: 'pending' | 'completed' | 'not_interested', tier: Tier) => Promise<void>;
+  onModStatusUpdate: (modName: string, status: 'pending' | 'completed' | 'not_interested') => Promise<void>;
   onWishlistToggleComplete: () => Promise<void>;
 }
 
@@ -44,13 +43,11 @@ export default function ModificationsTab({
   savedItemNames,
   loading,
   loadingModNames,
-  earnedTier,
-  tierProgress,
-  tierProgressLoading,
   onModStatusUpdate,
   onWishlistToggleComplete,
 }: ModificationsTabProps) {
   const [showCompleted, setShowCompleted] = useState(false);
+  const [showRest, setShowRest] = useState(false);
 
   const getModStatus = (modName: string) =>
     modTracking.find(t => t.mod_name === modName);
@@ -65,9 +62,93 @@ export default function ModificationsTab({
     return tracking && (tracking.status === 'completed' || tracking.status === 'not_interested');
   });
 
+  /*
+    ── The next rungs, rather than everything at once ────────────────────────
+
+    David, 7 Aug: "we don't have to show 100% of the available mods for the car,
+    just an assortment of next logical progression kind of thing."
+
+    `nextRungs` orders by role — foundation, then control, then the parts that
+    only exist to enable a bigger step — and returns a handful. The rest is not
+    thrown away: it sits behind "Show the rest", because hiding a part the
+    owner's own knowledge base offered would be a different complaint about the
+    same screen.
+
+    Only `completed` counts as done for the ladder. `not_interested` is in
+    `doneMods` for display, but treating a declined mod as a completed step
+    would advance the build on the strength of a refusal.
+  */
+  const completedNames = modTracking
+    .filter((t) => t.status === 'completed')
+    .map((t) => t.mod_name);
+
+  /*
+    The whole list in ladder order, then the first few as the rungs.
+
+    `nextRungs` was called once for the top three and the remainder was rendered
+    straight from `activeMods` — **which is database order.** So expanding
+    "show the rest" produced two different orderings stacked in one list: three
+    sorted by role, then everything else in whatever order the knowledge base
+    happened to hold. On the WRX that put the downpipe (`enabling`) above the
+    brakes (`control`), which is the exact inversion this module exists to
+    prevent, visible only once expanded. Found by Cowork, 7 Aug.
+  */
+  const orderedMods = nextRungs({
+    mods: activeMods,
+    completed: completedNames,
+    mindedness: vehicle.performance_mindedness as string | undefined,
+    limit: activeMods.length,
+  });
+
+  const rungs = orderedMods.slice(0, 3);
+
+  /*
+    Where this build sits, on the same instrument the health score uses.
+
+    Weighted by the difficulty the vehicle's own knowledge base assigned, and
+    counted only from mods actually marked installed — a dial that moved when
+    someone *considered* a turbo would be measuring intent and calling it a
+    build.
+  */
+  const position = buildPosition(
+    performanceMods
+      .filter((m) => completedNames.includes(m.name))
+      /*
+        `Mod` carries an index signature, so `difficulty` widens to `unknown`.
+        Narrowed here rather than loosening `effortOf` — an unrecognised value
+        already scores as Moderate, and a signature that accepted `unknown`
+        would hide the day this field stops being a string.
+      */
+      .map((m) => ({ difficulty: typeof m.difficulty === 'string' ? m.difficulty : null }))
+  );
+
+  const rungNames = new Set(rungs.map((r) => r.name));
+  const restMods = orderedMods.filter((r) => !rungNames.has(r.name));
+  const shownRungs = showRest ? orderedMods : rungs;
+
+  const byName = new Map(activeMods.map((m) => [m.name, m]));
+
   return (
     <div className="space-y-4">
-      <TierProgressCard progress={tierProgress} loading={tierProgressLoading} />
+      {/*
+        The build dial. Sits above the ladder because it answers "where am I"
+        before "what next" — the same order the dashboard puts the health score
+        above its recommendations.
+      */}
+      <div className="flex items-center gap-5 rounded-xl border border-white/8 bg-white/4 p-4">
+        <BuildGauge position={position} size={140} />
+        <p className="flex-1 text-sm text-white/70">
+          {buildSummary(position, restMods.length + rungs.length)}
+        </p>
+      </div>
+
+      {/*
+        `TierProgressCard` used to sit here. The dial replaces it: it showed
+        progress toward a *next tier*, which is the end-state framing the
+        continuum removed. Its props are still accepted so the parent needs no
+        change in the same commit, and they are unused on purpose — see the
+        interface.
+      */}
 
       {loadingModNames && activeMods.length === 0 ? (
         <div className="space-y-3">
@@ -87,14 +168,35 @@ export default function ModificationsTab({
             </p>
           ) : (
             <div className="space-y-3">
-              {activeMods.map((mod) => {
-                const details = modDetails[mod.name];
+              {rungs.length > 0 && (
+                <p className="text-xs text-white/60">
+                  {progressionSummary(rungs, completedNames)}
+                </p>
+              )}
+
+              {shownRungs.map((rung, index) => {
+                const mod = byName.get(rung.name);
+                if (!mod) return null;
+                const details = modDetails[rung.name];
+
+                /*
+                  The rationale is a property of the *role*, not of the part, so
+                  it prints once per run rather than on every card. It rendered
+                  on each, which put the same sentence — "Worth doing before
+                  more power, not after…" — verbatim above both the Brembo kit
+                  and the sway bars. Two identical sentences stacked in a list
+                  read as a bug whatever the intent. Cowork's catch.
+                */
+                const startsRun = index === 0 || shownRungs[index - 1].role !== rung.role;
 
                 return (
-                  <div key={mod.name}>
+                  <div key={rung.name}>
+                    {startsRun && (
+                      <p className="text-xs text-cyan-300/70 mb-1.5">{rung.rationale}</p>
+                    )}
                     <ModificationDetailsCard
                       vehicleId={vehicle.id as string}
-                      modName={mod.name}
+                      modName={rung.name}
                       vehicle={vehicle}
                       details={details}
                     />
@@ -110,7 +212,7 @@ export default function ModificationsTab({
                         size="sm"
                         variant="outline"
                         className="h-7 text-xs"
-                        onClick={() => onModStatusUpdate(mod.name, 'completed', earnedTier)}
+                        onClick={() => onModStatusUpdate(mod.name, 'completed')}
                         disabled={loading}
                       >
                         <Check className="h-3 w-3 mr-1" />
@@ -120,7 +222,7 @@ export default function ModificationsTab({
                         size="sm"
                         variant="ghost"
                         className="h-7 text-xs text-white/60"
-                        onClick={() => onModStatusUpdate(mod.name, 'not_interested', earnedTier)}
+                        onClick={() => onModStatusUpdate(mod.name, 'not_interested')}
                         disabled={loading}
                       >
                         <ThumbsDown className="h-3 w-3 mr-1" />
@@ -131,6 +233,16 @@ export default function ModificationsTab({
                 );
               })}
             </div>
+          )}
+
+          {restMods.length > 0 && !showRest && (
+            <button
+              className="flex items-center gap-1.5 text-xs text-white/60 hover:text-white/75 transition-colors"
+              onClick={() => setShowRest(true)}
+            >
+              <ChevronDown className="h-3 w-3" />
+              Show the other {restMods.length} {restMods.length === 1 ? 'modification' : 'modifications'} for this car
+            </button>
           )}
 
           {doneMods.length > 0 && (

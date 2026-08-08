@@ -81,7 +81,15 @@ export type ConsultantContextResult =
  * the "AI Extracted" badge removed in `9597869`: a provenance claim the data
  * behind it no longer substantiated.
  */
-export type ContextKind = 'knowledge' | 'service' | 'issues' | 'mods' | 'wishlist' | 'recalls';
+/*
+  Declared in `@crewchief/core/consultant-context-kinds` since the Expo advisor
+  screen began rendering the same provenance row and cannot reach this file.
+  Re-exported rather than moved outright so the existing `@/lib/consultant-context`
+  import path keeps working — this module is still where the kinds are *computed*,
+  which is the half that needs a Supabase client.
+*/
+export type { ContextKind } from '@crewchief/core/consultant-context-kinds';
+import type { ContextKind } from '@crewchief/core/consultant-context-kinds';
 
 function nonEmpty(v: any): boolean {
   if (!v) return false;
