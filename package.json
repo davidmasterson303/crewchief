@@ -8,6 +8,7 @@
   ],
   "_dependencyNotes": {
     "bufferutil, utf-8-validate": "Optional native deps of `ws`, reached via @google/genai -> lib/gemini.ts. Nothing here imports them and a pruning pass will read them as dead weight. DO NOT REMOVE: without them webpack emits 'Module not found' and every request through the Gemini path HANGS INDEFINITELY rather than erroring. Cost an evening on 28 Jul. Guarded by lib/__tests__/ws-optional-deps.test.ts.",
+    "jest, jest-environment-jsdom are pinned exact — do not restore the carets": "apps/mobile is on jest 29 (jest-expo 57 requires it), so a full workspace install hoists the jest-29 packages to the root and pushes the web app's jest 30 into node_modules/jest/node_modules. Those two are then resolved independently: the caret let `jest` float to 30.4.2 while `jest-environment-jsdom` stayed at 30.2.0, and the environment is where the moduleMocker comes from. jest-runtime 30.4 calls moduleMocker.clearMocksOnScope(), added in jest-mock 30.4 — against the 30.2 mock it is undefined, and EVERY web suite dies before its first test with `TypeError: this._moduleMocker.clearMocksOnScope is not a function`. Nobody noticed for weeks because the on-disk trees still held the old consistent 30.2.0 and nobody had installed apps/mobile. Pinning keeps runtime and environment on one version by construction. Bump them together or not at all, and verify with `rm -rf node_modules && npm ci && npx jest` — a passing `npx jest` on an existing tree proves nothing here.",
     "DO NOT run `npm run build` while `npm run dev` is running": "They share .next. A build replaces the chunks the dev server is serving, so every /_next/static request 404s: the page renders as unstyled HTML and React never hydrates, which presents as dead buttons rather than an error. This is the PackFileCacheStrategy / 503-chunk symptom recorded against /forgot-password. Fix: stop dev, rm -rf .next, restart. Deployments are unaffected \u2014 Netlify never runs dev."
   },
   "scripts": {
@@ -96,8 +97,8 @@
     "autoprefixer": "^10.4.15",
     "eslint": "^8.49.0",
     "eslint-config-next": "^13.5.1",
-    "jest": "^30.2.0",
-    "jest-environment-jsdom": "^30.2.0",
+    "jest": "30.2.0",
+    "jest-environment-jsdom": "30.2.0",
     "postcss": "^8.4.30",
     "sharp": "^0.35.3",
     "tailwindcss": "^3.3.3",
