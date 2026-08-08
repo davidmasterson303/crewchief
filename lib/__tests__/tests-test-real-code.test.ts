@@ -189,6 +189,12 @@ const STATIC_ANALYSIS_SUITES = [
   // service-role key and a push endpoint. What matters is which checks exist
   // and in what order, which is on disk.
   'notify-sweep-route.test.ts',
+  // Reads DashboardLayout's tab block to prove the section nav uses Link with
+  // prefetch, so a switch transfers one segment instead of re-booting 26 JS
+  // chunks. jsdom has no router, segment cache or prefetch, so none of it is
+  // observable in a rendered test; the evidence is a browser measurement
+  // recorded in that file's docblock, and this is the ratchet.
+  'dashboard-tabs-prefetch.test.ts',
 ];
 
 /**

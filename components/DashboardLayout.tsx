@@ -347,9 +347,57 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
               {tabs.map(({ key, label, icon: Icon, href }) => {
                 const isActive = currentPage === key;
                 return (
+                  /*
+                    ── `Link` with `prefetch`, and the history is worth keeping ─
+
+                    These were `Link`, then briefly a plain `<a>`, and are `Link`
+                    again. The round trip is recorded because the middle step was
+                    based on a measurement error and somebody will otherwise
+                    repeat it.
+
+                    **8 Aug, reported:** tabs unreachable — clicking did nothing.
+                    I "reproduced" it with browser automation and blamed a
+                    hydration race in which `Link` calls `preventDefault()` before
+                    the router can act, and swapped in a native `<a>`.
+
+                    **That reproduction was an artifact.** The automated clicks
+                    were going into a *background* tab —
+                    `document.visibilityState === 'hidden'` — where a synthetic
+                    click does not drive navigation. Every confusing result
+                    followed from that, including clicks that "worked" only right
+                    after a `javascript_tool` call.
+
+                    What the native anchor did fix was real, though: tabs began
+                    changing. What it cost was worse than the bug. Each switch
+                    became a full page load, re-downloading and re-executing 26
+                    chunks and re-hydrating — measured at ~2.7s of client boot —
+                    when the server itself answers every one of these routes in
+                    0.4–0.6s warm. The slowness was never the server.
+
+                    `Link` transfers only the changed route segment and leaves
+                    the shell, the nav and the vehicle header mounted. `prefetch`
+                    pulls that segment during idle time after the page settles,
+                    so the content is local before the click. That is the
+                    "lazy-load the tab content" behaviour this needs, and it is
+                    the framework's, not something to hand-roll.
+
+                    **If tabs ever appear unreachable again, do not start with
+                    this component.** Check the transition itself — a segment
+                    fetch that hangs looks exactly like a dead control, because
+                    `Link` cancels the browser's own navigation and shows nothing
+                    while it waits. `prefetch` is also the mitigation for that:
+                    a pre-warmed segment has nothing left to wait for.
+                  */
                   <Link
                     key={key}
                     href={href(vehicle.id)}
+                    /*
+                      Explicit rather than relying on the default. In Next 13's
+                      app router the default is a *partial* prefetch on viewport
+                      entry; `prefetch` asks for the whole segment, which is what
+                      makes the click instant instead of merely quicker.
+                    */
+                    prefetch
                     /*
                       RB0 rule 3. This was `py-2.5 text-xs` — about 36px tall,
                       under the 44px floor, on the primary navigation: the one
