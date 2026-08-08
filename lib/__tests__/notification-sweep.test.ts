@@ -23,7 +23,12 @@ import {
   shouldRaiseService,
 } from '@crewchief/core/notification-sweep';
 import { normaliseRecall } from '@crewchief/core/recalls';
-import { evaluateSchedule, isWorthNotifying, nextMilestone } from '@crewchief/core/service-due';
+import {
+  evaluateSchedule,
+  isWorthNotifying,
+  nextMilestone,
+  type Milestone,
+} from '@crewchief/core/service-due';
 
 /** A raw NHTSA-shaped row, through the real normaliser rather than a hand-built object. */
 function recall(campaign: string | null, extra: Record<string, unknown> = {}) {
@@ -250,29 +255,38 @@ describe('headlineService', () => {
     };
   }
 
-  const outOfOrder = {
-    atMiles: 92_500,
+  /*
+    Typed as `Milestone`, not cast through `unknown`.
+
+    The first version cast, and the cast hid a real mistake: the fixture called
+    the field `atMiles`, which `Milestone` does not have — it is `mileage`. The
+    tests passed anyway because `headlineService` only reads `services`, so a
+    fixture describing a shape that cannot exist sat here looking authoritative.
+    The same wrong name then went into the route, where tsc did catch it.
+  */
+  const outOfOrder: Milestone = {
+    mileage: 92_500,
     services: [service('Tyre rotation', 'soon'), service('Engine oil and filter', 'overdue')],
-  } as unknown as Parameters<typeof headlineService>[0];
+  };
 
   it('names the overdue service even when it is not first', () => {
     expect(headlineService(outOfOrder)).toBe('Engine oil and filter');
   });
 
   it('prefers overdue over merely due', () => {
-    const mixed = {
-      atMiles: 92_500,
+    const mixed: Milestone = {
+      mileage: 92_500,
       services: [service('Tyre rotation', 'due'), service('Engine oil and filter', 'overdue')],
-    } as unknown as Parameters<typeof headlineService>[0];
+    };
 
     expect(headlineService(mixed)).toBe('Engine oil and filter');
   });
 
   it('falls back to the first service when none is overdue or due', () => {
-    const quiet = {
-      atMiles: 92_500,
+    const quiet: Milestone = {
+      mileage: 92_500,
       services: [service('Tyre rotation', 'soon')],
-    } as unknown as Parameters<typeof headlineService>[0];
+    };
 
     expect(headlineService(quiet)).toBe('Tyre rotation');
   });

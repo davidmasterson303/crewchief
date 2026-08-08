@@ -183,6 +183,12 @@ const STATIC_ANALYSIS_SUITES = [
   // the write and the error is swallowed. `LogServiceModal` has been inserting
   // a non-existent column with an illegal source for months without a symptom.
   'service-baseline-schema.test.ts',
+  // Reads the sweep route and its Netlify scheduler. The route sends a push to
+  // every account in the product, so its authorization is the most abusable
+  // thing here if it is ever wrong — and executing it needs a live Supabase, a
+  // service-role key and a push endpoint. What matters is which checks exist
+  // and in what order, which is on disk.
+  'notify-sweep-route.test.ts',
 ];
 
 /**
