@@ -82,11 +82,25 @@ export default function ModificationsTab({
     .filter((t) => t.status === 'completed')
     .map((t) => t.mod_name);
 
-  const rungs = nextRungs({
+  /*
+    The whole list in ladder order, then the first few as the rungs.
+
+    `nextRungs` was called once for the top three and the remainder was rendered
+    straight from `activeMods` — **which is database order.** So expanding
+    "show the rest" produced two different orderings stacked in one list: three
+    sorted by role, then everything else in whatever order the knowledge base
+    happened to hold. On the WRX that put the downpipe (`enabling`) above the
+    brakes (`control`), which is the exact inversion this module exists to
+    prevent, visible only once expanded. Found by Cowork, 7 Aug.
+  */
+  const orderedMods = nextRungs({
     mods: activeMods,
     completed: completedNames,
     mindedness: vehicle.performance_mindedness as string | undefined,
+    limit: activeMods.length,
   });
+
+  const rungs = orderedMods.slice(0, 3);
 
   /*
     Where this build sits, on the same instrument the health score uses.
@@ -109,8 +123,10 @@ export default function ModificationsTab({
   );
 
   const rungNames = new Set(rungs.map((r) => r.name));
-  const restMods = activeMods.filter((mod) => !rungNames.has(mod.name));
-  const shownMods = showRest ? activeMods : activeMods.filter((mod) => rungNames.has(mod.name));
+  const restMods = orderedMods.filter((r) => !rungNames.has(r.name));
+  const shownRungs = showRest ? orderedMods : rungs;
+
+  const byName = new Map(activeMods.map((m) => [m.name, m]));
 
   return (
     <div className="space-y-4">
@@ -158,23 +174,29 @@ export default function ModificationsTab({
                 </p>
               )}
 
-              {shownMods.map((mod) => {
-                const details = modDetails[mod.name];
-                const rung = rungs.find((r) => r.name === mod.name);
+              {shownRungs.map((rung, index) => {
+                const mod = byName.get(rung.name);
+                if (!mod) return null;
+                const details = modDetails[rung.name];
+
+                /*
+                  The rationale is a property of the *role*, not of the part, so
+                  it prints once per run rather than on every card. It rendered
+                  on each, which put the same sentence — "Worth doing before
+                  more power, not after…" — verbatim above both the Brembo kit
+                  and the sway bars. Two identical sentences stacked in a list
+                  read as a bug whatever the intent. Cowork's catch.
+                */
+                const startsRun = index === 0 || shownRungs[index - 1].role !== rung.role;
 
                 return (
-                  <div key={mod.name}>
-                    {/*
-                      Why this one is next, in the owner's terms. Only on the
-                      rungs — a card under "Show the rest" has no claim to being
-                      the next step and should not carry a sentence saying it is.
-                    */}
-                    {rung && (
+                  <div key={rung.name}>
+                    {startsRun && (
                       <p className="text-xs text-cyan-300/70 mb-1.5">{rung.rationale}</p>
                     )}
                     <ModificationDetailsCard
                       vehicleId={vehicle.id as string}
-                      modName={mod.name}
+                      modName={rung.name}
                       vehicle={vehicle}
                       details={details}
                     />
