@@ -2460,6 +2460,60 @@ export async function updateVehicleAvgMileage(vehicleId: string, avgMilesPerMont
   }
 }
 
+/**
+ * Turn the modifications surface on or off for one car.
+ *
+ * ── Why this exists, and why it is not optional ─────────────────────────────
+ *
+ * Onboarding asks one yes/no about modifications, and answering "not
+ * interested" hides the whole surface — the dossier tab, the ladder, the build
+ * dial. That answer is given in the first sixty seconds of using the product,
+ * before anyone knows what they are switching off, and it used to be
+ * **irreversible**: nothing anywhere could set it back.
+ *
+ * A choice with no way back is not a preference, it is a trap. It also made the
+ * onboarding question far weightier than it reads — David flagged wanting "some
+ * subtle CTA if user wants to bring it back later" the moment he proposed the
+ * hiding, and this is that.
+ *
+ * ── The enum, and why "yes" is stored as `mild` ─────────────────────────────
+ *
+ * `performance_mindedness` is a Postgres enum `('stock','mild','aggressive')`.
+ * A truer word for "interested" would need `ALTER TYPE` and a hand-applied
+ * migration, which is not worth spending on a label. `mild` means interested;
+ * `aggressive` is legacy and read-only. Nothing branches on the difference —
+ * `showsModifications` in `@crewchief/core/mod-progression` is the whole rule,
+ * and this writes the values that rule reads.
+ */
+export async function setModificationsVisible(vehicleId: string, visible: boolean) {
+  try {
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
+    const client = getServiceRoleClient();
+    const { error } = await client
+      .from('vehicles')
+      .update({
+        performance_mindedness: visible ? 'mild' : 'stock',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', vehicleId);
+
+    if (error) {
+      return { success: false, error: 'Failed to update modification preference' };
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    return {
+      success: false,
+      error: `Failed to update modification preference: ${error.message || 'Unknown error'}`,
+    };
+  }
+}
+
 export async function updateVehicleStatus(vehicleId: string, status: 'daily_driver' | 'weekend' | 'stored' | 'for_sale') {
   try {
     const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });

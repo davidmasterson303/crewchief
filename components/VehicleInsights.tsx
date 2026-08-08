@@ -21,6 +21,7 @@ import {
   ensureAggressiveModMinimum,
   generateVehicleDossier,
   generateVehicleHealthSummary,
+  setModificationsVisible,
 } from '@/app/actions';
 import { useWishlistData } from '@/hooks/useWishlistData';
 import { toast } from 'sonner';
@@ -81,7 +82,16 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
       onboarding asks a yes/no now, because a level is an end state — so the
       rule is simply: asked for it, sees it first.
     */
-    const dossierTabs = showsModifications(vehicle.performance_mindedness)
+    /*
+      Held locally so turning modifications on reveals the tab immediately.
+      The server action persists it; waiting for a refetch to show a tab the
+      person just asked for reads as the button not having worked.
+    */
+    const [modsVisible, setModsVisible] = useState(
+      showsModifications(vehicle.performance_mindedness)
+    );
+
+    const dossierTabs = modsVisible
       ? ['mods', 'issues', 'maintenance']
       : ['issues', 'maintenance'];
 
@@ -503,6 +513,41 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
           </CardHeader>
           <CardContent>
             <Tabs value={dossierTab} onValueChange={setDossierTab} className="w-full">
+              {/*
+                The way back.
+
+                Answering "not interested" in onboarding hides this whole
+                surface, and that answer is given in the first sixty seconds
+                before anyone knows what it turns off. Without this it is
+                irreversible, which makes a preference into a trap — and it is
+                the reason the onboarding question can stay a single yes/no
+                rather than having to be got right first time.
+
+                Quiet on purpose. It sits under the tabs rather than in them:
+                someone who said no should not be sold to every time they open
+                the dossier, only shown that the door is unlocked.
+              */}
+              {!modsVisible && (
+                <button
+                  type="button"
+                  className="mb-4 text-xs text-white/50 hover:text-white/75 transition-colors underline underline-offset-2 decoration-white/20"
+                  onClick={async () => {
+                    setModsVisible(true);
+                    setDossierTab('mods');
+                    const result = await setModificationsVisible(vehicle.id as string, true);
+                    if (!result.success) {
+                      // Put it back rather than leaving a tab that will vanish
+                      // on the next load — a silent revert is worse than none.
+                      setModsVisible(false);
+                      setDossierTab('issues');
+                      toast.error(result.error || 'Could not turn modifications on');
+                    }
+                  }}
+                >
+                  Interested in modifications for this car? Turn them on
+                </button>
+              )}
+
               <TabsList className={`grid w-full ${dossierTabs.length === 2 ? 'grid-cols-2' : 'grid-cols-3'} mb-4 bg-white/4 border border-white/8 p-0.5 rounded-xl`}>
                 {dossierTabs.map((tabVal) => {
                   const isActive = dossierTab === tabVal;
