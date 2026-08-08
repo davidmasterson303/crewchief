@@ -107,4 +107,48 @@ describe('POST /api/v1/vehicles', () => {
     expect(post).toMatch(/kbError/);
     expect(post).toMatch(/logger\.warn/);
   });
+
+  describe('the Track A2a service baseline', () => {
+    it('is built by core rather than assembled here', () => {
+      // Which date "in the last 6 months" resolves to is a product rule with a
+      // safety direction, and it belongs in one place that a test can drive
+      // without a database. See onboarding-baseline.ts.
+      expect(post).toMatch(/buildBaselineRow\(/);
+      expect(post).toMatch(/isBaselineAge\(/);
+    });
+
+    it('narrows the age rather than trusting the body', () => {
+      // A client-supplied string reaching `baselineDate` unchecked would put an
+      // unrecognised value into a lookup that returns null for it — silent, and
+      // indistinguishable from the owner choosing "not sure".
+      expect(post).toMatch(/isBaselineAge\(body\.lastServiceAge\)/);
+    });
+
+    it('does not fail the request when the insert is rejected', () => {
+      /*
+        The important one, and it is not hypothetical: the migration adding
+        `mileage_at_service` and the `'owner-onboarding'` source **is written
+        but not yet applied**. Until it runs, this insert is rejected on a
+        missing column.
+
+        If that could fail the request, a pending migration would mean nobody
+        can add a car — a total outage of the launch-blocking flow, caused by a
+        DB change that has not happened yet. Same posture as the knowledge-base
+        insert above: what the caller asked for was a vehicle.
+      */
+      const baselineBlock = post.slice(post.indexOf('buildBaselineRow'));
+
+      expect(baselineBlock).toMatch(/baselineError/);
+      expect(baselineBlock).toMatch(/logger\.warn/);
+      // No early return and no non-2xx between the insert and the 201.
+      expect(baselineBlock).not.toMatch(/status:\s*(4|5)\d\d/);
+    });
+
+    it('writes the baseline after the vehicle exists, not before', () => {
+      // It carries `vehicle_id`. Ordering this ahead of the insert that creates
+      // the row would make it fail on a foreign key every time — and, given the
+      // rule above, fail silently.
+      expect(post.indexOf('buildBaselineRow')).toBeGreaterThan(post.indexOf('.insert('));
+    });
+  });
 });

@@ -13,6 +13,10 @@ import {
 
 import { apiRequest, ApiRequestError } from '../api/client';
 import { validateMileageUpdate } from '@crewchief/core/mileage-tracking';
+import {
+  BASELINE_AGE_OPTIONS,
+  type BaselineAge,
+} from '@crewchief/core/onboarding-baseline';
 
 /**
  * Add a car — the first thing a new user does, and until 8 Aug it did not exist
@@ -26,15 +30,32 @@ import { validateMileageUpdate } from '@crewchief/core/mileage-tracking';
  * mobile was a companion. Fatal once it is the product: an App Store reviewer
  * downloads the app and cannot reach anything.
  *
- * ── Four fields, where the web wizard asks fourteen ─────────────────────────
+ * ── A handful of fields, where the web wizard asks fourteen ─────────────────
  *
  * `createVehicle` gathers VIN, colour, drivetrain, transmission, usage profile,
  * driving style and more across five steps. This asks what identifies the car,
- * what the odometer reads, and the one question the product actually branches
- * on. Everything else has a sensible default and is editable later.
+ * what the odometer reads, the one question the product actually branches on,
+ * and — since Track A2a — one optional question about its history. Everything
+ * else has a sensible default and is editable later.
  *
  * A first-run flow that demands a VIN before showing anything is a first-run
  * flow people abandon — and the dossier the model generates does not need one.
+ *
+ * ── The history question, and why it names the oil change ───────────────────
+ *
+ * A used car arrives with a past this product cannot see. Without a baseline,
+ * every time-based service reports `unknown` and every mileage-based one counts
+ * from the odometer rather than from the work.
+ *
+ * It asks about the **oil change** rather than "the last service" for a
+ * mechanical reason as well as a human one: `categoryFor('service')` is `null`,
+ * so a vague answer matches no scheduled item and the question would be pure
+ * cost. `onboarding-baseline.ts` carries the full argument, including why every
+ * "roughly when" answer resolves to the *oldest* end of its range.
+ *
+ * Both fields are optional and nothing gates on them. There is no skip button
+ * precisely because there is nothing to skip — a button would imply a gate that
+ * does not exist.
  *
  * ── ⚠ Behaviour-level tests are not in place, and that is a real gap ───────
  *
@@ -71,6 +92,8 @@ export function AddVehicleScreen({ onAdded, onSignOut }: Props) {
   const [trim, setTrim] = useState('');
   const [mileage, setMileage] = useState('');
   const [wantsMods, setWantsMods] = useState(true);
+  const [serviceMileage, setServiceMileage] = useState('');
+  const [serviceAge, setServiceAge] = useState<BaselineAge | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -107,6 +130,16 @@ export function AddVehicleScreen({ onAdded, onSignOut }: Props) {
           trim: trim.trim(),
           currentMileage: reading,
           wantsModifications: wantsMods,
+          /*
+            Both optional and both independently useful — a mileage with no
+            date still lets every mileage-based service count from it. `null`
+            rather than 0 for an untouched field: 0 is a legitimate reading and
+            the route must be able to tell them apart.
+          */
+          lastServiceMileage: serviceMileage.trim()
+            ? Number(serviceMileage.replace(/[^0-9]/g, ''))
+            : null,
+          lastServiceAge: serviceAge,
         },
       });
 
@@ -223,6 +256,64 @@ export function AddVehicleScreen({ onAdded, onSignOut }: Props) {
           </View>
         </View>
 
+        {/*
+          Track A2a. One question, and it names the work rather than asking
+          about "the last service" — see `onboarding-baseline.ts` for why
+          "service" is unanswerable *and* unmatchable. Both fields are optional
+          and the screen submits perfectly well with neither touched.
+        */}
+        <View style={styles.modsBlock}>
+          <Text style={styles.modsQuestion}>When was its last oil change?</Text>
+          <Text style={styles.modsHint}>
+            Optional, and a rough answer is genuinely useful — it is what lets us
+            count from the work rather than guess from the odometer.
+          </Text>
+
+          <TextInput
+            style={styles.input}
+            value={serviceMileage}
+            onChangeText={setServiceMileage}
+            placeholder="Mileage at the time (optional)"
+            placeholderTextColor="rgba(255,255,255,0.35)"
+            keyboardType="number-pad"
+            accessibilityLabel="Mileage at last oil change, optional"
+            editable={!busy}
+          />
+
+          <View style={styles.ageGrid}>
+            {BASELINE_AGE_OPTIONS.map((option) => (
+              <Pressable
+                key={option.value}
+                accessibilityRole="button"
+                accessibilityState={{ selected: serviceAge === option.value }}
+                style={[styles.age, serviceAge === option.value && styles.choiceOn]}
+                onPress={() =>
+                  setServiceAge((held) => (held === option.value ? null : option.value))
+                }
+                disabled={busy}
+              >
+                <Text
+                  style={[styles.ageText, serviceAge === option.value && styles.choiceTextOn]}
+                >
+                  {option.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          {/*
+            The skip is a statement, not a control, and that is deliberate.
+            Nothing here is required, so a "skip" button would imply the block
+            above is a gate it is not — and the invoice scanner is reachable
+            from the car itself the moment it exists, which is a better moment
+            to offer it than before the car has been created.
+          */}
+          <Text style={styles.footnote}>
+            Or leave this blank — you can scan your receipts later and we will read
+            the dates off them.
+          </Text>
+        </View>
+
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <Pressable
@@ -287,6 +378,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.06)',
   },
+  ageGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  age: {
+    minHeight: 44,
+    paddingHorizontal: 14,
+    justifyContent: 'center',
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  ageText: { color: 'rgba(255,255,255,0.75)', fontSize: 14, fontWeight: '600' },
+
   choiceOn: { backgroundColor: '#fff' },
   choiceText: { color: 'rgba(255,255,255,0.75)', fontSize: 15, fontWeight: '600' },
   choiceTextOn: { color: '#080808' },

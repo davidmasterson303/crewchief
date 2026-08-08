@@ -4,6 +4,7 @@ import type { ApiResponse } from '@crewchief/core/types';
 import { checkRateLimit, getClientIdentifier, rateLimitResponse } from '@/lib/rate-limit';
 import { authorizeVehicleAccess, requireCaller } from '@/lib/api-auth';
 import { validateMileageUpdate } from '@crewchief/core/mileage-tracking';
+import { buildBaselineRow, isBaselineAge } from '@crewchief/core/onboarding-baseline';
 import { getServiceRoleClient } from '@/lib/supabase';
 import { resolveVehiclePhotos } from '@/lib/vehicle-photo';
 
@@ -386,6 +387,47 @@ export async function POST(request: NextRequest): Promise<Response> {
       vehicleId: vehicle.id,
       error: kbError.message,
     });
+  }
+
+  /*
+    Track A2a — the service baseline, if the owner gave one.
+
+    ── Why this cannot fail the request ────────────────────────────────────────
+
+    Two independent reasons, and either alone would be enough:
+
+    1. **The migration adding `mileage_at_service` and the `'owner-onboarding'`
+       source may not be applied yet.** It is written and additive and needs a
+       dashboard run. Until then this insert is rejected on a missing column,
+       and a request that let that through would mean **nobody can add a car** —
+       turning a pending migration into a total outage of the launch-blocking
+       flow.
+
+    2. Even once applied, a baseline is an optimisation. The car is the thing
+       being created; the baseline improves what the milestone screen can say
+       about it later. Losing it costs a service being estimated rather than
+       counted, which is exactly the behaviour every car has today.
+
+    Same posture as the knowledge-base insert above, for the same reason: what
+    the caller asked for was a vehicle.
+  */
+  const baseline = buildBaselineRow({
+    mileage: typeof body.lastServiceMileage === 'number' ? body.lastServiceMileage : null,
+    age: isBaselineAge(body.lastServiceAge) ? body.lastServiceAge : null,
+    today: new Date().toISOString().slice(0, 10),
+  });
+
+  if (baseline) {
+    const { error: baselineError } = await client
+      .from('maintenance_line_items')
+      .insert({ vehicle_id: vehicle.id, ...baseline });
+
+    if (baselineError) {
+      logger.warn('API:CREATE_VEHICLE', 'Vehicle created without its service baseline', {
+        vehicleId: vehicle.id,
+        error: baselineError.message,
+      });
+    }
   }
 
   logger.info('API:CREATE_VEHICLE', 'Vehicle created', { vehicleId: vehicle.id });
