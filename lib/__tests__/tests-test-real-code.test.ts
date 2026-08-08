@@ -83,6 +83,12 @@ const STATIC_ANALYSIS_SUITES = [
   // cannot load, and the property is structural (does each return path carry
   // the affordance) rather than behavioural.
   'mobile-account-reachable.test.ts',
+  // Reads apps/mobile's screens for a Pressable that swaps its <Text> for an
+  // ActivityIndicator without naming itself — the control loses its accessible
+  // name at exactly the moment it is working. Same constraint as the scans
+  // above: React Native source this runner cannot load, and the property is
+  // structural rather than something a render test could reach on every screen.
+  'mobile-busy-controls-named.test.ts',
   // Reads the upload route to prove it authorizes where the HTTP status is
   // still available, rather than letting a denial fall through the error
   // mapping as a 500. Executing it would need a live Supabase, a storage

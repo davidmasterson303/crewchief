@@ -97,6 +97,13 @@ export function SignInScreen() {
           autoCorrect={false}
           keyboardType="email-address"
           textContentType="username"
+          /*
+            A placeholder is not a label. VoiceOver reads it as the field's
+            *value* when the field is empty, and once someone types their
+            address it is gone entirely — so a screen-reader user re-reading the
+            form finds two unlabelled boxes containing an email and some dots.
+          */
+          accessibilityLabel="Email"
           editable={!busy}
         />
 
@@ -115,6 +122,7 @@ export function SignInScreen() {
             saved, which is why this was here before sign-up existed.
           */
           textContentType={isNew ? 'newPassword' : 'password'}
+          accessibilityLabel="Password"
           editable={!busy}
           onSubmitEditing={handleSubmit}
         />
@@ -126,6 +134,15 @@ export function SignInScreen() {
           style={[styles.button, !canSubmit && styles.buttonDisabled]}
           onPress={handleSubmit}
           disabled={!canSubmit}
+          accessibilityRole="button"
+          /*
+            Named explicitly rather than by its `<Text>` child, because the
+            child is swapped for a spinner while `busy` — so the control loses
+            its accessible name at exactly the moment someone most needs to know
+            what it is doing. `accessibilityState.busy` is what says "working".
+          */
+          accessibilityLabel={isNew ? 'Create account' : 'Sign in'}
+          accessibilityState={{ disabled: !canSubmit, busy }}
         >
           {busy ? (
             <ActivityIndicator color="#080808" />

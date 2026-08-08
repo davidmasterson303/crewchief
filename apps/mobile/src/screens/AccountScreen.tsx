@@ -160,7 +160,10 @@ export function AccountScreen({
               onPress={() => void handleDelete()}
               disabled={!confirmed || deleting}
               accessibilityRole="button"
-              accessibilityState={{ disabled: !confirmed || deleting }}
+              // Same reason as SignInScreen's submit: the `<Text>` that names
+              // this is replaced by a spinner while `deleting`.
+              accessibilityLabel="Delete my account"
+              accessibilityState={{ disabled: !confirmed || deleting, busy: deleting }}
               style={({ pressed }) => [
                 styles.deleteButton,
                 (!confirmed || deleting) && styles.deleteButtonDisabled,
