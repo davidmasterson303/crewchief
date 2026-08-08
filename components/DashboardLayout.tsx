@@ -347,7 +347,43 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
               {tabs.map(({ key, label, icon: Icon, href }) => {
                 const isActive = currentPage === key;
                 return (
-                  <Link
+                  /*
+                    ── A plain <a>, deliberately, and not `next/link` ─────────
+
+                    Reproduced on production 8 Aug, signed in: **a click on any
+                    of these tabs within ~2.7s of page load did nothing at all**
+                    — not delayed, discarded. After the page settled the same
+                    click worked. That window is the whole time a person is
+                    looking at a dashboard that appears finished.
+
+                    The cause is a hydration race, and the damning part is that
+                    it is worse than no JavaScript. React hydrates far enough
+                    for `Link` to call `preventDefault()` — captured in the
+                    event log as `click (bubble end): prevented=true` — but not
+                    far enough for the router transition to run. So the
+                    browser's own navigation is cancelled and nothing replaces
+                    it. The click is swallowed.
+
+                    Ruled out first, by measurement rather than reasoning: the
+                    routes all return 200, the hrefs are correct, there is no
+                    console error, and nothing overlays the tabs (sampled at
+                    t=0, 400ms, 800ms, 1.5s, 2.5s and 3.5s — the anchor was the
+                    top element at every one). A programmatic `a.click()`
+                    navigates at any moment; only a real click during the
+                    window fails.
+
+                    A native anchor cannot lose a click, because the browser
+                    handles it without asking React. That is the entire reason
+                    this is not a `Link`.
+
+                    **The cost is real and accepted**: these four lose prefetch
+                    and client-side transitions, so switching section is a full
+                    load. Worth it — a tab bar that works every time beats one
+                    that is faster once it decides to work. The underlying
+                    ~2.7s hydration window is the actual defect and is tracked
+                    separately; when it is gone this can go back to `Link`.
+                  */
+                  <a
                     key={key}
                     href={href(vehicle.id)}
                     /*
@@ -365,7 +401,7 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                     <Icon className={`h-3.5 w-3.5 ${isActive ? 'text-cyan-400' : 'text-white/40'}`} />
                     {label}
                     {isActive && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400 rounded-t-full" />}
-                  </Link>
+                  </a>
                 );
             })}
           </div>

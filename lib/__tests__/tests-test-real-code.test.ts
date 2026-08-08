@@ -189,6 +189,12 @@ const STATIC_ANALYSIS_SUITES = [
   // service-role key and a push endpoint. What matters is which checks exist
   // and in what order, which is on disk.
   'notify-sweep-route.test.ts',
+  // Reads DashboardLayout's tab block to prove the primary section nav uses
+  // native anchors. The property is a fact about the markup, and neither half
+  // of the bug it pins is observable under jsdom — there is no hydration race
+  // to lose a click to and no navigation to watch. The browser reproduction is
+  // the evidence; this is the ratchet.
+  'dashboard-tabs-native.test.ts',
 ];
 
 /**
