@@ -124,10 +124,10 @@ describe('nextRungs — a handful, not the catalogue', () => {
     ]);
   });
 
-  describe('what the owner said they wanted', () => {
-    it('paces the enabling path for a mild owner rather than hiding it', () => {
-      // Was `.not.toContain`. A downpipe is not an improvement on its own, so
-      // it sorts late — but "never" was an end state, and a build has no end.
+  describe('whether, never how much', () => {
+    it('shows the enabling path whatever was answered', () => {
+      // Was `.not.toContain`, then a pacing assertion. Both were end states —
+      // and the levels that justified them are gone.
       const names = nextRungs({ mods: WRX, mindedness: 'mild', limit: 99 }).map((r) => r.name);
 
       expect(names).toContain('Grimmspeed Downpipe');
@@ -217,8 +217,8 @@ describe('showsModifications', () => {
   });
 });
 
-describe('pacing, not gating', () => {
-  it('still reaches the enabling path for a mild owner', () => {
+describe('one order, for everyone', () => {
+  it('reaches the enabling path whatever the owner answered', () => {
     /*
       This used to be a `filter` that removed `enabling` outright for a mild
       owner — an end state decided from one onboarding answer. A downpipe now
@@ -230,16 +230,19 @@ describe('pacing, not gating', () => {
     expect(names).toContain('Grimmspeed Downpipe');
   });
 
-  it('sinks the enabling part behind cosmetics for a mild owner, and not for a keen one', () => {
+  it('orders identically whatever was answered', () => {
     /*
-      The WRX cannot show this on its own: it has no cosmetic part, so
-      `enabling` and `durability` are already last and adding a constant to both
-      preserves the order. The difference needs something for them to sink
-      *behind*, which is what this fixture supplies.
+      This asserted the opposite an hour ago: `enabling` sank behind cosmetics
+      for a `mild` owner and not for a keen one.
 
-      That is worth stating rather than fixing by picking a different car — a
-      pacing rule whose effect is invisible on four of the five real vehicles is
-      a weak rule, and the next person should know its reach.
+      Three rules stood here in sequence and all three were the same mistake.
+      First a `filter` removed `enabling` outright for a mild owner. Then a
+      pacing constant sank it. Then the levels themselves went — David, 7 Aug:
+      a level *is* an end state, and the dial shows where a car sits without
+      anyone declaring where they mean to stop.
+
+      With no levels there is nothing to pace by, and keeping the rule would
+      have penalised every new owner for answering the only question left.
     */
     const mixed = [
       { name: 'Grimmspeed Downpipe', difficulty: 'Moderate', purpose: 'needed for Stage 2' },
@@ -249,11 +252,13 @@ describe('pacing, not gating', () => {
     const mild = nextRungs({ mods: mixed, mindedness: 'mild', limit: 99 }).map((r) => r.name);
     const keen = nextRungs({ mods: mixed, mindedness: 'aggressive', limit: 99 }).map((r) => r.name);
 
-    expect(mild).toEqual(['Exhaust Tip Upgrade', 'Grimmspeed Downpipe']);
-    expect(keen).toEqual(['Grimmspeed Downpipe', 'Exhaust Tip Upgrade']);
+    expect(mild).toEqual(keen);
+    // Role order still governs: the part that only unlocks a bigger step comes
+    // before the one that changes nothing but the look.
+    expect(mild).toEqual(['Grimmspeed Downpipe', 'Exhaust Tip Upgrade']);
   });
 
-  it('does not change what a mild owner sees first', () => {
+  it('still opens on the prerequisite-free gain', () => {
     // Pacing must not disturb the top of the ladder — the point is still that
     // the cheap, prerequisite-free gain comes first.
     expect(nextRungs({ mods: WRX, mindedness: 'mild' })[0].name).toBe(

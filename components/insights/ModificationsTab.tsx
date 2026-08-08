@@ -133,7 +133,13 @@ export default function ModificationsTab({
         </p>
       </div>
 
-      <TierProgressCard progress={tierProgress} loading={tierProgressLoading} />
+      {/*
+        `TierProgressCard` used to sit here. The dial replaces it: it showed
+        progress toward a *next tier*, which is the end-state framing the
+        continuum removed. Its props are still accepted so the parent needs no
+        change in the same commit, and they are unused on purpose — see the
+        interface.
+      */}
 
       {loadingModNames && activeMods.length === 0 ? (
         <div className="space-y-3">

@@ -169,8 +169,6 @@ const ROLE_ORDER: Record<ModRole, number> = {
 
 const EFFORT_ORDER: Record<string, number> = { Easy: 0, Moderate: 1, Hard: 2 };
 
-/** Enough to sink a role behind every other, without removing it. */
-const LATER = 10;
 
 /**
  * How far a build has gone, from what has actually been completed.
@@ -206,10 +204,14 @@ function rationaleFor(role: ModRole, stage: ReturnType<typeof buildStage>): stri
  * **Returns a handful, not the catalogue**, which is the whole point — a list
  * of everything is what this replaces.
  *
- * `mindedness` **paces rather than narrows**. A `mild` owner still reaches the
- * turbo path; the parts that only exist to enable a bigger engine simply sort
- * behind the ones that improve the car they have. Nothing is withheld, because
- * a build has no end and an onboarding answer is not a verdict.
+ * `mindedness` is now only ever *whether*, never *how much*. Onboarding asks a
+ * yes/no since 7 Aug, because a level is an end state and the dial shows where
+ * a car sits without anyone declaring where they mean to stop.
+ *
+ * There was a pacing rule here — `enabling` and `durability` sank behind
+ * everything else for a `mild` owner. It went with the levels: with no levels
+ * there is no level to pace by, and keeping it would have penalised every new
+ * owner for answering the only question left. One order, for everyone.
  *
  * `stock` gets nothing, and callers should not be asking — `VehicleInsights`
  * hides the surface entirely, and `showsModifications` carries the rule.
@@ -231,25 +233,10 @@ export function nextRungs(params: {
     .filter((mod) => mod?.name && !done.has(mod.name.trim().toLowerCase()))
     .map((mod) => ({ mod, role: classifyMod(mod) }));
 
-  /*
-    Pacing, not gating. For a `mild` owner the parts that exist only to unlock a
-    bigger engine sink behind everything that improves the car they already
-    have — a downpipe is not an improvement on its own. They are still on the
-    ladder, just further along it, and "show the rest" reaches them today.
-
-    This replaced a `filter` that removed them outright. That was an end state:
-    it decided, from one onboarding answer, that this owner would never want
-    them.
-  */
-  const pace = (role: ModRole): number =>
-    mindedness === 'mild' && (role === 'enabling' || role === 'durability')
-      ? ROLE_ORDER[role] + LATER
-      : ROLE_ORDER[role];
-
   return candidates
     .sort(
       (a, b) =>
-        pace(a.role) - pace(b.role) ||
+        ROLE_ORDER[a.role] - ROLE_ORDER[b.role] ||
         (EFFORT_ORDER[a.mod.difficulty ?? 'Moderate'] ?? 1) -
           (EFFORT_ORDER[b.mod.difficulty ?? 'Moderate'] ?? 1) ||
         a.mod.name.localeCompare(b.mod.name)

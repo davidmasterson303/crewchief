@@ -31,6 +31,7 @@ import MaintenanceHistoryDialog from './MaintenanceHistoryDialog';
 import IssuesTab from './insights/IssuesTab';
 import MaintenanceTab from './insights/MaintenanceTab';
 import ModificationsTab from './insights/ModificationsTab';
+import { showsModifications } from '@crewchief/core/mod-progression';
 import type { TierProgress, Tier } from './TierProgressCard';
 
 interface VehicleInsightsProps {
@@ -70,21 +71,19 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
       because until now the onboarding answer only ever narrowed what was shown
       and nothing made the choice consequential. It stays.
 
-      What is new (7 Aug, David) is that `aggressive` puts mods **first**. An
-      owner who said "track-ready, high-performance builds" is not opening the
+      What is new (7 Aug, David) is that anyone who wants modifications gets
+      them **first**. Someone who asked for the surface is not opening the
       dossier to read the maintenance schedule, and making them scroll past two
       tabs to reach the one they came for is the same clutter complaint pointing
       the other way.
 
-      `mild` keeps the existing order. They said tasteful improvements, not that
-      modifications are the point of the car.
+      This briefly keyed on `aggressive` versus `mild`. Those levels are gone —
+      onboarding asks a yes/no now, because a level is an end state — so the
+      rule is simply: asked for it, sees it first.
     */
-    const dossierTabs =
-      vehicle.performance_mindedness === 'stock'
-        ? ['issues', 'maintenance']
-        : vehicle.performance_mindedness === 'aggressive'
-          ? ['mods', 'issues', 'maintenance']
-          : ['issues', 'maintenance', 'mods'];
+    const dossierTabs = showsModifications(vehicle.performance_mindedness)
+      ? ['mods', 'issues', 'maintenance']
+      : ['issues', 'maintenance'];
 
     /*
       The default follows the order rather than being pinned to 'issues'. A
