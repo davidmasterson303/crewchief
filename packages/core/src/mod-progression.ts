@@ -46,6 +46,36 @@
 
 export type ModRole = 'foundation' | 'enabling' | 'control' | 'durability' | 'cosmetic';
 
+/** The difficulty tiers `getModTier` derives from `common_mods[].difficulty`. */
+export type ModTier = 'mild' | 'moderate' | 'aggressive';
+
+/**
+ * Is there anything to show this owner at all?
+ *
+ * ── There is no ceiling, because a build has no end ─────────────────────────
+ *
+ * This was `tierCeiling`, and it stopped a `mild` owner at `moderate` on the
+ * reading that "tasteful improvements, nothing crazy" described where they
+ * would finish. David, 7 Aug: *"I don't like the idea of end states anymore.
+ * It's a continuum. There's almost always something more you can do."*
+ *
+ * He is right, and the ceiling was the wrong shape twice over. It hard-coded a
+ * finish line nobody drew, and it made the onboarding answer a permanent verdict
+ * on a question people change their mind about — the whole reason the tab gate
+ * needs a way back.
+ *
+ * So nothing is withheld. `performance_mindedness` changes **what surfaces
+ * first**, not what exists: see `ROLE_ORDER` and the pacing below. The handful
+ * `nextRungs` returns is the pacing mechanism, and "show the rest" is always one
+ * click away.
+ *
+ * `stock` is the one genuine off switch, and it is "not now" rather than
+ * "never" — which is exactly why it owes the owner a way to turn it back on.
+ */
+export function showsModifications(mindedness: string | null | undefined): boolean {
+  return mindedness !== 'stock';
+}
+
 export interface ModCandidate {
   name: string;
   purpose?: string;
@@ -139,6 +169,9 @@ const ROLE_ORDER: Record<ModRole, number> = {
 
 const EFFORT_ORDER: Record<string, number> = { Easy: 0, Moderate: 1, Hard: 2 };
 
+/** Enough to sink a role behind every other, without removing it. */
+const LATER = 10;
+
 /**
  * How far a build has gone, from what has actually been completed.
  *
@@ -173,10 +206,13 @@ function rationaleFor(role: ModRole, stage: ReturnType<typeof buildStage>): stri
  * **Returns a handful, not the catalogue**, which is the whole point — a list
  * of everything is what this replaces.
  *
- * `mindedness` narrows rather than reorders. A `mild` owner is not shown the
- * turbo path: they said tasteful improvements, and a ladder that ends at a
- * built engine is not that. `stock` gets nothing, and callers should not be
- * asking — `VehicleInsights` already hides the surface entirely.
+ * `mindedness` **paces rather than narrows**. A `mild` owner still reaches the
+ * turbo path; the parts that only exist to enable a bigger engine simply sort
+ * behind the ones that improve the car they have. Nothing is withheld, because
+ * a build has no end and an onboarding answer is not a verdict.
+ *
+ * `stock` gets nothing, and callers should not be asking — `VehicleInsights`
+ * hides the surface entirely, and `showsModifications` carries the rule.
  */
 export function nextRungs(params: {
   mods: ModCandidate[];
@@ -193,19 +229,27 @@ export function nextRungs(params: {
 
   const candidates = mods
     .filter((mod) => mod?.name && !done.has(mod.name.trim().toLowerCase()))
-    .map((mod) => ({ mod, role: classifyMod(mod) }))
-    /*
-      A `mild` owner keeps the roles that improve the car they have and drops
-      the ones that only exist to enable a bigger one. `enabling` is the whole
-      of that distinction: a downpipe is not an improvement on its own, it is a
-      prerequisite for a step this owner said they do not want.
-    */
-    .filter(({ role }) => (mindedness === 'mild' ? role !== 'enabling' : true));
+    .map((mod) => ({ mod, role: classifyMod(mod) }));
+
+  /*
+    Pacing, not gating. For a `mild` owner the parts that exist only to unlock a
+    bigger engine sink behind everything that improves the car they already
+    have — a downpipe is not an improvement on its own. They are still on the
+    ladder, just further along it, and "show the rest" reaches them today.
+
+    This replaced a `filter` that removed them outright. That was an end state:
+    it decided, from one onboarding answer, that this owner would never want
+    them.
+  */
+  const pace = (role: ModRole): number =>
+    mindedness === 'mild' && (role === 'enabling' || role === 'durability')
+      ? ROLE_ORDER[role] + LATER
+      : ROLE_ORDER[role];
 
   return candidates
     .sort(
       (a, b) =>
-        ROLE_ORDER[a.role] - ROLE_ORDER[b.role] ||
+        pace(a.role) - pace(b.role) ||
         (EFFORT_ORDER[a.mod.difficulty ?? 'Moderate'] ?? 1) -
           (EFFORT_ORDER[b.mod.difficulty ?? 'Moderate'] ?? 1) ||
         a.mod.name.localeCompare(b.mod.name)

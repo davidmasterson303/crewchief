@@ -14,6 +14,7 @@ import { checkStoredPhotoSize } from '@crewchief/core/image-resize';
 import { budgetMessage, demoBudgetMessage } from '@crewchief/core/ai/budget';
 import { VEHICLE_RESEARCH_PROMPT, POWERTRAIN_OPTIONS_PROMPT, CONSULTANT_SYSTEM_PROMPT, CONSULTANT_DOCUMENT_VALIDATION_PROMPT } from '@crewchief/core/prompts';
 import { VehicleDataSchema } from '@crewchief/core/vehicle-utils';
+import { showsModifications } from '@crewchief/core/mod-progression';
 import { logger } from '@crewchief/core/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { recomputePerformanceStats } from '@/lib/performance-stats';
@@ -5376,17 +5377,46 @@ export async function getModsForEarnedTier(
 
     const client = getServiceRoleClient();
 
-    const [knowledgeRes, trackingRes, cacheRes] = await Promise.all([
+    const [knowledgeRes, trackingRes, cacheRes, vehicleRes] = await Promise.all([
       client.from('vehicle_knowledge_base').select('common_mods').eq('vehicle_id', vehicleId).maybeSingle(),
       client.from('modification_tracking').select('mod_name, status, tier, is_backfill').eq('vehicle_id', vehicleId).eq('tier', tier),
       client.from('performance_mod_cache').select('mods_data').eq('vehicle_id', vehicleId).eq('performance_goal', tier).maybeSingle(),
+      client.from('vehicles').select('performance_mindedness').eq('id', vehicleId).maybeSingle(),
     ]);
 
     const allMods: any[] = knowledgeRes.data?.common_mods || [];
     const tracking: any[] = trackingRes.data || [];
 
-    // Base mods for this tier
-    const tierMods = allMods.filter((m: any) => getModTier(m.difficulty) === tier);
+    /*
+      ── The ceiling is what the owner asked for, not what they have earned ────
+
+      This filtered `getModTier(m.difficulty) === tier` against
+      `vehicles.earned_tier` — **exactly** that tier rather than up to it.
+
+      Measured on the live database, 7 Aug: every vehicle sits at
+      `earned_tier: 'mild'` bar one, so the WRX owner — who answered
+      "track-ready, high-performance builds" in onboarding — was shown **one
+      modification out of five**. Its downpipe, brake kit, sway bars and rod
+      bolts were all filtered out as too difficult for a tier they had no way to
+      leave: you advance by completing mods, and `modification_tracking` is
+      empty across the entire product, so nobody ever advanced.
+
+      A progression that cannot progress is a gate.
+
+      **And there is no ceiling either** — David, 7 Aug: a build is a continuum,
+      not a set of end states, so nothing is withheld on the strength of one
+      onboarding answer. `performance_mindedness` decides *whether* there is a
+      mods surface at all and, through `nextRungs`, what surfaces first.
+      `earned_tier` marks progress rather than withholding.
+
+      `tier` still scopes the tracking and cache reads below, because those are
+      genuinely per-tier records. Only the *visible list* is widened, so a mod
+      above the earned tier renders without cached analysis rather than not at
+      all — "No analysis yet" is a true statement and an invisible mod is not.
+    */
+    const tierMods = showsModifications(vehicleRes.data?.performance_mindedness)
+      ? allMods
+      : [];
 
     // Backfill mods that were generated for this tier
     const backfillTracking = tracking.filter((t) => t.is_backfill);

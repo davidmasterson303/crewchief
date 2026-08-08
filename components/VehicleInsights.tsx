@@ -60,7 +60,37 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
     const [earnedTier, setEarnedTier] = useState<Tier>((vehicle.earned_tier || 'mild') as Tier);
     const [tierProgress, setTierProgress] = useState<TierProgress | null>(null);
     const [tierProgressLoading, setTierProgressLoading] = useState(false);
-    const [dossierTab, setDossierTab] = useState('issues');
+    /*
+      ── Which dossier tabs exist, and in what order ─────────────────────────
+
+      Driven by the owner's own onboarding answer rather than fixed.
+
+      `stock` has hidden the mods tab since it was written, and that gate has
+      **never once fired** — no vehicle in the product has ever been `stock`,
+      because until now the onboarding answer only ever narrowed what was shown
+      and nothing made the choice consequential. It stays.
+
+      What is new (7 Aug, David) is that `aggressive` puts mods **first**. An
+      owner who said "track-ready, high-performance builds" is not opening the
+      dossier to read the maintenance schedule, and making them scroll past two
+      tabs to reach the one they came for is the same clutter complaint pointing
+      the other way.
+
+      `mild` keeps the existing order. They said tasteful improvements, not that
+      modifications are the point of the car.
+    */
+    const dossierTabs =
+      vehicle.performance_mindedness === 'stock'
+        ? ['issues', 'maintenance']
+        : vehicle.performance_mindedness === 'aggressive'
+          ? ['mods', 'issues', 'maintenance']
+          : ['issues', 'maintenance', 'mods'];
+
+    /*
+      The default follows the order rather than being pinned to 'issues'. A
+      first tab that is not the selected one reads as a rendering bug.
+    */
+    const [dossierTab, setDossierTab] = useState(dossierTabs[0]);
     const [loadingModNames, setLoadingModNames] = useState(false);
     const [isAutoResearching, setIsAutoResearching] = useState(false);
     const autoResearchRef = useRef(false);
@@ -474,8 +504,8 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
           </CardHeader>
           <CardContent>
             <Tabs value={dossierTab} onValueChange={setDossierTab} className="w-full">
-              <TabsList className={`grid w-full ${vehicle.performance_mindedness === 'stock' ? 'grid-cols-2' : 'grid-cols-3'} mb-4 bg-white/4 border border-white/8 p-0.5 rounded-xl`}>
-                {(['issues', 'maintenance', ...(vehicle.performance_mindedness !== 'stock' ? ['mods'] : [])] as string[]).map((tabVal) => {
+              <TabsList className={`grid w-full ${dossierTabs.length === 2 ? 'grid-cols-2' : 'grid-cols-3'} mb-4 bg-white/4 border border-white/8 p-0.5 rounded-xl`}>
+                {dossierTabs.map((tabVal) => {
                   const isActive = dossierTab === tabVal;
                   const tabConfig = {
                     issues:      { Icon: AlertCircle, label: 'Issues',      count: knownIssues.length },

@@ -1,0 +1,162 @@
+/**
+ * How far a build has come — a position, never a percentage.
+ *
+ * @jest-environment node
+ *
+ * David, 7 Aug: *"I don't like the idea of end states anymore. It's a
+ * continuum. There's almost always something more you can do"* — and then a
+ * sport dial to show it.
+ *
+ * The tension in that brief is real: a dial has a redline, a continuum does
+ * not. Most of this file is the resolution — the needle approaches 100 and
+ * never arrives, so the glass itself says there is more to do.
+ */
+
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+import {
+  buildPosition,
+  buildSummary,
+  effortOf,
+  needleFor,
+} from '@crewchief/core/build-progress';
+import { TRACK, VIEW_H, VIEW_W, angleFor } from '@crewchief/core/cluster-geometry';
+
+/** The WRX's five parts — Easy, Moderate ×3, Hard. 1 + 9 + 6 = 16. */
+const WRX = [
+  { difficulty: 'Easy' },
+  { difficulty: 'Moderate' },
+  { difficulty: 'Moderate' },
+  { difficulty: 'Moderate' },
+  { difficulty: 'Hard' },
+];
+
+describe('the dial never reaches the end', () => {
+  it('never returns 100, however much has been done', () => {
+    // The whole argument, as an assertion. A progress bar that fills says
+    // "finished"; this cannot.
+    const absurd = Array.from({ length: 200 }, () => ({ difficulty: 'Hard' }));
+
+    expect(needleFor(10_000)).toBeLessThan(100);
+    expect(buildPosition(absurd).needle).toBeLessThan(100);
+  });
+
+  it('reads zero for a car with nothing recorded', () => {
+    expect(buildPosition([]).needle).toBe(0);
+  });
+
+  it('leaves visible headroom after a full pass of the known list', () => {
+    /*
+      Completing everything the WRX's knowledge base knows about should read as
+      a long way along and visibly unfinished — if it pegged the dial, the
+      catalogue would have become an end state by the back door.
+    */
+    const { needle } = buildPosition(WRX);
+
+    expect(needle).toBeGreaterThan(50);
+    expect(needle).toBeLessThan(80);
+  });
+
+  it('always climbs — more work never reads as less', () => {
+    let previous = -1;
+    for (const points of [0, 1, 3, 6, 12, 22, 40, 100]) {
+      const now = needleFor(points);
+      expect(now).toBeGreaterThanOrEqual(previous);
+      previous = now;
+    }
+  });
+});
+
+describe('effortOf', () => {
+  it('is superlinear, because a built engine is not three air filters', () => {
+    expect(effortOf('Hard')).toBeGreaterThan(effortOf('Moderate') * 1.5);
+  });
+
+  it.each([[null], [undefined], ['Unknown'], ['']])(
+    'scores %p as Moderate rather than nothing',
+    (value) => {
+      // Scoring an oddly-described mod at zero would quietly punish the owners
+      // with the most unusual builds — the people this feature is for.
+      expect(effortOf(value as string)).toBe(effortOf('Moderate'));
+    }
+  );
+});
+
+describe('zones', () => {
+  it('calls an untouched car stock', () => {
+    expect(buildPosition([]).zone).toBe('stock');
+  });
+
+  it('moves off stock on the first completed mod', () => {
+    expect(buildPosition([{ difficulty: 'Easy' }]).zone).toBe('lightly-modified');
+  });
+
+  it('has no terminal zone — built is a floor, not a ceiling', () => {
+    const heavy = buildPosition(Array.from({ length: 20 }, () => ({ difficulty: 'Hard' })));
+    const heavier = buildPosition(Array.from({ length: 40 }, () => ({ difficulty: 'Hard' })));
+
+    expect(heavy.zone).toBe('built');
+    expect(heavier.zone).toBe('built');
+    // Same word, further along the dial. The zone stops describing; the needle
+    // does not stop moving.
+    expect(heavier.needle).toBeGreaterThanOrEqual(heavy.needle);
+  });
+});
+
+describe('buildSummary', () => {
+  it('tells an untouched car how the dial moves', () => {
+    expect(buildSummary(buildPosition([]), 3)).toMatch(/mark work installed/);
+  });
+
+  it('says plainly when the owner has outrun the list', () => {
+    // Not "complete". There is no complete.
+    expect(buildSummary(buildPosition(WRX), 0)).toMatch(/outrun|keeps going/);
+  });
+
+  it('never says a percentage or a completion', () => {
+    const claims = [
+      buildSummary(buildPosition([]), 3),
+      buildSummary(buildPosition(WRX), 2),
+      buildSummary(buildPosition(WRX), 0),
+    ];
+
+    for (const claim of claims) {
+      expect(claim).not.toMatch(/%|complete|finished|100/i);
+    }
+  });
+});
+
+/**
+ * The build dial and the health dial must stay the same instrument.
+ *
+ * `BuildGauge` reads its geometry from `@crewchief/core/cluster-geometry`.
+ * `ClusterGauge` still carries its own literals, deliberately — it works, it is
+ * covered, and rewriting a shipped component to prove a point about duplication
+ * is how a working thing breaks.
+ *
+ * So this pins them instead. If either moves, the two gauges stop being one
+ * instrument and the cluster reads as two unrelated widgets.
+ */
+describe('one instrument, two readings', () => {
+  const gauge = readFileSync(
+    join(__dirname, '..', '..', 'components', 'ClusterGauge.tsx'),
+    'utf8'
+  );
+
+  it('shares the arc path', () => {
+    expect(gauge).toContain('M 50.5 149.5 A ${R} ${R} 0 1 1 149.5 149.5');
+    expect(TRACK).toBe('M 50.5 149.5 A 70 70 0 1 1 149.5 149.5');
+  });
+
+  it('shares the viewBox', () => {
+    expect(gauge).toContain(`const VIEW_W = ${VIEW_W}`);
+    expect(gauge).toContain(`const VIEW_H = ${VIEW_H}`);
+  });
+
+  it('shares the angle conversion', () => {
+    expect(gauge).toContain('2.7 * score - 135');
+    expect(angleFor(0)).toBe(-135);
+    expect(angleFor(100)).toBe(135);
+  });
+});

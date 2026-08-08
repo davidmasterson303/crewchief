@@ -15,6 +15,7 @@ import {
   classifyMod,
   nextRungs,
   progressionSummary,
+  showsModifications,
 } from '@crewchief/core/mod-progression';
 
 /** 2018 Honda Accord Sport 1.5T — `mild`. */
@@ -124,12 +125,12 @@ describe('nextRungs — a handful, not the catalogue', () => {
   });
 
   describe('what the owner said they wanted', () => {
-    it('hides the enabling path from a mild owner', () => {
-      // A downpipe is not an improvement on its own — it is a prerequisite for
-      // a step this owner said they do not want.
+    it('paces the enabling path for a mild owner rather than hiding it', () => {
+      // Was `.not.toContain`. A downpipe is not an improvement on its own, so
+      // it sorts late — but "never" was an end state, and a build has no end.
       const names = nextRungs({ mods: WRX, mindedness: 'mild', limit: 99 }).map((r) => r.name);
 
-      expect(names).not.toContain('Grimmspeed Downpipe');
+      expect(names).toContain('Grimmspeed Downpipe');
       expect(names).toContain('COBB Accessport Stage 1 Tune');
     });
 
@@ -185,5 +186,78 @@ describe('progressionSummary', () => {
 
   it('does not claim a finished build when the car simply has no mods listed', () => {
     expect(progressionSummary([], [])).toBe('No modifications on record for this car yet.');
+  });
+});
+
+/**
+ * There is no ceiling, because a build has no end.
+ *
+ * `getModsForEarnedTier` filtered on `getModTier(difficulty) === earned_tier`,
+ * exactly rather than up to. Measured live 7 Aug: every car sat at
+ * `earned_tier: 'mild'` bar one, so the WRX owner — who answered "track-ready,
+ * high-performance builds" — was shown **one modification out of five**, with
+ * the only exit being a table that is empty across the entire product.
+ *
+ * The first fix replaced that with a ceiling from `performance_mindedness`.
+ * David, 7 Aug: *"I don't like the idea of end states anymore. It's a
+ * continuum. There's almost always something more you can do."* So the ceiling
+ * went too. Nothing is withheld; `mindedness` paces what surfaces first.
+ */
+describe('showsModifications', () => {
+  it.each([['mild'], ['aggressive'], ['moderate'], [null], [undefined], ['']])(
+    'shows the surface for %p',
+    (value) => {
+      // Everything except an explicit "not now" gets the ladder.
+      expect(showsModifications(value as string)).toBe(true);
+    }
+  );
+
+  it('is the one genuine off switch', () => {
+    expect(showsModifications('stock')).toBe(false);
+  });
+});
+
+describe('pacing, not gating', () => {
+  it('still reaches the enabling path for a mild owner', () => {
+    /*
+      This used to be a `filter` that removed `enabling` outright for a mild
+      owner — an end state decided from one onboarding answer. A downpipe now
+      sorts behind everything that improves the car they already have, and is
+      reachable rather than absent.
+    */
+    const names = nextRungs({ mods: WRX, mindedness: 'mild', limit: 99 }).map((r) => r.name);
+
+    expect(names).toContain('Grimmspeed Downpipe');
+  });
+
+  it('sinks the enabling part behind cosmetics for a mild owner, and not for a keen one', () => {
+    /*
+      The WRX cannot show this on its own: it has no cosmetic part, so
+      `enabling` and `durability` are already last and adding a constant to both
+      preserves the order. The difference needs something for them to sink
+      *behind*, which is what this fixture supplies.
+
+      That is worth stating rather than fixing by picking a different car — a
+      pacing rule whose effect is invisible on four of the five real vehicles is
+      a weak rule, and the next person should know its reach.
+    */
+    const mixed = [
+      { name: 'Grimmspeed Downpipe', difficulty: 'Moderate', purpose: 'needed for Stage 2' },
+      { name: 'Exhaust Tip Upgrade', difficulty: 'Easy', purpose: 'Cosmetic enhancement' },
+    ];
+
+    const mild = nextRungs({ mods: mixed, mindedness: 'mild', limit: 99 }).map((r) => r.name);
+    const keen = nextRungs({ mods: mixed, mindedness: 'aggressive', limit: 99 }).map((r) => r.name);
+
+    expect(mild).toEqual(['Exhaust Tip Upgrade', 'Grimmspeed Downpipe']);
+    expect(keen).toEqual(['Grimmspeed Downpipe', 'Exhaust Tip Upgrade']);
+  });
+
+  it('does not change what a mild owner sees first', () => {
+    // Pacing must not disturb the top of the ladder — the point is still that
+    // the cheap, prerequisite-free gain comes first.
+    expect(nextRungs({ mods: WRX, mindedness: 'mild' })[0].name).toBe(
+      'COBB Accessport Stage 1 Tune'
+    );
   });
 });
