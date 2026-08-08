@@ -13,6 +13,21 @@
  * itself was defined twice, and `MaintenanceScheduleItem` described a structured
  * shape nothing produced. A second declaration is only defensible when something
  * breaks the moment the two disagree.
+ *
+ * ── One schema again, as of `c2c5af8` ───────────────────────────────────────
+ *
+ * This file used to carry two: `MileageEntrySchema` for what the real schema
+ * accepted, and `TimeOnlyEntrySchema` for what it dropped. The split existed
+ * because `isUsableScheduleEntry` required `interval_miles > 0`, so a brake-fluid
+ * entry — time interval, no mileage — was filtered out before validation ever
+ * ran, silently, with an empty array as the only symptom. `evaluateSchedule` had
+ * already learned to read months; the write side had not, and the backfill routed
+ * around it.
+ *
+ * `c2c5af8` fixed the write side: `isUsableScheduleEntry` now accepts *either*
+ * interval and applies `Number.isFinite` to both. The route-around is obsolete,
+ * so the two schemas collapse back into the one they were mirroring. A time-only
+ * entry now goes through the same door as everything else.
  */
 
 import { z } from 'zod';
@@ -30,68 +45,69 @@ const ServiceName = z.string().refine((s) => s.trim().length > 0, {
 });
 
 /**
- * A mileage interval, held to the rule `isUsableScheduleEntry` actually applies.
+ * An interval, held to the rule `isPositiveInterval` actually applies.
  *
  * `positive()` rather than `nonnegative()` for the reason the real schema gives:
  * a 0-mile interval is a service due at zero miles, overdue on every car
- * forever.
+ * forever. 0 months is the same trap said in the other unit.
  *
- * `finite()` because `positive()` alone accepts `Infinity` — also caught by the
- * equivalence test, and the real filter's `Number.isFinite` rejects it. An
- * infinite interval is a service that comes due never, which reads as "handled"
- * on a screen whose whole job is to say when things are due.
+ * `finite()` because `positive()` alone accepts `Infinity` — which is a number,
+ * passes every check this file carried before, and describes a service that is
+ * never due. That reads as "handled" on a screen whose whole job is to say when
+ * things are due. The real schema applies `.finite()` to both fields as of
+ * `c2c5af8`; this is no longer the one place the two deliberately differ.
  */
-const IntervalNumber = z.number().positive().finite();
+const Interval = z.number().positive().finite();
 
-/** A service with a mileage interval — what `VehicleDataSchema` accepts today. */
-export const MileageEntrySchema = z.object({
-  service: ServiceName,
-  interval_miles: IntervalNumber,
-  interval_months: IntervalNumber.nullable().optional(),
-  description: z.string().optional().default(''),
-  priority: z.enum(['Critical', 'Recommended', 'Optional']),
-});
+/** Present, absent, or explicitly absent — `null` is how the backfill writes "no mileage". */
+const OptionalInterval = Interval.nullable().optional();
 
 /**
- * A service with only a time interval — what `VehicleDataSchema` does **not**
- * accept, and the reason this file has two schemas instead of one.
+ * One schedule entry, mirroring `VehicleDataSchema.maintenance_schedule` and the
+ * `isUsableScheduleEntry` filter that runs in front of it.
  *
- * `c09ccf8` taught the read side about `interval_months`: `evaluateSchedule`
- * treats a time-only service as first-class and returns `unknown` rather than
- * dropping it. The write side did not move with it. `VehicleDataSchema`
- * preprocesses the array through `isUsableScheduleEntry`, which requires
- * `interval_miles > 0`, so a brake-fluid entry validated through it is filtered
- * out before validation ever runs — silently, and with an empty array as the
- * only symptom.
- *
- * All four cars in the product have a time-only brake-fluid entry. Sending them
- * through the real schema on the way in would delete the exact rows c09ccf8 was
- * written to save.
- *
- * The rules are otherwise identical: a positive number of months, never 0,
- * because 0 months means due immediately — the same trap as `interval_miles: 0`.
+ * The `refine` is that filter's surviving half: an entry needs at least one real
+ * interval. Note what is deliberately *not* here — no coercion. An entry whose
+ * `interval_miles` is the string `"7500"` is rejected rather than quietly read
+ * as a time-only entry, which is what the two-schema version did to it.
  */
-export const TimeOnlyEntrySchema = z.object({
-  service: ServiceName,
-  interval_miles: z.null(),
-  interval_months: IntervalNumber,
-  description: z.string().optional().default(''),
-  priority: z.enum(['Critical', 'Recommended', 'Optional']),
-});
+export const ScheduleEntrySchema = z
+  .object({
+    service: ServiceName,
+    interval_miles: OptionalInterval,
+    interval_months: OptionalInterval,
+    description: z.string().optional().default(''),
+    priority: z.enum(['Critical', 'Recommended', 'Optional']),
+  })
+  .refine(
+    (entry) =>
+      typeof entry.interval_miles === 'number' || typeof entry.interval_months === 'number',
+    { message: 'neither a mileage nor a time interval could be read' }
+  );
 
 /**
- * Validate one composed entry down whichever branch it belongs to.
+ * Validate one composed entry.
  *
  * Returns the value to write, or the reason it cannot be written. An entry that
  * carries neither interval is a failure rather than a silent drop: the service
  * exists on the row today and losing it to a backfill would be a regression,
  * so the caller keeps the original legacy object instead.
+ *
+ * `path` is for the dry run's benefit — it says which kind of entry this turned
+ * out to be, so a report can group time-only services separately from mileage
+ * ones without re-deriving it.
  */
 export function validateEntry(entry) {
+  /*
+    `?? null` normalises a missing field to the explicit `null` the column
+    stores. It deliberately does not touch a value of the wrong *type*: turning
+    `"7500"` into `null` would convert a malformed mileage entry into a
+    well-formed time-only one, which is a silent corruption rather than a fix.
+  */
   const candidate = {
     service: entry.service,
-    interval_miles: entry.interval_miles,
-    interval_months: entry.interval_months,
+    interval_miles: entry.interval_miles ?? null,
+    interval_months: entry.interval_months ?? null,
     description: entry.description,
     priority: entry.priority,
   };
@@ -99,19 +115,12 @@ export function validateEntry(entry) {
   const explain = (error) =>
     error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`).join('; ');
 
-  if (typeof candidate.interval_miles === 'number') {
-    const result = MileageEntrySchema.safeParse(candidate);
-    return result.success
-      ? { ok: true, value: result.data, path: 'mileage' }
-      : { ok: false, why: explain(result.error) };
-  }
+  const result = ScheduleEntrySchema.safeParse(candidate);
+  if (!result.success) return { ok: false, why: explain(result.error) };
 
-  if (typeof candidate.interval_months === 'number') {
-    const result = TimeOnlyEntrySchema.safeParse({ ...candidate, interval_miles: null });
-    return result.success
-      ? { ok: true, value: result.data, path: 'time-only' }
-      : { ok: false, why: explain(result.error) };
-  }
-
-  return { ok: false, why: 'neither a mileage nor a time interval could be read' };
+  return {
+    ok: true,
+    value: result.data,
+    path: typeof result.data.interval_miles === 'number' ? 'mileage' : 'time-only',
+  };
 }

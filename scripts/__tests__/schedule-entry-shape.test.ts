@@ -7,18 +7,18 @@
  * safe rather than merely convenient: both are run against the same cases, and
  * a change to either that the other does not follow turns this red.
  *
- * ── The second half of this file is a ratchet, not a description ────────────
+ * ── The ratchet fired, and has been removed ─────────────────────────────────
  *
- * It asserts that the real schema currently *drops* a time-only entry. That is
- * a bug, it is documented as one, and the backfill routes around it. The test
- * exists so the day someone fixes `isUsableScheduleEntry` this file fails and
- * says where the workaround lives — rather than the workaround quietly
- * outliving the problem, which is how a temporary route around a defect becomes
- * permanent.
+ * The second half of this file used to assert that the real schema *dropped* a
+ * time-only entry — a documented bug the backfill routed around, with a test
+ * whose whole job was to fail the day someone fixed it. `c2c5af8` fixed it:
+ * `isUsableScheduleEntry` accepts either interval and applies `Number.isFinite`
+ * to both. The ratchet fired, the route-around is gone, and what is left here is
+ * a description rather than a countdown.
  */
 
 import { VehicleDataSchema } from '@crewchief/core/vehicle-utils';
-import { MileageEntrySchema, validateEntry } from '../lib/schedule-entry-shape.mjs';
+import { ScheduleEntrySchema, validateEntry } from '../lib/schedule-entry-shape.mjs';
 
 const OIL = {
   service: 'Engine oil and filter',
@@ -28,21 +28,39 @@ const OIL = {
   priority: 'Critical' as const,
 };
 
-/** The real schema, asked about one entry: does it survive to the other side? */
+/**
+ * The real schema, asked about one entry: does it survive to the other side?
+ *
+ * Three outcomes, not two, and the `catch` is the reason this comment exists.
+ * `isUsableScheduleEntry` runs as a `preprocess` filter, so an entry it rejects
+ * is *removed* — no error, an empty array. But since `c2c5af8` an entry can pass
+ * that filter on one interval and then fail validation on the other: `{miles: 0,
+ * months: 12}` is usable by the filter's reckoning and rejected by
+ * `z.number().positive()`, which throws for the whole payload.
+ *
+ * Dropped and rejected are very different for a caller. They are the same answer
+ * to the only question this file asks — may the backfill write this? — so both
+ * are `false` here, and the distinction is pinned by its own test below rather
+ * than swallowed by this `catch`.
+ */
 function realSchemaKeeps(entry: unknown): boolean {
-  const parsed = VehicleDataSchema.parse({
-    known_issues: [{ part: 'x', mileage_range: 'y', severity: 'Low', description: 'z' }],
-    maintenance_schedule: [entry],
-  });
-  return parsed.maintenance_schedule.length === 1;
+  try {
+    const parsed = VehicleDataSchema.parse({
+      known_issues: [{ part: 'x', mileage_range: 'y', severity: 'Low', description: 'z' }],
+      maintenance_schedule: [entry],
+    });
+    return parsed.maintenance_schedule.length === 1;
+  } catch {
+    return false;
+  }
 }
 
 /** The mirror, asked the same question. */
 function mirrorKeeps(entry: any): boolean {
-  return MileageEntrySchema.safeParse(entry).success;
+  return ScheduleEntrySchema.safeParse(entry).success;
 }
 
-describe('the mirror agrees with VehicleDataSchema on mileage entries', () => {
+describe('the mirror agrees with VehicleDataSchema', () => {
   it.each([
     ['a complete entry', OIL, true],
     ['no time interval', { ...OIL, interval_months: undefined }, true],
@@ -53,6 +71,16 @@ describe('the mirror agrees with VehicleDataSchema on mileage entries', () => {
     ['an infinite mileage interval', { ...OIL, interval_miles: Infinity }, false],
     ['a NaN mileage interval', { ...OIL, interval_miles: NaN }, false],
     ['a blank service name', { ...OIL, service: '   ' }, false],
+    /*
+      Below the line: entries with no mileage at all. Before `c2c5af8` every one
+      of these was `false` on the real schema and the backfill carried a second
+      schema to write them anyway. They are ordinary cases now.
+    */
+    ['a time-only entry', { ...OIL, interval_miles: null }, true],
+    ['a time-only entry with no mileage field', { ...OIL, interval_miles: undefined }, true],
+    ['a zero time interval and no mileage', { ...OIL, interval_miles: null, interval_months: 0 }, false],
+    ['an infinite time interval', { ...OIL, interval_months: Infinity }, false],
+    ['neither interval', { ...OIL, interval_miles: null, interval_months: null }, false],
   ])('%s', (_label, entry, expected) => {
     // The mirror is only trustworthy if it answers exactly as the real schema
     // does. Asserting both against `expected` rather than against each other
@@ -64,32 +92,36 @@ describe('the mirror agrees with VehicleDataSchema on mileage entries', () => {
   it('defaults a missing description rather than losing the entry', () => {
     const { description: _dropped, ...noDescription } = OIL;
 
-    expect(MileageEntrySchema.parse(noDescription).description).toBe('');
+    expect(ScheduleEntrySchema.parse(noDescription).description).toBe('');
     expect(realSchemaKeeps(noDescription)).toBe(true);
   });
 
-  it('is deliberately stricter than the real schema on an infinite interval_months', () => {
+  it('rejects rather than drops when one interval is usable and the other is malformed', () => {
     /*
-      The one place the two are allowed to differ, recorded here rather than
-      left to be discovered.
+      The distinction `realSchemaKeeps` flattens, recorded here so it is a known
+      property rather than a surprise in production.
 
-      `isUsableScheduleEntry` applies `Number.isFinite` to `interval_miles` and
-      nothing at all to `interval_months`, and the inner `z.number().positive()`
-      accepts `Infinity`. So the real schema keeps a service due in infinity
-      months. That was harmless while `evaluateSchedule` never read the field.
-      `c09ccf8` made it load-bearing and the write-side discipline did not
-      follow — `statusForMonths(Infinity)` returns `later`, so the service
-      renders as fine, forever.
-
-      The backfill will not write one. Worth fixing in the schema too, at which
-      point this test becomes an equivalence case like the rest.
+      A blank service is removed by the filter — the payload parses, one entry
+      short. A malformed `interval_miles` alongside a valid `interval_months`
+      now survives the filter and fails validation, so the *whole vehicle
+      payload* throws. Louder than the silent drop it replaced, and better for
+      it, but a caller that parses a research response has to expect a throw
+      where it previously got a shorter array.
     */
-    expect(realSchemaKeeps({ ...OIL, interval_months: Infinity })).toBe(true);
-    expect(mirrorKeeps({ ...OIL, interval_months: Infinity })).toBe(false);
+    const payload = (entry: unknown) => ({
+      known_issues: [{ part: 'x', mileage_range: 'y', severity: 'Low', description: 'z' }],
+      maintenance_schedule: [entry],
+    });
+
+    expect(() => VehicleDataSchema.parse(payload({ ...OIL, service: '   ' }))).not.toThrow();
+    expect(VehicleDataSchema.parse(payload({ ...OIL, service: '   ' })).maintenance_schedule)
+      .toHaveLength(0);
+
+    expect(() => VehicleDataSchema.parse(payload({ ...OIL, interval_miles: 0 }))).toThrow();
   });
 });
 
-describe('time-only entries: the gap the backfill routes around', () => {
+describe('time-only entries', () => {
   const BRAKE_FLUID = {
     service: 'Brake fluid flush',
     interval_miles: null,
@@ -98,26 +130,20 @@ describe('time-only entries: the gap the backfill routes around', () => {
     priority: 'Critical' as const,
   };
 
-  it('RATCHET: VehicleDataSchema still drops them — delete this when that is fixed', () => {
-    /*
-      `isUsableScheduleEntry` requires `interval_miles > 0` and runs as a
-      `preprocess` filter, so this entry is removed before validation rather
-      than rejected by it. No error, no warning, an empty array.
-
-      When this expectation flips to 1, `isUsableScheduleEntry` has learned
-      about time and the backfill should validate everything through the real
-      schema again — see `TimeOnlyEntrySchema` in
-      `scripts/lib/schedule-entry-shape.mjs`.
-    */
+  it('survives the real schema now, which is the whole point of c2c5af8', () => {
     const parsed = VehicleDataSchema.parse({
       known_issues: [{ part: 'x', mileage_range: 'y', severity: 'Low', description: 'z' }],
       maintenance_schedule: [BRAKE_FLUID],
     });
 
-    expect(parsed.maintenance_schedule).toHaveLength(0);
+    expect(parsed.maintenance_schedule).toHaveLength(1);
+    expect(parsed.maintenance_schedule[0]).toMatchObject({
+      interval_miles: null,
+      interval_months: 24,
+    });
   });
 
-  it('the backfill keeps them, because evaluateSchedule now reads months', () => {
+  it('the backfill writes it through the same door as everything else', () => {
     const result = validateEntry(BRAKE_FLUID);
 
     expect(result.ok).toBe(true);
@@ -134,5 +160,18 @@ describe('time-only entries: the gap the backfill routes around', () => {
 
     expect(result.ok).toBe(false);
     expect(result.why).toMatch(/neither/);
+  });
+
+  it('will not read a malformed mileage as an absent one', () => {
+    /*
+      The two-schema version fell through to its time-only branch on anything
+      `interval_miles` was not a number, so `"7500"` was written as a service
+      with no mileage interval at all — a silent downgrade of the exact field
+      the backfill exists to populate.
+    */
+    const result = validateEntry({ ...BRAKE_FLUID, interval_miles: '7500' });
+
+    expect(result.ok).toBe(false);
+    expect(result.why).toMatch(/interval_miles/);
   });
 });
