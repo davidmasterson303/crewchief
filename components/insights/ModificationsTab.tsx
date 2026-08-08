@@ -9,7 +9,6 @@ import { buildPosition, buildSummary } from '@crewchief/core/build-progress';
 import { BuildGauge } from '@/components/BuildGauge';
 import ModificationDetailsCard from '@/components/ModificationDetailsCard';
 import ModWishlistButton from '@/components/ModWishlistButton';
-import TierProgressCard, { type TierProgress, type Tier } from '@/components/TierProgressCard';
 
 interface Mod {
   name: string;
@@ -32,10 +31,7 @@ interface ModificationsTabProps {
   savedItemNames: Set<string>;
   loading: boolean;
   loadingModNames: boolean;
-  earnedTier: Tier;
-  tierProgress: TierProgress | null;
-  tierProgressLoading: boolean;
-  onModStatusUpdate: (modName: string, status: 'pending' | 'completed' | 'not_interested', tier: Tier) => Promise<void>;
+  onModStatusUpdate: (modName: string, status: 'pending' | 'completed' | 'not_interested') => Promise<void>;
   onWishlistToggleComplete: () => Promise<void>;
 }
 
@@ -47,9 +43,6 @@ export default function ModificationsTab({
   savedItemNames,
   loading,
   loadingModNames,
-  earnedTier,
-  tierProgress,
-  tierProgressLoading,
   onModStatusUpdate,
   onWishlistToggleComplete,
 }: ModificationsTabProps) {
@@ -197,7 +190,7 @@ export default function ModificationsTab({
                         size="sm"
                         variant="outline"
                         className="h-7 text-xs"
-                        onClick={() => onModStatusUpdate(mod.name, 'completed', earnedTier)}
+                        onClick={() => onModStatusUpdate(mod.name, 'completed')}
                         disabled={loading}
                       >
                         <Check className="h-3 w-3 mr-1" />
@@ -207,7 +200,7 @@ export default function ModificationsTab({
                         size="sm"
                         variant="ghost"
                         className="h-7 text-xs text-white/60"
-                        onClick={() => onModStatusUpdate(mod.name, 'not_interested', earnedTier)}
+                        onClick={() => onModStatusUpdate(mod.name, 'not_interested')}
                         disabled={loading}
                       >
                         <ThumbsDown className="h-3 w-3 mr-1" />

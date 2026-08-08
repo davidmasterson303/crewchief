@@ -1116,7 +1116,7 @@ export async function sendConsultantMessage(params: {
       objective: vehicle.ownership_objective || 'Not specified',
       ownershipDetails: vehicle.usage_profile || '',
       drivingStyle: vehicle.driving_style || '',
-      performanceGoal: vehicle.performance_mindedness || vehicle.performance_goal || '',
+      performanceGoal: vehicle.performance_mindedness || '',
       avgMilesPerMonth: vehicle.avg_miles_per_month || 0,
       color: vehicle.color || '',
       engineType: vehicle.engine_type || knowledge?.engine_type || '',
@@ -1362,7 +1362,7 @@ export async function fetchAllVehicles() {
     const { data, error } = await client
       .from('vehicles')
       .select(`
-        id,year,make,model,trim,color,current_mileage,image_url,custom_image_url,performance_goal,ownership_objective,created_at,
+        id,year,make,model,trim,color,current_mileage,image_url,custom_image_url,performance_mindedness,ownership_objective,created_at,
         nhtsa_data(recalls),
         vehicle_health_summary(health_score,summary,red_flags)
       `)
@@ -1385,7 +1385,7 @@ export async function fetchDemoVehicles() {
     const { data, error } = await client
       .from('vehicles')
       .select(`
-        id,year,make,model,trim,color,current_mileage,image_url,custom_image_url,performance_goal,ownership_objective,created_at,
+        id,year,make,model,trim,color,current_mileage,image_url,custom_image_url,performance_mindedness,ownership_objective,created_at,
         nhtsa_data(recalls),
         vehicle_health_summary(health_score,summary,red_flags)
       `)
@@ -2080,12 +2080,18 @@ export async function generateModificationDetails(vehicleId: string, modName: st
       got mod analysis at all. That is the reported disagreement between the two
       fields: they never disagreed so much as one of them was never consulted.
 
-      Preferring the parameter fixes it. `performance_goal` stays as the
-      fallback so a caller that has not been updated still behaves as before
-      rather than losing context entirely.
+      Preferring the parameter fixed it. **The `vehicles.performance_goal`
+      fallback is now gone too** (7 Aug): that column was never written by any
+      screen, so falling back to it meant falling back to a default nobody
+      chose. It was the last reader, and removing it is what makes the column
+      droppable.
+
+      Note the `performance_goal` further down this function is a *different
+      column* on `mod_detail_queue` and `performance_mod_cache`, where it is
+      NOT NULL and part of a UNIQUE key. That one stays.
     */
     const performanceGoal: GoalKey = normaliseGoal(
-      performanceMindset || vehicle.performance_mindedness || vehicle.performance_goal
+      performanceMindset || vehicle.performance_mindedness
     );
 
     const prompt = `You are an expert automotive consultant analyzing a modification for a specific vehicle owner.
@@ -5242,186 +5248,21 @@ const FREE_SKIPS_PER_TIER = 2;
 // in the aggressive tier before we generate more.
 const AGGRESSIVE_MIN_ACTIONABLE = 3;
 
-function getModTier(difficulty: string): 'mild' | 'moderate' | 'aggressive' {
-  if (difficulty === 'Easy') return 'mild';
-  if (difficulty === 'Moderate') return 'moderate';
-  return 'aggressive';
-}
-
-export async function recomputeVehicleTier(vehicleId: string): Promise<{
-  success: boolean;
-  tier?: 'mild' | 'moderate' | 'aggressive';
-  progress?: {
-    currentTier: 'mild' | 'moderate' | 'aggressive';
-    completed: number;
-    skipped: number;
-    total: number;
-    backfillsRequired: number;
-    backfillsPending: number;
-    canAdvance: boolean;
-  };
-}> {
-  try {
-    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
-    if (!access.ok) {
-      return { success: false };
-    }
-
-    const client = getServiceRoleClient();
-
-    const [vehicleRes, knowledgeRes, trackingRes, backfillRes] = await Promise.all([
-      client.from('vehicles').select('earned_tier').eq('id', vehicleId).maybeSingle(),
-      client.from('vehicle_knowledge_base').select('common_mods').eq('vehicle_id', vehicleId).maybeSingle(),
-      client.from('modification_tracking').select('mod_name, status, tier, is_backfill').eq('vehicle_id', vehicleId),
-      client.from('tier_backfill_queue').select('tier, status, skipped_mod_name').eq('vehicle_id', vehicleId),
-    ]);
-
-    if (!knowledgeRes.data) return { success: false };
-
-    const allMods: any[] = knowledgeRes.data.common_mods || [];
-    const tracking: any[] = trackingRes.data || [];
-    const backfillQueue: any[] = backfillRes.data || [];
-
-    const trackingByName = new Map(tracking.map((t) => [t.mod_name, t]));
-
-    const currentEarnedTier = (vehicleRes.data?.earned_tier || 'mild') as 'mild' | 'moderate' | 'aggressive';
-
-    // Compute what tier we're actually at by checking gates bottom-up
-    let earnedTier: 'mild' | 'moderate' | 'aggressive' = 'mild';
-
-    for (const tier of TIER_ORDER) {
-      const tierMods = allMods.filter((m: any) => getModTier(m.difficulty) === tier);
-      // Include backfill mods that belong to this tier
-      const backfillMods = tracking.filter((t) => t.is_backfill && t.tier === tier);
-
-      const allTierModNames = [
-        ...tierMods.map((m: any) => m.name),
-        ...backfillMods.map((t) => t.mod_name),
-      ];
-
-      const completed = allTierModNames.filter((n) => trackingByName.get(n)?.status === 'completed').length;
-      const skipped = allTierModNames.filter((n) => trackingByName.get(n)?.status === 'not_interested').length;
-      const total = allTierModNames.length;
-
-      const pendingBackfills = backfillQueue.filter(
-        (b) => b.tier === tier && b.status !== 'completed'
-      ).length;
-
-      const netSkips = Math.max(0, skipped - FREE_SKIPS_PER_TIER);
-      const backfillsRequired = netSkips;
-      const completedBackfills = backfillQueue.filter(
-        (b) => b.tier === tier && b.status === 'completed'
-      ).length;
-      const backfillsSatisfied = completedBackfills >= backfillsRequired;
-
-      const actionableDone = completed + skipped;
-      const canAdvance = actionableDone >= total && backfillsSatisfied && pendingBackfills === 0;
-
-      if (tier === currentEarnedTier) {
-        if (!canAdvance) {
-          earnedTier = tier;
-
-          // Persist if changed
-          if (earnedTier !== currentEarnedTier) {
-            await client.from('vehicles').update({ earned_tier: earnedTier }).eq('id', vehicleId);
-          }
-
-          return {
-            success: true,
-            tier: earnedTier,
-            progress: {
-              currentTier: tier,
-              completed,
-              skipped,
-              total,
-              backfillsRequired,
-              backfillsPending: pendingBackfills,
-              canAdvance: false,
-            },
-          };
-        }
-
-        // Can advance — find next tier
-        const nextIndex = TIER_ORDER.indexOf(tier) + 1;
-        if (nextIndex < TIER_ORDER.length) {
-          earnedTier = TIER_ORDER[nextIndex];
-        } else {
-          earnedTier = 'aggressive';
-        }
-      }
-    }
-
-    // If we made it through all tiers, cap at aggressive
-    if (TIER_ORDER.indexOf(earnedTier) > TIER_ORDER.indexOf(currentEarnedTier)) {
-      earnedTier = earnedTier;
-    }
-
-    // Persist updated tier
-    if (earnedTier !== currentEarnedTier) {
-      await client.from('vehicles').update({ earned_tier: earnedTier }).eq('id', vehicleId);
-    }
-
-    // Recompute progress for the new current tier
-    const tier = earnedTier;
-    const tierMods = allMods.filter((m: any) => getModTier(m.difficulty) === tier);
-    const backfillMods = tracking.filter((t) => t.is_backfill && t.tier === tier);
-    const allTierModNames = [
-      ...tierMods.map((m: any) => m.name),
-      ...backfillMods.map((t) => t.mod_name),
-    ];
-    const completed = allTierModNames.filter((n) => trackingByName.get(n)?.status === 'completed').length;
-    const skipped = allTierModNames.filter((n) => trackingByName.get(n)?.status === 'not_interested').length;
-    const total = allTierModNames.length;
-    const netSkips = Math.max(0, skipped - FREE_SKIPS_PER_TIER);
-    const completedBackfills = backfillQueue.filter(
-      (b) => b.tier === tier && b.status === 'completed'
-    ).length;
-    const pendingBackfills = backfillQueue.filter(
-      (b) => b.tier === tier && b.status !== 'completed'
-    ).length;
-    const backfillsRequired = netSkips;
-    const backfillsSatisfied = completedBackfills >= backfillsRequired;
-    const actionableDone = completed + skipped;
-    const canAdvance = tier !== 'aggressive' && actionableDone >= total && backfillsSatisfied && pendingBackfills === 0;
-
-    return {
-      success: true,
-      tier: earnedTier,
-      progress: {
-        currentTier: tier,
-        completed,
-        skipped,
-        total,
-        backfillsRequired,
-        backfillsPending: pendingBackfills,
-        canAdvance,
-      },
-    };
-  } catch (error: any) {
-    console.error('[TIER] recomputeVehicleTier error:', error.message);
-    return { success: false };
-  }
-}
-
-export async function getTierProgress(vehicleId: string): Promise<{
-  success: boolean;
-  tier?: 'mild' | 'moderate' | 'aggressive';
-  progress?: {
-    currentTier: 'mild' | 'moderate' | 'aggressive';
-    completed: number;
-    skipped: number;
-    total: number;
-    backfillsRequired: number;
-    backfillsPending: number;
-    canAdvance: boolean;
-  };
-}> {
-  return recomputeVehicleTier(vehicleId);
-}
-
-export async function getModsForEarnedTier(
-  vehicleId: string,
-  tier: 'mild' | 'moderate' | 'aggressive'
+/**
+ * Every modification this car's knowledge base knows about.
+ *
+ * Was `getModsForEarnedTier(vehicleId, tier)`, and the tier did two jobs, both
+ * now gone. It filtered the visible list to *exactly* that difficulty — the bug
+ * that showed the WRX owner one mod out of five — and it scoped the cache and
+ * tracking reads.
+ *
+ * The scoping went with the tiers (7 Aug). Cached analysis is a property of
+ * (vehicle, mod), not of a tier the owner happened to occupy when it was
+ * generated, so filtering it by tier meant a mod carried no analysis the moment
+ * the tier moved underneath it.
+ */
+export async function getModsForVehicle(
+  vehicleId: string
 ): Promise<{ success: boolean; data: any[] }> {
   try {
     const access = await authorizeVehicleAccess(vehicleId, { intent: 'read' });
@@ -5433,8 +5274,8 @@ export async function getModsForEarnedTier(
 
     const [knowledgeRes, trackingRes, cacheRes, vehicleRes] = await Promise.all([
       client.from('vehicle_knowledge_base').select('common_mods').eq('vehicle_id', vehicleId).maybeSingle(),
-      client.from('modification_tracking').select('mod_name, status, tier, is_backfill').eq('vehicle_id', vehicleId).eq('tier', tier),
-      client.from('performance_mod_cache').select('mods_data').eq('vehicle_id', vehicleId).eq('performance_goal', tier).maybeSingle(),
+      client.from('modification_tracking').select('mod_name, status, tier, is_backfill').eq('vehicle_id', vehicleId),
+      client.from('performance_mod_cache').select('mods_data').eq('vehicle_id', vehicleId).limit(1).maybeSingle(),
       client.from('vehicles').select('performance_mindedness').eq('id', vehicleId).maybeSingle(),
     ]);
 
@@ -5474,7 +5315,17 @@ export async function getModsForEarnedTier(
 
     // Backfill mods that were generated for this tier
     const backfillTracking = tracking.filter((t) => t.is_backfill);
-    const backfillMods = backfillTracking.map((t) => ({ name: t.mod_name, difficulty: tier === 'mild' ? 'Easy' : tier === 'moderate' ? 'Moderate' : 'Hard', is_backfill: true }));
+    /*
+      Backfill rows carry the tier they were generated under. That column is on
+      its way out and is read here only to keep an existing row's difficulty
+      sensible; a row without one reads Moderate, which is what `effortOf` also
+      assumes for an unknown.
+    */
+    const backfillMods = backfillTracking.map((t) => ({
+      name: t.mod_name,
+      difficulty: t.tier === 'mild' ? 'Easy' : t.tier === 'aggressive' ? 'Hard' : 'Moderate',
+      is_backfill: true,
+    }));
 
     const combinedMods = [...tierMods, ...backfillMods];
 
@@ -5694,13 +5545,7 @@ export async function processSkipAndBackfill(
       }).catch(() => {});
     }
 
-    const tierResult = await recomputeVehicleTier(vehicleId);
-
-    return {
-      success: true,
-      backfillTriggered,
-      newTier: tierResult.tier,
-    };
+    return { success: true, backfillTriggered };
   } catch (error: any) {
     console.error('[BACKFILL] processSkipAndBackfill error:', error.message);
     return { success: false, backfillTriggered: false };
@@ -5730,8 +5575,18 @@ export async function ensureAggressiveModMinimum(vehicleId: string): Promise<{ s
 
     const trackingByName = new Map(tracking.map((t: any) => [t.mod_name, t]));
 
-    const aggressiveMods = allMods.filter((m: any) => getModTier(m.difficulty) === 'aggressive');
-    const aggressiveBackfills = tracking.filter((t: any) => t.is_backfill && t.tier === 'aggressive');
+    /*
+      Every mod, not only the Hard ones.
+
+      This counted `getModTier(m.difficulty) === 'aggressive'` — so the top-up
+      only ever considered a car's hardest work, and a list exhausted at the
+      easy end never refilled. With tiers gone the pool is the whole list, which
+      is also what the function's own name should now say: it keeps a car from
+      running out, not from running out *of a tier*. Renaming it is worth doing
+      and not in the same change as removing a subsystem.
+    */
+    const aggressiveMods = allMods;
+    const aggressiveBackfills = tracking.filter((t: any) => t.is_backfill);
 
     const allAggressiveNames = [
       ...aggressiveMods.map((m: any) => m.name),
@@ -5835,16 +5690,30 @@ Respond with ONLY valid JSON:
   }
 }
 
+/**
+ * Mark a modification pending, installed, or not wanted.
+ *
+ * The `tier` parameter is gone with the tiers (7 Aug), and removing it fixed a
+ * live bug rather than only tidying: `VehicleInsights` called this as
+ * `(vehicleId, modName, 'completed', data.notes, data.dateCompleted)`, so the
+ * **notes were passed as the tier and the completion date as the notes**. The
+ * date never reached the row. The typecheck could not see it while `tier` sat
+ * in that position accepting a string.
+ *
+ * Name kept rather than dropping the `WithTier` suffix, only because
+ * `updateModificationStatus` already exists at :1505 and is a different
+ * function. Worth reconciling, and not in the same change as ripping out a
+ * subsystem.
+ */
 export async function updateModificationStatusWithTier(
   vehicleId: string,
   modName: string,
   status: 'pending' | 'completed' | 'not_interested',
-  tier: 'mild' | 'moderate' | 'aggressive',
   notes?: string,
   installedDate?: string,
   costParts?: number,
   costLabor?: number
-): Promise<{ success: boolean; newTier?: 'mild' | 'moderate' | 'aggressive'; backfillTriggered?: boolean }> {
+): Promise<{ success: boolean; backfillTriggered?: boolean }> {
   try {
     const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
     if (!access.ok) {
@@ -5852,10 +5721,16 @@ export async function updateModificationStatusWithTier(
     }
 
     if (status === 'not_interested') {
-      const result = await processSkipAndBackfill(vehicleId, modName, tier);
+      /*
+        `processSkipAndBackfill` still takes a tier — it writes one onto the
+        backfill row it generates. Passed as 'moderate' rather than threading a
+        dead concept back through this signature: the column is on its way out,
+        and a middle value keeps an existing row's difficulty sensible in the
+        meantime.
+      */
+      const result = await processSkipAndBackfill(vehicleId, modName, 'moderate');
       return {
         success: result.success,
-        newTier: result.newTier,
         backfillTriggered: result.backfillTriggered,
       };
     }
@@ -5867,7 +5742,8 @@ export async function updateModificationStatusWithTier(
         vehicle_id: vehicleId,
         mod_name: modName,
         status,
-        tier,
+        // See above: the tier column is vestigial and awaits its migration.
+        tier: 'moderate',
         notes: notes || null,
         installed_date: installedDate || null,
         cost_parts: costParts || 0,
@@ -5882,18 +5758,21 @@ export async function updateModificationStatusWithTier(
       return { success: false };
     }
 
-    // If completing an aggressive mod, check if we need to top up
-    if (status === 'completed' && tier === 'aggressive') {
+    /*
+      Top up the list on any completion, not only an "aggressive" one. The old
+      gate meant the owners most likely to exhaust their list were the only ones
+      who ever got more generated.
+
+      `recomputeVehicleTier` used to run here and its result was returned as
+      `newTier` so the client could pop a "Tier unlocked!" toast. Both are gone:
+      the build dial shows where a car sits directly, so an unlockable tier was
+      a second, coarser answer to the same question.
+    */
+    if (status === 'completed') {
       ensureAggressiveModMinimum(vehicleId).catch(() => {});
     }
 
-    const tierResult = await recomputeVehicleTier(vehicleId);
-
-    return {
-      success: true,
-      newTier: tierResult.tier,
-      backfillTriggered: false,
-    };
+    return { success: true, backfillTriggered: false };
   } catch (error: any) {
     console.error('[TIER] updateModificationStatusWithTier error:', error.message);
     return { success: false };

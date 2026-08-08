@@ -16,8 +16,7 @@ import {
   getModNamesOnly,
   getDetailedModsWithCachedDetails,
   getCachedPerformanceModifications,
-  getTierProgress,
-  getModsForEarnedTier,
+  getModsForVehicle,
   ensureAggressiveModMinimum,
   generateVehicleDossier,
   generateVehicleHealthSummary,
@@ -33,7 +32,6 @@ import IssuesTab from './insights/IssuesTab';
 import MaintenanceTab from './insights/MaintenanceTab';
 import ModificationsTab from './insights/ModificationsTab';
 import { showsModifications } from '@crewchief/core/mod-progression';
-import type { TierProgress, Tier } from './TierProgressCard';
 
 interface VehicleInsightsProps {
   vehicle: any;
@@ -59,9 +57,12 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
     const [selectedMaintenanceItem, setSelectedMaintenanceItem] = useState<string>('');
     const [selectedModForInstall, setSelectedModForInstall] = useState<string>('');
     const [performanceMods, setPerformanceMods] = useState<any[]>([]);
-    const [earnedTier, setEarnedTier] = useState<Tier>((vehicle.earned_tier || 'mild') as Tier);
-    const [tierProgress, setTierProgress] = useState<TierProgress | null>(null);
-    const [tierProgressLoading, setTierProgressLoading] = useState(false);
+    /*
+      `earnedTier` and its progress card lived here. Both are gone (7 Aug): the
+      build dial shows where a car sits directly, so a tier the owner had to
+      unlock was a second, coarser answer to the same question — and one that
+      gated the mod list while it was at it.
+    */
     /*
       ── Which dossier tabs exist, and in what order ─────────────────────────
 
@@ -114,12 +115,11 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
     }, [vehicle.id]);
 
     useEffect(() => {
-      loadTierProgress();
     }, [vehicle.id]);
 
     useEffect(() => {
-      loadPerformanceMods(earnedTier);
-    }, [earnedTier, vehicle.id]);
+      loadPerformanceMods();
+    }, [vehicle.id]);
 
     useEffect(() => {
       onWishlistStateUpdate?.(savedItemNames);
@@ -145,18 +145,6 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
       }
     }, [vehicle.id, vehicle.year, vehicle.make, vehicle.model, knowledge?.research_status, router]);
 
-    const loadTierProgress = async () => {
-      setTierProgressLoading(true);
-      const result = await getTierProgress(vehicle.id);
-      if (result.success && result.progress) {
-        setTierProgress(result.progress);
-        if (result.tier && result.tier !== earnedTier) {
-          setEarnedTier(result.tier);
-        }
-      }
-      setTierProgressLoading(false);
-    };
-
     const loadTracking = async () => {
       const [issueResult, modResult] = await Promise.all([
         getIssueTracking(vehicle.id),
@@ -179,11 +167,11 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
       }
     };
 
-    const loadPerformanceMods = async (tier: Tier) => {
+    const loadPerformanceMods = async () => {
       setLoadingModNames(true);
 
       // Try tier-specific mod list first
-      const tierResult = await getModsForEarnedTier(vehicle.id, tier);
+      const tierResult = await getModsForVehicle(vehicle.id);
       if (tierResult.success && tierResult.data.length > 0) {
         setPerformanceMods(tierResult.data);
         const detailsMap: Record<string, any> = {};
@@ -196,13 +184,13 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
       }
 
       // Fallback: load from names cache then details cache
-      const namesResult = await getModNamesOnly(vehicle.id, tier);
+      const namesResult = await getModNamesOnly(vehicle.id, 'mild');
       if (namesResult.success && namesResult.data.length > 0) {
         setPerformanceMods(namesResult.data);
       }
       setLoadingModNames(false);
 
-      const detailsResult = await getDetailedModsWithCachedDetails(vehicle.id, tier);
+      const detailsResult = await getDetailedModsWithCachedDetails(vehicle.id, 'mild');
       if (detailsResult.success && detailsResult.data.length > 0) {
         setPerformanceMods(detailsResult.data);
         const detailsMap: Record<string, any> = {};
@@ -211,7 +199,7 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
         }
         setModDetails((prev) => ({ ...prev, ...detailsMap }));
       } else {
-        const fallbackResult = await getCachedPerformanceModifications(vehicle.id, tier);
+        const fallbackResult = await getCachedPerformanceModifications(vehicle.id, 'mild');
         if (fallbackResult.success && fallbackResult.data.length > 0) {
           setPerformanceMods(fallbackResult.data);
           const detailsMap: Record<string, any> = {};
@@ -222,10 +210,13 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
         }
       }
 
-      // If aggressive, ensure perpetual backfill minimum
-      if (tier === 'aggressive') {
-        ensureAggressiveModMinimum(vehicle.id).catch(() => {});
-      }
+      /*
+        Backfill top-up. This was gated on `tier === 'aggressive'` — so the
+        owners most likely to exhaust a list were the only ones who ever got
+        more generated, and everyone else quietly ran out. With tiers gone it
+        runs for any car showing modifications.
+      */
+      ensureAggressiveModMinimum(vehicle.id).catch(() => {});
     };
 
     const handleIssueStatusUpdate = async (
@@ -269,8 +260,7 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
 
     const handleModStatusUpdate = async (
       modName: string,
-      status: 'pending' | 'completed' | 'not_interested',
-      tier: Tier
+      status: 'pending' | 'completed' | 'not_interested'
     ) => {
       if (status === 'completed') {
         setSelectedModForInstall(modName);
@@ -278,7 +268,7 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
         return;
       }
       setLoading(true);
-      const result = await updateModificationStatusWithTier(vehicle.id, modName, status, tier);
+      const result = await updateModificationStatusWithTier(vehicle.id, modName, status);
       if (result.success) {
         if (status === 'not_interested' && result.backfillTriggered) {
           toast.success('Skipped — a replacement mod is being generated');
@@ -286,14 +276,8 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
           toast.success('Modification status updated');
         }
 
-        if (result.newTier && result.newTier !== earnedTier) {
-          setEarnedTier(result.newTier);
-          toast.success(`Tier unlocked: ${result.newTier.charAt(0).toUpperCase() + result.newTier.slice(1)}!`);
-        }
-
         await loadTracking();
-        await loadTierProgress();
-        await loadPerformanceMods(result.newTier || earnedTier);
+        await loadPerformanceMods();
         invalidateDashboardCache(vehicle.id);
         triggerPerfStatsRecalc();
         router.refresh();
@@ -363,7 +347,6 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
           vehicle.id,
           selectedModForInstall,
           'completed',
-          earnedTier,
           data.notes,
           data.dateCompleted
         );
@@ -371,11 +354,6 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
           toast.error('Failed to update modification status');
           setLoading(false);
           return;
-        }
-
-        if (modResult.newTier && modResult.newTier !== earnedTier) {
-          setEarnedTier(modResult.newTier);
-          toast.success(`Tier unlocked: ${modResult.newTier.charAt(0).toUpperCase() + modResult.newTier.slice(1)}!`);
         }
       }
       const result = await addMaintenanceHistory(
@@ -397,8 +375,7 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
         setMaintenanceDialogOpen(false);
         setSelectedMaintenanceItem('');
         await loadTracking();
-        await loadTierProgress();
-        await loadPerformanceMods(earnedTier);
+        await loadPerformanceMods();
         generateVehicleHealthSummary(vehicle.id, true).then(() => {
           invalidateDashboardCache(vehicle.id);
           router.refresh();
@@ -607,7 +584,7 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
                 />
               </TabsContent>
 
-              {vehicle.performance_mindedness !== 'stock' && (
+              {modsVisible && (
                 <TabsContent value="mods">
                   <ModificationsTab
                     vehicle={vehicle}
@@ -617,9 +594,6 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
                     savedItemNames={savedItemNames}
                     loading={loading}
                     loadingModNames={loadingModNames}
-                    earnedTier={earnedTier}
-                    tierProgress={tierProgress}
-                    tierProgressLoading={tierProgressLoading}
                     onModStatusUpdate={handleModStatusUpdate}
                     onWishlistToggleComplete={handleWishlistToggleComplete}
                   />
