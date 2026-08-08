@@ -24,6 +24,7 @@ import {
   SERVICE_BASIS_LABELS,
   milestoneBasis,
 } from '@crewchief/core/service-provenance';
+import { historyLookups, type ServiceHistoryRow } from '@crewchief/core/service-history';
 import { validateMileageUpdate } from '@crewchief/core/mileage-tracking';
 import { wishlistItemIdentifier } from '@crewchief/core/wishlist-identifier';
 
@@ -89,10 +90,28 @@ interface VehicleResponse {
   knowledge?: { maintenance_schedule?: unknown } | null;
 }
 
+/**
+ * `/api/v1/load-maintenance-data`. Only `lineItems` is read here.
+ *
+ * It is **owner-only** — a demo caller is deliberately not issued that query at
+ * all — so an empty array is the correct and expected answer on the demo cars,
+ * and the screen falls back to estimating from the odometer exactly as it did
+ * before Track A2a.
+ */
+interface MaintenanceResponse {
+  lineItems?: ServiceHistoryRow[] | null;
+}
+
 type State =
   | { kind: 'loading' }
   | { kind: 'error'; message: string }
-  | { kind: 'ready'; name: string; mileage: number; schedule: ScheduleEntry[] };
+  | {
+      kind: 'ready';
+      name: string;
+      mileage: number;
+      schedule: ScheduleEntry[];
+      history: ServiceHistoryRow[];
+    };
 
 const miles = new Intl.NumberFormat('en-US');
 
@@ -106,9 +125,25 @@ export function ServiceMilestoneScreen({ vehicleId, onSignOut }: Props) {
   const load = useCallback(async () => {
     setState({ kind: 'loading' });
     try {
-      const body = await apiRequest<VehicleResponse>(
-        `/load-vehicle?vehicleId=${encodeURIComponent(vehicleId)}`
-      );
+      /*
+        Two requests, in parallel, and only one of them may fail the screen.
+
+        The vehicle is the screen; without it there is nothing to draw. History
+        is an *improvement* to what gets drawn — with it, a service counts from
+        when it was last done; without it, from the odometer. That is precisely
+        the degradation this screen shipped with, so falling back to it is a
+        return to a known-good state rather than a broken one.
+
+        `Promise.all` would have coupled them and made a maintenance failure
+        blank a screen that a push notification just opened. Handled separately
+        so it cannot.
+      */
+      const [body, history] = await Promise.all([
+        apiRequest<VehicleResponse>(`/load-vehicle?vehicleId=${encodeURIComponent(vehicleId)}`),
+        apiRequest<MaintenanceResponse>(
+          `/load-maintenance-data?vehicleId=${encodeURIComponent(vehicleId)}`
+        ).catch(() => null),
+      ]);
 
       const vehicle = body.vehicle;
       const mileage = typeof vehicle?.current_mileage === 'number' ? vehicle.current_mileage : 0;
@@ -119,6 +154,7 @@ export function ServiceMilestoneScreen({ vehicleId, onSignOut }: Props) {
         name: [vehicle?.year, vehicle?.make, vehicle?.model].filter(Boolean).join(' ') || 'this car',
         mileage,
         schedule: Array.isArray(rawSchedule) ? (rawSchedule as ScheduleEntry[]) : [],
+        history: Array.isArray(history?.lineItems) ? history.lineItems : [],
       });
       setReading(String(mileage));
     } catch (error) {
@@ -266,7 +302,19 @@ export function ServiceMilestoneScreen({ vehicleId, onSignOut }: Props) {
     );
   }
 
-  const services = evaluateSchedule({ schedule: state.schedule, currentMileage: state.mileage });
+  /*
+    Track A2a. These three lookups have been parameters of `evaluateSchedule`
+    since it was written and nothing ever passed any — so every time-based
+    service on this screen reported `unknown`, and every mileage-based one
+    counted from the odometer rather than from when the work was actually done.
+
+    `historyLookups` returns all three, so it spreads.
+  */
+  const services = evaluateSchedule({
+    schedule: state.schedule,
+    currentMileage: state.mileage,
+    ...historyLookups(state.history),
+  });
   const milestone = nextMilestone(services, { horizonMiles: 5_000 });
   const unknowns = services.filter((service) => service.status === 'unknown');
 
