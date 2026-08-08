@@ -145,6 +145,76 @@ describe('VehicleDataSchema.maintenance_schedule', () => {
     expect(parsed.maintenance_schedule[0].service).toBe('Engine oil and filter');
   });
 
+  it.each([
+    ['a zero mileage beside a real month interval', { interval_miles: 0, interval_months: 12 }],
+    ['a zero month interval beside real mileage', { interval_miles: 7500, interval_months: 0 }],
+    ['a null mileage beside a real month interval', { interval_miles: null, interval_months: 12 }],
+  ])('keeps %s, clearing the absent axis rather than throwing', (_label, intervals) => {
+    /*
+      The regression Cowork found on 7 Aug. Once `isUsableScheduleEntry` began
+      accepting *either* interval, an entry could pass the filter on one axis
+      and then be rejected by `.positive()` on the other — and `parse` throws on
+      the whole object, so one junk number took the entire knowledge base with
+      it and broke onboarding. `interval_miles: 0` is not exotic: the prompt's
+      own "0 for numbers" fallback produces exactly it.
+
+      Filtering decides whether an entry survives; sanitising decides what shape
+      it survives in.
+    */
+    const entry = { service: 'Something', priority: 'Critical' as const, ...intervals };
+
+    expect(() => VehicleDataSchema.parse(research([entry]))).not.toThrow();
+
+    const [kept] = VehicleDataSchema.parse(research([entry])).maintenance_schedule;
+    expect(kept).toBeDefined();
+
+    // Exactly one axis survives, and it is the real one.
+    const axes = [kept.interval_miles, kept.interval_months].filter(
+      (v) => typeof v === 'number'
+    );
+    expect(axes).toHaveLength(1);
+  });
+
+  it.each([
+    ['a stringified mileage', { interval_miles: '7500', interval_months: 12 }],
+    ['a negative mileage', { interval_miles: -100, interval_months: 12 }],
+    ['an infinite mileage', { interval_miles: Infinity, interval_months: 12 }],
+    ['an infinite month interval', { interval_miles: 7500, interval_months: Infinity }],
+  ])('drops the whole entry on %s rather than reinterpreting it', (_label, intervals) => {
+    /*
+      Cowork's point, and it is right. `0` and `null` mean *this axis does not
+      apply* — the prompt tells the model to use 0 when it has no data — so
+      clearing them is honest. A string, a negative or an infinity is a
+      **malformed** value, and nulling it would silently turn a 7,500-mile
+      service into a purely time-based one: a schedule that tells someone the
+      wrong thing, which is worse than one that tells them nothing.
+
+      Dropped whole, and the rest of the payload survives.
+    */
+    const parsed = VehicleDataSchema.parse(
+      research([
+        { service: 'Good', interval_miles: 7500, priority: 'Critical' },
+        { service: 'Malformed', priority: 'Critical', ...intervals },
+      ])
+    );
+
+    expect(parsed.maintenance_schedule.map((e) => e.service)).toEqual(['Good']);
+  });
+
+  it('does not take the whole knowledge base down with one junk interval', () => {
+    // The property this preprocess exists for, restated as the failure it had.
+    const parsed = VehicleDataSchema.parse({
+      maintenance_schedule: [
+        { service: 'Good', interval_miles: 7500, priority: 'Critical' },
+        { service: 'Junk', interval_miles: 0, interval_months: 12, priority: 'Critical' },
+      ],
+      reliability_score: 8,
+    });
+
+    expect(parsed.maintenance_schedule).toHaveLength(2);
+    expect(parsed.reliability_score).toBe(8);
+  });
+
   it('does not throw when every entry is unusable', () => {
     // A whole legacy schedule, or a whole hallucinated one. An empty schedule
     // is a car with no service notifications, which is the correct outcome —

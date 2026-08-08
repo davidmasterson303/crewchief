@@ -99,15 +99,29 @@ export const ScheduleEntrySchema = z
  */
 export function validateEntry(entry) {
   /*
+    ── Absent, malformed, and why they are not the same ──────────────────────
+
     `?? null` normalises a missing field to the explicit `null` the column
     stores. It deliberately does not touch a value of the wrong *type*: turning
     `"7500"` into `null` would convert a malformed mileage entry into a
     well-formed time-only one, which is a silent corruption rather than a fix.
+
+    **That reasoning was right and the real schema now shares it** — Claude
+    Code, 7 Aug. `packages/core/src/vehicle-utils.ts` treats `0`, `null` and a
+    missing field as *absent* (the research prompt tells the model to use 0
+    where it has no data) and clears them, while a string, a negative or an
+    infinity is *malformed* and drops the whole entry.
+
+    `0` is added here for that reason: a time-only service routinely arrives
+    carrying `interval_miles: 0`, and passing that through produced a `.positive()`
+    failure rather than a clean time-only row.
   */
+  const absent = (value) => value === undefined || value === null || value === 0;
+
   const candidate = {
     service: entry.service,
-    interval_miles: entry.interval_miles ?? null,
-    interval_months: entry.interval_months ?? null,
+    interval_miles: absent(entry.interval_miles) ? null : entry.interval_miles,
+    interval_months: absent(entry.interval_months) ? null : entry.interval_months,
     description: entry.description,
     priority: entry.priority,
   };

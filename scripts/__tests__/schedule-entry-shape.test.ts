@@ -55,9 +55,20 @@ function realSchemaKeeps(entry: unknown): boolean {
   }
 }
 
-/** The mirror, asked the same question. */
+/**
+ * The mirror, asked the same question — through `validateEntry`, not the raw
+ * shape schema.
+ *
+ * It called `ScheduleEntrySchema.safeParse` directly, which skipped the very
+ * normalisation `validateEntry` performs. That made the comparison unfair in a
+ * way that hid rather than caught: the real pipeline is filter → sanitise →
+ * validate, and asking only the last step whether an entry survives answers a
+ * different question. `{interval_miles: 0, interval_months: 12}` is the case
+ * that exposed it — the real schema clears the absent axis and keeps the entry,
+ * and the raw schema rejected it on `.positive()`.
+ */
 function mirrorKeeps(entry: any): boolean {
-  return ScheduleEntrySchema.safeParse(entry).success;
+  return validateEntry(entry).ok;
 }
 
 describe('the mirror agrees with VehicleDataSchema', () => {
@@ -65,7 +76,14 @@ describe('the mirror agrees with VehicleDataSchema', () => {
     ['a complete entry', OIL, true],
     ['no time interval', { ...OIL, interval_months: undefined }, true],
     ['a null time interval', { ...OIL, interval_months: null }, true],
-    ['a zero mileage interval', { ...OIL, interval_miles: 0 }, false],
+    /*
+      Flipped to `true` by Claude Code, 7 Aug, when the real schema learned to
+      tell *absent* from *malformed*. `0` is what the research prompt tells the
+      model to write where it has no data, so `{miles: 0, months: 12}` is an
+      ordinary time-only service, not a broken one. It is cleared to null and
+      kept. The malformed cases below still drop.
+    */
+    ['a zero mileage interval beside a real time interval', { ...OIL, interval_miles: 0 }, true],
     ['a negative mileage interval', { ...OIL, interval_miles: -7500 }, false],
     ['a stringified mileage interval', { ...OIL, interval_miles: '7500' }, false],
     ['an infinite mileage interval', { ...OIL, interval_miles: Infinity }, false],
@@ -96,7 +114,7 @@ describe('the mirror agrees with VehicleDataSchema', () => {
     expect(realSchemaKeeps(noDescription)).toBe(true);
   });
 
-  it('rejects rather than drops when one interval is usable and the other is malformed', () => {
+  it('drops a malformed entry and clears an absent axis — never throws', () => {
     /*
       The distinction `realSchemaKeeps` flattens, recorded here so it is a known
       property rather than a surprise in production.
@@ -117,7 +135,35 @@ describe('the mirror agrees with VehicleDataSchema', () => {
     expect(VehicleDataSchema.parse(payload({ ...OIL, service: '   ' })).maintenance_schedule)
       .toHaveLength(0);
 
-    expect(() => VehicleDataSchema.parse(payload({ ...OIL, interval_miles: 0 }))).toThrow();
+    /*
+      ── This assertion is inverted from what it was, deliberately ───────────
+
+      It read `.toThrow()`, and the comment above defended that as "louder than
+      the silent drop it replaced, and better for it". The louder behaviour was
+      real; being better for it was the part that did not survive contact.
+
+      `VehicleDataSchema` guards **onboarding**, and `parse` throws on the whole
+      object — so one junk interval took the entire knowledge base down and left
+      a new user on a broken first screen. `interval_miles: 0` is not an exotic
+      input either: the research prompt instructs the model to use 0 where it
+      has no data, which makes the throw reachable on ordinary output.
+
+      So `0` now reads as *absent* and the entry survives on its time interval.
+      A **malformed** value — a string, a negative, an infinity — still costs
+      the whole entry rather than being nulled, which is the distinction this
+      file's own `validateEntry` docblock argued for and was right about.
+    */
+    expect(() => VehicleDataSchema.parse(payload({ ...OIL, interval_miles: 0 }))).not.toThrow();
+    expect(
+      VehicleDataSchema.parse(payload({ ...OIL, interval_miles: 0 })).maintenance_schedule
+    ).toHaveLength(1);
+
+    expect(() =>
+      VehicleDataSchema.parse(payload({ ...OIL, interval_miles: '7500' }))
+    ).not.toThrow();
+    expect(
+      VehicleDataSchema.parse(payload({ ...OIL, interval_miles: '7500' })).maintenance_schedule
+    ).toHaveLength(0);
   });
 });
 

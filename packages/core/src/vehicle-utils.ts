@@ -47,14 +47,76 @@ export function isUsableScheduleEntry(entry: unknown): boolean {
 
   if (typeof service !== 'string' || service.trim().length === 0) return false;
 
+  /*
+    ── "Absent" and "malformed" are different, and conflating them costs ──────
+
+    `0`, `null` and `undefined` all mean *this axis does not apply* — the
+    prompt's own instruction is "use 0 for numbers" when there is no data, so a
+    time-only service routinely arrives carrying `interval_miles: 0`. Those are
+    cleared to `null` by `sanitiseScheduleEntry` and the entry survives on its
+    other axis.
+
+    A string, a negative, a `NaN` or an `Infinity` is a *malformed* value, not
+    an absent one, and the entry is dropped whole. Cowork's point, and it is
+    right: nulling `interval_miles: "7500"` would silently reinterpret a
+    7,500-mile service as a purely time-based one, which is a worse outcome than
+    losing the entry — the schedule would then quietly tell someone the wrong
+    thing rather than tell them nothing.
+  */
+  if (isMalformedInterval(record.interval_miles)) return false;
+  if (isMalformedInterval(record.interval_months)) return false;
+
   return (
     isPositiveInterval(record.interval_miles) || isPositiveInterval(record.interval_months)
   );
 }
 
+/** Present, and not a value this can read. Absent (`0`/`null`/missing) is not malformed. */
+function isMalformedInterval(value: unknown): boolean {
+  if (value === undefined || value === null || value === 0) return false;
+  return !isPositiveInterval(value);
+}
+
 /** A real, comparable interval. `Infinity` is a number and is not one. */
 function isPositiveInterval(value: unknown): boolean {
   return typeof value === 'number' && Number.isFinite(value) && value > 0;
+}
+
+/**
+ * Clear the intervals that are not real, on an entry that is being kept.
+ *
+ * ── The regression this closes ──────────────────────────────────────────────
+ *
+ * `isUsableScheduleEntry` asks whether an entry has **at least one** usable
+ * interval. Once it started accepting either, `{interval_miles: 0,
+ * interval_months: 12}` began passing the filter on its months and then
+ * **throwing** on its miles, because the field schema is `.positive()`.
+ *
+ * That created a third outcome where there had only ever been two. The whole
+ * design of this preprocess is that a bad entry costs *one entry* — `parse`
+ * throws on the entire object, so a schedule with one junk interval took the
+ * complete knowledge base with it and left a new user staring at a broken first
+ * screen. And `interval_miles: 0` is not exotic: the prompt's own "0 for
+ * numbers" fallback produces exactly it.
+ *
+ * Filtering decides **whether** an entry survives; this decides **what shape**
+ * it survives in, so validation only ever sees values it can accept. Anything
+ * non-positive or non-finite becomes `null`, which is the honest reading — the
+ * entry is time-based, or mileage-based, and the other axis is simply unknown.
+ *
+ * Found by Cowork on 7 Aug, comparing the backfill's mirror against the real
+ * schema. My own tests missed it because they checked `{miles: 0}` alone, which
+ * the filter drops, and `{miles: 0, months: 12}` through `isUsableScheduleEntry`
+ * but never through `parse`.
+ */
+function sanitiseScheduleEntry(entry: unknown): unknown {
+  const record = entry as Record<string, unknown>;
+
+  return {
+    ...record,
+    interval_miles: isPositiveInterval(record.interval_miles) ? record.interval_miles : null,
+    interval_months: isPositiveInterval(record.interval_months) ? record.interval_months : null,
+  };
 }
 
 export const VehicleDataSchema = z.object({
@@ -111,7 +173,8 @@ export const VehicleDataSchema = z.object({
     service that is never due.
   */
   maintenance_schedule: z.preprocess(
-    (raw) => (Array.isArray(raw) ? raw.filter(isUsableScheduleEntry) : []),
+    (raw) =>
+      Array.isArray(raw) ? raw.filter(isUsableScheduleEntry).map(sanitiseScheduleEntry) : [],
     z.array(z.object({
       service: z.string().min(1),
       interval_miles: z.number().positive().finite().nullable().optional(),
