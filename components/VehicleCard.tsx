@@ -520,7 +520,7 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary, alerts }: V
               <Button variant="outline" onClick={() => setShowMileageDialog(false)} disabled={isUpdatingMileage} className="border-white/15 text-white/70 hover:text-white hover:bg-white/8">
                 Cancel
               </Button>
-              <Button onClick={handleUpdateMileage} disabled={isUpdatingMileage} className="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white">
+              <Button onClick={handleUpdateMileage} disabled={isUpdatingMileage} className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground">
                 {isUpdatingMileage ? 'Updating...' : 'Update Mileage'}
               </Button>
             </div>

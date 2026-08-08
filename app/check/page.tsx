@@ -173,7 +173,7 @@ export default function CheckPage() {
             <Button
               onClick={submit}
               disabled={busy || (!file && !text.trim())}
-              className="w-full mt-4 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-xl h-12 text-base disabled:opacity-40"
+              className="w-full mt-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl h-12 text-base disabled:opacity-40"
             >
               {busy ? (
                 <>
@@ -275,7 +275,7 @@ function AnswerCard({ answer, onReset }: { answer: Answer; onReset: () => void }
           vehicle&apos;s history.
         </p>
         <Link href="/signup" className="block mt-4">
-          <Button className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-xl h-11">
+          <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl h-11">
             Create a free account
             <ArrowRight className="ml-2 h-4 w-4" aria-hidden />
           </Button>

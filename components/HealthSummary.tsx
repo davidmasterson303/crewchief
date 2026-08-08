@@ -157,7 +157,7 @@ export default function HealthSummary({ vehicleId, healthSummary, recalls = [], 
                 size="sm"
                 onClick={handleRefresh}
                 disabled={isRefreshing}
-                className="w-full bg-cyan-600 hover:bg-cyan-500 text-white glow-cyan-sm"
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground glow-cyan-sm"
               >
                 <TrendingUp className="h-4 w-4 mr-2" />
                 Generate Health Report

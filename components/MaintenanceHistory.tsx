@@ -246,7 +246,7 @@ export default function MaintenanceHistory({ vehicleId, documents, lineItems = [
           </div>
           <Button
             onClick={() => setUploadDialogOpen(true)}
-            className="bg-cyan-600 hover:bg-cyan-500 text-white border-0 h-9 px-4 text-sm gap-2"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground border-0 h-9 px-4 text-sm gap-2"
           >
             <Upload className="h-4 w-4" />
             Upload Invoice
@@ -311,7 +311,7 @@ export default function MaintenanceHistory({ vehicleId, documents, lineItems = [
             <Button
               onClick={() => setUploadDialogOpen(true)}
               size="sm"
-              className="bg-cyan-600 hover:bg-cyan-500 text-white h-9 px-4 gap-2 text-xs"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground h-9 px-4 gap-2 text-xs"
             >
               <Upload className="h-3.5 w-3.5" />
               Upload Your First Invoice

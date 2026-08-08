@@ -870,7 +870,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
               <Button
                 type="button"
                 onClick={handleNext}
-                className="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white font-medium"
+                className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
                 disabled={loading || (step === 1 && !powertrainReady)}
               >
                 {step === 1 && !powertrainReady ? (
@@ -886,7 +886,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
               <Button
                 type="button"
                 onClick={handleSubmit}
-                className="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white font-medium"
+                className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
                 disabled={loading || !formData.ownership_objective}
               >
                 {loading ? (
@@ -902,7 +902,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
               <Button
                 type="button"
                 onClick={handleClarificationSubmit}
-                className="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white font-medium"
+                className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
                 disabled={loading}
               >
                 {loading ? (

@@ -479,7 +479,7 @@ export function QuoteRequestDialogV2({
                 <Button
                   onClick={handleNext}
                   disabled={state.step === 1 && state.selectedItemIds.size === 0}
-                  className="bg-cyan-600 hover:bg-cyan-500 text-white h-10 px-5 rounded-xl font-semibold text-sm gap-2 disabled:opacity-40"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground h-10 px-5 rounded-xl font-semibold text-sm gap-2 disabled:opacity-40"
                 >
                   {state.step === 2 ? 'Generate Quote' : 'Next'}
                   <ChevronRight className="h-4 w-4" />
@@ -489,7 +489,7 @@ export function QuoteRequestDialogV2({
               {state.step === 3 && (
                 <Button
                   onClick={handleClose}
-                  className="bg-cyan-600 hover:bg-cyan-500 text-white h-10 px-5 rounded-xl font-semibold text-sm gap-2"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground h-10 px-5 rounded-xl font-semibold text-sm gap-2"
                 >
                   <CheckCircle className="h-4 w-4" />
                   Done

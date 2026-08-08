@@ -265,7 +265,7 @@ export default function TCOCard({ vehicle, vehicleId, onEditInputs }: TCOCardPro
               <Button
                 onClick={onEditInputs}
                 size="sm"
-                className="bg-cyan-600 hover:bg-cyan-500 text-white text-xs"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs"
               >
                 <SlidersHorizontal className="h-3.5 w-3.5 mr-1.5" />
                 Enter Cost Inputs

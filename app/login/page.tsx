@@ -115,7 +115,7 @@ function LoginForm() {
       <Button
         type="submit"
         disabled={loading}
-        className="w-full h-11 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-xl transition-all"
+        className="w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl transition-all"
       >
         {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Sign In'}
       </Button>

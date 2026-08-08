@@ -63,7 +63,7 @@ function PublicNavActions() {
   if (!loading && user) {
     return (
       <Link href="/garage">
-        <Button className="bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-xl transition-all text-sm h-9 px-4">
+        <Button className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl transition-all text-sm h-9 px-4">
           My Garage
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
@@ -222,7 +222,7 @@ function GarageContents() {
                 </p>
                 <Button
                   onClick={() => window.location.reload()}
-                  className="bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-xl transition-all h-10 px-5"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl transition-all h-10 px-5"
                 >
                   Retry
                 </Button>
