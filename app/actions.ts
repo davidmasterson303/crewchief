@@ -5270,7 +5270,25 @@ export async function getModsForVehicle(
       return { success: false, data: [] };
     }
 
-    const client = getServiceRoleClient();
+    /*
+      ── The caller's client, not the service role ─────────────────────────────
+
+      This read `getServiceRoleClient()` unconditionally, **including for demo
+      vehicles**, and that is the exact failure `load-vehicle/route.ts` records
+      in its own header: the deployed service-role key is rejected, so a route
+      that reaches for it on the public demo gets nothing back while its
+      siblings serve the same data fine.
+
+      It cost a promote. Locally the key is valid so the WRX showed all five
+      mods; on the demo every query returned empty and the tab read **Mods 0**.
+      Found by loading the promoted build rather than trusting the local one.
+
+      `authorizeVehicleAccess` already hands back the right client — the anon
+      client for a demo vehicle, where RLS permits the public read, and an
+      RLS-scoped caller client otherwise. Using it is both the fix and the rule
+      this codebase already settled on.
+    */
+    const client = access.client;
 
     const [knowledgeRes, trackingRes, cacheRes, vehicleRes] = await Promise.all([
       client.from('vehicle_knowledge_base').select('common_mods').eq('vehicle_id', vehicleId).maybeSingle(),
