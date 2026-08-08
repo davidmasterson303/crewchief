@@ -1,4 +1,4 @@
-import { render, waitFor } from '@testing-library/react-native';
+import { render, userEvent, waitFor } from '@testing-library/react-native';
 
 import { GarageScreen } from '../GarageScreen';
 import { apiRequest, ApiRequestError } from '../../api/client';
@@ -51,14 +51,14 @@ const M235I = {
  * `view.findByText is not a function`, or an unpopulated `screen` reporting
  * that render "has not been called", neither of which names the cause.
  */
-function renderGarage() {
+function renderGarage(overrides: { onAddVehicle?: () => void } = {}) {
   return render(
     <GarageScreen
       accessToken="test-token"
       email="owner@example.test"
       onSignOut={jest.fn()}
       onOpenVehicle={jest.fn()}
-      onAddVehicle={jest.fn()}
+      onAddVehicle={overrides.onAddVehicle ?? jest.fn()}
     />
   );
 }
@@ -128,5 +128,77 @@ describe('App Store 5.1.1(v) — account deletion stays reachable', () => {
 
     expect(await view.findByLabelText('Account')).toBeTruthy();
     expect(view.getByText('No vehicles yet')).toBeTruthy();
+  });
+});
+
+/**
+ * Adding a car is reachable from every state, not just the empty one.
+ *
+ * **The defect this pins was live.** "Add a car" existed only inside
+ * `ListEmptyComponent`, so the affordance disappeared the moment you owned a
+ * car — there was no way on the phone to add a second. Invisible while the web
+ * was where you became a user, and a hole in the product once the phone *is*
+ * the product.
+ *
+ * It is the same rule, broken the same way, as the account-deletion bug
+ * `mobile-account-reachable.test.ts` was written after: an affordance placed in
+ * one branch of a screen that renders several. That guard is a source scan
+ * because no mobile runner existed when it was written. One exists now, so this
+ * mounts the screen instead — it asserts what a person can actually reach
+ * rather than what the file contains.
+ */
+describe('adding a car', () => {
+  it('is reachable with cars in the garage', async () => {
+    // The state the old placement missed entirely.
+    request.mockResolvedValue({ vehicles: [M235I] });
+
+    const view = await renderGarage();
+
+    await view.findByText('2015 BMW M235i');
+    expect(view.getByLabelText('Add a car')).toBeTruthy();
+  });
+
+  it('is reachable with an empty garage', async () => {
+    request.mockResolvedValue({ vehicles: [] });
+
+    const view = await renderGarage();
+
+    expect(await view.findByLabelText('Add a car')).toBeTruthy();
+  });
+
+  it('is reachable when the garage failed to load', async () => {
+    /*
+      A person whose connection dropped should still be able to start adding a
+      car. This is also the state where the old empty-state placement was most
+      misleading: the list is empty because the request failed, not because the
+      account has no cars.
+    */
+    request.mockRejectedValue(
+      new ApiRequestError({ status: 500, message: 'Upstream is having a moment' })
+    );
+
+    const view = await renderGarage();
+
+    await waitFor(() => expect(view.getByText('Could not load your garage')).toBeTruthy());
+    expect(view.getByLabelText('Add a car')).toBeTruthy();
+  });
+
+  it('actually calls the handler rather than merely rendering a control', async () => {
+    /*
+      The three above prove a label exists. This proves it is wired — a
+      `Pressable` with no `onPress`, or one bound to the wrong callback, renders
+      and reads identically. `userEvent` rather than `fireEvent`: see
+      `AddVehicleScreen.test.tsx` for why the latter silently does nothing here.
+    */
+    const user = userEvent.setup();
+    const onAddVehicle = jest.fn();
+    request.mockResolvedValue({ vehicles: [M235I] });
+
+    const view = await renderGarage({ onAddVehicle });
+
+    await view.findByText('2015 BMW M235i');
+    await user.press(view.getByLabelText('Add a car'));
+
+    expect(onAddVehicle).toHaveBeenCalledTimes(1);
   });
 });
