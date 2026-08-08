@@ -74,6 +74,12 @@ nav {
      * halo weight. */
     --focus-ring-soft: rgb(34 211 238 / 0.22);
 
+    /* The build dial's redline — v8 §4c. Deliberately hotter and more
+       orange-shifted than --critical-red (#F87171): a redline that matched the
+       alert red would be read as an alert. Do not harmonise them. */
+    --build-redline: #FF4436;
+    --build-redline-track: rgb(255 68 54 / 0.22);
+
     /* ── design-system vocabulary, aliased onto the app's tokens (v7 C0) ──
      *
      * The v7 specs are written in these names; this file was written in the
@@ -110,6 +116,9 @@ nav {
     --radius-sm: 8px;
     --border-subtle: rgb(255 255 255 / 0.08);
     --text-muted-40: rgb(245 243 240 / 0.4);
+    /* 13px, the small-body step. It was specified with no value, so every call
+       site carried the literal instead. v8 §1. */
+    --text-body-sm: 13px;
 
     --foreground: 36 20% 95%;         /* #F5F3F0 */
     --card-foreground: 36 20% 95%;
@@ -709,8 +718,16 @@ nav {
     align-items: flex-end;
     gap: 24px;
   }
-  /* The hero numeral never sits on raw photography. */
-  .ph-glass {
+  /*
+   * The hero numeral never sits on raw photography.
+   *
+   * Renamed from `.ph-glass` — v8 §8c. There is no glassmorphism anywhere in
+   * this product and the old name invited it back: the next person reading
+   * "glass" reaches for more blur and more translucency, which is how a plate
+   * that exists to make a numeral legible turns into decoration that makes it
+   * less so. A plinth is what this is — a solid thing a number stands on.
+   */
+  .plinth {
     background: rgb(255 255 255 / 0.06);
     border: 1px solid rgb(255 255 255 / 0.1);
     backdrop-filter: blur(14px);
@@ -1015,14 +1032,14 @@ nav {
   }
 
   /*
-   * The `sm` size step. 13px is the app's existing small-body size — the
-   * design system calls this `--text-body-sm` but ships no value for it, so
-   * this is a literal until one arrives. One place to change.
+   * The `sm` size step. This carried a 13px literal with a note saying the
+   * design system named `--text-body-sm` but shipped no value for it. v8 §1
+   * supplies the value, so the literal goes and the token is consumed.
    */
   .field-sm {
     min-height: 34px;
     padding: 7px 10px;
-    font-size: 13px;
+    font-size: var(--text-body-sm);
   }
 
   /*
