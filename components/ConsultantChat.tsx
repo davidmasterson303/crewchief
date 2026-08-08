@@ -894,7 +894,19 @@ export default function ConsultantChat({
                                 <Heart className="h-3.5 w-3.5 flex-shrink-0" />
                               )}
                               <span className="flex-1 font-medium text-xs">{action.name}</span>
-                              <span className="text-xs opacity-50 capitalize">{action.type}</span>
+                              {/*
+                                An explicit colour per state, not `opacity-50`.
+                                An alpha multiplier is the one form of de-emphasis
+                                `text-contrast-floor.test.ts` structurally cannot
+                                measure — it reads colour classes — so a faded
+                                label is an unaudited one. Same rule R10 states:
+                                contrast, not size, makes a label recede.
+                              */}
+                              <span
+                                className={`text-xs capitalize ${isAdded ? 'text-green-300/60' : 'text-info/60'}`}
+                              >
+                                {action.type}
+                              </span>
                               {!isAdded && !isAdding && <span className="text-xs text-cyan-400 font-semibold">+ Add</span>}
                             </button>
                           );
@@ -928,7 +940,7 @@ export default function ConsultantChat({
                             >
                               <FileText className="h-3.5 w-3.5 flex-shrink-0" />
                               <span className="flex-1 font-medium text-xs">Get competing quotes</span>
-                              <span className="text-xs opacity-60">
+                              <span className="text-xs text-amber-300/60">
                                 {pullable.length} item{pullable.length > 1 ? 's' : ''}
                               </span>
                             </button>
