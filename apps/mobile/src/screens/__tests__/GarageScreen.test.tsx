@@ -58,6 +58,7 @@ function renderGarage() {
       email="owner@example.test"
       onSignOut={jest.fn()}
       onOpenVehicle={jest.fn()}
+      onAddVehicle={jest.fn()}
     />
   );
 }

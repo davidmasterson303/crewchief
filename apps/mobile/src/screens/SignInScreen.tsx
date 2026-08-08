@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 
-import { signIn } from '../auth/session';
+import { signIn, signUp } from '../auth/session';
 import { hasDevCredentials, signInWithDevCredentials } from '../auth/dev-session';
 import { checkSharedCore } from '../core-check';
 
@@ -21,13 +21,27 @@ import { checkSharedCore } from '../core-check';
  * only that. Adding Google or Facebook login triggers Apple's Sign in with
  * Apple requirement (4.8), which is a submission-scope decision and not one to
  * make by adding a button.
+ *
+ * ── Sign-up lives here rather than on its own screen ────────────────────────
+ *
+ * Added 8 Aug, when the product went mobile-first. Until then this screen could
+ * only sign in, so the only way to become a user was the web app — fatal for
+ * something sold on the App Store, where a reviewer downloads the app and has
+ * no route to the product.
+ *
+ * One form, two modes, because the fields are identical and the difference is a
+ * verb. A separate screen would duplicate the inputs, the keyboard handling and
+ * the error surface to change one label and one call.
  */
 export function SignInScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [mode, setMode] = useState<'in' | 'up'>('in');
 
+  const isNew = mode === 'up';
   const canSubmit = email.trim().length > 0 && password.length > 0 && !busy;
 
   async function handleSubmit() {
@@ -35,14 +49,29 @@ export function SignInScreen() {
 
     setBusy(true);
     setError(null);
+    setNotice(null);
 
-    const result = await signIn(email, password);
+    const result = isNew ? await signUp(email, password) : await signIn(email, password);
 
-    // No success branch: a successful sign-in fires onAuthStateChange, and the
-    // root swaps this screen out. Setting state here would be a write to an
-    // unmounted component.
     if (!result.ok) {
-      setError(result.error ?? 'Could not sign in.');
+      setError(result.error ?? (isNew ? 'Could not create your account.' : 'Could not sign in.'));
+      setBusy(false);
+      return;
+    }
+
+    /*
+      A successful sign-in — and a sign-up on a project with confirmation off —
+      fires `onAuthStateChange` and the root swaps this screen out, so there is
+      nothing to do and setting state would write to an unmounted component.
+
+      Confirmation being *on* is the case that needs handling: the account
+      exists, there is no session, and nothing swaps. Without this the screen
+      sits there looking like the button did nothing.
+    */
+    if (isNew && 'needsConfirmation' in result && result.needsConfirmation) {
+      setNotice('Account created. Check your email for a confirmation link, then sign in.');
+      setMode('in');
+      setPassword('');
       setBusy(false);
     }
   }
@@ -54,7 +83,9 @@ export function SignInScreen() {
     >
       <View style={styles.form}>
         <Text style={styles.title}>CrewChief</Text>
-        <Text style={styles.subtitle}>Sign in to your garage</Text>
+        <Text style={styles.subtitle}>
+          {isNew ? 'Create your garage' : 'Sign in to your garage'}
+        </Text>
 
         <TextInput
           style={styles.input}
@@ -77,14 +108,19 @@ export function SignInScreen() {
           placeholderTextColor="rgba(255,255,255,0.3)"
           secureTextEntry
           autoCapitalize="none"
-          // Lets the iOS keychain offer a saved password rather than
-          // encouraging people to type one they will pick badly.
-          textContentType="password"
+          /*
+            `newPassword` on sign-up so the keychain offers to generate and save
+            a strong one, rather than nudging someone to invent a weak one they
+            will reuse. `password` on sign-in so it offers what is already
+            saved, which is why this was here before sign-up existed.
+          */
+          textContentType={isNew ? 'newPassword' : 'password'}
           editable={!busy}
           onSubmitEditing={handleSubmit}
         />
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
+        {notice ? <Text style={styles.notice}>{notice}</Text> : null}
 
         <Pressable
           style={[styles.button, !canSubmit && styles.buttonDisabled]}
@@ -94,8 +130,23 @@ export function SignInScreen() {
           {busy ? (
             <ActivityIndicator color="#080808" />
           ) : (
-            <Text style={styles.buttonText}>Sign in</Text>
+            <Text style={styles.buttonText}>{isNew ? 'Create account' : 'Sign in'}</Text>
           )}
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => {
+            setMode(isNew ? 'in' : 'up');
+            setError(null);
+            setNotice(null);
+          }}
+          disabled={busy}
+          style={styles.switchMode}
+        >
+          <Text style={styles.switchModeText}>
+            {isNew ? 'Already have an account? Sign in' : 'New here? Create an account'}
+          </Text>
         </Pressable>
 
         <DevAutoSignIn />
@@ -255,6 +306,9 @@ const styles = StyleSheet.create({
     A render test now does.
   */
   buttonDisabled: { backgroundColor: '#b8b8b8' },
+  notice: { color: '#7dd3a0', fontSize: 13, lineHeight: 18 },
+  switchMode: { minHeight: 44, justifyContent: 'center', alignItems: 'center' },
+  switchModeText: { color: 'rgba(255,255,255,0.7)', fontSize: 14 },
   buttonText: { color: '#080808', fontSize: 16, fontWeight: '600' },
 
   devCheck: { marginTop: 18, gap: 4 },

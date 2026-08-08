@@ -300,12 +300,14 @@ export function GarageScreen({
   email,
   onSignOut,
   onOpenVehicle,
+  onAddVehicle,
 }: {
   accessToken: string;
   email: string | null;
   onSignOut: () => void;
   /** Title travels with the id so the detail header is right during the fetch. */
   onOpenVehicle: (vehicleId: string, title: string) => void;
+  onAddVehicle: () => void;
 }) {
   /*
     App Store 5.1.1(v). The account surface is one tap from here because the
@@ -479,9 +481,18 @@ export function GarageScreen({
         */
         <View style={styles.centred}>
           <Text style={styles.errorTitle}>No vehicles yet</Text>
+          {/*
+            This read "Add a car on the web and it will appear here." — the
+            mobile-first problem in one sentence. A new user's first screen sent
+            them to a different product to become a user at all, which an App
+            Store reviewer would have hit before anything else.
+          */}
           <Text style={styles.errorBody}>
-            Add a car on the web and it will appear here.
+            Add your first car and CrewChief gets to work on it.
           </Text>
+          <Pressable style={styles.button} onPress={onAddVehicle} accessibilityRole="button">
+            <Text style={styles.buttonText}>Add a car</Text>
+          </Pressable>
         </View>
       }
       ListFooterComponent={<DevToken token={accessToken} />}

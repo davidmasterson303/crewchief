@@ -158,6 +158,13 @@ const STATIC_ANALYSIS_SUITES = [
   // cookie-authenticated handler behaves perfectly until a client with no
   // cookies calls it, which is the mobile app and not this runner.
   'v1-accepts-bearer.test.ts',
+  // Reads the vehicles route to prove `POST` authorizes with `requireCaller`
+  // rather than the cookie-only client, never takes `user_id` from the body,
+  // and does not block on the ~23s dossier research. Executing it needs a live
+  // Supabase and a session; the properties that matter are which helper is
+  // called and what is refused, both of which are on disk. Same reasoning as
+  // `upload-route-status-codes`.
+  'create-vehicle-route.test.ts',
 ];
 
 /**

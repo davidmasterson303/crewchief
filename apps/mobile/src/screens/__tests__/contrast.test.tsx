@@ -7,6 +7,7 @@ import { RecallDetailScreen } from '../RecallDetailScreen';
 import { WishlistScreen } from '../WishlistScreen';
 import { ServiceMilestoneScreen } from '../ServiceMilestoneScreen';
 import { SignInScreen } from '../SignInScreen';
+import { AddVehicleScreen } from '../AddVehicleScreen';
 import { apiRequest, ApiRequestError } from '../../api/client';
 import { auditText, belowFloor, contrastRatio, SCREEN_BACKGROUND } from '../../test-support/contrast';
 
@@ -66,6 +67,7 @@ describe('the health score colour — never checked by the source scan', () => {
         email="owner@example.test"
         onSignOut={jest.fn()}
         onOpenVehicle={jest.fn()}
+        onAddVehicle={jest.fn()}
       />
     );
 
@@ -110,6 +112,7 @@ describe('failure states, which are where sub-floor text hides', () => {
         email="owner@example.test"
         onSignOut={jest.fn()}
         onOpenVehicle={jest.fn()}
+        onAddVehicle={jest.fn()}
       />
     );
 
@@ -126,6 +129,7 @@ describe('failure states, which are where sub-floor text hides', () => {
         email="owner@example.test"
         onSignOut={jest.fn()}
         onOpenVehicle={jest.fn()}
+        onAddVehicle={jest.fn()}
       />
     );
 
@@ -229,6 +233,7 @@ describe('the measurement itself', () => {
         email="owner@example.test"
         onSignOut={jest.fn()}
         onOpenVehicle={jest.fn()}
+        onAddVehicle={jest.fn()}
       />
     );
 
@@ -560,4 +565,52 @@ describe('the sign-in screen', () => {
     await view.findByText('Sign in');
     expect(belowFloor(auditText(view))).toEqual([]);
   });
+});
+
+/**
+ * The two screens that make a person a user, 8 Aug.
+ *
+ * Until the mobile-first pivot neither existed: `SignInScreen` could only sign
+ * in, and there was no add-vehicle anywhere in the app. They are now the first
+ * two screens anyone sees, which makes them the two most expensive places for
+ * unreadable text — and both open in a disabled state, which is the class of
+ * defect that has slipped past twice already.
+ */
+describe('sign-up', () => {
+  it('reads at AA in create-account mode', async () => {
+    const view = await render(<SignInScreen />);
+
+    fireEvent.press(await view.findByText('New here? Create an account'));
+
+    await view.findByText('Create your garage');
+    expect(belowFloor(auditText(view))).toEqual([]);
+  });
+});
+
+describe('add a car', () => {
+  it('reads at AA in the disabled state it opens in', async () => {
+    // The form is empty on arrival, so the submit button renders in its
+    // unavailable fill — the state a new user actually meets first.
+    const view = await render(
+      <AddVehicleScreen onAdded={jest.fn()} onSignOut={jest.fn()} />
+    );
+
+    await view.findByText('Add to my garage');
+    expect(belowFloor(auditText(view))).toEqual([]);
+  });
+
+  it('reads at AA with the form filled and both choices rendered', async () => {
+    const view = await render(
+      <AddVehicleScreen onAdded={jest.fn()} onSignOut={jest.fn()} />
+    );
+
+    fireEvent.changeText(view.getByLabelText('Model year'), '2020');
+    fireEvent.changeText(view.getByLabelText('Make'), 'Subaru');
+    fireEvent.changeText(view.getByLabelText('Model'), 'WRX');
+
+    // Both the selected and unselected chip, since they are different fills.
+    await view.findByText('Not for me');
+    expect(belowFloor(auditText(view))).toEqual([]);
+  });
+
 });
