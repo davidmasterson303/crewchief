@@ -6,6 +6,7 @@ import { InvoiceScanScreen } from '../InvoiceScanScreen';
 import { RecallDetailScreen } from '../RecallDetailScreen';
 import { WishlistScreen } from '../WishlistScreen';
 import { ServiceMilestoneScreen } from '../ServiceMilestoneScreen';
+import { SignInScreen } from '../SignInScreen';
 import { apiRequest, ApiRequestError } from '../../api/client';
 import { auditText, belowFloor, contrastRatio, SCREEN_BACKGROUND } from '../../test-support/contrast';
 
@@ -538,6 +539,25 @@ describe('the service milestone screen', () => {
 
     await view.findByText('Timed by date, not mileage');
     expect(view.queryByText(/Brake fluid flush/)).not.toBeNull();
+    expect(belowFloor(auditText(view))).toEqual([]);
+  });
+});
+
+/**
+ * Sign-in — the first screen anyone sees, and until 7 Aug 2026 **no test
+ * mounted it**.
+ *
+ * Its submit button is disabled on arrival: the form is empty, so the state a
+ * new user actually meets is the greyed-out one. It used `opacity: 0.4` on a
+ * white fill with a near-black label — about 1.85:1 against a 4.5 floor —
+ * and neither guard could see it. The source scan reads colour literals and
+ * there are none; this suite did not composite a parent alpha until today.
+ */
+describe('the sign-in screen', () => {
+  it('reads at AA in the disabled state it opens in', async () => {
+    const view = await render(<SignInScreen />);
+
+    await view.findByText('Sign in');
     expect(belowFloor(auditText(view))).toEqual([]);
   });
 });

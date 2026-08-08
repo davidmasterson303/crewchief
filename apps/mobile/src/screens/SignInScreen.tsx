@@ -243,7 +243,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 6,
   },
-  buttonDisabled: { opacity: 0.4 },
+  /*
+    An explicit fill, not `opacity` — the same defect the advisor's "Ask"
+    button carried, on the first screen anyone sees.
+
+    `opacity: 0.4` on a white button with a near-black label measures about
+    1.85:1 against a 4.5 floor, and it is the state the screen *opens in*: the
+    form is empty, so the button is disabled before a single keystroke. Nothing
+    caught it because both contrast guards were blind — the source scan reads
+    colour literals and sees none here, and no test mounts this screen at all.
+    A render test now does.
+  */
+  buttonDisabled: { backgroundColor: '#b8b8b8' },
   buttonText: { color: '#080808', fontSize: 16, fontWeight: '600' },
 
   devCheck: { marginTop: 18, gap: 4 },

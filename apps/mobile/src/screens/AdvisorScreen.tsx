@@ -455,6 +455,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 13,
   },
-  sendDisabled: { opacity: 0.35 },
+  /*
+    An explicit fill, not `opacity`.
+
+    This was `opacity: 0.35`, which put the near-black "Ask" label at **1.61:1**
+    against a 4.5 floor — effectively invisible on the product's flagship
+    screen. It survived every check because both contrast guards were blind to
+    it: the source scan reads colour literals and sees none here, and the
+    rendered-pixel suite did not composite a parent alpha until 7 Aug.
+
+    Same construction as the 4.47:1 defect found on this screen on 6 Aug, and
+    the second time a *disabled* state has been the one nothing measured.
+
+    #b8b8b8 keeps the label at roughly 9:1 while reading clearly as
+    unavailable — a disabled control still has to say what it is.
+  */
+  sendDisabled: { backgroundColor: '#b8b8b8' },
   sendText: { color: '#080808', fontSize: 15, fontWeight: '600' },
 });

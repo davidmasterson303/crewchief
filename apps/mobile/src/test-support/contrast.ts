@@ -139,25 +139,49 @@ interface HostNode {
 function walk(
   node: HostNode | string | null | undefined,
   backdrop: RGB,
-  found: { node: HostNode; backdrop: RGB }[] = []
-): { node: HostNode; backdrop: RGB }[] {
+  opacity: number = 1,
+  found: { node: HostNode; backdrop: RGB; opacity: number }[] = []
+): { node: HostNode; backdrop: RGB; opacity: number }[] {
   if (!node || typeof node === 'string') return found;
 
   let surface = backdrop;
 
   const style = StyleSheet.flatten(node.props?.style as never) as
-    | { backgroundColor?: string }
+    | { backgroundColor?: string; opacity?: number }
     | undefined;
+
+  /*
+    ── Opacity, which this walk was blind to until 7 Aug 2026 ────────────────
+
+    `opacity` on a `View` fades its whole subtree toward whatever is behind it,
+    and nothing here saw it — so a control greyed out the ordinary way was
+    measured at its *undimmed* colour and passed at a ratio it does not
+    achieve. Found by mutation: the wishlist's disabled CTA was dropped from
+    `opacity: 0.55` to `0.12`, which makes its label unreadable, and all 39
+    tests stayed green.
+
+    Accumulated multiplicatively down the tree, because nested faded groups
+    compound.
+
+    ⚠ **This is an approximation, and the direction it errs matters.** True
+    group opacity flattens a subtree and composites it *once*; this applies the
+    factor to each layer as it descends. For the shape that actually occurs —
+    a solid fill with text on it — the two agree. They diverge when translucent
+    layers are stacked inside a faded group, where this reads slightly darker
+    than the platform will paint. Erring toward "less contrast than claimed" is
+    the safe direction for a floor.
+  */
+  const effective = typeof style?.opacity === 'number' ? opacity * style.opacity : opacity;
 
   if (typeof style?.backgroundColor === 'string') {
     const parsed = parseColor(style.backgroundColor);
     // A translucent panel over its own parent, not over the screen — which is
     // how a card on a card ends up lighter than either.
-    if (parsed) surface = composite(parsed, backdrop);
+    if (parsed) surface = composite({ ...parsed, alpha: parsed.alpha * effective }, backdrop);
   }
 
-  if (node.type === 'Text') found.push({ node, backdrop: surface });
-  for (const child of node.children ?? []) walk(child, surface, found);
+  if (node.type === 'Text') found.push({ node, backdrop: surface, opacity: effective });
+  for (const child of node.children ?? []) walk(child, surface, effective, found);
 
   return found;
 }
@@ -188,7 +212,7 @@ export function auditText(
 
   return roots
     .flatMap((root) => walk(root, base))
-    .map(({ node, backdrop }) => {
+    .map(({ node, backdrop, opacity }) => {
       const style = StyleSheet.flatten(node.props?.style as never) as
         | { color?: string; fontSize?: number; fontWeight?: string }
         | undefined;
@@ -205,7 +229,15 @@ export function auditText(
       const parsed = parseColor(color);
       if (!parsed) return null;
 
-      const text = luminance(composite(parsed, backdrop));
+      /*
+        The inherited fade applies to the ink as well as to the fill it sits
+        on. A `Text` inside an `opacity: 0.5` group is half-transparent against
+        that group's own faded surface, which is the whole reason a greyed-out
+        control loses contrast rather than merely looking dimmer.
+      */
+      const faded = { ...parsed, alpha: parsed.alpha * opacity };
+
+      const text = luminance(composite(faded, backdrop));
       const behind = luminance(backdrop);
       const [lighter, darker] = text > behind ? [text, behind] : [behind, text];
       const ratio = (lighter + 0.05) / (darker + 0.05);
