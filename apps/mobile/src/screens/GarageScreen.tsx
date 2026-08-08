@@ -300,12 +300,14 @@ export function GarageScreen({
   email,
   onSignOut,
   onOpenVehicle,
+  onAddVehicle,
 }: {
   accessToken: string;
   email: string | null;
   onSignOut: () => void;
   /** Title travels with the id so the detail header is right during the fetch. */
   onOpenVehicle: (vehicleId: string, title: string) => void;
+  onAddVehicle: () => void;
 }) {
   /*
     App Store 5.1.1(v). The account surface is one tap from here because the
@@ -362,14 +364,37 @@ export function GarageScreen({
   const header = (
     <View style={styles.header}>
       <Text style={styles.heading}>Garage</Text>
-      <Pressable
-        onPress={() => setAccountOpen(true)}
-        hitSlop={12}
-        accessibilityRole="button"
-        accessibilityLabel="Account"
-      >
-        <Text style={styles.signOut}>Account</Text>
-      </Pressable>
+      <View style={styles.headerActions}>
+        {/*
+          "Add a car" lives here, not only in the empty state.
+
+          It used to exist solely inside `ListEmptyComponent`, which meant that
+          **once you owned one car there was no way on the phone to add a
+          second.** Fine while the web was where you became a user; a hole in
+          the product once the phone is the product.
+
+          This is the same rule `mobile-account-reachable.test.ts` holds for
+          account deletion, and it was broken the same way — an affordance
+          placed in one branch of a screen that renders several. The header
+          renders in every state this screen has, which is why both live in it.
+        */}
+        <Pressable
+          onPress={onAddVehicle}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="Add a car"
+        >
+          <Text style={styles.headerAction}>Add car</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => setAccountOpen(true)}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="Account"
+        >
+          <Text style={styles.signOut}>Account</Text>
+        </Pressable>
+      </View>
     </View>
   );
 
@@ -479,9 +504,18 @@ export function GarageScreen({
         */
         <View style={styles.centred}>
           <Text style={styles.errorTitle}>No vehicles yet</Text>
+          {/*
+            This read "Add a car on the web and it will appear here." — the
+            mobile-first problem in one sentence. A new user's first screen sent
+            them to a different product to become a user at all, which an App
+            Store reviewer would have hit before anything else.
+          */}
           <Text style={styles.errorBody}>
-            Add a car on the web and it will appear here.
+            Add your first car and CrewChief gets to work on it.
           </Text>
+          <Pressable style={styles.button} onPress={onAddVehicle} accessibilityRole="button">
+            <Text style={styles.buttonText}>Add a car</Text>
+          </Pressable>
         </View>
       }
       ListFooterComponent={<DevToken token={accessToken} />}
@@ -507,6 +541,19 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   heading: { color: '#fff', fontSize: 30, fontWeight: '700', letterSpacing: -0.6 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 18 },
+  /*
+    Brighter than `signOut`, because these two are not equals: adding a car is
+    the thing this screen exists to lead to, and Account is somewhere you go
+    occasionally. Both clear the 44px target through `minHeight` plus `hitSlop`.
+  */
+  headerAction: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 14,
+    fontWeight: '600',
+    minHeight: 44,
+    lineHeight: 44,
+  },
   signOut: { color: 'rgba(255,255,255,0.5)', fontSize: 14, minHeight: 44, lineHeight: 44 },
   deletedNotice: {
     position: 'absolute',

@@ -4,6 +4,16 @@ import { CX, CY, R, TRACK, VIEW_H, VIEW_W, angleFor, pointAt } from '@crewchief/
 import type { BuildPosition } from '@crewchief/core/build-progress';
 
 /**
+ * Where the redline starts, on the same 0-100 scale as the reading.
+ *
+ * One constant drives the painted band and the needle's colour, so the two
+ * cannot drift — a redline drawn at 82 with a needle that turns at 85 would
+ * show a pointer sitting in the red while still reading as normal, which is
+ * worse than having no redline.
+ */
+const REDLINE_FROM = 82;
+
+/**
  * How far this build has come, on the cluster dial.
  *
  * ── Why a sibling of `ClusterGauge` and not a variant of it ─────────────────
@@ -43,6 +53,18 @@ export function BuildGauge({
   const colour =
     needle >= 70 ? '#f0a35e' : needle >= 40 ? '#e0c168' : needle >= 12 ? '#9fc8d8' : '#7d8794';
 
+  /*
+    The needle joins the redline once it enters it — v8 §4c.
+
+    Only the needle, never the lit arc. The arc is the *history* of the build
+    and none of it happened in the red; the needle is where the car is now. A
+    tachometer colours the pointer, not the sweep behind it.
+
+    Still not a failure: `aria-label` stays "Build progress — {label}" and
+    never a score, so nothing here announces a modified car as a fault.
+  */
+  const needleColour = needle >= REDLINE_FROM ? 'var(--build-redline)' : colour;
+
   return (
     <figure className="flex flex-col items-center gap-1" style={{ width: size }}>
       <svg
@@ -57,8 +79,36 @@ export function BuildGauge({
           d={TRACK}
           fill="none"
           stroke="rgb(255 255 255 / 0.08)"
-          strokeWidth={10}
+          strokeWidth={6}
           strokeLinecap="butt"
+        />
+
+        {/*
+          The redline. v8 §4c.
+
+          Painted on the **unlit** face from 82 to 100, so it is there at a
+          reading of zero — visible at idle, visible with the car switched off,
+          exactly as a tachometer's is painted at the factory.
+
+          This is the one place red does not mean fault. A redline means *near
+          the limit of the engine*, and that is the argument this dial already
+          makes in its geometry: `needleFor` clamps at 99, and a complete pass
+          of the WRX's entire known catalogue lands near 63. Visible from first
+          launch, very nearly unreachable.
+
+          `--build-redline` is deliberately hotter and more orange-shifted than
+          `--critical-red`. A redline that matched the alert red would be read
+          as an alert — do not harmonise them.
+        */}
+        <path
+          d={TRACK}
+          fill="none"
+          stroke="var(--build-redline-track)"
+          strokeWidth={6}
+          strokeLinecap="butt"
+          pathLength={100}
+          strokeDasharray={`${100 - REDLINE_FROM} 100`}
+          strokeDashoffset={-REDLINE_FROM}
         />
 
         {/* The reading. `pathLength` normalises the arc to 100 so the dasharray
@@ -67,7 +117,7 @@ export function BuildGauge({
           d={TRACK}
           fill="none"
           stroke={colour}
-          strokeWidth={10}
+          strokeWidth={6}
           strokeLinecap="butt"
           pathLength={100}
           strokeDasharray={`${needle} 100`}
@@ -99,12 +149,20 @@ export function BuildGauge({
           y1={CY}
           x2={tip.x}
           y2={tip.y}
-          stroke={colour}
+          stroke={needleColour}
           strokeWidth={2.5}
-          strokeLinecap="round"
+          /*
+            `butt`, not `round`. A round cap adds half a stroke width past the
+            tip, which on a dial with ticks reads as the needle sitting a little
+            past where it points — the same error the health gauge's arc caps
+            were changed for.
+          */
+          strokeLinecap="butt"
           style={{ transition: 'all 900ms ease-out' }}
         />
-        <circle cx={CX} cy={CY} r={5} fill="#0d1117" stroke={colour} strokeWidth={2} />
+        {/* `#100F0D`, the warm graphite ground — not the cool `#0d1117` this
+            carried, which belonged to a palette this system moved off. */}
+        <circle cx={CX} cy={CY} r={5} fill="#100F0D" stroke={needleColour} strokeWidth={2} />
       </svg>
 
       {/*

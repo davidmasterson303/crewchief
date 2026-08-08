@@ -60,8 +60,13 @@ export default function IssueCard({
       className={`${isSmall ? 'p-3' : 'p-4'} border rounded-lg transition-all ${
         isCompleted
           ? 'bg-green-500/10 border-green-400/30'
-          : isNotInterested
-          ? 'bg-slate-800/30 border-slate-700/30 opacity-60'
+          : /* "Not interested" is already said twice — by the slate fill and by
+               the muted border. The `opacity-60` that used to be here was a
+               third signal, and the only one that faded the issue text and its
+               controls along with the card. The card is still live: you can
+               read it and change your mind about it. */
+            isNotInterested
+          ? 'bg-slate-800/30 border-slate-700/30'
           : 'bg-slate-900/30 border-slate-700/50 hover:border-cyan-400/30 hover:bg-slate-900/50'
       }`}
     >
@@ -104,7 +109,7 @@ export default function IssueCard({
             className={
               isSaved
                 ? `${isSmall ? 'h-7 text-xs' : ''} border-red-400/50 text-red-300 hover:border-red-400 hover:bg-red-500/10`
-                : `${isSmall ? 'h-7 text-xs' : ''} bg-cyan-600 text-white hover:bg-cyan-500`
+                : `${isSmall ? 'h-7 text-xs' : ''} bg-primary text-primary-foreground hover:bg-primary/90`
             }
             onClick={toggleWishlist}
             disabled={wishlistLoading || loading}

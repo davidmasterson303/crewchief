@@ -106,7 +106,11 @@ const ToastDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <ToastPrimitives.Description
     ref={ref}
-    className={cn('text-sm opacity-90', className)}
+    /* Was `opacity-90`. Mild, and not a legibility problem on its own — but it
+       is a fade on the one line of a toast that carries the actual message, and
+       an alpha there multiplies against any colour a caller passes in. Stated
+       as a colour so it composes predictably and the guard can measure it. */
+    className={cn('text-sm text-foreground/90', className)}
     {...props}
   />
 ));

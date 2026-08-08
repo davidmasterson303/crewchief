@@ -48,6 +48,64 @@ export interface SignInResult {
  * argument as `NOT_FOUND_MESSAGE` in `lib/api-auth.ts`, where "not found" and
  * "not yours" are deliberately indistinguishable.
  */
+/**
+ * Create an account.
+ *
+ * ── Why this had to exist before launch ─────────────────────────────────────
+ *
+ * `SignInScreen` could only sign in. There was no account creation anywhere in
+ * the app, and no onboarding either — so the only way to become a CrewChief
+ * user was to open the web app, sign up, add a car, and *then* install this.
+ * Fine for a companion. Fatal for a mobile-first product sold on the App Store:
+ * a reviewer downloads it and cannot reach the product at all.
+ *
+ * ── Email and password only, deliberately ───────────────────────────────────
+ *
+ * Same reasoning `SignInScreen` already carries: adding Google or Facebook
+ * login triggers Apple's Sign in with Apple requirement (guideline 4.8), which
+ * is a submission-scope decision and not one to make by adding a button.
+ *
+ * ── Confirmation is not assumed either way ──────────────────────────────────
+ *
+ * Supabase returns a session immediately when email confirmation is off, and
+ * returns a user with **no session** when it is on. Both are successes and they
+ * need different words on screen — "you're in" versus "check your email" — so
+ * this reports which happened rather than guessing at the project's setting.
+ * Guessing wrong strands someone on a screen that says nothing.
+ */
+export async function signUp(
+  email: string,
+  password: string
+): Promise<SignInResult & { needsConfirmation?: boolean }> {
+  const { data, error } = await supabase.auth.signUp({
+    email: email.trim(),
+    password,
+  });
+
+  if (error) {
+    const isNetwork = /network|fetch|timeout/i.test(error.message);
+    if (isNetwork) {
+      return {
+        ok: false,
+        error: 'Could not reach CrewChief. Check your connection and try again.',
+      };
+    }
+
+    /*
+      Supabase's own message is surfaced here rather than replaced. Sign-in can
+      afford one flat "did not match" because the causes are indistinguishable
+      and equally recoverable; sign-up cannot — "password too short", "already
+      registered" and "invalid email" each need a different action, and a
+      generic sentence would send someone round the same loop.
+    */
+    return { ok: false, error: error.message };
+  }
+
+  // A session means confirmation is off and they are already in. No session
+  // with a user means the confirmation email is the next step.
+  return { ok: true, needsConfirmation: !data.session };
+}
+
 export async function signIn(email: string, password: string): Promise<SignInResult> {
   const { error } = await supabase.auth.signInWithPassword({
     email: email.trim(),

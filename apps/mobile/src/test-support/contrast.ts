@@ -34,7 +34,33 @@ import { StyleSheet, Text } from 'react-native';
 /** Every CrewChief screen renders on this. */
 export const SCREEN_BACKGROUND = '#080808';
 
-/** WCAG 2.1 AA. Large text — 18pt, or 14pt bold — may use 3:1. */
+/**
+ * WCAG 2.1 AA. Large text — 18pt, or 14pt bold — may use 3:1.
+ *
+ * ── This helper is stricter than the standard, deliberately ─────────────────
+ *
+ * Since `d6fbae8` it composites parent `opacity`, which makes it *more*
+ * accurate than a scan of colour literals — and it means it will flag disabled
+ * controls that **WCAG 2.1 SC 1.4.3 explicitly exempts**:
+ *
+ *   "User Interface Components that are not available for user interaction
+ *   (e.g., a disabled control in HTML) are not required to meet contrast
+ *   requirements."
+ *
+ * Verified against the W3C Understanding document rather than recalled. The two
+ * buttons that first run found — the Advisor's "Ask" at 1.61:1 and SignIn's
+ * submit at ~1.85:1 — were both **disabled states**, and the commit that fixed
+ * them described them as failures "against a 4.5 floor". That overstated it.
+ * They were worth fixing on product grounds: a primary action nobody can read
+ * leaves you unable to tell what the control even is, and the sign-in button is
+ * the state that screen *opens* in. But the standard did not require it.
+ *
+ * So read a failure here as **a rule this project chose**, not as a compliance
+ * defect — and do not let a red result here be used to argue that the app is
+ * inaccessible, or a green one to claim more than it proves. The web guard
+ * `lib/__tests__/text-contrast-floor.test.ts` draws the exemption line
+ * explicitly and its reasoning applies to both clients.
+ */
 export const AA_NORMAL = 4.5;
 export const AA_LARGE = 3;
 

@@ -127,7 +127,7 @@ export default function OnboardVinForm() {
 
             <Button
               type="submit"
-              className="w-full bg-cyan-600 hover:bg-cyan-500 text-white h-12 text-sm font-semibold rounded-xl glow-cyan-sm transition-all hover:scale-[1.01] active:scale-[0.99]"
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-12 text-sm font-semibold rounded-xl glow-cyan-sm transition-all hover:scale-[1.01] active:scale-[0.99]"
               disabled={loading || vin.length !== 17}
             >
               {loading ? (

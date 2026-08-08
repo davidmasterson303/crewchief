@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { ArrowRight, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import FeaturesDrawer from './FeaturesDrawer';
+import { AppStoreCTA } from './AppStoreCTA';
 
 /**
  * The pitch that sits on the garage door. Content only.
@@ -88,8 +89,23 @@ export default function LandingHero({ onEnter }: LandingHeroProps) {
           under the door said the opposite, rendering sign-up filled and sign-in
           as plain text. The same pair, two hierarchies, on the same page.
 
-          One hierarchy now, and the nav matches it: enter the demo, then sign
-          up, then sign in.
+          One hierarchy now, and the nav matches it.
+
+          ── 8 Aug: what that hierarchy is, after the pivot ──────────────────
+
+          iOS is the product; this page is a shop window for it. So the middle
+          slot is no longer "sign up" — it is the app. Enrollment happens on the
+          phone, where the polished experience is and where the subscription is
+          sold.
+
+          `/signup` is *not* deleted, and that is a decision rather than an
+          oversight. It is the only way an existing web user reaches the
+          companion, and killing it would strand them for no reason Apple's
+          rules require — the web sells nothing, so a free account created here
+          is outside the in-app-purchase regime entirely. It moves one click
+          deeper, to the "Sign up free" link `/login` already carries, which is
+          where someone who wants a web account will look. It comes off the
+          hero, which is where a new visitor decides what this product is.
 
           Radius is the design-system token (`--radius`, consumed as rounded-xl)
           rather than rounded-full. The v4 notes in globals.css record that radii
@@ -120,12 +136,7 @@ export default function LandingHero({ onEnter }: LandingHeroProps) {
             </span>
           </button>
 
-          <Link
-            href="/signup"
-            className="flex items-center justify-center h-14 px-7 text-base font-semibold text-white bg-cyan-600 hover:bg-cyan-500 rounded-xl transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
-          >
-            Sign up
-          </Link>
+          <AppStoreCTA variant="hero" />
 
           <Link
             href="/login"

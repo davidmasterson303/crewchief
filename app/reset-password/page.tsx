@@ -130,7 +130,7 @@ export default function ResetPasswordPage() {
               This link is invalid or has already been used. Request a new one below.
             </p>
             <Link href="/forgot-password">
-              <Button className="bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl h-10 px-4 sm:px-6">
+              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl h-10 px-4 sm:px-6">
                 Request New Link
               </Button>
             </Link>
@@ -218,7 +218,7 @@ export default function ResetPasswordPage() {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full h-11 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-xl transition-all"
+              className="w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl transition-all"
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Update Password'}
             </Button>

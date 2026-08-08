@@ -83,6 +83,12 @@ const STATIC_ANALYSIS_SUITES = [
   // cannot load, and the property is structural (does each return path carry
   // the affordance) rather than behavioural.
   'mobile-account-reachable.test.ts',
+  // Reads apps/mobile's screens for a Pressable that swaps its <Text> for an
+  // ActivityIndicator without naming itself — the control loses its accessible
+  // name at exactly the moment it is working. Same constraint as the scans
+  // above: React Native source this runner cannot load, and the property is
+  // structural rather than something a render test could reach on every screen.
+  'mobile-busy-controls-named.test.ts',
   // Reads the upload route to prove it authorizes where the HTTP status is
   // still available, rather than letting a denial fall through the error
   // mapping as a 500. Executing it would need a live Supabase, a storage
@@ -112,6 +118,12 @@ const STATIC_ANALYSIS_SUITES = [
   // missed the front door, because it only sees routes someone remembered to
   // visit. The class name in the source is the whole signal.
   'text-contrast-floor.test.ts',
+  // Reads every .tsx off disk for a 3+ column grid with no breakpoint — R3's
+  // shape, where 231px split three ways left the text cell at roughly zero and
+  // "8-speed automatic" wrapped one character per line. jsdom has no layout, so
+  // no rendered assertion in this repo can observe a column's resolved width;
+  // the class string is deterministic and is the whole signal.
+  'responsive-grid-floor.test.ts',
   'portability.test.ts',
   'ws-optional-deps.test.ts',
   'illustration-tokens.test.ts',
@@ -158,6 +170,25 @@ const STATIC_ANALYSIS_SUITES = [
   // cookie-authenticated handler behaves perfectly until a client with no
   // cookies calls it, which is the mobile app and not this runner.
   'v1-accepts-bearer.test.ts',
+  // Reads the vehicles route to prove `POST` authorizes with `requireCaller`
+  // rather than the cookie-only client, never takes `user_id` from the body,
+  // and does not block on the ~23s dossier research. Executing it needs a live
+  // Supabase and a session; the properties that matter are which helper is
+  // called and what is refused, both of which are on disk. Same reasoning as
+  // `upload-route-status-codes`.
+  'create-vehicle-route.test.ts',
+  // Reads the A2a migration against the modules that name its column and its
+  // source value. Same class as `mod-details-goal-key`: an agreement between
+  // SQL and TypeScript that no runtime here checks, because Postgres rejects
+  // the write and the error is swallowed. `LogServiceModal` has been inserting
+  // a non-existent column with an illegal source for months without a symptom.
+  'service-baseline-schema.test.ts',
+  // Reads the sweep route and its Netlify scheduler. The route sends a push to
+  // every account in the product, so its authorization is the most abusable
+  // thing here if it is ever wrong — and executing it needs a live Supabase, a
+  // service-role key and a push endpoint. What matters is which checks exist
+  // and in what order, which is on disk.
+  'notify-sweep-route.test.ts',
 ];
 
 /**

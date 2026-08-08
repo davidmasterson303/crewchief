@@ -174,7 +174,10 @@ const DropdownMenuShortcut = ({
 }: React.HTMLAttributes<HTMLSpanElement>) => {
   return (
     <span
-      className={cn('ml-auto text-xs tracking-widest opacity-60', className)}
+      /* `text-muted-foreground` rather than `opacity-60` — upstream shadcn's
+         own idiom for this, and the one the contrast guard can read. An alpha
+         here would multiply against whatever the menu item sets. */
+      className={cn('ml-auto text-xs tracking-widest text-muted-foreground', className)}
       {...props}
     />
   );

@@ -265,7 +265,7 @@ export function QuoteDetailDialog({
         <DialogFooter>
           <Button
             onClick={() => onOpenChange(false)}
-            className="w-full bg-cyan-600 hover:bg-cyan-700 text-white"
+            className="w-full bg-primary hover:bg-cyan-700 text-primary-foreground"
           >
             Close
           </Button>

@@ -118,7 +118,7 @@ export default function TCOInputsModal({ open, onOpenChange, vehicleId, vehicle,
           <Button
             onClick={handleSave}
             disabled={saving || saved}
-            className={`flex-1 text-sm transition-all duration-200 ${saved ? 'bg-emerald-600 hover:bg-emerald-600 text-white' : 'bg-cyan-600 hover:bg-cyan-500 text-white'}`}
+            className={`flex-1 text-sm transition-all duration-200 ${saved ? 'bg-emerald-600 hover:bg-emerald-600 text-primary-foreground' : 'bg-primary hover:bg-primary/90 text-primary-foreground'}`}
           >
             {saved ? (
               <><Check className="h-4 w-4 mr-1.5" />Saved</>

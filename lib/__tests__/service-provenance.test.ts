@@ -34,8 +34,14 @@ const PLUGS: ScheduleEntry = { service: 'Spark plugs', interval_miles: 30_000 };
 
 describe('serviceBasis', () => {
   it('claims service records only when there are service records', () => {
-    expect(serviceBasis(true)).toBe('service-history');
-    expect(serviceBasis(false)).toBe('mileage-estimate');
+    expect(serviceBasis('records')).toBe('service-history');
+    expect(serviceBasis(null)).toBe('mileage-estimate');
+  });
+
+  it('does not let a remembered date pass as a record', () => {
+    // Track A2a. An invoice is evidence; an onboarding answer is a
+    // recollection. Both beat nothing, and only one is a document.
+    expect(serviceBasis('owner-reported')).toBe('owner-reported');
   });
 
   it('derives from what evaluateSchedule actually computed', () => {
@@ -47,9 +53,49 @@ describe('serviceBasis', () => {
       lastServiceMileage: () => 58_000,
     });
     const [fromOdometer] = evaluateSchedule({ schedule: [OIL], currentMileage: 60_000 });
+    const [fromOwner] = evaluateSchedule({
+      schedule: [OIL],
+      currentMileage: 60_000,
+      lastServiceMileage: () => 58_000,
+      lastServiceEvidence: () => 'owner-reported',
+    });
 
-    expect(serviceBasis(fromHistory.basedOnHistory)).toBe('service-history');
-    expect(serviceBasis(fromOdometer.basedOnHistory)).toBe('mileage-estimate');
+    expect(serviceBasis(fromHistory.evidence)).toBe('service-history');
+    expect(serviceBasis(fromOdometer.evidence)).toBe('mileage-estimate');
+    expect(serviceBasis(fromOwner.evidence)).toBe('owner-reported');
+  });
+
+  it('reports no evidence when nothing was found, whatever the caller says', () => {
+    /*
+      The failure this rules out: a caller that supplies `lastServiceEvidence`
+      for every service in the schedule, including the ones whose mileage and
+      date lookups came back empty. Reading the evidence unconditionally would
+      stamp a provenance label onto a figure resting on nothing — a badge
+      asserting a source that does not exist, which is the defect
+      `provenance-claims.test.ts` was written after.
+    */
+    const [nothingFound] = evaluateSchedule({
+      schedule: [OIL],
+      currentMileage: 60_000,
+      lastServiceMileage: () => null,
+      lastServiceEvidence: () => 'owner-reported',
+    });
+
+    expect(nothingFound.evidence).toBeNull();
+    expect(serviceBasis(nothingFound.evidence)).toBe('mileage-estimate');
+  });
+
+  it('defaults to records, so callers written before A2a do not get downgraded', () => {
+    // Every caller that existed before the baseline question supplied history
+    // from invoice-extracted rows. Treating a missing `lastServiceEvidence` as
+    // "no evidence" would silently weaken every claim already shipping.
+    const [legacy] = evaluateSchedule({
+      schedule: [OIL],
+      currentMileage: 60_000,
+      lastServiceMileage: () => 58_000,
+    });
+
+    expect(legacy.evidence).toBe('records');
   });
 });
 
@@ -80,6 +126,38 @@ describe('milestoneBasis', () => {
   it('reports the weaker claim for an empty milestone', () => {
     expect(milestoneBasis([])).toBe('mileage-estimate');
   });
+
+  it('reports owner-reported when an invoice is mixed with a recollection', () => {
+    /*
+      Track A2a, and the same "weakest link" rule with a third rung on the
+      ladder. A visit resting partly on a document and partly on what someone
+      remembered at sign-up cannot claim to come from records — but calling it
+      a bare estimate would throw away a real baseline the owner gave us. The
+      middle claim is the only true one.
+    */
+    const services = evaluateSchedule({
+      schedule: [OIL, PLUGS],
+      currentMileage: 60_000,
+      lastServiceMileage: () => 55_000,
+      lastServiceEvidence: (service) =>
+        service === 'Spark plugs' ? 'owner-reported' : 'records',
+    });
+
+    expect(milestoneBasis(services)).toBe('owner-reported');
+  });
+
+  it('still falls to an estimate when one service rests on nothing', () => {
+    // A remembered baseline does not rescue a service that has neither. One
+    // unknown drags the whole visit down, exactly as before.
+    const services = evaluateSchedule({
+      schedule: [OIL, PLUGS],
+      currentMileage: 60_000,
+      lastServiceMileage: (service) => (service === 'Spark plugs' ? 30_000 : null),
+      lastServiceEvidence: () => 'owner-reported',
+    });
+
+    expect(milestoneBasis(services)).toBe('mileage-estimate');
+  });
 });
 
 describe('the wording', () => {
@@ -98,7 +176,7 @@ describe('the wording', () => {
   });
 
   it('gives every basis a label, so a client can never render a blank chip', () => {
-    for (const basis of ['service-history', 'mileage-estimate'] as const) {
+    for (const basis of ['service-history', 'owner-reported', 'mileage-estimate'] as const) {
       expect(SERVICE_BASIS_LABELS[basis]).toEqual(expect.any(String));
       expect(SERVICE_BASIS_LABELS[basis].length).toBeGreaterThan(0);
     }
@@ -106,12 +184,30 @@ describe('the wording', () => {
 });
 
 describe('isServiceBasis', () => {
-  it('accepts the two real values', () => {
+  it('accepts every real value', () => {
+    /*
+      All three, and `owner-reported` matters most here: it is the newest, and
+      the narrowing is what stands between the phone and an undefined label.
+      A value the server can send that this cannot recognise renders as
+      nothing — correct behaviour for an *unknown* basis, and silent data loss
+      for one we shipped and forgot to list.
+    */
     expect(isServiceBasis('service-history')).toBe(true);
+    expect(isServiceBasis('owner-reported')).toBe(true);
     expect(isServiceBasis('mileage-estimate')).toBe(true);
   });
 
-  it.each([['a third value', 'dealer-records'], ['undefined', undefined], ['null', null], ['a number', 1]])(
+  it('recognises exactly the values that have labels', () => {
+    // Guards the pairing rather than either side. The failure it pins is a
+    // basis added to the union and the labels but not to the narrowing — the
+    // phone would then drop a chip the server considers valid, which looks
+    // like a rendering bug and is a missing `||`.
+    for (const basis of Object.keys(SERVICE_BASIS_LABELS)) {
+      expect(isServiceBasis(basis)).toBe(true);
+    }
+  });
+
+  it.each([['an unknown value', 'dealer-records'], ['undefined', undefined], ['null', null], ['a number', 1]])(
     'rejects %s',
     (_label, value) => {
       // A server that has shipped a third basis to a phone that has not been

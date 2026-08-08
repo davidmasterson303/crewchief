@@ -189,7 +189,7 @@ export function WishlistSection({ vehicleId }: WishlistSectionProps) {
             <Button
               onClick={() => setShowAddDialog(true)}
               size="sm"
-              className="bg-cyan-600 hover:bg-cyan-500 text-white h-8 px-3 text-xs gap-1.5 rounded-lg"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground h-8 px-3 text-xs gap-1.5 rounded-lg"
             >
               <Plus className="h-3.5 w-3.5" />
               Add Item
@@ -209,7 +209,7 @@ export function WishlistSection({ vehicleId }: WishlistSectionProps) {
             <Button
               onClick={() => setShowAddDialog(true)}
               size="sm"
-              className="bg-cyan-600 hover:bg-cyan-500 text-white h-9 px-4 text-xs gap-1.5 rounded-xl"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground h-9 px-4 text-xs gap-1.5 rounded-xl"
             >
               <Plus className="h-3.5 w-3.5" />
               Add Your First Item
@@ -298,7 +298,7 @@ export function WishlistSection({ vehicleId }: WishlistSectionProps) {
             <div className="px-4 sm:px-6 py-4 border-t border-white/8 sticky bottom-0 bg-[#0d1117]/95 backdrop-blur-sm z-10">
               <Button
                 onClick={() => setShowQuoteDialog(true)}
-                className="w-full bg-cyan-600 hover:bg-cyan-500 text-white h-11 rounded-xl text-sm font-semibold gap-2 transition-all hover:scale-[1.005] shadow-lg shadow-cyan-900/30"
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-11 rounded-xl text-sm font-semibold gap-2 transition-all hover:scale-[1.005] shadow-lg shadow-cyan-900/30"
               >
                 <FileText className="h-4 w-4" />
                 Get Quote for {wishlistItems.length} {wishlistItems.length === 1 ? 'Item' : 'Items'}

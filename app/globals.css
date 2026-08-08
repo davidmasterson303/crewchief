@@ -74,6 +74,12 @@ nav {
      * halo weight. */
     --focus-ring-soft: rgb(34 211 238 / 0.22);
 
+    /* The build dial's redline — v8 §4c. Deliberately hotter and more
+       orange-shifted than --critical-red (#F87171): a redline that matched the
+       alert red would be read as an alert. Do not harmonise them. */
+    --build-redline: #FF4436;
+    --build-redline-track: rgb(255 68 54 / 0.22);
+
     /* ── design-system vocabulary, aliased onto the app's tokens (v7 C0) ──
      *
      * The v7 specs are written in these names; this file was written in the
@@ -110,6 +116,9 @@ nav {
     --radius-sm: 8px;
     --border-subtle: rgb(255 255 255 / 0.08);
     --text-muted-40: rgb(245 243 240 / 0.4);
+    /* 13px, the small-body step. It was specified with no value, so every call
+       site carried the literal instead. v8 §1. */
+    --text-body-sm: 13px;
 
     --foreground: 36 20% 95%;         /* #F5F3F0 */
     --card-foreground: 36 20% 95%;
@@ -118,8 +127,34 @@ nav {
     --muted-foreground: 36 10% 55%;
 
     /* ── brand: cyan, now reserved for CTA / focus / brand mark / ring ── */
-    --primary: 192 91% 36%;           /* #0891B2  cyan-600, button fill */
-    --primary-foreground: 190 60% 6%; /* #06181C */
+    /*
+      ── v8 §1. A PAIRED change — never apply one half ────────────────────────
+      Fill goes down the ramp and the ink flips light, together:
+        #0891B2 + #06181C (dark ink)  = 4.94:1  — what this was
+        #0E7490 + #06181C             = 3.39:1  — FAILS. Never ship this pair.
+        #0E7490 + #F2FBFD (light ink) = 5.10:1  — what this is now
+      The old pairing already passed, so this is a design change rather than an
+      AA fix: every other surface in CrewChief is light-on-dark, and dark ink on
+      the one filled CTA reads as a highlighter — the v4 failure where three
+      competing CTAs on a screen meant no primary at all. It also keeps real
+      distance between the fill and the reserved cyan-400 accent.
+    */
+    --primary: 193 82% 31%;              /* #0E7490  button fill */
+    --primary-foreground: 191 73% 97%;   /* #F2FBFD  near-white ink, 5.10:1 */
+    /*
+      ⚠ No `--primary-hover`, and hover deliberately does NOT go up the ramp.
+
+      v8 §1 says hover returns to #0891B2. Measured against the light ink that
+      pairing is **3.51:1 and fails AA** — the same shape of error as the
+      omitted ink row: a value that was right beside dark ink and is wrong
+      beside light. Hover is a live, readable state; nothing exempts it.
+
+      The existing call site is already correct. `hover:bg-primary/90` in
+      components/ui/button.tsx composites the fill toward the page ground,
+      making it *darker* — 5.87:1, better than the resting state. So the safe
+      hover is the one that was already there, and the fix is to not adopt this
+      half of the spec.
+    */
     --accent: 188 86% 53%;            /* #22D3EE  cyan-400, accent + glow */
     --accent-foreground: 190 60% 6%;
     --ring: 188 86% 53%;              /* focus ring stays brand cyan */
@@ -709,8 +744,16 @@ nav {
     align-items: flex-end;
     gap: 24px;
   }
-  /* The hero numeral never sits on raw photography. */
-  .ph-glass {
+  /*
+   * The hero numeral never sits on raw photography.
+   *
+   * Renamed from `.ph-glass` — v8 §8c. There is no glassmorphism anywhere in
+   * this product and the old name invited it back: the next person reading
+   * "glass" reaches for more blur and more translucency, which is how a plate
+   * that exists to make a numeral legible turns into decoration that makes it
+   * less so. A plinth is what this is — a solid thing a number stands on.
+   */
+  .plinth {
     background: rgb(255 255 255 / 0.06);
     border: 1px solid rgb(255 255 255 / 0.1);
     backdrop-filter: blur(14px);
@@ -1015,14 +1058,14 @@ nav {
   }
 
   /*
-   * The `sm` size step. 13px is the app's existing small-body size — the
-   * design system calls this `--text-body-sm` but ships no value for it, so
-   * this is a literal until one arrives. One place to change.
+   * The `sm` size step. This carried a 13px literal with a note saying the
+   * design system named `--text-body-sm` but shipped no value for it. v8 §1
+   * supplies the value, so the literal goes and the token is consumed.
    */
   .field-sm {
     min-height: 34px;
     padding: 7px 10px;
-    font-size: 13px;
+    font-size: var(--text-body-sm);
   }
 
   /*

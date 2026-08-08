@@ -174,7 +174,7 @@ export default function FeaturesDrawer({ open, onOpenChange }: FeaturesDrawerPro
           */}
           <div className="mt-4 flex flex-col items-center gap-3 pb-2">
             <Link href="/signup" onClick={() => onOpenChange(false)} className="w-full">
-              <Button className="w-full h-11 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-xl transition-all">
+              <Button className="w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl transition-all">
                 Sign up
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>

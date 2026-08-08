@@ -6,6 +6,7 @@ import { ArrowRight, Car } from 'lucide-react';
 import { VehicleCard } from '@/components/VehicleCard';
 import GarageDoor, { useIntroRevealed } from '@/components/GarageDoor';
 import LandingHero from '@/components/LandingHero';
+import { AppStoreCTA } from '@/components/AppStoreCTA';
 import { useAuth } from '@/components/AuthProvider';
 import { useDemoVehicles, type GarageVehicle } from '@/hooks/useVehicles';
 
@@ -46,6 +47,15 @@ export default function GaragePage() {
  * While the session is still resolving, the signed-out pair is rendered rather
  * than a gap: `/` is public and most of its traffic is anonymous, so that is
  * both the likely answer and the one that avoids a hole in the nav.
+ *
+ * ── 8 Aug: the filled slot is the app, not sign-up ──────────────────────────
+ *
+ * The hero carries the same CTA, but the hero is *behind the lifted door* — a
+ * visitor who presses "Enter demo" and browses the three cars never sees it
+ * again. This nav is the only surface that stays with them, so it is where the
+ * pitch has to survive. Sign-up is still reachable via `/login`'s "Sign up
+ * free" link; it does not need the loudest slot on a page whose product is on
+ * the App Store.
  */
 function PublicNavActions() {
   const { user, loading } = useAuth();
@@ -53,7 +63,7 @@ function PublicNavActions() {
   if (!loading && user) {
     return (
       <Link href="/garage">
-        <Button className="bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-xl transition-all text-sm h-9 px-4">
+        <Button className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl transition-all text-sm h-9 px-4">
           My Garage
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
@@ -65,15 +75,11 @@ function PublicNavActions() {
     <div className="flex items-center gap-1 sm:gap-3">
       <Link
         href="/login"
-        className="px-3 py-2 text-sm font-medium text-white/60 hover:text-white transition-colors rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
+        className="px-2 sm:px-3 py-2 text-sm font-medium text-white/60 hover:text-white transition-colors rounded-xl whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
       >
         Sign in
       </Link>
-      <Link href="/signup">
-        <Button className="bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-xl transition-all text-sm h-9 px-4">
-          Sign up
-        </Button>
-      </Link>
+      <AppStoreCTA variant="nav" />
     </div>
   );
 }
@@ -216,7 +222,7 @@ function GarageContents() {
                 </p>
                 <Button
                   onClick={() => window.location.reload()}
-                  className="bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-xl transition-all h-10 px-5"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl transition-all h-10 px-5"
                 >
                   Retry
                 </Button>

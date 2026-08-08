@@ -406,7 +406,7 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
                         <Button
                           onClick={() => handleUpload(false)}
                           disabled={uploading}
-                          className="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white font-medium"
+                          className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
                         >
                           <Upload className="mr-2 h-4 w-4" />
                           Upload {selectedFiles.length} File{selectedFiles.length !== 1 ? 's' : ''}

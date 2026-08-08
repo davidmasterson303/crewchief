@@ -69,7 +69,7 @@ export default function MaintenanceItemCard({
           className={
             isSaved
               ? 'h-7 text-xs border-red-400/50 text-red-300 hover:border-red-400 hover:bg-red-500/10'
-              : 'h-7 text-xs bg-cyan-600 text-white hover:bg-cyan-500'
+              : 'h-7 text-xs bg-primary text-primary-foreground hover:bg-primary/90'
           }
           onClick={toggleWishlist}
           disabled={wishlistLoading || loading}

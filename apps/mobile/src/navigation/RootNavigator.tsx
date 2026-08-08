@@ -17,6 +17,7 @@ import { WishlistScreen } from '../screens/WishlistScreen';
 import { ServiceMilestoneScreen } from '../screens/ServiceMilestoneScreen';
 import { pickInvoiceImage } from '../media/pick-invoice-image';
 import { GarageScreen } from '../screens/GarageScreen';
+import { AddVehicleScreen } from '../screens/AddVehicleScreen';
 import { VehicleDetailScreen } from '../screens/VehicleDetailScreen';
 
 /**
@@ -62,6 +63,13 @@ import { VehicleDetailScreen } from '../screens/VehicleDetailScreen';
 
 export type RootStackParamList = {
   Garage: undefined;
+  /*
+    8 Aug, mobile-first. There was no way to add a car on the phone — the garage
+    empty state told people to go and use the web app. Deliberately not
+    deep-linkable: a URL that opens a form which creates a row is a URL that can
+    be put in front of someone who did not mean to.
+  */
+  AddVehicle: undefined;
   /*
     `title` is optional because a deep link cannot supply one — see `linking`
     below. It stays a param rather than being dropped: a tap from the garage
@@ -266,6 +274,23 @@ export function RootNavigator({
               onSignOut={onSignOut}
               onOpenVehicle={(vehicleId, title) =>
                 navigation.navigate('VehicleDetail', { vehicleId, title })
+              }
+              onAddVehicle={() => navigation.navigate('AddVehicle')}
+            />
+          )}
+        </Stack.Screen>
+
+        <Stack.Screen name="AddVehicle" options={{ title: 'Add a car' }}>
+          {({ navigation }) => (
+            <AddVehicleScreen
+              onSignOut={onSignOut}
+              /*
+                `replace`, not `navigate`. Going back to a form that has already
+                created the car would let someone add it twice, and the natural
+                place to go from a new car is the car.
+              */
+              onAdded={(vehicleId, title) =>
+                navigation.replace('VehicleDetail', { vehicleId, title })
               }
             />
           )}

@@ -144,7 +144,7 @@ export default function RlsCheckPage() {
       <button
         onClick={run}
         disabled={!vehicleId.trim() || running}
-        className="bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 px-5 py-2.5 rounded-lg font-semibold"
+        className="bg-primary hover:bg-primary/90 disabled:opacity-40 px-5 py-2.5 rounded-lg font-semibold"
       >
         {running ? 'Running…' : 'Run isolation check'}
       </button>

@@ -4,6 +4,7 @@ import type { ApiResponse } from '@crewchief/core/types';
 import { checkRateLimit, getClientIdentifier, rateLimitResponse } from '@/lib/rate-limit';
 import { authorizeVehicleAccess, requireCaller } from '@/lib/api-auth';
 import { validateMileageUpdate } from '@crewchief/core/mileage-tracking';
+import { buildBaselineRow, isBaselineAge } from '@crewchief/core/onboarding-baseline';
 import { getServiceRoleClient } from '@/lib/supabase';
 import { resolveVehiclePhotos } from '@/lib/vehicle-photo';
 
@@ -247,4 +248,189 @@ export async function PATCH(request: NextRequest): Promise<Response> {
   });
 
   return Response.json({ success: true, currentMileage } as ApiResponse);
+}
+
+/**
+ * Add a vehicle to the caller's garage.
+ *
+ * ── Why a route, when `createVehicle` already exists ────────────────────────
+ *
+ * `app/actions.ts`'s `createVehicle` authenticates with
+ * `createServerActionClient()` — `next/headers` cookies and nothing else. A
+ * React Native client presents `Authorization: Bearer <jwt>` and carries no
+ * cookies, so it cannot call that action at all. Same class as the wishlist GET
+ * fixed on 7 Aug, and as the garage route before it.
+ *
+ * That mattered little while mobile was a companion. From 8 Aug it is the
+ * product, and **a person could not create a car on the phone** — there was no
+ * sign-up either. This is half of closing that.
+ *
+ * ── Deliberately fewer fields than the web wizard ───────────────────────────
+ *
+ * The web action takes fourteen, gathered over a five-step wizard. This takes
+ * the four that identify a car plus the two the product actually branches on.
+ * Everything else on that row has a sensible default and can be edited later,
+ * and a first-run flow that asks for a VIN and a drivetrain before showing
+ * anything is a first-run flow people abandon.
+ *
+ * ── `user_id` is never accepted from the caller ─────────────────────────────
+ *
+ * Ownership comes from the verified session. `createVehicle`'s own comment
+ * makes the point and it holds harder here: a client-supplied `user_id` on a
+ * request body reads as authoritative even when the handler ignores it, which
+ * is one careless edit away from being trusted.
+ *
+ * ── Research is not awaited ─────────────────────────────────────────────────
+ *
+ * The dossier generation measured ~23s on a warm server. Holding the response
+ * open for it would put a half-minute spinner between "add my car" and seeing
+ * anything. The row is returned immediately and the knowledge base fills in
+ * behind it — `research_status: 'pending'` is what `VehicleInsights` already
+ * watches for, so the existing machinery does the rest.
+ */
+export async function POST(request: NextRequest): Promise<Response> {
+  const identifier = getClientIdentifier(request);
+  const rateLimit = await checkRateLimit(identifier, 'default');
+  if (!rateLimit.allowed) {
+    logger.warn('API:CREATE_VEHICLE', 'Rate limit exceeded', { identifier });
+    return rateLimitResponse(rateLimit);
+  }
+
+  const caller = await requireCaller();
+  if (!caller.ok) return caller.response;
+
+  let body: Record<string, unknown>;
+  try {
+    body = (await request.json()) as Record<string, unknown>;
+  } catch {
+    return Response.json({ success: false, error: 'Invalid JSON body' } as ApiResponse, {
+      status: 400,
+    });
+  }
+
+  const year = Number(body.year);
+  const make = typeof body.make === 'string' ? body.make.trim() : '';
+  const model = typeof body.model === 'string' ? body.model.trim() : '';
+
+  if (!Number.isInteger(year) || year < 1900 || year > new Date().getFullYear() + 2) {
+    return Response.json(
+      { success: false, error: 'Enter a valid model year' } as ApiResponse,
+      { status: 400 }
+    );
+  }
+
+  if (!make || !model) {
+    return Response.json(
+      { success: false, error: 'Make and model are required' } as ApiResponse,
+      { status: 400 }
+    );
+  }
+
+  /*
+    Mileage reuses `validateMileageUpdate` against a current of 0 rather than
+    growing a second opinion about what a plausible odometer reading is. A first
+    reading is only ever an increase from nothing, so the correction path does
+    not apply and the bounds do.
+  */
+  const mileage = Number(body.currentMileage ?? 0);
+  const mileageCheck = validateMileageUpdate({ current: 0, next: mileage });
+  if (!mileageCheck.ok) {
+    return Response.json(
+      { success: false, error: mileageCheck.message } as ApiResponse,
+      { status: 422 }
+    );
+  }
+
+  const client = getServiceRoleClient();
+
+  const { data: vehicle, error } = await client
+    .from('vehicles')
+    .insert({
+      year,
+      make,
+      model,
+      trim: typeof body.trim === 'string' ? body.trim.trim() : '',
+      current_mileage: mileage,
+      /*
+        The one product branch that has to be set at creation: whether this
+        owner sees modifications at all. `mild` means interested and `stock`
+        means not — the enum's own values, and `showsModifications` is the rule
+        that reads them.
+      */
+      performance_mindedness: body.wantsModifications === false ? 'stock' : 'mild',
+      user_id: caller.userId,
+    })
+    .select('id,year,make,model')
+    .single();
+
+  if (error || !vehicle) {
+    logger.error('API:CREATE_VEHICLE', new Error(error?.message ?? 'Insert returned no row'), {
+      userId: caller.userId,
+    });
+    return Response.json({ success: false, error: 'Could not save the vehicle' } as ApiResponse, {
+      status: 500,
+    });
+  }
+
+  /*
+    Seed the knowledge-base row as `pending` and return. `VehicleInsights`
+    already triggers research when it sees that status, so the dossier fills in
+    on first view rather than blocking this request for ~23 seconds.
+  */
+  const { error: kbError } = await client
+    .from('vehicle_knowledge_base')
+    .insert({ vehicle_id: vehicle.id, research_status: 'pending' });
+
+  if (kbError) {
+    // Not fatal. The car exists and is usable; the dossier is what waits.
+    logger.warn('API:CREATE_VEHICLE', 'Vehicle created without a knowledge-base row', {
+      vehicleId: vehicle.id,
+      error: kbError.message,
+    });
+  }
+
+  /*
+    Track A2a — the service baseline, if the owner gave one.
+
+    ── Why this cannot fail the request ────────────────────────────────────────
+
+    Two independent reasons, and either alone would be enough:
+
+    1. **The migration adding `mileage_at_service` and the `'owner-onboarding'`
+       source may not be applied yet.** It is written and additive and needs a
+       dashboard run. Until then this insert is rejected on a missing column,
+       and a request that let that through would mean **nobody can add a car** —
+       turning a pending migration into a total outage of the launch-blocking
+       flow.
+
+    2. Even once applied, a baseline is an optimisation. The car is the thing
+       being created; the baseline improves what the milestone screen can say
+       about it later. Losing it costs a service being estimated rather than
+       counted, which is exactly the behaviour every car has today.
+
+    Same posture as the knowledge-base insert above, for the same reason: what
+    the caller asked for was a vehicle.
+  */
+  const baseline = buildBaselineRow({
+    mileage: typeof body.lastServiceMileage === 'number' ? body.lastServiceMileage : null,
+    age: isBaselineAge(body.lastServiceAge) ? body.lastServiceAge : null,
+    today: new Date().toISOString().slice(0, 10),
+  });
+
+  if (baseline) {
+    const { error: baselineError } = await client
+      .from('maintenance_line_items')
+      .insert({ vehicle_id: vehicle.id, ...baseline });
+
+    if (baselineError) {
+      logger.warn('API:CREATE_VEHICLE', 'Vehicle created without its service baseline', {
+        vehicleId: vehicle.id,
+        error: baselineError.message,
+      });
+    }
+  }
+
+  logger.info('API:CREATE_VEHICLE', 'Vehicle created', { vehicleId: vehicle.id });
+
+  return Response.json({ success: true, vehicle } as ApiResponse, { status: 201 });
 }

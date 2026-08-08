@@ -200,7 +200,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 </Button>
                 <Button
                   onClick={this.handleRefresh}
-                  className="gap-2 bg-cyan-600 hover:bg-cyan-700 text-white"
+                  className="gap-2 bg-primary hover:bg-cyan-700 text-primary-foreground"
                 >
                   <RefreshCw className="h-4 w-4" />
                   Refresh Page

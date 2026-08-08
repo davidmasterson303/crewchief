@@ -114,7 +114,7 @@ export default function MaintenanceItemDetailsDialog({
                 <DollarSign className="h-3.5 w-3.5" />
                 Cost Breakdown
               </p>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div className="text-center p-3 bg-white/3 rounded-lg">
                   <p className="text-xs text-white/50 mb-1">Labor</p>
                   <p className="text-base font-bold text-white tabular-nums">${(item.cost_labor || 0).toFixed(2)}</p>

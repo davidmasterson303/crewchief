@@ -79,7 +79,14 @@ function AttachmentLink({ doc, className }: { doc: any; className: string }) {
   );
 
   if (!href) {
-    return <div className={`${className} opacity-60 cursor-default`}>{body}</div>;
+    /*
+      `text-white/60` rather than `opacity-60`: the chip wraps a `text-sm` file
+      name, and an alpha on the wrapper multiplies against whatever the children
+      set — the shape that put `ModificationsTab`'s badges at an effective 0.30.
+      A colour lands on the text the guard can measure, and the children here
+      set no colour of their own, so it reads identically.
+    */
+    return <div className={`${className} text-white/60 cursor-default`}>{body}</div>;
   }
 
   return (
@@ -710,7 +717,7 @@ export default function ConsultantChat({
             <Button
               size="sm"
               onClick={handleNewChat}
-              className="bg-cyan-600 hover:bg-cyan-500 text-white h-7 px-2.5 border-0 text-xs rounded-lg"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground h-7 px-2.5 border-0 text-xs rounded-lg"
             >
               <Plus className="h-3.5 w-3.5 mr-1" />
               New
@@ -833,7 +840,7 @@ export default function ConsultantChat({
                   <div
                     className={
                       msg.role === 'user'
-                        ? 'max-w-[80%] bg-cyan-600/90 text-white rounded-2xl rounded-tr-sm p-4 overflow-hidden'
+                        ? 'max-w-[80%] bg-primary/90 text-primary-foreground rounded-2xl rounded-tr-sm p-4 overflow-hidden'
                         /*
                           Unboxed: no background, border, radius or padding. A
                           CrewChief answer is a diagnosis, not a chat line, and
@@ -1156,7 +1163,7 @@ export default function ConsultantChat({
                 disabled={loading || uploadingFiles || (!input.trim() && selectedFiles.length === 0)}
                 size="sm"
                 aria-label="Send"
-                className="tap-target-44 h-8 bg-cyan-600 hover:bg-cyan-500 text-white border-0 transition-all disabled:opacity-40"
+                className="tap-target-44 h-8 bg-primary hover:bg-primary/90 text-primary-foreground border-0 transition-all disabled:opacity-40"
               >
                 {uploadingFiles ? (
                   <Loader2 className="h-[15px] w-[15px] animate-spin" />

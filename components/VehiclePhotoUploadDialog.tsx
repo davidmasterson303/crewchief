@@ -394,9 +394,21 @@ export function VehiclePhotoUploadDialog({
 
                 {!isPanning && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="flex items-center gap-1.5 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1.5 border border-white/15 opacity-70">
-                      <Move className="h-3.5 w-3.5 text-white/70" />
-                      <span className="text-xs text-white/60 font-medium">Drag to reposition</span>
+                    {/*
+                      The container's `opacity-70` is gone for the same reason
+                      as ModificationsTab's: it multiplied. `text-white/60`
+                      inside it composited to an effective 0.42 alpha, on an
+                      instruction sitting over a photograph — the one place the
+                      backdrop is least predictable and legibility matters most.
+
+                      The pill's own `bg-black/50` is what makes this readable
+                      over an arbitrary image; that is doing the work, and the
+                      extra fade was undoing it. Expressed as colour instead, so
+                      the contrast guard can measure it.
+                    */}
+                    <div className="flex items-center gap-1.5 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1.5 border border-white/15">
+                      <Move className="h-3.5 w-3.5 text-white/80" />
+                      <span className="text-xs text-white/80 font-medium">Drag to reposition</span>
                     </div>
                   </div>
                 )}

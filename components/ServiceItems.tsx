@@ -212,7 +212,7 @@ const ServiceItemsComponent = forwardRef<{ refreshWishlist: () => Promise<void> 
               <Heart className="h-5 w-5 text-info" />
               My Wishlist
             </CardTitle>
-            <Button onClick={() => setShowAddDialog(true)} className="bg-cyan-600 hover:bg-cyan-700 text-white border-0">
+            <Button onClick={() => setShowAddDialog(true)} className="bg-primary hover:bg-cyan-700 text-primary-foreground border-0">
               <Plus className="mr-2 h-4 w-4" />
               Add Item
             </Button>
@@ -258,7 +258,7 @@ const ServiceItemsComponent = forwardRef<{ refreshWishlist: () => Promise<void> 
                   </p>
                   <Button
                     onClick={() => setShowQuoteDialog(true)}
-                    className="bg-cyan-600 hover:bg-cyan-700 text-white border-0"
+                    className="bg-primary hover:bg-cyan-700 text-primary-foreground border-0"
                     size="sm"
                   >
                     <Mail className="mr-2 h-4 w-4" />

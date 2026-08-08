@@ -235,6 +235,26 @@ const ROUTE_POSTURE: Record<string, 'vehicle-scoped' | 'session' | 'public' | 's
   */
   'app/api/health/consultant/route.ts': 'secret-gated',
   /*
+    The nightly notification sweep (Phase 5, C1-C3). No user session exists
+    because no user triggered it — the caller is a Netlify scheduled function
+    and the clock.
+
+    It clears the bar the entry above sets, and then some. `/api/health/consultant`
+    is secret-gated because an open endpoint that spends tokens on request is
+    an unbounded *cost*. This one spends no tokens at all — the whole path is
+    free, verified by grep. What it spends is **attention**: it sends a push
+    notification to every account in the product, and a push cannot be recalled.
+    The recovery from an abused endpoint here is not a bill, it is people
+    uninstalling the app.
+
+    So the secret is compared in constant time and the route **fails closed** —
+    an unset CRON_SECRET refuses every request rather than running unprotected,
+    because the realistic failure is a deploy that missed the variable and
+    "unconfigured means open" would make that an open relay.
+    `notify-sweep-route.test.ts` pins all of it.
+  */
+  'app/api/internal/notify-sweep/route.ts': 'secret-gated',
+  /*
     The anonymous front door (Phase 2.97b, decision D9). It spends Gemini
     tokens on request, from an unauthenticated caller, on an uploaded image.
 
@@ -446,6 +466,35 @@ describe('API routes', () => {
     const source = readFileSync(join(ROOT, route), 'utf8');
     if (!USES_SERVICE_ROLE.test(source)) return;
     if (ROUTE_POSTURE[route] === 'public') return;
+
+    /*
+      ── `secret-gated` is exempt, and this is a deliberate loosening ─────────
+
+      Added 8 Aug for `app/api/internal/notify-sweep`. The rule predates any
+      secret-gated route that also needs the service role, and the exemption is
+      narrow enough to state precisely:
+
+      **There is no owner to prove.** `PROVES_OWNERSHIP` asks a route to show it
+      resolved *a user* before reaching a client that bypasses RLS. A secret-
+      gated route has no user — nothing triggered the sweep but the clock — so
+      the assertion is not "weak" here, it is unanswerable. Passing it would
+      require inventing a session, which is worse than exempting it.
+
+      **The authorization it does have is checked harder than this.** The
+      `actually gates on a secret` case above demands the route read the secret
+      from the environment, compare what the caller presented, *and fail closed
+      when it is unset*. `public` — which was already exempt — is checked by
+      nothing at all. So this exemption is strictly stronger than the one it
+      sits beside.
+
+      **The bar it must clear.** Do not read this as "secret-gated routes are
+      trusted". It is the reason `notify-sweep-route.test.ts` exists as a
+      separate suite: constant-time comparison, fail-closed on an unset secret,
+      POST only, no user credential accepted, and a bounded blast radius. A new
+      secret-gated route reaching the service role needs the same, and adding
+      one here without it is how this exemption becomes the hole.
+    */
+    if (ROUTE_POSTURE[route] === 'secret-gated') return;
 
     expect(PROVES_OWNERSHIP.test(source)).toBe(true);
   });
