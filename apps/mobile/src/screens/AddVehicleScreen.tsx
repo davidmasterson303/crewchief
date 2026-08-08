@@ -57,19 +57,23 @@ import {
  * precisely because there is nothing to skip — a button would imply a gate that
  * does not exist.
  *
- * ── ⚠ Behaviour-level tests are not in place, and that is a real gap ───────
+ * ── Behaviour tests: the gap is closed ─────────────────────────────────────
  *
- * `contrast.test.tsx` mounts this screen in two states and audits it, so it
- * renders and its colours are measured. What is *not* covered is what it sends:
- * that the mileage rule refuses a bad reading before a round trip, that the
- * body carries no `user_id`, and that a 401 signs out.
+ * `AddVehicleScreen.test.tsx` covers what this screen *sends* — the mileage
+ * rule refusing a bad reading before a round trip, the absence of a `user_id`
+ * in the body, the mods answer, the A2a baseline fields, and a 401 signing out
+ * where a 500 does not. `contrast.test.tsx` separately mounts it and measures
+ * its colours.
  *
- * A standalone suite for those was written and removed rather than left broken.
- * `fireEvent` against this form did not reach the handler under jest-expo's
- * async `render`, and the failures were harness-shaped rather than defects —
- * chasing them further was costing more than the coverage was worth in the
- * session that built this. It is worth another attempt with fresh eyes, and the
- * assertions to restore are named above so nobody has to re-derive them.
+ * An earlier attempt was written and deleted rather than left broken, and the
+ * reason is worth carrying: **`fireEvent` does not work against this form and
+ * fails silently.** `changeText` leaves state untouched, so `canSubmit` stays
+ * false and `submit()` returns at its first line; the submit control resolves
+ * to a host `View` with no `onPress`. Nothing throws — a suite built on it
+ * passes while proving nothing.
+ *
+ * `userEvent`, RNTL 14's async API for React 19's concurrent render, works
+ * completely. **Use it for every interaction in this app's screen tests.**
  *
  * ── The mods question is asked here, not buried in settings ─────────────────
  *
