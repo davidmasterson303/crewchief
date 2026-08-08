@@ -256,7 +256,26 @@ export default function ModificationsTab({
               </button>
 
               {showCompleted && (
-                <div className="space-y-3 mt-3 opacity-60">
+                /*
+                  The `opacity-60` that used to be here is gone.
+
+                  It faded a whole `ModificationDetailsCard`, and opacity on an
+                  ancestor *multiplies*: the "Skipped" badge inside carries
+                  `text-white/50`, which composited to an effective 0.30 alpha —
+                  item 17 measured `white/30` at **2.71:1** against a 4.5 floor.
+                  Live, readable, operable content, so none of WCAG 1.4.3's
+                  inactive-component exemption applies.
+
+                  Nothing replaces it, because nothing needs to. This block is
+                  already behind a "Show N completed / skipped" disclosure and
+                  every card in it carries an Installed or Skipped badge. The
+                  fade was a third signal saying what two already said, and it
+                  was the only one that cost legibility.
+
+                  R10's rule, and the reason the guard below can now see this
+                  file at all: contrast makes a label recede, not alpha.
+                */
+                <div className="space-y-3 mt-3">
                   {doneMods.map((mod) => {
                     const tracking = getModStatus(mod.name);
                     const isCompleted = tracking?.status === 'completed';

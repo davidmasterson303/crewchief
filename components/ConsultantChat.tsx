@@ -79,7 +79,14 @@ function AttachmentLink({ doc, className }: { doc: any; className: string }) {
   );
 
   if (!href) {
-    return <div className={`${className} opacity-60 cursor-default`}>{body}</div>;
+    /*
+      `text-white/60` rather than `opacity-60`: the chip wraps a `text-sm` file
+      name, and an alpha on the wrapper multiplies against whatever the children
+      set — the shape that put `ModificationsTab`'s badges at an effective 0.30.
+      A colour lands on the text the guard can measure, and the children here
+      set no colour of their own, so it reads identically.
+    */
+    return <div className={`${className} text-white/60 cursor-default`}>{body}</div>;
   }
 
   return (

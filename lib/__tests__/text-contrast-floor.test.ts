@@ -259,6 +259,181 @@ describe('body text holds the AA contrast floor', () => {
     expect(failures).toEqual([]);
   });
 
+  describe('and nothing hides under an opacity multiplier', () => {
+    /*
+      ── The gap this closes, and the standard I had wrong ────────────────────
+
+      `d6fbae8` taught the *mobile* helper to composite `opacity` and it
+      immediately found two controls at 1.61:1 and ~1.85:1. This guard, on the
+      web side, never mentioned opacity at all — so every rule above could be
+      satisfied by a perfectly compliant `text-white/50` sitting inside an
+      `opacity-60` parent, at an effective 0.30 alpha. That is item 17's own
+      2.71:1 defect, reachable without ever writing a sub-floor token.
+
+      **Correction, because I overstated this once.** WCAG 2.1 SC 1.4.3 exempts
+      inactive components: *"User Interface Components that are not available
+      for user interaction (e.g., a disabled control in HTML) are not required
+      to meet contrast requirements."* Verified against the W3C Understanding
+      document, not recalled. The two buttons `d6fbae8` fixed were **disabled
+      states**, and I described them as failures "against a 4.5 floor" — they
+      were not WCAG failures. The fixes stand on product grounds (a primary
+      action nobody can read leaves you unable to tell what the control is), but
+      the standard did not require them.
+
+      That distinction is the difference between this rule touching 26 sites and
+      touching 2. `components/ui/button.tsx` carries `disabled:opacity-50` for
+      the whole app; "fixing" that shared primitive would have been the obvious
+      move and would have been wrong.
+
+      ── What is in scope ─────────────────────────────────────────────────────
+
+      A **bare** `opacity-N` — no state variant — on an element that is not
+      itself an icon. State variants (`disabled:`, `hover:`, `focus:`, `group-`,
+      `peer-`, `aria-`, `data-`) are excluded: the first is exempt, and the rest
+      describe a transient state rather than how the element reads at rest.
+      Responsive variants are *not* excluded — `sm:opacity-60` always applies at
+      that width, which makes it an ordinary fade.
+
+      ── ⚠ Known blind spot, stated rather than papered over ──────────────────
+
+      **A source scan cannot see opacity on a distant ancestor.** This rule
+      catches the fade at the element that declares it; if a wrapper three
+      components up fades a subtree, nothing here knows. Both defects found on
+      8 Aug were the shallow form — `ModificationsTab`'s completed-mods
+      container and `VehiclePhotoUploadDialog`'s hint pill — and both were found
+      by grep before this rule existed, not by it.
+
+      That is the same honesty `mobile-text-contrast.test.ts` applies to its own
+      three limits. The rendered probe is the instrument for the deep case, and
+      it has its own blind spot (it only sees routes someone visits). Neither is
+      complete; recording which is which is what keeps a green run from being
+      read as more than it is.
+    */
+
+    /** Bare or variant-prefixed, with the variant chain captured. */
+    const OPACITY = /(?:^|[\s"'`{])((?:[a-z-]+(?:\[[^\]]*\])?:)*)opacity-(\d{1,3})\b/g;
+
+    /** Transient or formally exempt. See the note above on 1.4.3. */
+    const STATE_VARIANT = /\b(disabled|hover|focus|focus-visible|active|group-[a-z-]+|peer-[a-z-]+|aria-[a-z-]+|data-\[)/;
+
+    /**
+     * A control disabled by a runtime condition rather than by the `disabled`
+     * attribute.
+     *
+     * `DashboardLayout:475` is the shape: `isDemo ? 'opacity-60
+     * cursor-not-allowed' : …`, beside an `onClick` reading `!isDemo && …`. It
+     * is exactly as inactive as anything carrying `disabled:opacity-50` and
+     * 1.4.3 exempts it identically — but it is written as a ternary, so the
+     * variant check above cannot see it.
+     *
+     * Keying on the cursor is deliberate: `cursor-not-allowed` and
+     * `pointer-events-none` are *assertions that the thing cannot be used*, and
+     * an author who writes one has said the quiet part in the markup. Keying on
+     * the ternary instead would exempt every conditional fade, which is most of
+     * them.
+     */
+    const MARKED_INACTIVE = /\b(cursor-not-allowed|pointer-events-none)\b/;
+
+    /**
+     * Elements whose only visible child is a glyph, so the 3:1 non-text bar
+     * applies rather than 4.5:1.
+     *
+     * Both are the shadcn close button: an `<X className="h-4 w-4" />` plus a
+     * `<span className="sr-only">Close</span>`. `sr-only` text is visually
+     * hidden, and 1.4.3 exempts text "not visible to anyone" in the same
+     * sentence it exempts inactive components — so the only thing on screen is
+     * the glyph.
+     *
+     * Named individually rather than matched by a pattern. An allowlist that
+     * can be satisfied by accident is not one, and these are vendored
+     * primitives nobody edits by hand.
+     */
+    const ICON_ONLY_CONTROLS = new Set([
+      'components/ui/dialog.tsx',
+      'components/ui/sheet.tsx',
+      /*
+        Vendored by shadcn and rendered by nothing — zero importers, checked on
+        8 Aug. Its two sites are `day-outside` cells, the greyed leading and
+        trailing days of an adjacent month.
+
+        Exempted rather than fixed on the same reasoning that deleted
+        `PerformanceGoalSelector` and `TierProgressCard` this week: making an
+        unrendered component compliant is work whose only effect is on a file
+        nobody sees. Not deleted either, because it is upstream's file and
+        `shadcn add` will put it back — a bespoke component that nothing renders
+        is dead code, a vendored one is inventory. Worth a separate look.
+      */
+      'components/ui/calendar.tsx',
+    ]);
+
+    const fades = SURFACES.flatMap(tsxFiles).flatMap((file) => {
+      const rel = file.slice(ROOT.length + 1);
+      const source = stripComments(readFileSync(file, 'utf8'));
+      const found: string[] = [];
+
+      for (const match of Array.from(source.matchAll(OPACITY))) {
+        const [, variants, value] = match;
+        const alpha = Number(value);
+
+        // 0 is hidden and 100 is a no-op; neither fades readable text.
+        if (alpha === 0 || alpha >= 100) continue;
+        if (STATE_VARIANT.test(variants)) continue;
+        if (ICON_ONLY_CONTROLS.has(rel)) continue;
+
+        const index = match.index ?? 0;
+        const classes = enclosingString(source, index);
+
+        // An icon answers to 3:1 and is allowed to be quiet.
+        if (ICON_DIMS.every((re) => re.test(classes)) && !TEXT_SIZE.test(classes)) continue;
+
+        /*
+          Inactive by a runtime condition — 1.4.3 exempts it. See above.
+
+          Widened to the enclosing template for the same reason the `text` rule
+          is: inside `` `… ${isDemo ? 'opacity-60 cursor-not-allowed' : …}` ``,
+          `enclosingString` returns the *condition* — the literal `"isDemo ?"` —
+          because that is the nearest quoted run before the match. The branch
+          carrying the cursor is a sibling of it. Testing both is what lets a
+          conditional disabled state be recognised as one.
+        */
+        const context = `${classes} ${enclosingTemplate(source, index) ?? ''}`;
+        if (MARKED_INACTIVE.test(context)) continue;
+
+        found.push(
+          `${rel}:${source.slice(0, index).split('\n').length}  opacity-${alpha}  in "${classes.trim()}"`
+        );
+      }
+
+      return found;
+    });
+
+    it('found opacity sites to reason about, so this cannot pass vacuously', () => {
+      // The exempt sites still have to be *seen*. A regex that matched nothing
+      // would make the assertion below trivially green — this file's own
+      // "did not eat the markup" case exists for the same reason.
+      const anyOpacity = SURFACES.flatMap(tsxFiles).reduce(
+        (n, f) => n + (stripComments(readFileSync(f, 'utf8')).match(/opacity-\d/g)?.length ?? 0),
+        0
+      );
+      expect(anyOpacity).toBeGreaterThan(30);
+    });
+
+    it('fades nothing readable with a bare opacity', () => {
+      /*
+        To fix one: express the de-emphasis as a colour. R10 in
+        `docs/roadmap.md` already says so — "contrast, not size, makes a label
+        recede" — and the reason it matters here is mechanical rather than
+        stylistic: an alpha multiplier is the one form of de-emphasis this scan
+        structurally cannot measure, and a colour class is the one it can.
+
+        If the fade is on a container, move it onto the text inside, or drop it
+        where another signal already carries the meaning. Both 8 Aug fixes took
+        the second route and neither lost anything.
+      */
+      expect(fades).toEqual([]);
+    });
+  });
+
   it('leaves nothing unclassifiable', () => {
     // Not pedantry, and not a stricter reading of the rule than item 17's —
     // this category is where the second defect was. `HealthHistoryChart`

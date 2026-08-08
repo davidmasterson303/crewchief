@@ -60,8 +60,13 @@ export default function IssueCard({
       className={`${isSmall ? 'p-3' : 'p-4'} border rounded-lg transition-all ${
         isCompleted
           ? 'bg-green-500/10 border-green-400/30'
-          : isNotInterested
-          ? 'bg-slate-800/30 border-slate-700/30 opacity-60'
+          : /* "Not interested" is already said twice — by the slate fill and by
+               the muted border. The `opacity-60` that used to be here was a
+               third signal, and the only one that faded the issue text and its
+               controls along with the card. The card is still live: you can
+               read it and change your mind about it. */
+            isNotInterested
+          ? 'bg-slate-800/30 border-slate-700/30'
           : 'bg-slate-900/30 border-slate-700/50 hover:border-cyan-400/30 hover:bg-slate-900/50'
       }`}
     >
