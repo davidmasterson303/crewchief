@@ -171,6 +171,12 @@ const STATIC_ANALYSIS_SUITES = [
   // called and what is refused, both of which are on disk. Same reasoning as
   // `upload-route-status-codes`.
   'create-vehicle-route.test.ts',
+  // Reads the A2a migration against the modules that name its column and its
+  // source value. Same class as `mod-details-goal-key`: an agreement between
+  // SQL and TypeScript that no runtime here checks, because Postgres rejects
+  // the write and the error is swallowed. `LogServiceModal` has been inserting
+  // a non-existent column with an illegal source for months without a symptom.
+  'service-baseline-schema.test.ts',
 ];
 
 /**

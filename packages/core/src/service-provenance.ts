@@ -46,13 +46,37 @@
  */
 
 /** Where a "next due" figure came from. */
-export type ServiceBasis = 'service-history' | 'mileage-estimate';
+export type ServiceBasis = 'service-history' | 'owner-reported' | 'mileage-estimate';
+
+/**
+ * What was found to count from, before it is turned into a claim.
+ *
+ * `null` means nothing was found, which is the second-hand car's default and
+ * the reason `mileage-estimate` exists.
+ */
+export type ServiceEvidence = 'records' | 'owner-reported' | null;
 
 /** Where the interval itself came from. Only one source exists today. */
 export type ScheduleBasis = 'generated-schedule';
 
 export const SERVICE_BASIS_LABELS: Record<ServiceBasis, string> = {
   'service-history': 'From your service records',
+  /*
+    Track A2a. Deliberately not folded into `service-history`, and the wording
+    is the reason the distinction exists at all.
+
+    A line item extracted from an invoice is evidence: a document said so. An
+    onboarding answer is a **recollection** — "I think the last big service was
+    around 85,000" — given on a sign-up screen by somebody who mainly wants to
+    finish signing up. Both are far better than nothing and both belong in the
+    calculation. Only one of them is a record.
+
+    "You told us" rather than "From your notes" because it names the source as a
+    person's memory, which is the part a reader needs in order to judge it. This
+    is the same reasoning that made `generated-schedule` say "typical" instead
+    of "manufacturer-recommended": the weaker word is the true one.
+  */
+  'owner-reported': 'Based on what you told us at sign-up',
   'mileage-estimate': 'Estimated from your mileage',
 };
 
@@ -72,8 +96,10 @@ export const SCHEDULE_BASIS_LABELS: Record<ScheduleBasis, string> = {
  * Takes the flag `evaluateSchedule` already computes, so there is no second
  * place where a claim could be made that the data does not support.
  */
-export function serviceBasis(basedOnHistory: boolean): ServiceBasis {
-  return basedOnHistory ? 'service-history' : 'mileage-estimate';
+export function serviceBasis(evidence: ServiceEvidence): ServiceBasis {
+  if (evidence === 'records') return 'service-history';
+  if (evidence === 'owner-reported') return 'owner-reported';
+  return 'mileage-estimate';
 }
 
 /**
@@ -82,15 +108,24 @@ export function serviceBasis(basedOnHistory: boolean): ServiceBasis {
  * **A milestone is only as well-founded as its weakest service.** If three
  * services come from logged records and one is estimated, the screen must not
  * say "from your service records" — a reader would take that as covering the
- * lot. Mixed evidence reports as estimated, which is the conservative
- * direction and the only one that cannot mislead.
+ * lot. Mixed evidence reports as the weakest of what it holds, which is the
+ * conservative direction and the only one that cannot mislead.
+ *
+ * With three bases rather than two the rule is unchanged, just ordered:
+ * records > owner-reported > estimate. A milestone mixing an invoice with a
+ * remembered date reports as **owner-reported**, because that is the claim the
+ * whole group can actually support.
  */
-export function milestoneBasis(services: Array<{ basedOnHistory: boolean }>): ServiceBasis {
+export function milestoneBasis(services: Array<{ evidence: ServiceEvidence }>): ServiceBasis {
   if (services.length === 0) return 'mileage-estimate';
 
-  return services.every((service) => service.basedOnHistory)
+  // Any service with nothing to count from drags the whole visit down to an
+  // estimate — one unknown is enough to make "from your records" untrue.
+  if (services.some((service) => service.evidence === null)) return 'mileage-estimate';
+
+  return services.every((service) => service.evidence === 'records')
     ? 'service-history'
-    : 'mileage-estimate';
+    : 'owner-reported';
 }
 
 /**
@@ -101,5 +136,9 @@ export function milestoneBasis(services: Array<{ basedOnHistory: boolean }>): Se
  * cannot name a source should not draw one.
  */
 export function isServiceBasis(value: unknown): value is ServiceBasis {
-  return value === 'service-history' || value === 'mileage-estimate';
+  return (
+    value === 'service-history' ||
+    value === 'owner-reported' ||
+    value === 'mileage-estimate'
+  );
 }

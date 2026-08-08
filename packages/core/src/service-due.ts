@@ -29,6 +29,18 @@
  * sending: one alert about a visit, rather than four about filters.
  */
 
+/*
+  The only import in this module, and it points at the vocabulary rather than
+  the other way round.
+
+  `service-provenance.ts` describes *what a claim means*; this file decides
+  *what happened*. The concept "which kind of record did we count from" is a
+  provenance idea, so it is defined there and consumed here — and the
+  dependency stays one-directional because `service-provenance` types its own
+  inputs structurally and never imports this file.
+*/
+import type { ServiceEvidence } from './service-provenance';
+
 /**
  * `unknown` is not a fifth severity — it means **we cannot say**.
  *
@@ -68,6 +80,16 @@ export interface ServiceDue {
   status: DueStatus;
   /** Whether a completed service was found to count from. */
   basedOnHistory: boolean;
+  /**
+   * *What kind* of thing was found — Track A2a.
+   *
+   * `basedOnHistory` answers "did we find anything", which was enough while
+   * everything came from invoices. Once an owner can type a baseline at
+   * sign-up, a boolean cannot tell a document from a recollection, and
+   * `service-provenance.ts` has to say which. Kept alongside rather than
+   * replacing it: the two answer different questions and both have callers.
+   */
+  evidence: ServiceEvidence;
 }
 
 export interface Milestone {
@@ -238,10 +260,21 @@ export function evaluateSchedule(params: {
   currentMileage: number;
   lastServiceMileage?: (service: string) => number | null;
   lastServiceDate?: (service: string) => string | null;
+  /**
+   * Which kind of record the two lookups above answered from — Track A2a.
+   *
+   * Optional, and its absence means `'records'` rather than `null`: every
+   * caller that existed before A2a supplied history from
+   * `maintenance_line_items` rows extracted from invoices, so treating a
+   * missing answer as "no evidence" would silently downgrade every existing
+   * claim. A caller that has owner-reported baselines says so.
+   */
+  lastServiceEvidence?: (service: string) => ServiceEvidence;
   /** Injectable so a test is not at the mercy of the clock. */
   today?: string;
 }): ServiceDue[] {
   const { schedule, currentMileage, lastServiceMileage, lastServiceDate } = params;
+  const lastServiceEvidence = params.lastServiceEvidence;
   const today = params.today ?? new Date().toISOString().slice(0, 10);
 
   return schedule
@@ -252,6 +285,7 @@ export function evaluateSchedule(params: {
 
       const lastMileage = lastServiceMileage ? lastServiceMileage(entry.service) : null;
       const lastDate = lastServiceDate ? lastServiceDate(entry.service) : null;
+      const found = lastMileage !== null || lastDate !== null;
 
       let dueAtMiles: number | null = null;
       let milesRemaining: number | null = null;
@@ -308,7 +342,16 @@ export function evaluateSchedule(params: {
         monthsRemaining,
         drivenBy,
         status,
-        basedOnHistory: lastMileage !== null || lastDate !== null,
+        basedOnHistory: found,
+        /*
+          Only claim an evidence kind when something was actually found. A
+          caller supplying `lastServiceEvidence` for every service in the
+          schedule would otherwise have its answer recorded for services whose
+          lookups returned nothing — a provenance label on a figure that rests
+          on no record at all, which is the exact defect this vocabulary exists
+          to prevent.
+        */
+        evidence: found ? lastServiceEvidence?.(entry.service) ?? 'records' : null,
       };
     })
     .sort(

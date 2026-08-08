@@ -46,10 +46,16 @@ import { wishlistItemIdentifier } from '@crewchief/core/wishlist-identifier';
  *
  * This app has shipped unsubstantiated provenance claims twice, and
  * `provenance-claims.test.ts` exists because of it. Every label here derives
- * from `evaluateSchedule`'s own `basedOnHistory` flag, and a milestone reports
- * as *estimated* unless every service in it came from records — mixed evidence
- * takes the weaker claim, because a reader takes "from your service records" as
- * covering the lot.
+ * from `evaluateSchedule`'s own `evidence` field, and a milestone takes the
+ * weakest claim its services can jointly support — because a reader takes "from
+ * your service records" as covering the lot.
+ *
+ * Three rungs since Track A2a, not two: records, then what the owner told us at
+ * sign-up, then a bare estimate. The middle one exists because an invoice is a
+ * document and a recollection is not, and collapsing them would make the app
+ * cite a memory as a record. The label is rendered by lookup, so a fourth rung
+ * would appear here without an edit — `isServiceBasis` is what stops an
+ * unrecognised one drawing a blank chip.
  *
  * ── What is deliberately not here ───────────────────────────────────────────
  *
