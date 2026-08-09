@@ -516,6 +516,22 @@ nav {
   .service-bay {
     --bay-led: 1;
     --bay-vignette: 0.35;
+    /*
+      The second light source, off by default — v8 §3.
+
+      A performance bay is not this room brighter; it is this room with a work
+      light in it, throwing warm bounce off the floor against the cold ceiling
+      wash. Two-tone lighting is what separates a lit workshop from a dark web
+      page, and the eye reads it before it reads anything on the screen.
+
+      **At 0 this layer paints nothing**, so adding it is a visual no-op until
+      something turns it on. That something is the sport register, and it is why
+      this lands first: `tokens/register.css` sets `--bay-heat: 1` and states
+      the layer "already exists in `.service-bay` at zero". It did not — this
+      file had two knobs and its own comment said so — so the register's single
+      biggest perceptual change would have set a variable nothing reads.
+    */
+    --bay-heat: 0;
 
     background-color: #0b0a09;
     background-image:
@@ -525,6 +541,8 @@ nav {
       radial-gradient(ellipse 92% 52% at 50% 13%, rgb(34 211 238 / calc(0.09 * var(--bay-led))), transparent 62%),
       /* the floor catching it */
       radial-gradient(ellipse 52% 9% at 50% 69%, rgb(34 211 238 / calc(0.06 * var(--bay-led))), transparent 72%),
+      /* the work light's warm bounce off the floor — only ever visible in sport */
+      radial-gradient(ellipse 78% 30% at 50% 99%, rgb(255 92 60 / calc(0.13 * var(--bay-heat))), transparent 72%),
       linear-gradient(180deg, rgb(255 255 255 / 0.028), rgb(255 255 255 / 0.007) 45%, transparent),
       /* wall/floor seam */
       linear-gradient(rgb(255 255 255 / 0.045), rgb(255 255 255 / 0.045)),
@@ -532,9 +550,16 @@ nav {
       repeating-linear-gradient(90deg, transparent 0 139px, rgb(255 255 255 / 0.02) 139px 140px),
       /* the room */
       linear-gradient(180deg, #0b0a09 0%, #131110 52%, #191713 64%, #15130f 100%);
-    background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, repeat-x, no-repeat;
-    background-size: 100% 100%, 100% 100%, 100% 100%, 100% 36%, 100% 1px, 100% 64%, 100% 100%;
-    background-position: 0 0, 0 0, 0 0, 0 100%, 0 64%, 0 0, 0 0;
+    /*
+      Four lists, one order. Inserting the heat layer at position 4 shifts every
+      later entry, and getting that wrong is not cosmetic: `repeat-x` landing on
+      the wrong layer is how the beltline's brushed grain once climbed out of
+      its 11% band and textured the whole page. Counted rather than eyeballed —
+      8 layers, 8 entries in each list.
+    */
+    background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, repeat-x, no-repeat;
+    background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 36%, 100% 1px, 100% 64%, 100% 100%;
+    background-position: 0 0, 0 0, 0 0, 0 0, 0 100%, 0 64%, 0 0, 0 0;
   }
 
   /* The cockpit beltline — concept 1c, and the dashboard's half of the rhyme.
