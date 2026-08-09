@@ -107,6 +107,25 @@ nav {
     --build-redline: #FF4436;
     --build-redline-track: rgb(255 68 54 / 0.22);
 
+    /*
+     * The build ramp — v8 §6's prerequisite.
+     *
+     * These four values shipped inside `BuildGauge.tsx` as a bare ternary of
+     * hex literals. Naming them here is not tidying: **v8's register sets
+     * `--register-accent: var(--build-far)`, and `--build-far` did not exist**,
+     * so the sport register's accent would have resolved to nothing. Same shape
+     * as `--bay-heat` in §3 — the spec assumed a token the repo never had.
+     *
+     * Cool steel for stock, warming to the amber this app already uses for
+     * recall attention. Nothing here is a failure state, so nothing is red —
+     * the redline above is a separate axis and deliberately not part of this
+     * ramp.
+     */
+    --build-stock: #7d8794;           /* under 12 — untouched */
+    --build-mild: #9fc8d8;            /* 12–39  — bolt-ons */
+    --build-warm: #e0c168;            /* 40–69  — committed */
+    --build-far: #f0a35e;             /* 70+    — far side of sensible */
+
     /* ── design-system vocabulary, aliased onto the app's tokens (v7 C0) ──
      *
      * The v7 specs are written in these names; this file was written in the
@@ -247,6 +266,104 @@ nav {
     --scroll-reveal-distance: 28px;
     --duration-count-up: 900ms;
     --duration-shimmer: 1600ms;
+
+    /*
+     * ── Register defaults — v8 §6 ─────────────────────────────────────────
+     *
+     * The default register, stated rather than implied. These exist so the
+     * sport block below has something to override and so `.panel-cut` has a
+     * defined chamfer: `calc(100% - var(--register-chamfer))` against an
+     * UNDEFINED custom property is invalid at computed-value time, which
+     * silently drops the whole `clip-path`. A `0px` default makes the polygon
+     * a plain rectangle on purpose instead of by accident.
+     *
+     * `--register-accent` resolves to `--info` here, which is a full hex — not
+     * one of this file's bare HSL triplets — so `color: var(--register-accent)`
+     * is valid without an `hsl()` wrapper. Do not "harmonise" `--info` into a
+     * triplet without fixing this.
+     */
+    --register-accent: var(--info);
+    --register-rule: var(--border-subtle);
+    --register-chamfer: 0px;
+    --register-grain: transparent;
+    /*
+     * `--register-glow` (0.22 / 0.4) is deliberately NOT here. Its only reader
+     * is the cluster's ignition sweep in `tokens/cluster.css`, which is not
+     * ported yet — so shipping it now would add a token nothing reads, which
+     * is the precise defect `register-tokens.test.ts` exists to catch. It
+     * lands with the cluster work, not before.
+     */
+    /* Note this is NOT 0: the default register tightens numerals slightly too,
+       and the registers differ by amount. At 14px it is 0.14px — deliberate,
+       and the reason `.num` reads the token rather than hardcoding zero. */
+    --register-tracking: -0.01em;
+  }
+
+  /*
+   * ── The sport register — v8 §6 ──────────────────────────────────────────
+   *
+   * A second voice for the same product: same information, harder delivery.
+   * Set `data-register="sport"` on <html> and the surfaces below re-tune. It
+   * is a token swap, not a second stylesheet — nothing here restates a rule
+   * that `:root` already owns.
+   *
+   * Equal specificity to `:root` (both 0,1,0), so this wins on SOURCE ORDER
+   * alone. It must stay after the `:root` block and inside this layer. Moving
+   * it above, or out to an unlayered rule, silently changes which one applies.
+   *
+   * ── Three departures from `tokens/register.css`, all forced by wiring ────
+   *
+   * The export overrides `--radius-sm/md/lg/xl`. In this repo that would have
+   * squared off `rounded-xl` and left everything else at 14px, because:
+   *
+   *   - `--radius-md` and `--radius-lg` **do not exist here and are read by
+   *     nothing**. Tailwind derives `rounded-lg/md/sm` from `--radius`, which
+   *     the export never mentions. Overriding `--radius` is what actually
+   *     collapses the corners, so that is what this does.
+   *
+   *   - `--radius-sm` exists but is NOT Tailwind's `rounded-sm`. It is the
+   *     8px control radius, read directly by `.field`. Both are set, because
+   *     they are genuinely two different things.
+   *
+   *   - `--radius-full` is not overridden at all. `rounded-full` is 94 sites,
+   *     nearly all of them pills, avatars and dots where a 3px radius reads as
+   *     a rendering fault rather than a decision. The register sharpens
+   *     panels; it does not turn every badge into a chiclet.
+   *
+   * The type voice swaps `.display-serif` to the sans stack rather than to
+   * `var(--font-sans)`, which this repo does not define — Tailwind only
+   * extends `display`, so `sans` falls through to its default stack. Naming
+   * the stack keeps the swap honest instead of resolving to nothing.
+   */
+  [data-register='sport'] {
+    /* Hotter bay, harder light. See §3 for what each of these drives. */
+    --bay-heat: 1;
+    --bay-led: 1.5;
+    --bay-vignette: 0.62;
+    --belt-led: 1.7;
+
+    /* Milled, not rounded. `--radius` is the one that moves the product. */
+    --radius: 3px;
+    --radius-xl: 3px;
+    --radius-sm: 2px;
+
+    --register-chamfer: 16px;
+    --register-accent: var(--build-far);
+    --register-grain: rgb(255 255 255 / 0.03);
+    --register-tracking: -0.03em;
+  }
+
+  /*
+   * The type voice. The editorial serif is the default register's whole
+   * personality, so the sport register cannot merely tighten it — it changes
+   * instrument.
+   */
+  [data-register='sport'] .display-serif {
+    font-family:
+      ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+      'Helvetica Neue', Arial, sans-serif;
+    font-weight: 650;
+    letter-spacing: var(--register-tracking, -0.02em);
   }
 }
 
@@ -1278,9 +1395,65 @@ nav {
   }
 
   /* Tabular figures wherever digits line up in columns. */
+  /*
+   * A panel with a corner taken off — v8 §6.
+   *
+   * The chamfer is `0px` in the default register, so this is an ordinary card
+   * until the register changes. `--radius-lg` in the export is `--radius`
+   * here; see the sport block for why that substitution is the whole point
+   * rather than a rename.
+   */
+  .panel-cut {
+    position: relative;
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06);
+    background-image:
+      linear-gradient(180deg, rgb(255 255 255 / 0.04), transparent 30px),
+      repeating-linear-gradient(120deg, var(--register-grain) 0 1px, transparent 1px 4px);
+    clip-path: polygon(
+      0 0,
+      calc(100% - var(--register-chamfer)) 0,
+      100% var(--register-chamfer),
+      100% 100%,
+      0 100%
+    );
+  }
+
+  /* The cut edge wants a light on it, or it reads as a corner that fell off.
+     Scoped to sport because in the default register there is no bevel to
+     light — a 1px diagonal over a square corner is just a scratch. */
+  [data-register='sport'] .panel-cut::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: calc(var(--register-chamfer) * 1.42);
+    height: 1px;
+    background: rgb(255 255 255 / 0.16);
+    transform-origin: top right;
+    transform: rotate(45deg);
+    pointer-events: none;
+  }
+
+  .register-rule {
+    background: var(--register-rule);
+    height: 1px;
+    border: none;
+  }
+
+  .register-mark {
+    color: var(--register-accent);
+  }
+
   .num {
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1;
+    /* Tightens with the register — v8 §6. Both registers set this; they differ
+       by amount (-0.01em default, -0.03em sport). The `0` fallback only
+       applies if the token is removed entirely. */
+    letter-spacing: var(--register-tracking, 0);
   }
 
   /*

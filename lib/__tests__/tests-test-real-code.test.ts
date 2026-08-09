@@ -37,6 +37,14 @@ const TESTS_DIR = __dirname;
  * used as a blanket excuse.
  */
 const STATIC_ANALYSIS_SUITES = [
+  // Reads globals.css and tailwind.config.ts to prove the sport register
+  // overrides only tokens something actually reads. There is nothing to
+  // import: the subject is a block of CSS custom properties, and the failure
+  // it pins is SILENT — overriding a token nothing reads changes nothing and
+  // looks exactly like working code. jsdom resolves neither `var()` through
+  // Tailwind's generated utilities nor `clip-path`, so the rendered check the
+  // guard would otherwise want is not available under any runner here.
+  'register-tokens.test.ts',
   'auth-posture.test.ts',
   'internal-fetch-posture.test.ts',
   // Reads apps/mobile off disk to prove the Expo client never queries Supabase
