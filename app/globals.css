@@ -282,6 +282,24 @@ nav {
      * is valid without an `hsl()` wrapper. Do not "harmonise" `--info` into a
      * triplet without fixing this.
      */
+    /*
+     * The bay knobs live HERE, not on `.service-bay` / `.cockpit-belt`.
+     *
+     * They were originally set on those elements, which reads naturally and is
+     * wrong: **a custom property set directly on an element beats one
+     * inherited from an ancestor.** The sport register sets these on <html>,
+     * so with the element-level definitions in place all four of its biggest
+     * perceptual changes — heat, LED, vignette, belt — resolved to the local
+     * value and did nothing.
+     *
+     * Caught by measuring the deployed page, not by the guard, because the
+     * guard's `:root` slice was itself broken. Both are fixed together.
+     */
+    --bay-heat: 0;
+    --bay-led: 1;
+    --bay-vignette: 0.35;
+    --belt-led: 1;
+
     --register-accent: var(--info);
     --register-rule: var(--border-subtle);
     --register-chamfer: 0px;
@@ -631,8 +649,6 @@ nav {
    * Geometry: wall to 64%, floor below it. That horizon is shared by three
    * layers, so if it moves it moves in all of them. */
   .service-bay {
-    --bay-led: 1;
-    --bay-vignette: 0.35;
     /*
       The second light source, off by default — v8 §3.
 
@@ -641,15 +657,13 @@ nav {
       wash. Two-tone lighting is what separates a lit workshop from a dark web
       page, and the eye reads it before it reads anything on the screen.
 
-      **At 0 this layer paints nothing**, so adding it is a visual no-op until
-      something turns it on. That something is the sport register, and it is why
-      this lands first: `tokens/register.css` sets `--bay-heat: 1` and states
-      the layer "already exists in `.service-bay` at zero". It did not — this
-      file had two knobs and its own comment said so — so the register's single
-      biggest perceptual change would have set a variable nothing reads.
-    */
-    --bay-heat: 0;
+      **At `--bay-heat: 0` this layer paints nothing**, so it stays a visual
+      no-op until the sport register turns it on.
 
+      `--bay-led`, `--bay-vignette` and `--bay-heat` were DECLARED here and now
+      live at `:root`. Declaring them on this element put them out of reach of
+      the register that exists to change them — see the note beside them.
+    */
     background-color: #0b0a09;
     background-image:
       /* corner falloff */
@@ -702,8 +716,9 @@ nav {
    * part of the page's ground, not a fixed overlay, and pinning it would make
    * it swim against the content on the way down. */
   .cockpit-belt {
+    /* `--belt-y` stays here — it is this element's geometry and no register
+       touches it. `--belt-led` moved to `:root`, because sport does. */
     --belt-y: 58%;
-    --belt-led: 1;
 
     background-color: #0a0a0b;
     background-image:

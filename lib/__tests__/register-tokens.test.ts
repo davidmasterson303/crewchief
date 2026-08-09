@@ -123,8 +123,75 @@ describe('the sport register', () => {
       `calc()` goes invalid at computed-value time and drops its whole
       declaration — the failure `--register-chamfer: 0px` exists to prevent.
     */
-    const root = code(css).slice(css.indexOf(':root {'), css.indexOf("[data-register='sport']"));
+    /*
+      Both indices must come from the SAME string. The first version took them
+      from `css` and applied them to `code(css)` — stripping comments shortens
+      the text, so the slice landed somewhere arbitrary and the assertion was
+      not checking `:root` at all. Found by measuring the deployed page and
+      seeing `--bay-heat` resolve to the empty string at `:root` while this
+      test was green.
+    */
+    const bare = code(css);
+    const root = bare.slice(bare.indexOf(':root {'), bare.indexOf("[data-register='sport']"));
     expect(root).toContain(`${token}:`);
+  });
+});
+
+/**
+ * The selector a declaration sits inside: the text between the previous `}` or
+ * `{` and the `{` that opens this rule.
+ */
+function enclosingSelector(source: string, at: number): string {
+  const open = source.lastIndexOf('{', at);
+  const prior = Math.max(source.lastIndexOf('}', open), source.lastIndexOf('{', open - 1));
+  return source.slice(prior + 1, open).trim();
+}
+
+/**
+ * Where a register-controlled token may legally be declared.
+ *
+ * `:root` is the default and the register block is the override. Anything else
+ * that declares one of these SHADOWS the register — see the test below.
+ *
+ * The third entry is a deliberate exception rather than an oversight.
+ * `.service-bay-dim` is the auth screens' variant: the room is scenery there,
+ * not the subject, so the LED comes down and the corners go darker. It should
+ * keep winning in BOTH registers — a sign-in page has no reason to be brighter
+ * because someone answered a modifications question — so it is allowed to
+ * shadow on purpose. Adding to this list is a decision, which is the point of
+ * it being a list.
+ */
+const DECLARATION_SITES = [':root', "[data-register='sport']", '.service-bay-dim'];
+
+describe('nothing shadows an override', () => {
+  it.each(overridden)('%s is not re-declared on a descendant rule', (token) => {
+    /*
+      The defect this suite was written to prevent, in the one form it did not
+      originally check — and the form that actually shipped.
+
+      **A custom property set directly on an element beats one inherited from
+      an ancestor.** The register sets its tokens on <html>. `.service-bay`
+      declared `--bay-heat`, `--bay-led` and `--bay-vignette` on ITSELF, and
+      `.cockpit-belt` declared `--belt-led`, so all four of sport's biggest
+      perceptual changes resolved to the local value and did nothing.
+
+      It read naturally — the knob lives with the thing it drives — which is
+      exactly why it needs a test rather than care. Declarations are legal in
+      only two places: `:root` (the default) and the register block (the
+      override).
+    */
+    const bare = code(css);
+
+    let declaration: RegExpExecArray | null;
+    const pattern = new RegExp(`${token}\\s*:`, 'g');
+    const offenders: string[] = [];
+
+    while ((declaration = pattern.exec(bare)) !== null) {
+      const selector = enclosingSelector(bare, declaration.index);
+      if (!DECLARATION_SITES.includes(selector)) offenders.push(selector);
+    }
+
+    expect(offenders).toEqual([]);
   });
 });
 
