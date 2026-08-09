@@ -195,6 +195,11 @@ const STATIC_ANALYSIS_SUITES = [
   // observable in a rendered test; the evidence is a browser measurement
   // recorded in that file's docblock, and this is the ratchet.
   'dashboard-tabs-prefetch.test.ts',
+  // Reads the button primitive's cva string. jsdom computes no layout, so it
+  // cannot tell 40px from 44px, and it does not composite a var() against a
+  // backdrop — the rendered evidence is a browser measurement recorded in that
+  // component's docblock. What regresses is which classes are declared.
+  'button-primitive.test.ts',
 ];
 
 /**

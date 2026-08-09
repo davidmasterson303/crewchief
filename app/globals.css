@@ -77,6 +77,33 @@ nav {
     /* The build dial's redline — v8 §4c. Deliberately hotter and more
        orange-shifted than --critical-red (#F87171): a redline that matched the
        alert red would be read as an alert. Do not harmonise them. */
+    /*
+      A disabled control's own fill and ink — v8 §8a.
+
+      Explicit values rather than a group `opacity`, and that is the entire
+      point: an alpha on the wrapper multiplies with any alpha inside it, which
+      is how ModificationsTab's badges reached an effective 0.30. These two are
+      pre-composited, so there is nothing left to multiply and the contrast
+      guard can read them.
+
+      ⚠ Measured, because the design system's own comment is wrong here. It
+      claims "4.6:1 on surface-2, 4.9:1 on surface-3". Actual, against this
+      repo's surfaces:
+
+        on --surface-disabled #1B1917 : 3.31:1   <- the pairing this produces
+        on --surface-2        #1F1C19 : 3.20:1
+        on --surface-3        #272320 : 2.94:1
+
+      None of those is 4.6. That is **not a defect**: WCAG 2.1 SC 1.4.3 exempts
+      inactive components — "a disabled control in HTML is not required to meet
+      contrast requirements" — so a disabled label is allowed to sit here. The
+      reason to prefer these tokens over `opacity-50` is measurability, not
+      compliance. The numbers are corrected so nobody later reads 4.6 and
+      believes a disabled control clears the body floor.
+    */
+    --text-disabled: #6E6B67;
+    --surface-disabled: #1B1917;
+
     --build-redline: #FF4436;
     --build-redline-track: rgb(255 68 54 / 0.22);
 
