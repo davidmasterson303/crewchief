@@ -149,6 +149,43 @@ describe('the radius collapse', () => {
   });
 });
 
+describe('the way back', () => {
+  /** The `.register-switch` rule body. */
+  function rule(): string {
+    const bare = code(css);
+    const start = bare.indexOf('.register-switch {');
+    expect(start).toBeGreaterThan(-1);
+    return bare.slice(start, bare.indexOf('}', start));
+  }
+
+  it('clears the 44px floor', () => {
+    /*
+      RB0 rule 3. `register-switch.test.tsx` asserts the control opts into this
+      class; jsdom computes no layout, so the number itself can only be pinned
+      here. The control this replaced was an 11px underline with no floor at
+      all, which is exactly the regression worth catching.
+    */
+    expect(rule()).toMatch(/min-height:\s*44px/);
+  });
+
+  it('is a ghost, never a filled control', () => {
+    /*
+      It is not what anyone came to the garage to do. A filled button here
+      competes with the actual primary action on the surface, and the design
+      system is explicit that the filled primary is cyan in both registers.
+    */
+    expect(rule()).toMatch(/background:\s*transparent/);
+    expect(rule()).toMatch(/border:\s*none/);
+  });
+
+  it('keeps a visible focus ring', () => {
+    // `outline: none` without a replacement is a keyboard trap dressed as a
+    // style choice. The pair is what makes removing the outline acceptable.
+    const focus = code(css).slice(code(css).indexOf('.register-switch:focus-visible'));
+    expect(focus.slice(0, 200)).toMatch(/box-shadow:[^;]*var\(--focus-ring-soft\)/);
+  });
+});
+
 describe('the accent', () => {
   it('resolves to a colour, not a bare HSL triplet', () => {
     /*

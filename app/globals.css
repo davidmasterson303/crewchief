@@ -1437,6 +1437,62 @@ nav {
     pointer-events: none;
   }
 
+  /*
+   * The way back — v8 §6.
+   *
+   * REQUIRED, not optional. Answering "not interested" in onboarding hides the
+   * whole modifications surface, and that answer is given in the first sixty
+   * seconds before anyone knows what it turns off. An irreversible preference
+   * is a trap, and it is what lets the onboarding question stay a single
+   * yes/no rather than having to be got right first time.
+   *
+   * Quiet by construction — ghost, never filled — because it is not what
+   * anyone came here to do. It still owes the 44px floor: this is a real
+   * control, not a footnote.
+   *
+   * Three substitutions from the export, all forced by tokens this repo does
+   * not define:
+   *
+   *   - `--touch-target-min` → the 44px literal, matching `button.tsx`, which
+   *     hardcodes the same floor for the same reason (RB0 rule 3).
+   *   - `--radius-md` → `--radius-sm`, which IS this repo's control radius.
+   *     `--radius-md` does not exist here; see the register block above.
+   *   - `--font-sans` → `inherit`. There is nothing to switch to — the body is
+   *     already the sans stack, and only `.display-serif` departs from it.
+   */
+  .register-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 44px;
+    padding: 0 10px;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: var(--text-body-sm);
+    font-weight: 600;
+    cursor: pointer;
+    transition: color var(--duration-fast) var(--ease-standard);
+  }
+
+  .register-switch:hover {
+    color: var(--text-primary);
+  }
+
+  .register-switch:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--focus-ring-soft);
+  }
+
+  /* Mid-flight. `cursor-not-allowed` also marks it inactive for the contrast
+     guard, which is what exempts the dimmed label from the body floor. */
+  .register-switch:disabled {
+    cursor: not-allowed;
+    color: var(--text-disabled);
+  }
+
   .register-rule {
     background: var(--register-rule);
     height: 1px;

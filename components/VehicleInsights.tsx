@@ -20,7 +20,6 @@ import {
   ensureAggressiveModMinimum,
   generateVehicleDossier,
   generateVehicleHealthSummary,
-  setModificationsVisible,
 } from '@/app/actions';
 import { useWishlistData } from '@/hooks/useWishlistData';
 import { toast } from 'sonner';
@@ -31,6 +30,7 @@ import MaintenanceHistoryDialog from './MaintenanceHistoryDialog';
 import IssuesTab from './insights/IssuesTab';
 import MaintenanceTab from './insights/MaintenanceTab';
 import ModificationsTab from './insights/ModificationsTab';
+import RegisterSwitch from './RegisterSwitch';
 import { showsModifications } from '@crewchief/core/mod-progression';
 
 interface VehicleInsightsProps {
@@ -491,39 +491,34 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
           <CardContent>
             <Tabs value={dossierTab} onValueChange={setDossierTab} className="w-full">
               {/*
-                The way back.
+                The way back. Why it must exist is in `RegisterSwitch`; what is
+                dossier-specific is here.
 
-                Answering "not interested" in onboarding hides this whole
-                surface, and that answer is given in the first sixty seconds
-                before anyone knows what it turns off. Without this it is
-                irreversible, which makes a preference into a trap — and it is
-                the reason the onboarding question can stay a single yes/no
-                rather than having to be got right first time.
+                It sits beside the tabs rather than in them, and stays quiet in
+                both directions: someone who said no should not be sold to
+                every time they open the dossier, only shown that the door is
+                unlocked.
 
-                Quiet on purpose. It sits under the tabs rather than in them:
-                someone who said no should not be sold to every time they open
-                the dossier, only shown that the door is unlocked.
+                Shown in BOTH states as of v8 §6. It was one-way until then —
+                which left "not interested" reversible exactly once, and only
+                for people who had never changed their mind before.
               */}
-              {!modsVisible && (
-                <button
-                  type="button"
-                  className="mb-4 text-xs text-white/50 hover:text-white/75 transition-colors underline underline-offset-2 decoration-white/20"
-                  onClick={async () => {
-                    setModsVisible(true);
-                    setDossierTab('mods');
-                    const result = await setModificationsVisible(vehicle.id as string, true);
-                    if (!result.success) {
-                      // Put it back rather than leaving a tab that will vanish
-                      // on the next load — a silent revert is worse than none.
-                      setModsVisible(false);
-                      setDossierTab('issues');
-                      toast.error(result.error || 'Could not turn modifications on');
-                    }
-                  }}
-                >
-                  Interested in modifications for this car? Turn them on
-                </button>
-              )}
+              <RegisterSwitch
+                vehicleId={vehicle.id as string}
+                visible={modsVisible}
+                className="mb-4"
+                onApply={(next) => {
+                  setModsVisible(next);
+                  /*
+                    Turning the surface off while standing on its tab would
+                    leave the dossier on a tab that no longer exists. Moving
+                    only in that case keeps a failed revert from yanking
+                    somebody off whatever they were reading.
+                  */
+                  if (next) setDossierTab('mods');
+                  else if (dossierTab === 'mods') setDossierTab('issues');
+                }}
+              />
 
               <TabsList className={`grid w-full ${dossierTabs.length === 2 ? 'grid-cols-2' : 'grid-cols-3'} mb-4 bg-white/4 border border-white/8 p-0.5 rounded-xl`}>
                 {dossierTabs.map((tabVal) => {
