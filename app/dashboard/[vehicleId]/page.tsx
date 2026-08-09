@@ -1,11 +1,11 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
 import DashboardContent from '@/components/DashboardContent';
 import RecallAlerts from '@/components/RecallAlerts';
 import HealthSummary from '@/components/HealthSummary';
-import HealthHistoryChart from '@/components/HealthHistoryChart';
 import DiagnosticHero from '@/components/DiagnosticHero';
 import CollapsibleSection from '@/components/CollapsibleSection';
 import { getClientSupabase } from '@/lib/supabase';
@@ -16,6 +16,23 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { VehicleResearchStatus } from '@/components/VehicleResearchStatus';
 import { useVehicleImage } from '@/hooks/useSignedUrl';
 import { getHealthBand } from '@/hooks/use-health-band';
+
+/*
+  The score history is `defaultOpen={false}`, so it loads when it is unfolded.
+
+  Same reasoning as the two sections in `DashboardContent` — see the note there
+  — and it is the last closed-by-default tree that was still being downloaded
+  on every dashboard load. Smaller than those two, because the chart is
+  hand-rolled SVG rather than a charting library, but it is on the same side of
+  the same line.
+
+  `ssr: false` costs nothing here: with the fold closed this never renders on
+  the server anyway.
+*/
+const HealthHistoryChart = dynamic(() => import('@/components/HealthHistoryChart'), {
+  ssr: false,
+  loading: () => <div className="h-32" aria-hidden="true" />,
+});
 
 /**
  * The health report's folded state: the score and the band it falls in.
