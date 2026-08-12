@@ -40,6 +40,15 @@ export const metadata: Metadata = {
     process.env.NEXT_PUBLIC_SITE_URL || 'https://crewchief-demo.davidmasterson.co'
   ),
   title: 'CrewChief — Your Personal Auto Ownership Consultant',
+  /*
+     The favicon, apple-touch-icon and SVG icon are NOT declared here — they
+     are app/favicon.ico, app/icon.svg and app/apple-icon.png, served by the
+     same filename convention as opengraph-image.tsx below. All of them, and
+     the manifest's two PNGs, are generated from the Sweep 1024 master
+     (public/brand/crewchief-icon-1024.svg); regenerate together, never
+     hand-edit one.
+  */
+  manifest: '/manifest.json',
   description:
     'Track your vehicles, log service history, and get answers from an AI consultant that knows your car — its issues, schedule, and history.',
   openGraph: {

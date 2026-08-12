@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 
 import { apiRequest, ApiRequestError } from '../api/client';
+import Logo from '../components/Logo';
 import { AccountScreen } from './AccountScreen';
 import { getHealthBandJudgement, healthBandHex } from '@crewchief/core/health-band';
 
@@ -363,7 +364,12 @@ export function GarageScreen({
   */
   const header = (
     <View style={styles.header}>
-      <Text style={styles.heading}>Garage</Text>
+      <View style={styles.headingRow}>
+        {/* 22px — the small cut, switched inside the component. This is the
+            root screen, so the nav header carries the mark alone. */}
+        <Logo variant="mark" size={22} />
+        <Text style={styles.heading}>Garage</Text>
+      </View>
       <View style={styles.headerActions}>
         {/*
           "Add a car" lives here, not only in the empty state.
@@ -541,6 +547,7 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   heading: { color: '#fff', fontSize: 30, fontWeight: '700', letterSpacing: -0.6 },
+  headingRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 18 },
   /*
     Brighter than `signOut`, because these two are not equals: adding a car is

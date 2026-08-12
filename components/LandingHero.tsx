@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { ArrowRight, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import FeaturesDrawer from './FeaturesDrawer';
+import Logo from '@/components/brand/Logo';
 import { AppStoreCTA } from './AppStoreCTA';
 
 /**
@@ -50,6 +51,16 @@ export default function LandingHero({ onEnter }: LandingHeroProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.05, duration: 0.45, ease: 'easeOut' }}
         >
+          {/*
+            The stacked lockup, primary treatment on the graphite plate. It
+            rides the headline's motion.div rather than getting its own
+            stagger — every entrance here must finish inside
+            INTRO_PANEL_SETTLED_MS, and a new staggered element would move
+            that finish line.
+          */}
+          <div className="flex justify-center mb-10">
+            <Logo variant="stacked" size={60} />
+          </div>
           <h1
             className="text-6xl md:text-[5.25rem] font-bold text-white leading-tight"
             style={{ letterSpacing: '-0.04em' }}

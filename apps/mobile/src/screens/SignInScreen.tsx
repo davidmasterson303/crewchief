@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 
+import Logo from '../components/Logo';
 import { signIn, signUp } from '../auth/session';
 import { hasDevCredentials, signInWithDevCredentials } from '../auth/dev-session';
 import { checkSharedCore } from '../core-check';
@@ -82,7 +83,10 @@ export function SignInScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={styles.form}>
-        <Text style={styles.title}>CrewChief</Text>
+        {/* The stacked lockup, per the Sweep handoff: this screen had no mark. */}
+        <View style={styles.lockup}>
+          <Logo variant="stacked" size={60} />
+        </View>
         <Text style={styles.subtitle}>
           {isNew ? 'Create your garage' : 'Sign in to your garage'}
         </Text>
@@ -291,7 +295,7 @@ function DevCoreCheck() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#080808', justifyContent: 'center' },
   form: { padding: 28, gap: 14 },
-  title: { color: '#fff', fontSize: 30, fontWeight: '700', letterSpacing: -0.5 },
+  lockup: { alignItems: 'flex-start', marginBottom: 4 },
   subtitle: { color: 'rgba(255,255,255,0.5)', fontSize: 15, marginBottom: 14 },
   input: {
     backgroundColor: 'rgba(255,255,255,0.06)',

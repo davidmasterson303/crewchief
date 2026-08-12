@@ -138,6 +138,14 @@ nav {
      * `hsl(var(--surface-3))`. Mixing the two up produces no colour at all.
      */
     --brand-accent: hsl(var(--accent));
+    /*
+     * The logo's other two colours (Sweep handoff, Aug 2026). The brief calls
+     * them existing tokens; they weren't — same shape as `--build-far` above,
+     * a spec assuming a name the repo never had. Cyan-700 is also the mark's
+     * colour on any light ground: cyan-400 on white measures 1.9:1.
+     */
+    --brand-accent-button: #0E7490;
+    --brand-accent-ink: #F2FBFD;
     --text-primary: hsl(var(--foreground));
     --text-muted: hsl(var(--muted-foreground));
     --border-default: hsl(var(--border));

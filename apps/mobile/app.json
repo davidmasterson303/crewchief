@@ -5,6 +5,11 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#100F0D"
+    },
     "scheme": "crewchief",
     "userInterfaceStyle": "dark",
     "ios": {
@@ -29,7 +34,7 @@
     "android": {
       "package": "co.davidmasterson.crewchief",
       "adaptiveIcon": {
-        "backgroundColor": "#080808",
+        "backgroundColor": "#100F0D",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"

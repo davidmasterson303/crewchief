@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Car, Clock, MessageSquare, Wrench, CreditCard as Edit2, Check, X, Info, ChevronLeft, ChevronRight, Tag } from 'lucide-react';
+import { Clock, MessageSquare, Wrench, CreditCard as Edit2, Check, X, Info, ChevronLeft, ChevronRight, Tag } from 'lucide-react';
+import Logo from '@/components/brand/Logo';
 import { isDemoVehicleId } from '@crewchief/core/demo';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -245,9 +246,9 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12">
           <div className={`flex items-center justify-between transition-all duration-200 ${scrolled ? 'py-3' : 'py-4'}`}>
             <div className="flex items-center gap-3">
-              <Link href={homeHref} className="flex items-center space-x-2.5 group">
-                <Car className="h-6 w-6 text-cyan-400 transition-transform group-hover:scale-105" />
-                <span className={`font-semibold text-white tracking-tight transition-all duration-200 ${scrolled ? 'text-base' : 'text-lg'}`}>CrewChief</span>
+              <Link href={homeHref} className="flex items-center group">
+                {/* 21px mark — the small cut, switched inside the component. */}
+                <Logo variant="horizontal" size={21} />
               </Link>
 
               {/*
@@ -585,7 +586,17 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
         </div>
 
         <footer className={`${appShell ? 'hidden md:flex ' : 'flex '}mt-10 pt-6 border-t border-white/6 items-center justify-between text-xs text-white/50`}>
-          <span>CrewChief &copy; {new Date().getFullYear()}</span>
+          {/* One-colour knockout: whole lockup in --text-primary, redline dropped. */}
+          <span className="flex items-center gap-2">
+            <Logo
+              variant="horizontal"
+              size={16}
+              mono
+              color="var(--text-primary)"
+              nameColor="var(--text-primary)"
+            />
+            <span>&copy; {new Date().getFullYear()}</span>
+          </span>
           <div className="flex items-center gap-4">
             <a href="mailto:feedback@crewchief.app" className="hover:text-white/50 transition-colors">Feedback</a>
             <Link href={homeHref} className="hover:text-white/50 transition-colors">Garage</Link>

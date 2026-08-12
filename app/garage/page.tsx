@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Car, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
+import Logo from '@/components/brand/Logo';
 import { VehicleCard } from '@/components/VehicleCard';
 import { useMyVehicles } from '@/hooks/useVehicles';
 import { useAuth } from '@/components/AuthProvider';
@@ -47,9 +48,9 @@ export default function GaragePage() {
       <nav className="relative z-20 border-b border-info-border" style={{ backgroundColor: '#000000', backdropFilter: 'blur(12px)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 py-5">
           <div className="flex items-center justify-between">
-            <Link href={homeHref} className="flex items-center space-x-3 group">
-              <Car className="h-7 w-7 text-cyan-400 transition-transform group-hover:scale-105" />
-              <span className="text-xl font-semibold text-white tracking-tight">CrewChief</span>
+            <Link href={homeHref} className="flex items-center group">
+              {/* 21px mark — the small cut, switched inside the component. */}
+              <Logo variant="horizontal" size={21} />
             </Link>
             <div className="flex items-center gap-3">
               {/*
@@ -92,7 +93,8 @@ export default function GaragePage() {
           <div className="border border-info-border rounded-3xl text-center py-32 px-12 bg-gradient-to-b from-black/60 to-black/40 backdrop-blur-sm">
             <div className="mb-8">
               <div className="h-24 w-24 bg-gradient-to-br from-cyan-500/20 to-cyan-500/20 rounded-2xl flex items-center justify-center mx-auto">
-                <Car className="h-12 w-12 text-info" />
+                {/* Resting glyph: mark alone, one colour, --text-muted-40. */}
+                <Logo variant="mark" size={48} mono color="var(--text-muted-40)" />
               </div>
             </div>
             <h2 className="text-4xl font-bold mb-4 text-white tracking-tight">Your Garage is Empty</h2>

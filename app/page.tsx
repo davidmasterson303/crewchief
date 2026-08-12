@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Car } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
+import Logo from '@/components/brand/Logo';
 import { VehicleCard } from '@/components/VehicleCard';
 import GarageDoor, { useIntroRevealed } from '@/components/GarageDoor';
 import LandingHero from '@/components/LandingHero';
@@ -112,9 +113,9 @@ function GarageContents() {
         <nav className="relative bay-batten border-b border-white/8 bg-black/80 backdrop-blur-xl">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 py-4">
             <div className="flex items-center justify-between">
-              <Link href="/" className="flex items-center space-x-2.5 group">
-                <Car className="h-6 w-6 text-white transition-transform group-hover:scale-105" />
-                <span className="text-lg font-semibold text-white tracking-tight">CrewChief</span>
+              <Link href="/" className="flex items-center group">
+                {/* 21px mark — the small cut, switched inside the component. */}
+                <Logo variant="horizontal" size={21} />
               </Link>
               <PublicNavActions />
             </div>
@@ -212,7 +213,8 @@ function GarageContents() {
                 protected route. Offering a retry is the honest answer.
               */
               <div className="col-span-full text-center py-20">
-                <Car className="h-10 w-10 text-white/25 mx-auto mb-5" />
+                {/* Resting glyph: mark alone, one colour, --text-muted-40. */}
+                <Logo variant="mark" size={40} mono color="var(--text-muted-40)" className="mx-auto mb-5" />
                 <h2 className="text-xl font-semibold text-white mb-2">
                   Demo vehicles unavailable
                 </h2>
