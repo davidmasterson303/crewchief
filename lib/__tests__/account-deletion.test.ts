@@ -276,3 +276,130 @@ describe('deleteAccount — failure handling', () => {
     expect(result.success).toBe(false);
   });
 });
+
+describe('subscriptionNotice — Guideline 3.1.2 and the E5 rejection reason', () => {
+  /*
+    Deleting an account while an Apple-billed subscription keeps charging is a
+    documented rejection reason, and a real failure rather than a paperwork one:
+    the account that could manage the subscription is gone, the charge
+    continues, and there is no obvious way left to stop it.
+
+    We cannot cancel it — Apple holds the billing relationship and there is no
+    server-side call that ends an App Store subscription on someone's behalf.
+    So the only honest remedy is to say so before the confirmation.
+  */
+  const { subscriptionNotice, SUBSCRIPTION_CANCEL_PATH } = require('@crewchief/core/account-deletion');
+
+  it('says nothing when there is no live subscription', () => {
+    /*
+      Not a detail. Warning somebody about a subscription they do not have
+      sends them to cancel something that is not there — and when they cannot
+      find it, the reasonable conclusion is that the deletion did not work.
+    */
+    expect(subscriptionNotice(false)).toBeNull();
+  });
+
+  it('warns that deletion does not cancel the subscription', () => {
+    const notice = subscriptionNotice(true);
+
+    expect(notice).not.toBeNull();
+    expect(notice.headline.toLowerCase()).toContain('does not cancel');
+  });
+
+  it('names where to cancel, because "manage your subscription" is not a location', () => {
+    const notice = subscriptionNotice(true);
+
+    expect(notice.action).toContain(SUBSCRIPTION_CANCEL_PATH);
+    expect(SUBSCRIPTION_CANCEL_PATH.toLowerCase()).toContain('subscriptions');
+  });
+
+  it('never claims the app will cancel it', () => {
+    /*
+      The failure mode worth pinning. Copy that says "we will cancel your
+      subscription" is a promise the product cannot keep — there is no such
+      call — and it is worse than saying nothing, because the user stops
+      looking for the thing that is still charging them.
+    */
+    const notice = subscriptionNotice(true);
+    const text = `${notice.headline} ${notice.action}`.toLowerCase();
+
+    expect(text).not.toMatch(/we will cancel|we'll cancel|automatically cancel|cancels your subscription/);
+  });
+
+  it('tells them to cancel first rather than blocking the deletion', () => {
+    /*
+      The design decision, asserted so it cannot be quietly reversed.
+
+      The tempting fix is to refuse deletion until the subscription is
+      cancelled. That trades one guideline violation for a worse one: 5.1.1(v)
+      requires deletion to be completed from inside the app, and gating it on
+      an action taken in a *different* app is the obstruction the guideline
+      exists to prevent.
+
+      So the notice is advice, not a gate — and nothing in this module exposes
+      a way to block.
+    */
+    const notice = subscriptionNotice(true);
+    expect(notice.action.toLowerCase()).toContain('cancel it first');
+
+    const core = require('node:fs').readFileSync(
+      require('node:path').join(__dirname, '..', '..', 'packages/core/src/account-deletion.ts'),
+      'utf8'
+    );
+    const code = core.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+
+    // No exported predicate that a surface could mistake for "may they delete".
+    expect(code).not.toMatch(/export function canDelete|blocksDeletion|preventDeletion/);
+  });
+});
+
+describe('both delete surfaces show the subscription notice', () => {
+  /*
+    The parity check, and the reason `subscriptionNotice` lives in core at all.
+
+    Apple reviews the **mobile** surface, so the risk is not that the web
+    dialog is wrong — it is that the two drift and the reviewed one becomes the
+    weaker. That drift is invisible: both screens would still delete accounts,
+    and both would still look right.
+
+    Structural rather than rendered, deliberately. The mobile screen is React
+    Native and cannot be rendered by this runner at all, so "did it import the
+    shared rule and use it" is the strongest property both surfaces can be held
+    to in one place. Each surface has its own render tests for behaviour.
+  */
+  const read = (p: string) =>
+    require('node:fs').readFileSync(require('node:path').join(__dirname, '..', '..', p), 'utf8');
+
+  const SURFACES = [
+    'components/DeleteAccountDialog.tsx',
+    'apps/mobile/src/screens/AccountScreen.tsx',
+  ];
+
+  it.each(SURFACES)('%s reads the shared rule rather than writing its own copy', (file) => {
+    const source = read(file);
+
+    expect(source).toContain('subscriptionNotice');
+    expect(source).toContain('@crewchief/core/account-deletion');
+  });
+
+  it.each(SURFACES)('%s renders the notice it computed', (file) => {
+    /*
+      Importing the rule and never rendering it is the exact failure this guard
+      exists for — it would satisfy the assertion above while showing the user
+      nothing.
+    */
+    const source = read(file);
+    expect(source).toMatch(/notice\.headline/);
+    expect(source).toMatch(/notice\.action/);
+  });
+
+  it.each(SURFACES)('%s does not hard-code the cancellation copy', (file) => {
+    /*
+      A surface that spells out its own wording has stopped sharing the rule,
+      whatever it imports. The phrase is one string in core precisely so a
+      correction reaches both clients at once.
+    */
+    const source = read(file);
+    expect(source).not.toMatch(/does not cancel your subscription/i);
+  });
+});

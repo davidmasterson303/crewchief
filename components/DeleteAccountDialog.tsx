@@ -23,6 +23,7 @@ import {
   DELETION_CONFIRM_PHRASE,
   describeDeletion,
   isDeletionConfirmed,
+  subscriptionNotice,
 } from '@crewchief/core/account-deletion';
 
 /*
@@ -38,6 +39,15 @@ interface DeleteAccountDialogProps {
   onOpenChange: (open: boolean) => void;
   /** Counts shown so the user knows exactly what disappears. */
   vehicleCount: number;
+  /**
+   * Whether an App Store subscription is still running. E5.
+   *
+   * Optional so the dialog cannot be rendered *without* the warning by
+   * accident in a caller that predates it — defaulting to `false` here would
+   * silently omit it, and the mobile screen is the one Apple reviews but this
+   * one is the one a subscriber is most likely to use.
+   */
+  hasLiveSubscription?: boolean;
 }
 
 /**
@@ -56,12 +66,14 @@ export function DeleteAccountDialog({
   open,
   onOpenChange,
   vehicleCount,
+  hasLiveSubscription = false,
 }: DeleteAccountDialogProps) {
   const router = useRouter();
   const [confirmText, setConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
 
   const confirmed = isDeletionConfirmed(confirmText);
+  const notice = subscriptionNotice(hasLiveSubscription);
 
   async function handleDelete() {
     if (!confirmed || deleting) return;
@@ -108,6 +120,28 @@ export function DeleteAccountDialog({
             This is permanent and cannot be undone.
           </DialogDescription>
         </DialogHeader>
+
+        {/*
+          E5, above the inventory rather than below it. Somebody who has decided
+          to delete stops reading once they find the confirm field, and this is
+          the one item on the screen that costs money to miss.
+
+          Amber rather than the panel's red: the red states an irreversible
+          consequence of what you came here to do, this states an avoidable one
+          that happens somewhere else. Two messages in one colour read as one.
+        */}
+        {notice && (
+          <div
+            className="rounded-lg border p-4 text-sm"
+            style={{
+              background: 'var(--warning-amber-wash, rgba(251,191,36,0.08))',
+              borderColor: 'var(--warning-amber-border, rgba(251,191,36,0.35))',
+            }}
+          >
+            <p className="font-semibold text-foreground">{notice.headline}</p>
+            <p className="mt-1 text-foreground/75">{notice.action}</p>
+          </div>
+        )}
 
         <div
           className="rounded-lg border p-4 text-sm"

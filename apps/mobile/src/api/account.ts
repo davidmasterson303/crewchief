@@ -15,6 +15,38 @@ export interface DeleteAccountResult {
   deleted: DeletionCounts;
 }
 
+export interface AccountSubscription {
+  /** Whether an App Store subscription is still running. */
+  live: boolean;
+  /**
+   * False when the server could not read the entitlement and defaulted to
+   * warning. The screen shows the same notice either way — a warning withheld
+   * from a subscriber is a charge they cannot stop, where a warning shown to a
+   * non-subscriber is a confusing sentence — but the flag is carried so a log
+   * or a support conversation can tell the two apart.
+   */
+  certain: boolean;
+}
+
+/**
+ * What the delete screen needs to know before it asks.
+ *
+ * Deliberately fails to `live: false` on a network error rather than throwing:
+ * the account screen's job is deletion, and blocking it because a secondary
+ * read failed would obstruct the one flow Apple requires to work. The tradeoff
+ * is stated where it is made — see `AccountScreen`.
+ */
+export async function getSubscription(): Promise<AccountSubscription> {
+  try {
+    const response = await apiRequest<{ subscription?: AccountSubscription }>('/account', {
+      method: 'GET',
+    });
+    return response.subscription ?? { live: false, certain: false };
+  } catch {
+    return { live: false, certain: false };
+  }
+}
+
 /**
  * Delete the signed-in account and everything belonging to it.
  *

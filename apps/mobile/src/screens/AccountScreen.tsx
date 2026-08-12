@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -10,11 +10,12 @@ import {
   View,
 } from 'react-native';
 
-import { deleteAccount } from '../api/account';
+import { deleteAccount, getSubscription } from '../api/account';
 import { ApiRequestError } from '../api/client';
 import {
   DELETION_CONFIRM_PHRASE,
   DELETION_INVENTORY,
+  subscriptionNotice,
   describeDeletion,
   isDeletionConfirmed,
 } from '@crewchief/core/account-deletion';
@@ -65,8 +66,36 @@ export function AccountScreen({
   const [confirmText, setConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [subscribed, setSubscribed] = useState(false);
 
   const confirmed = isDeletionConfirmed(confirmText);
+  const notice = subscriptionNotice(subscribed);
+
+  /*
+    E5. Read on open rather than on mount: this is a modal that outlives a
+    subscription purchase, and a screen that checked once at app start would
+    tell somebody who subscribed ten minutes ago that they have nothing to
+    cancel.
+
+    A failure here resolves to "no subscription" and is deliberately silent.
+    The screen's job is deletion — Apple requires that flow to work — and
+    blocking or erroring it because a secondary read failed would obstruct the
+    guideline this whole screen exists to satisfy. The server already fails the
+    other way, warning when it cannot read, so the quiet case here is a network
+    failure rather than an unknown entitlement.
+  */
+  useEffect(() => {
+    if (!visible) return;
+
+    let cancelled = false;
+    void getSubscription().then((subscription) => {
+      if (!cancelled) setSubscribed(subscription.live);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [visible]);
 
   async function handleDelete() {
     if (!confirmed || deleting) return;
@@ -129,6 +158,19 @@ export function AccountScreen({
 
           <View style={styles.danger}>
             <Text style={styles.dangerTitle}>Delete account</Text>
+
+            {/*
+              Above the inventory, not below it: somebody who has decided to
+              delete stops reading once they find the confirm field, and this
+              is the one item on the screen that costs money to miss.
+            */}
+            {notice && (
+              <View style={styles.notice}>
+                <Text style={styles.noticeHeadline}>{notice.headline}</Text>
+                <Text style={styles.noticeBody}>{notice.action}</Text>
+              </View>
+            )}
+
             <Text style={styles.dangerBody}>
               This cannot be undone. Deleting your account permanently removes:
             </Text>
@@ -229,6 +271,28 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   dangerTitle: { color: '#fca5a5', fontSize: 17, fontWeight: '700' },
+
+  /*
+    E5's subscription warning. An amber panel rather than the surrounding red:
+    the red states an irreversible consequence of the thing you came here to do,
+    while this states a consequence that happens somewhere else and is still
+    avoidable. Two different messages in one colour read as one message.
+
+    Both text colours are fully opaque and chosen against the composited
+    background this panel sits on — `mobile-text-contrast.test.ts` enforces the
+    4.5:1 floor with opacity composited in, and a translucent body here is
+    exactly the shape it catches.
+  */
+  notice: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(251,191,36,0.35)',
+    backgroundColor: 'rgba(251,191,36,0.08)',
+    padding: 14,
+    gap: 6,
+  },
+  noticeHeadline: { color: '#fcd34d', fontSize: 14, fontWeight: '700', lineHeight: 20 },
+  noticeBody: { color: '#fde9b8', fontSize: 13, lineHeight: 19 },
   dangerBody: { color: 'rgba(255,255,255,0.6)', fontSize: 14, lineHeight: 20 },
   inventoryItem: { color: 'rgba(255,255,255,0.5)', fontSize: 13, lineHeight: 19 },
 

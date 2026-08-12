@@ -3,6 +3,9 @@ import { type NextRequest } from 'next/server';
 import type { ApiResponse } from '@crewchief/core/types';
 import { checkRateLimit, getClientIdentifier, rateLimitResponse } from '@/lib/rate-limit';
 import { deleteAccount } from '@/lib/account-data';
+import { requireSession } from '@/lib/api-auth';
+import { getServiceRoleClient } from '@/lib/supabase';
+import { hasLiveEntitlement } from '@crewchief/core/entitlement';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,6 +45,66 @@ export const dynamic = 'force-dynamic';
  * call from the same caller cannot succeed, because the credential it
  * authenticated with no longer resolves to a user.
  */
+/**
+ * `GET /api/v1/account` — what the delete screen has to know before it asks.
+ *
+ * Phase 6, E5. The only thing it reports is whether an App Store subscription
+ * is still running, because **deleting an account while Apple keeps charging is
+ * a documented rejection reason** and the screen cannot warn about a state it
+ * cannot see.
+ *
+ * ── Why the client is told a boolean and not the row ────────────────────────
+ *
+ * `expires_at`, `original_transaction_id` and `product_id` are all things the
+ * client could render, and none of them are things it needs in order to say
+ * "cancel this first". Shipping the transaction id to a device puts Apple's
+ * billing identifier somewhere it can be read off a jailbroken phone or a proxy
+ * for no benefit at all. The decision — is it live *right now* — is made here,
+ * against the server's clock, by the same function the budget path uses.
+ *
+ * The server's clock matters: a device with a wound-forward date could
+ * otherwise talk itself out of the warning.
+ */
+export async function GET(): Promise<Response> {
+  const session = await requireSession();
+  if (!session.ok) {
+    return Response.json({ success: false, error: session.error } as ApiResponse<never>, {
+      status: 401,
+    });
+  }
+
+  const client = getServiceRoleClient();
+  const { data, error } = await client
+    .from('account_entitlements')
+    .select('tier, expires_at')
+    .eq('user_id', session.userId)
+    .maybeSingle();
+
+  if (error) {
+    /*
+      Fail toward showing the warning, which is the opposite of how the budget
+      path treats the same read failure — and for the same reason inverted.
+
+      There, an unreadable entitlement must not cost a paying user their
+      allowance, so it resolves to the free ceiling. Here, an unreadable
+      entitlement must not cost someone a subscription they keep paying for
+      after their account is gone. A warning shown to a non-subscriber is a
+      confusing sentence; a warning withheld from a subscriber is a recurring
+      charge they cannot stop.
+    */
+    logger.warn('API:ACCOUNT_GET', 'Could not read entitlement; warning anyway', {
+      message: error.message,
+    });
+    return Response.json({ success: true, subscription: { live: true, certain: false } });
+  }
+
+  const live = hasLiveEntitlement(
+    data ? { tier: data.tier as string | null, expiresAt: data.expires_at as string | null } : null
+  );
+
+  return Response.json({ success: true, subscription: { live, certain: true } });
+}
+
 export async function DELETE(request: NextRequest): Promise<Response> {
   logger.info('API:ACCOUNT_DELETE', 'Account deletion requested');
 
