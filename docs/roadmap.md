@@ -1,5 +1,44 @@
 # CrewChief roadmap — image pipeline, backdrop, cockpit direction, and responsive web
 
+> ## ⚠ READ THIS FIRST — reconciled 11 Aug 2026
+>
+> **Everything below this block was written on 2 August and is nine days and ~50 commits stale.**
+> Its design and responsive content is still the tree's record and still worth reading. Its
+> *sequencing* is not, and three of its instructions are actively dead.
+>
+> **This file is authoritative on the tree. It is not authoritative on the plan.** The plan of
+> record is **§0 of `~/Documents/Claude/Projects/davidmasterson.co/CREWCHIEF_ROADMAP_2026-08-02.md`
+> (Rev. G)**. Where the two disagree about what to build next, §0 wins.
+>
+> ### Dead instructions — do not act on these
+>
+> | Below it says | Reality |
+> |---|---|
+> | Pick up **5.2 Stripe checkout** second, "the next code item on the money track" | ⛔ **Dropped 8 Aug.** The product pivoted to mobile-first sold through the App Store; the web app is a free companion and takes no money. Apple IAP (E8) is the only revenue mechanism |
+> | **`brew install cocoapods`** on David's list | ⛔ **Never possible.** macOS ships Ruby 2.6, CocoaPods needs ≥ 3.0, and there is no Homebrew on this machine. Routed around by EAS cloud builds on 4 Aug |
+> | **Next.js upgrade is "still a pre-submission gate"** | It gates the **web** app, which is no longer what gets submitted. Real, but off the critical path (Track F) |
+>
+> ### Superseded state claims
+>
+> - **"Phase 3 stays at ~16 remaining"** — Phase 3 completed 5 Aug and is proven end to end.
+> - **"Erratum T2 blocks 5.2"** — 5.2 is gone. The same question (what a lapsed subscriber
+>   reaches) returns under IAP at E7/E8. Ask it there.
+> - **The R13/R14 decision "is David's call"** — R14's half was taken on 8 Aug in the delete
+>   direction (`f189679`): `UpcomingMaintenance.tsx` and `LogServiceModal.tsx` are gone.
+>   **`components/MaintenanceHistory.tsx` was not in that commit and is still dead** — R13 is
+>   still open on exactly the terms this file describes.
+> - Every `main` SHA, test count and promotion state below is from 2 Aug. As of 11 Aug: `main` is
+>   `5a36c2d`, web suites are **110 / 2160**, mobile **11 / 149**, three typechecks clean, and
+>   `demo-live` is **11 commits behind `main`**.
+>
+> ### What has landed since, that this file predates
+>
+> **Track A** (a person can sign up and add a car on the phone) — closed 8 Aug, **including R7 /
+> item 14**, the responsive onboarding wizard this file files under "P3, next quarter".
+> **Track C** (push notification scheduler and both triggers) — shipped 8 Aug.
+> **v8** — a design-system refresh across the register, tokens, the button primitive and the logo
+> set, 8 and 11 Aug.
+
 Source: `Live-Site Audit.dc.html` (2 Aug 2026), grounded in repo `davidmasterson303/crewchief@main` (aa1d73f) and the live demo. Finding refs (F1–F8) and concept refs (1a–1c, 2a–2c) point into that report. Advisor KB was offline for the audit; reconcile against it when reconnected, and stage a `kb_propose` for the decisions below.
 
 ---
@@ -696,7 +735,11 @@ current.
    written before it runs is blended permanently** — no later migration can
    reconstruct which traffic was demo, real, or the canary. This is the one item
    that gets worse by waiting.
-2. **`brew install cocoapods`** — unblocks the simulator and the rest of Phase 3.
+2. ~~**`brew install cocoapods`** — unblocks the simulator and the rest of Phase 3.~~
+   ⛔ **DEAD — do not run this.** It was never possible: macOS ships Ruby 2.6, CocoaPods needs
+   ≥ 3.0, and there is no Homebrew on this machine. **Routed around by EAS cloud builds on
+   4 Aug**, and Phase 3 completed 5 Aug. This instruction has sent David to a terminal for a
+   command that cannot succeed more than once.
 3. **A dashboard read for erratum T2**, blocking 5.2:
    `select tablename, policyname, cmd, roles, qual from pg_policies order by tablename;`
 4. **Review the KB queue** — `cd ~/Developer/advisor-kb && node dist/cli.js queue`.
@@ -863,23 +906,34 @@ hard way, all recorded in its own comments:
 
 ## Still open, in priority order
 
-1. **Erratum T2** — blocks 5.2. The anon RLS audit run this session found no
-   non-demo rows reachable across 25 tables, and `vehicle-documents` is private.
-   **That evidence does not touch the actual question**, which is what an
-   *authenticated* caller whose subscription lapsed can reach. Do not let anyone
-   close T2 on the anon result.
-2. **Phase 3 stays at ~16 remaining.** Built is not proven, and the simulator has
-   never run. **The blocker was never `xcode-select`** — that diagnosis was
-   wrong twice. `apps/mobile/ios` has never been generated (gitignored at
-   `apps/mobile/.gitignore:40`, no DerivedData, nothing installed on the booted
-   device) and CocoaPods is not installed. Do not run the simulator tool's
-   suggested `sudo xcode-select -s`; it is already the current selection.
-3. **2.98b is undecided, not dropped.** Recommendation is to drop it; three
-   costed options are in the roadmap's §3.3.
+> ⚠ **Reconciled 11 Aug — items 1 and 2 have both moved.** The rest hold. Current
+> state is §0.4 of the plan of record.
+
+1. **Erratum T2** — ~~blocks 5.2~~ **5.2 is dropped, so T2 blocks nothing today.**
+   **Re-scoped, not closed:** the same question — what an *authenticated* caller
+   whose subscription lapsed can reach — returns under Apple IAP at Track E's
+   E7/E8. Ask it there. The anon RLS audit run in this session found no non-demo
+   rows reachable across 25 tables and `vehicle-documents` is private, but
+   **that evidence does not touch the actual question**, and it must not be used
+   to close T2 whenever it does come back.
+2. ~~**Phase 3 stays at ~16 remaining.** Built is not proven, and the simulator has
+   never run.~~ ✅ **Phase 3 completed 5 Aug and is proven end to end.**
+   The two diagnoses recorded here are still worth keeping, because both were
+   wrong in instructive ways: **the blocker was never `xcode-select`** (that
+   diagnosis was wrong twice — do not run the simulator tool's suggested `sudo
+   xcode-select -s`, it is already the current selection), **and it was not
+   CocoaPods either.** CocoaPods was never installable on this machine — Ruby
+   2.6 against a ≥ 3.0 requirement, no Homebrew — so the real answer was to stop
+   trying to build locally at all. **EAS cloud builds routed around the whole
+   question on 4 Aug**, and Phase 3 closed the day after.
+3. **2.98b is undecided, not dropped.** ✅ **Decided 8 Aug — dropped, option A.**
+   The spec described a comparison the code cannot make: there is no stored
+   quoted figure anywhere in the schema.
 4. **`LOW → MINIMAL`** on the non-prose paths, once the round-trip gate can
-   speak to quality.
-5. **5.1's remaining half** — the upgrade-prompt UI, still deliberately unbuilt
-   while D2 and D3 are open.
+   speak to quality. *(Still open.)*
+5. **5.1's remaining half** — the upgrade-prompt UI. *(Still open, now tracked as
+   Track E's E6. No longer blocked on pricing: revenue goes through Apple IAP,
+   so the price is Apple's product record rather than a hard-coded figure.)*
 
 ---
 ---
@@ -1092,16 +1146,23 @@ Everything below is unblocked code unless marked. The blocked items are in
    has never been rendered — see the Phase 3.3 section below for exactly how far
    it *is* verified, and for the `xcode-select` false alarm not to repeat. **Do
    not press the final delete**: one real account, no throwaway.
-2. **5.2 — Stripe checkout (3 ed).** The next code item on the money track, and
+2. ~~**5.2 — Stripe checkout (3 ed).** The next code item on the money track, and
    the largest remaining. Blocked from *shipping* by 5.0 but not from being
-   built; D2 should be settled first so the price is not hard-coded twice.
+   built; D2 should be settled first so the price is not hard-coded twice.~~
+   ⛔ **DROPPED 8 Aug — do not build this.** The product pivoted to mobile-first,
+   sold through the App Store. The web app is a free companion that takes no
+   money, so there is no checkout to build. **Apple IAP is the only revenue
+   mechanism now.** The server-side entitlement gating survives as Track E's E7.
 3. **2.95d — window the consultant context (1.25 ed).** Size it against the
    meter rather than the guess, per Addendum A. Gate the consultant round trip
    before and after: a worse-grounded answer is still a well-formed answer.
 4. **The R10 tail** — data and labels to 13px on mobile. Needs a judgement per
    site, which is why only the 12px floor landed.
-5. **Next.js upgrade (3.5–6 ed).** Still a pre-submission gate. Taking money
-   does not make 13.5.11 more acceptable and does not move it earlier either.
+5. **Next.js upgrade (3.5–6 ed).** ~~Still a pre-submission gate.~~ **Re-scoped
+   8 Aug: it gates the *web* app, and the web app is no longer what gets
+   submitted.** Real work, still worth doing, but off the critical path — Track
+   F. Taking money does not make 13.5.11 more acceptable and does not move it
+   earlier either.
 6. **The R9 lint rule** in `_adherence.oxlintrc.json`. It is in the DS repo, so
    the 44px floor is still a review comment rather than a check — the one guard
    from this session's work that did not get automated.
