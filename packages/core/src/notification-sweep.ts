@@ -73,9 +73,99 @@ export const SWEEP_SEND_CAP = 200;
  */
 export const SERVICE_COOLDOWN_DAYS = 30;
 
+/**
+ * The most dossiers one sweep may generate.
+ *
+ * ── Why this cap is not `SWEEP_SEND_CAP` ────────────────────────────────────
+ *
+ * A send costs attention. A generation costs **money** — a Pro-model call, up
+ * to three attempts, on the most expensive path in the product. They are
+ * different resources with different failure modes and they must not share a
+ * number: 200 generations in one unattended night is a bill nobody authorised,
+ * while 200 sends is merely the circuit breaker doing its job.
+ *
+ * ── Why 10, and why it is a quota rather than a breaker ─────────────────────
+ *
+ * `SWEEP_SEND_CAP` is a **circuit breaker** — hitting it means something is
+ * broken and the run should say so loudly. This is the opposite: hitting it is
+ * *expected* on the first few nights after a backlog appears, and the right
+ * response is to do ten tonight and ten tomorrow. Ten a night clears any
+ * plausible backlog for a product this size inside a week, and puts a known
+ * ceiling on the spend either way.
+ *
+ * That is `bound-costs-degrade-gracefully` applied literally: **exhausting the
+ * budget must degrade the feature, not break it.** A car that misses tonight's
+ * ten still gets its schedule tomorrow, and its owner is no worse off than
+ * under the behaviour this replaces, where it never got one at all.
+ */
+export const SWEEP_GENERATE_CAP = 10;
+
 export interface RecallToRaise {
   campaignNumber: string;
   recall: NormalisedRecall;
+}
+
+/** A vehicle the sweep is considering generating a maintenance schedule for. */
+export interface GenerationCandidate {
+  vehicleId: string;
+  userId: string;
+  /** `research_status` from `vehicle_knowledge_base`, or null when no row exists. */
+  researchStatus: string | null;
+  /** Whether the account has at least one registered device. */
+  hasPushToken: boolean;
+  /** `current_mileage`. A car with no reading cannot produce a due date. */
+  mileage: number | null;
+}
+
+/**
+ * Which cars should have a maintenance schedule generated tonight.
+ *
+ * ── The gap this closes ─────────────────────────────────────────────────────
+ *
+ * A schedule is written by `researchVehicleDossier`, which until now only ever
+ * ran from a dashboard visit. So **a car whose owner never opened its dashboard
+ * had no schedule, and the sweep skipped it silently — forever.** Reaching
+ * somebody who is *not* in the app is the entire purpose of a notification, so
+ * the population the feature could not serve was precisely the one it was built
+ * for. Every car added on the phone starts in that state.
+ *
+ * ── Four filters, and the reasoning for each ────────────────────────────────
+ *
+ * **1. `pending` only.** Never `failed`: that row means the model already ran
+ * three times and cost money, and retrying it nightly forever is the exact
+ * runaway this module exists to prevent — the user already has a retry button
+ * owned by a request that waits for it. Never `unsupported`: the model has said
+ * it has nothing for this car. Never `completed`: a completed row with an empty
+ * schedule is a car whose research succeeded and produced no schedule, and
+ * regenerating *that* nightly is the same runaway wearing a different status.
+ *
+ * **2. A missing row (`null`) is skipped too, and this is the subtle one.**
+ * Generation reports failure by writing `research_status = 'failed'` — an
+ * UPDATE, which does nothing when there is no row to update. So a vehicle with
+ * no knowledge-base row at all could fail every night and never record that it
+ * had, which is a nightly paid call with no brake. Both insert paths create the
+ * row with `pending`, so a null here means something else is wrong and the
+ * sweep is not the place to repair it.
+ *
+ * **3. No push token, no generation.** Spending a Pro call at 3am to compute a
+ * notification for an account with no registered device is money for nobody.
+ *
+ * **4. `mileage > 0`.** `collectService` already refuses these, so generating
+ * for one could not produce a notification even if it succeeded.
+ */
+export function vehiclesToGenerate(
+  candidates: GenerationCandidate[],
+  cap: number = SWEEP_GENERATE_CAP
+): SweepPlan<GenerationCandidate> {
+  const eligible = candidates.filter(
+    (candidate) =>
+      candidate.researchStatus === 'pending' &&
+      candidate.hasPushToken &&
+      typeof candidate.mileage === 'number' &&
+      candidate.mileage > 0
+  );
+
+  return applySendCap(eligible, cap);
 }
 
 /**

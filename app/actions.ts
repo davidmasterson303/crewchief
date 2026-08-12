@@ -5,15 +5,14 @@ import {
   genAI,
   flashStructuredConfig,
   flashConfig,
-  proStructuredConfig,
   classificationConfig,
   withThinking,
 } from '@/lib/gemini';
 import { checkDemoBudget, checkMonthlyBudget } from '@/lib/ai-budget';
 import { checkStoredPhotoSize } from '@crewchief/core/image-resize';
 import { budgetMessage, demoBudgetMessage } from '@crewchief/core/ai/budget';
-import { VEHICLE_RESEARCH_PROMPT, POWERTRAIN_OPTIONS_PROMPT, CONSULTANT_SYSTEM_PROMPT, CONSULTANT_DOCUMENT_VALIDATION_PROMPT } from '@crewchief/core/prompts';
-import { VehicleDataSchema } from '@crewchief/core/vehicle-utils';
+import { POWERTRAIN_OPTIONS_PROMPT, CONSULTANT_SYSTEM_PROMPT, CONSULTANT_DOCUMENT_VALIDATION_PROMPT } from '@crewchief/core/prompts';
+import { researchVehicleDossier } from '@/lib/vehicle-research';
 import { showsModifications } from '@crewchief/core/mod-progression';
 import { logger } from '@crewchief/core/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
@@ -29,13 +28,12 @@ import {
   storedUrl,
   storagePathFromStoredUrl,
 } from '@crewchief/core/storage-paths';
-import { withTimeout, TimeoutError } from '@crewchief/core/retry';
 import { parseWishlistCommands, parsePerformanceCommands, parseStatusCommands, parseInvoiceFlag } from '@crewchief/core/consultant-commands';
 import { validateData, vehicleIdSchema, serviceItemSchema, maintenanceLineItemSchema, quoteRequestSchema } from '@crewchief/core/validation';
 import { withRetry } from '@crewchief/core/retry';
 import type { Vehicle, ServiceItem, MaintenanceLineItem, KnowledgeBase, ApiResponse, ConsultantContext } from '@crewchief/core/types';
 import { z } from 'zod';
-import { FLASH_MODEL, PRO_MODEL, LITE_MODEL, FLASH_VISION_MODEL } from '@crewchief/core/ai/models';
+import { FLASH_MODEL, LITE_MODEL, FLASH_VISION_MODEL } from '@crewchief/core/ai/models';
 
 import {
   addItemToWishlist as _addItemToWishlist,
@@ -335,7 +333,11 @@ export async function createVehicle(vehicleData: {
   "never returns" into "returns an error the UI can show". The ceiling matters
   more than the exact number: a spinner with no deadline is a hang, not a wait.
 */
-const RESEARCH_TIMEOUT_MS = 30_000;
+// The constant that used to sit here moved to `lib/vehicle-research.ts` with
+// the retry loop that reads it. It is deliberately NOT re-exported from this
+// file: `'use server'` requires every export to be an async function, so a
+// re-exported constant would fail the build — and that constraint is the same
+// one that made the research core have to move out of here at all.
 
 /**
  * Everything a new vehicle needs that is not required to own it.
@@ -451,212 +453,65 @@ export async function generateVehicleDossier(vehicleId: string, vehicleData?: an
       return { success: false, error: `Too many AI requests. Try again in ${rl.retryAfterSeconds}s.` };
     }
   }
-  try {
-    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
-    if (!access.ok) {
-      return { success: false, error: access.error };
-    }
 
-    const client = getServiceRoleClient();
-
-    const vehicle = vehicleData || null;
-
-    if (!vehicle) {
-      return { success: false, error: 'Vehicle data is required' };
-    }
-
-    const prompt = VEHICLE_RESEARCH_PROMPT(vehicle.year, vehicle.make, vehicle.model);
-
-    const researchStartedAt = Date.now();
-    let attempt = 0;
-    let parsed = null;
-    let lastError = null;
-
-    while (attempt < 3 && !parsed) {
-      try {
-        const waitTime = Math.pow(2, attempt) * 1000;
-        if (attempt > 0) {
-          await new Promise(resolve => setTimeout(resolve, waitTime));
-        }
-
-        console.log(`[Research Attempt ${attempt + 1}/3] Generating research for ${vehicle.year} ${vehicle.make} ${vehicle.model}`);
-
-        const response = await withTimeout(
-          () =>
-            genAI.models.generateContent({
-              model: PRO_MODEL,
-              contents: prompt,
-              config: proStructuredConfig,
-            }),
-          RESEARCH_TIMEOUT_MS,
-          'vehicle research'
-        );
-        // Recorded per attempt, not per dossier. A retried research call is
-        // billed every time it runs, so a per-dossier row would under-report
-        // exactly the calls that cost the most — and D6 (eager vs lazy dossier
-        // generation) is decided on this number.
-        recordAiUsageInBackground(
-          { purpose: 'vehicle_dossier', model: PRO_MODEL, userId: access.userId, vehicleId },
-          response.usageMetadata
-        );
-        const text = response.text || '';
-
-        console.log(`[Research Attempt ${attempt + 1}] Response length: ${text.length} chars`);
-
-        const jsonData = extractJSON(text);
-        console.log(`[Research Attempt ${attempt + 1}] JSON extracted successfully`);
-
-        parsed = VehicleDataSchema.parse(jsonData);
-        console.log(
-          `[Research Attempt ${attempt + 1}] Validation passed after ${Date.now() - researchStartedAt}ms`
-        );
-      } catch (error) {
-        lastError = error;
-        console.error(`[Research Attempt ${attempt + 1}] Failed:`, {
-          error: error instanceof Error ? error.message : String(error),
-          type: error instanceof SyntaxError ? 'JSON_PARSE' : error instanceof z.ZodError ? 'VALIDATION' : 'OTHER'
-        });
-
-        /*
-          A timeout ends the loop rather than consuming the remaining attempts.
-
-          Three 30s deadlines plus backoff is 96s of someone watching a
-          spinner, and an upstream that did not answer in 30s is unlikely to
-          answer in the next 30. Retrying a parse or validation failure is
-          worth it — the model may format better on a second pass — but
-          retrying silence is just charging the user for the wait.
-        */
-        if (error instanceof TimeoutError) {
-          console.error('[Research] Timed out; not retrying — see RESEARCH_TIMEOUT_MS');
-          break;
-        }
-
-        attempt++;
-      }
-    }
-
-    if (!parsed) {
-      console.error(`[Research Failed] All 3 attempts exhausted. Last error: ${lastError instanceof Error ? lastError.message : String(lastError)}`);
-
-      await client
-        .from('vehicle_knowledge_base')
-        .update({ research_status: 'failed' })
-        .eq('vehicle_id', vehicleId);
-
-      return { success: false, error: 'Failed to generate vehicle research after 3 attempts' };
-    }
-
-    if (parsed.known_issues.length === 0) {
-      console.warn(`[Research Complete] Limited data for ${vehicle.year} ${vehicle.make} ${vehicle.model}`);
-      await client
-        .from('vehicle_knowledge_base')
-        .update({ research_status: 'unsupported' })
-        .eq('vehicle_id', vehicleId);
-      return { success: true, unsupported: true };
-    }
-
-    console.log(`[Research Success] Found ${parsed.known_issues.length} known issues`);
-
-    const { data: existingKb } = await client
-      .from('vehicle_knowledge_base')
-      .select('engine_type, transmission_type, drivetrain')
-      .eq('vehicle_id', vehicleId)
-      .maybeSingle();
-
-    const updateData: any = {
-      known_issues: parsed.known_issues,
-      maintenance_schedule: parsed.maintenance_schedule,
-      fluid_specs: parsed.fluid_specs,
-      common_mods: parsed.common_mods,
-      reliability_score: parsed.reliability_score,
-      interesting_facts: parsed.interesting_facts || [],
-      research_status: 'completed',
-      last_research_date: new Date().toISOString(),
-    };
-
-    if (!existingKb?.engine_type && parsed.powertrain?.engine_type) {
-      updateData.engine_type = parsed.powertrain.engine_type;
-    }
-    if (!existingKb?.transmission_type && parsed.powertrain?.transmission_type) {
-      updateData.transmission_type = parsed.powertrain.transmission_type;
-    }
-    if (!existingKb?.drivetrain && parsed.powertrain?.drivetrain) {
-      updateData.drivetrain = parsed.powertrain.drivetrain;
-    }
-
-    const { error: updateError } = await client
-      .from('vehicle_knowledge_base')
-      .update(updateData)
-      .eq('vehicle_id', vehicleId);
-
-    if (updateError) {
-      console.error('Failed to save research data:', updateError);
-      return { success: false, error: 'Failed to save research data' };
-    }
-
-    if (parsed.performance_stats && (parsed.performance_stats.horsepower || parsed.performance_stats.torque || parsed.performance_stats.zero_to_sixty)) {
-      const { error: vehicleUpdateError } = await client
-        .from('vehicles')
-        .update({
-          stock_hp: parsed.performance_stats.horsepower || null,
-          stock_torque: parsed.performance_stats.torque || null,
-          stock_zero_to_sixty: parsed.performance_stats.zero_to_sixty || null,
-        })
-        .eq('id', vehicleId);
-
-      if (vehicleUpdateError) {
-        console.error('Failed to save performance stats:', vehicleUpdateError);
-        return { success: false, error: 'Failed to save performance stats' };
-      }
-    }
-
-    await fetchNHTSARecalls(vehicleId, vehicle.year, vehicle.make, vehicle.model);
-
-    fetchPowertrainOptions(vehicle.year, vehicle.make, vehicle.model, vehicle.trim).then(async (ptResult) => {
-      if (ptResult.success && ptResult.data) {
-        await client
-          .from('vehicle_knowledge_base')
-          .update({
-            engine_options: ptResult.data.engine_options,
-            transmission_options: ptResult.data.transmission_options,
-            drivetrain_options: ptResult.data.drivetrain_options,
-          })
-          .eq('vehicle_id', vehicleId);
-      }
-    }).catch((err) => {
-      console.error('Failed to fetch/store powertrain options:', err);
-    });
-
-    return { success: true, data: parsed };
-  } catch (error) {
-    console.error('Generate dossier error:', error);
-    return { success: false, error: 'An unexpected error occurred' };
+  const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+  if (!access.ok) {
+    return { success: false, error: access.error };
   }
-}
 
-async function fetchNHTSARecalls(vehicleId: string, year: number, make: string, model: string) {
-  try {
-    const client = getServiceRoleClient();
-    const response = await fetch(
-      `https://api.nhtsa.gov/recalls/recallsByVehicle?make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&modelYear=${year}`
-    );
-
-    if (response.ok) {
-      const data = await response.json();
-      const recalls = data.results || [];
-
-      await client
-        .from('nhtsa_data')
-        .insert({
-          vehicle_id: vehicleId,
-          recalls: recalls,
-          last_checked: new Date().toISOString(),
-          next_check_due: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
-        });
-    }
-  } catch (error) {
-    console.error('Failed to fetch recalls:', error);
+  const vehicle = vehicleData || null;
+  if (!vehicle) {
+    return { success: false, error: 'Vehicle data is required' };
   }
+
+  /*
+    The research itself lives in `lib/vehicle-research.ts`, not here.
+
+    It had to move: the nightly sweep needs the same work for cars whose owner
+    has never opened a dashboard, and it has no session to authorize with. This
+    file is `'use server'`, so an unauthorized variant exported from *here*
+    would be a public POST endpoint that generates a Pro-model dossier for any
+    vehicle id, with no credential. The split is what makes the reuse safe.
+
+    Everything above this comment is the authorization that the sweep replaces
+    with `CRON_SECRET` and a per-run spend cap. Read the docblock on
+    `researchVehicleDossier` before adding a third caller.
+  */
+  const outcome = await researchVehicleDossier(
+    { id: vehicleId, year: vehicle.year, make: vehicle.make, model: vehicle.model },
+    access.userId
+  );
+
+  /*
+    Powertrain options stay on this side of the split, because
+    `fetchPowertrainOptions` calls `requireSession()` — it is session-gated and
+    the sweep has no session to give it. Fire-and-forget, as before: the option
+    lists feed a dropdown, and a car without them is a slightly poorer form,
+    not a wrong one.
+  */
+  if (outcome.success && !outcome.unsupported) {
+    fetchPowertrainOptions(vehicle.year, vehicle.make, vehicle.model, vehicle.trim)
+      .then(async (ptResult) => {
+        if (ptResult.success && ptResult.data) {
+          await getServiceRoleClient()
+            .from('vehicle_knowledge_base')
+            .update({
+              engine_options: ptResult.data.engine_options,
+              transmission_options: ptResult.data.transmission_options,
+              drivetrain_options: ptResult.data.drivetrain_options,
+            })
+            .eq('vehicle_id', vehicleId);
+        }
+      })
+      .catch((err) => {
+        logger.warn('DOSSIER:POWERTRAIN_FAILED', 'Could not store powertrain options', {
+          vehicleId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+  }
+
+  return outcome;
 }
 
 export async function updateVehiclePowertrain(

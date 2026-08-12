@@ -47,6 +47,14 @@ const STATIC_ANALYSIS_SUITES = [
   'register-tokens.test.ts',
   'auth-posture.test.ts',
   'internal-fetch-posture.test.ts',
+  // Reads app/, lib/ and packages/ off disk to prove that the one function in
+  // this app which spends money without authorizing — `researchVehicleDossier`
+  // — has exactly two importers, and that each still carries the check it
+  // claims. It cannot import its subject: the property is *which other files
+  // import that module*, which importing it tells you nothing about. The
+  // failure it pins is silent — a third caller that forgot to authorize
+  // compiles, passes every other suite, and looks like a working feature.
+  'vehicle-research-callers.test.ts',
   // Reads apps/mobile off disk to prove the Expo client never queries Supabase
   // directly. It cannot import what it checks: those modules are React Native,
   // and loading one under this runner would fail on the transform rather than

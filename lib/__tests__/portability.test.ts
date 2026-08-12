@@ -228,6 +228,17 @@ const NOT_PORTABLE: Record<string, string> = {
   'lib/storage-objects.ts': 'reaches Supabase through lib/supabase',
   'lib/consultant-context.ts': 'queries Supabase — the shape it returns is portable, the loading is not',
   'lib/gemini.ts': 'client at module scope — a build-time server key (§19)',
+  /*
+    Server-only by construction, and deliberately so. It holds a service-role
+    Supabase client, the Gemini client, and a `fetch` to NHTSA.
+
+    Worth saying why it is not split the way `image-resize` was: there is no
+    portable half to rescue. What it does *is* the IO — call the model, validate,
+    write four tables — and the one genuinely portable piece, the schema that
+    validates the response, already lives in `@crewchief/core/vehicle-utils`
+    where both this and the mobile client read it.
+  */
+  'lib/vehicle-research.ts': 'service-role client, the Gemini client, and a fetch to NHTSA',
   'lib/actions/wishlist.ts': 'reaches Supabase through lib/supabase',
   // Splits, not moves — the effort the plan warned about.
   'lib/deletion-recovery.ts': 'queue logic is portable; persistence uses localStorage',
