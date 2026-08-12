@@ -38,6 +38,25 @@
 > **Track C** (push notification scheduler and both triggers) — shipped 8 Aug.
 > **v8** — a design-system refresh across the register, tokens, the button primitive and the logo
 > set, 8 and 11 Aug.
+>
+> **12 Aug, and none of it is pushed yet:**
+>
+> - **C4** (`2ce0e7d`) — the nightly sweep now generates a maintenance schedule for cars whose
+>   owner never opened a dashboard. It previously skipped them silently and forever, which after
+>   the mobile pivot means every car added on the phone. The research core moved to
+>   `lib/vehicle-research.ts` and **authorizes nothing** — read its docblock before adding a third
+>   caller, and see `vehicle-research-callers.test.ts`, which keeps that list closed.
+> - **E7** (`95a2302`) — `account_entitlements`, the record of who has paid. `resolveTier` is
+>   **deleted**; use `resolveEntitledTier` from `@crewchief/core/entitlement`. ⚠ Migration
+>   `20260812120000` is written and **not yet applied**, so the table does not exist in the live
+>   database yet and every account resolves to `free`.
+> - **E5** (`79d0575`) — a subscriber is warned that deleting their account does not stop Apple
+>   billing them. Both surfaces, with a parity guard.
+>
+> **Two rules worth knowing before you touch any of it:** the sweep must never generate under
+> `?dryRun=1` (a dry run that spends money is a trap sprung by whoever is being careful), and
+> `account_entitlements` must never become user-writable — a scoped `FOR ALL` policy is correct on
+> every other table in this schema and is a free subscription on that one.
 
 Source: `Live-Site Audit.dc.html` (2 Aug 2026), grounded in repo `davidmasterson303/crewchief@main` (aa1d73f) and the live demo. Finding refs (F1–F8) and concept refs (1a–1c, 2a–2c) point into that report. Advisor KB was offline for the audit; reconcile against it when reconnected, and stage a `kb_propose` for the decisions below.
 
