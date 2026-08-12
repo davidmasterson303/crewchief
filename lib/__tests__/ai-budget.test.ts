@@ -22,7 +22,6 @@ import {
   demoBudgetMessage,
   monthStart,
   budgetMessage,
-  resolveTier,
   DEMO_BUDGET,
   TIERS,
   WARN_AT,
@@ -127,11 +126,18 @@ describe('the tiers themselves', () => {
     expect(TIERS.free.monthlyOutputTokens).toBeGreaterThanOrEqual(2 * 200_000);
   });
 
-  it('resolves everyone to free until there is something to sell', () => {
-    // Honest placeholder. When 5.2 gives a profile a subscription this stops
-    // being a constant, and this assertion is what will fail to say so.
-    expect(resolveTier(null).name).toBe('free');
-    expect(resolveTier('any-user-id').name).toBe('free');
+  it('has a paid ceiling above the free one, so a tier means something', () => {
+    /*
+      `resolveTier` used to be asserted here — a placeholder that returned
+      `TIERS.free` for every user. E7 replaced it with `resolveEntitledTier`,
+      which reads a stored record against the clock, and that function's own
+      suite is `entitlement.test.ts`.
+
+      What is worth keeping at this level is that the two ceilings are not the
+      same number. A paid tier that bought nothing would make every test in
+      that suite pass while the product gave itself away.
+    */
+    expect(TIERS.paid.monthlyOutputTokens).toBeGreaterThan(TIERS.free.monthlyOutputTokens);
   });
 });
 

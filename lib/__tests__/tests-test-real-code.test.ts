@@ -55,6 +55,13 @@ const STATIC_ANALYSIS_SUITES = [
   // failure it pins is silent — a third caller that forgot to authorize
   // compiles, passes every other suite, and looks like a working feature.
   'vehicle-research-callers.test.ts',
+  // Reads the migration corpus, plus app/, components/, hooks/ and lib/, to
+  // prove `account_entitlements` is never user-writable. There is nothing to
+  // import: the subject is SQL and the absence of a write in client code. The
+  // failure it pins is a *revenue* bug wearing a correct-looking policy — a
+  // scoped `FOR ALL`, which is right on every other table in this schema and
+  // here hands any signed-in user the paid tier.
+  'entitlement-not-user-writable.test.ts',
   // Reads apps/mobile off disk to prove the Expo client never queries Supabase
   // directly. It cannot import what it checks: those modules are React Native,
   // and loading one under this runner would fail on the transform rather than

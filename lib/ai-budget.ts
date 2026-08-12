@@ -6,12 +6,12 @@ import {
   decideDemoBudget,
   decideFrontDoor,
   monthStart,
-  resolveTier,
   FRONT_DOOR_DISABLED_ENV,
   type BudgetDecision,
   type DemoBudgetDecision,
   type FrontDoorDecision,
 } from '@crewchief/core/ai/budget';
+import { resolveEntitledTier } from '@crewchief/core/entitlement';
 
 /**
  * Read what an account has spent this month and decide whether it may spend
@@ -56,6 +56,53 @@ const UNMEASURED: BudgetDecision = {
   fractionUsed: 0,
   remainingOutputTokens: Number.POSITIVE_INFINITY,
 };
+
+/**
+ * Which tier this account is actually on. Phase 6, E7.
+ *
+ * `resolveTier()` used to answer this with the constant `TIERS.free`, because
+ * there was nowhere to look. There is now: `account_entitlements`, written only
+ * by the service role.
+ *
+ * ── Why a read failure returns `free` rather than bailing out ───────────────
+ *
+ * Every other failure path in this file returns `UNMEASURED` — allowed, nothing
+ * counted — because what it protects is a bill and an unreadable usage table is
+ * no reason to take the product offline.
+ *
+ * This one is different and deliberately quieter. A failed entitlement read
+ * means we do not know whether somebody paid, and the two ways to be wrong are
+ * not symmetrical: guessing `paid` gives the product away to anyone whose read
+ * fails, while guessing `free` puts a paying customer on a ceiling documented
+ * as one "an ordinary month of real use does not touch". The first is silent
+ * and unbounded; the second is visible, survivable, and complained about.
+ *
+ * It is logged at warn precisely so that complaint has something to match.
+ */
+async function readTier(client: ReturnType<typeof getServiceRoleClient>, userId: string) {
+  const { data, error } = await client
+    .from('account_entitlements')
+    .select('tier, expires_at')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) {
+    logger.warn('AI_BUDGET:ENTITLEMENT_READ_FAILED', 'Could not read entitlement; treating as free', {
+      userId,
+      message: error.message,
+    });
+    return resolveEntitledTier(null);
+  }
+
+  /*
+    A missing row is the ordinary case, not an error: an account only gets one
+    when it buys something. `maybeSingle` returns null data without an error,
+    and `resolveEntitledTier` reads null as free.
+  */
+  return resolveEntitledTier(
+    data ? { tier: data.tier as string | null, expiresAt: data.expires_at as string | null } : null
+  );
+}
 
 /**
  * Whether the shared public demo may make another model call.
@@ -252,7 +299,7 @@ export async function checkMonthlyBudget(userId: string | null): Promise<BudgetD
       0
     );
 
-    const decision = decideBudget({ inputTokens: 0, outputTokens }, resolveTier(userId));
+    const decision = decideBudget({ inputTokens: 0, outputTokens }, await readTier(client, userId));
 
     if (decision.state !== 'ok') {
       logger.warn('AI_BUDGET:' + decision.state.toUpperCase(), 'Account is at or near its monthly AI budget', {
