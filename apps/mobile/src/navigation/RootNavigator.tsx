@@ -8,7 +8,8 @@ import {
   initialNotificationUrl,
   subscribeToNotificationTaps,
 } from '../notifications/push';
-import { registerForPush } from '../notifications/register';
+import { currentPushPermission, registerForPush } from '../notifications/register';
+import { shouldRegisterSilently } from '@crewchief/core/push-priming';
 
 import { AdvisorScreen } from '../screens/AdvisorScreen';
 import { InvoiceScanScreen } from '../screens/InvoiceScanScreen';
@@ -252,15 +253,27 @@ export function RootNavigator({
     configureNotificationHandler();
 
     /*
-      Registration asks for permission itself and then files the device's push
-      token against this account — the half that was missing until the
-      `device_push_tokens` table existed. Permission alone was never enough:
-      the server had nowhere to send.
+      ── C5: the system prompt is no longer raised from here ──────────────────
 
-      Fire-and-forget on purpose. Push is an enhancement, and a signed-in
-      person with a working garage must not wait on it or see it fail.
+      This used to call `registerForPush()`, which asks iOS for permission as
+      its first act. iOS shows that dialog **exactly once** and a "no" can only
+      be undone in Settings — so the one irreversible ask was being spent on
+      entry to the signed-in stack, before the person had seen what the product
+      does. The most likely answer to a dialog you did not expect is no.
+
+      Now: a device that **already** has permission still registers silently,
+      because its token must be filed against the account and there is nothing
+      to explain. Everyone else is offered `PushPrimer` first — see
+      `GarageScreen`, which is where the vehicle count that gates it lives.
+
+      `shouldRegisterSilently` and `shouldShowPushPrimer` are complementary by
+      construction and there is a test asserting they can never both be true.
     */
-    void registerForPush();
+    void (async () => {
+      if (shouldRegisterSilently(await currentPushPermission())) {
+        void registerForPush();
+      }
+    })();
   }, []);
 
   return (

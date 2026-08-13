@@ -3,6 +3,7 @@ import Constants from 'expo-constants';
 
 import { apiRequest } from '../api/client';
 import { secureStorage } from '../auth/secure-storage';
+import type { PushPermission } from '@crewchief/core/push-priming';
 import { isExpoPushToken } from '@crewchief/core/push-tokens';
 import { requestPushPermission } from './push';
 
@@ -39,6 +40,16 @@ import { requestPushPermission } from './push';
  */
 
 const DEVICE_ID_KEY = 'crewchief.device-id';
+
+/**
+ * When the user last said "not now" to the primer. C5.
+ *
+ * In the Keychain beside the device id rather than in a server column, and that
+ * is deliberate: the question it answers is "has this *install* been asked
+ * recently", and iOS permission is per-install too. A server-side flag would
+ * suppress the primer on a new phone where the system ask is available again.
+ */
+const PRIMER_DISMISSED_KEY = 'crewchief.push-primer-dismissed';
 
 /** A v4-shaped random id. Opaque, local, and not a credential — see the header. */
 function newDeviceId(): string {
@@ -141,5 +152,59 @@ export async function unregisterPush(): Promise<void> {
       by a network call.
     */
     console.warn('[Push] Could not unregister this device:', error);
+  }
+}
+
+
+/**
+ * The permission state, in the vocabulary the priming rule speaks.
+ *
+ * `expo-notifications` reports `granted` plus `canAskAgain`, which is two
+ * booleans describing three states. Collapsing them here means
+ * `shouldShowPushPrimer` never has to reason about the combination, and the one
+ * that matters — *asked and refused* versus *never asked* — is named rather
+ * than inferred at each call site.
+ */
+export async function currentPushPermission(): Promise<PushPermission> {
+  try {
+    const status = await Notifications.getPermissionsAsync();
+    if (status.granted) return 'granted';
+    // Not granted and cannot ask again is the irreversible one: iOS will not
+    // show its dialog, so only Settings can change the answer.
+    return status.canAskAgain ? 'undetermined' : 'denied';
+  } catch {
+    /*
+      Reported as `denied` rather than `undetermined`, which is the quiet
+      direction. A device that cannot answer the question must not be shown a
+      screen that leads to a system prompt that will also fail — the person
+      would refuse a dialog that never appeared, and on a real device that
+      refusal would be permanent.
+    */
+    return 'denied';
+  }
+}
+
+/** The date the primer was last declined on this install, or null. */
+export async function primerDismissedOn(): Promise<string | null> {
+  try {
+    return await secureStorage.getItem(PRIMER_DISMISSED_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Record a "not now".
+ *
+ * Stores a date rather than a boolean so the cooldown can expire. A boolean
+ * would make the first decline permanent, and somebody who was busy the first
+ * time would never be asked again — a worse outcome than not having a primer,
+ * because the system ask stays unspent forever.
+ */
+export async function recordPrimerDismissed(today: string): Promise<void> {
+  try {
+    await secureStorage.setItem(PRIMER_DISMISSED_KEY, today);
+  } catch {
+    // A failure here costs one repeated screen, not a lost permission.
   }
 }

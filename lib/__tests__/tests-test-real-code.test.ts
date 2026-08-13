@@ -68,6 +68,12 @@ const STATIC_ANALYSIS_SUITES = [
   // is only observable *after* a build has been spent: Apple cross-checks the
   // manifest against the App Store Connect answers and rejects a mismatch.
   'privacy-manifest.test.ts',
+  // Reads the mobile navigator, garage and primer off disk to prove the app
+  // obeys the priming rule rather than merely containing it. It cannot import
+  // its subject: those are React Native modules and this runner would fail on
+  // the transform. The failure it pins — iOS's one irreversible permission
+  // dialog raised uninvited — is not observable at runtime on any machine here.
+  'push-primer-wiring.test.ts',
   // Reads apps/mobile off disk to prove the Expo client never queries Supabase
   // directly. It cannot import what it checks: those modules are React Native,
   // and loading one under this runner would fail on the transform rather than

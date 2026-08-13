@@ -26,6 +26,27 @@ import { apiRequest, ApiRequestError } from '../../api/client';
  * on screen.
  */
 
+/*
+  The notification module is mocked so the C5 primer effect is deterministic.
+
+  `GarageScreen` now reads the push permission and the primer dismissal when
+  the vehicle list resolves. Left unmocked those are real async calls into
+  `expo-notifications` and the Keychain, which resolve *after* the assertions
+  and update state outside `act()` — visible as "overlapping act() calls"
+  warnings and, once, as a failure that did not reproduce.
+
+  A test that passes eight times out of nine is not passing. The default here
+  is `granted`, which is the state that shows no primer, so every existing
+  assertion sees the screen it was written against. The primer's own behaviour
+  is covered in `push-priming.test.ts`, where the rule lives.
+*/
+jest.mock('../../notifications/register', () => ({
+  currentPushPermission: jest.fn().mockResolvedValue('granted'),
+  primerDismissedOn: jest.fn().mockResolvedValue(null),
+  recordPrimerDismissed: jest.fn().mockResolvedValue(undefined),
+  registerForPush: jest.fn().mockResolvedValue({ status: 'registered' }),
+}));
+
 jest.mock('../../api/client', () => {
   const actual = jest.requireActual('../../api/client');
   return { ...actual, apiRequest: jest.fn() };

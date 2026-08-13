@@ -13,6 +13,14 @@ import {
 import { apiRequest, ApiRequestError } from '../api/client';
 import Logo from '../components/Logo';
 import { AccountScreen } from './AccountScreen';
+import { PushPrimer } from '../notifications/PushPrimer';
+import {
+  currentPushPermission,
+  primerDismissedOn,
+  recordPrimerDismissed,
+  registerForPush,
+} from '../notifications/register';
+import { shouldShowPushPrimer } from '@crewchief/core/push-priming';
 import { getHealthBandJudgement, healthBandHex } from '@crewchief/core/health-band';
 
 /**
@@ -324,6 +332,66 @@ export function GarageScreen({
     | { status: 'error'; message: string; unauthorized: boolean }
   >({ status: 'loading' });
   const [refreshing, setRefreshing] = useState(false);
+  const [primerOpen, setPrimerOpen] = useState(false);
+
+  /*
+    ── C5: the notification primer ──────────────────────────────────────────
+
+    It is raised from the garage rather than from the navigator because the
+    rule that gates it needs the vehicle count, and this is the screen that
+    has one. That is not incidental — "ask once they have a car" is the design:
+    somebody with an empty garage is being asked to agree to something
+    abstract, and an abstract yes is the one most likely to be no.
+
+    Runs when the vehicle list resolves, not on mount, so the count is real
+    rather than zero-while-loading. A zero-while-loading read would suppress
+    the primer on every launch and the screen would never appear at all.
+  */
+  useEffect(() => {
+    if (state.status !== 'ok') return;
+
+    let cancelled = false;
+
+    void (async () => {
+      const [permission, dismissedOn] = await Promise.all([
+        currentPushPermission(),
+        primerDismissedOn(),
+      ]);
+
+      if (cancelled) return;
+
+      setPrimerOpen(
+        shouldShowPushPrimer({
+          permission,
+          dismissedOn,
+          vehicleCount: state.vehicles.length,
+          today: new Date().toISOString().slice(0, 10),
+        })
+      );
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [state]);
+
+  const acceptPrimer = useCallback(async () => {
+    /*
+      Closed first, then the system dialog. Leaving our screen up underneath
+      Apple's puts two asks on screen at once, and the person answers the one
+      they can see while the other waits — which reads as the app arguing with
+      itself.
+    */
+    setPrimerOpen(false);
+    await registerForPush();
+  }, []);
+
+  const declinePrimer = useCallback(async () => {
+    setPrimerOpen(false);
+    // Records a date, not a boolean, so the cooldown can expire and somebody
+    // who was busy today can still be asked next month.
+    await recordPrimerDismissed(new Date().toISOString().slice(0, 10));
+  }, []);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -404,6 +472,10 @@ export function GarageScreen({
     </View>
   );
 
+  const primer = (
+    <PushPrimer visible={primerOpen} onAccept={acceptPrimer} onDecline={declinePrimer} />
+  );
+
   const account = (
     <AccountScreen
       visible={accountOpen}
@@ -434,6 +506,7 @@ export function GarageScreen({
           <ActivityIndicator color="rgba(255,255,255,0.5)" />
         </View>
         {account}
+        {primer}
       </View>
     );
   }
@@ -457,6 +530,7 @@ export function GarageScreen({
           </Pressable>
         </View>
         {account}
+        {primer}
       </View>
     );
   }
@@ -527,6 +601,7 @@ export function GarageScreen({
       ListFooterComponent={<DevToken token={accessToken} />}
     />
     {account}
+        {primer}
     </>
   );
 }
