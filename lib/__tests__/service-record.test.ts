@@ -16,6 +16,7 @@
 import {
   RECORD_SOURCE_LABELS,
   describeRecord,
+  describeRemoval,
   formatRecordDate,
   isRecollection,
   recordSourceLabel,
@@ -169,5 +170,53 @@ describe('totalRecorded', () => {
 
   it('is zero over nothing rather than NaN', () => {
     expect(totalRecorded([])).toEqual({ total: 0, counted: 0 });
+  });
+});
+
+describe('describeRemoval', () => {
+  /*
+    Removing a service record is irreversible, and none of its consequences are
+    visible on the row. "Are you sure?" asks a question the person has no way to
+    answer; these sentences are the answer.
+  */
+
+  it('always says the schedule reads these rows', () => {
+    /*
+      The consequence that reaches beyond the list. A service's next due date is
+      counted from the last record of it, so removing the only record makes the
+      job look never-done.
+    */
+    expect(describeRemoval({}).toLowerCase()).toContain('due date');
+  });
+
+  it('reassures that a scanned invoice survives', () => {
+    /*
+      The difference between a correction and a loss. `delete-maintenance-item`
+      touches `maintenance_line_items` only — `vehicle_documents` is untouched,
+      so the row can be recreated by re-scanning.
+    */
+    const text = describeRemoval({ source: 'vision', source_document_id: 'doc-1' });
+    expect(text.toLowerCase()).toContain('invoice');
+    expect(text.toLowerCase()).toContain('again');
+  });
+
+  it('does not promise an invoice that is not there', () => {
+    // A manually completed row has no document behind it. Saying one survives
+    // would be a reassurance about something that never existed.
+    expect(describeRemoval({ source: 'manual' }).toLowerCase()).not.toContain('invoice');
+    expect(describeRemoval({ source: 'vision' }).toLowerCase()).not.toContain('invoice');
+  });
+
+  it('warns that a combined row takes its parts with it', () => {
+    /*
+      Invoice extraction merges a labour line with its matching parts into one
+      record, so a £678 row titled "Front brake pads & rotors, replace" may be
+      labour plus three parts lines. Removing it removes all of them.
+    */
+    expect(describeRemoval({ is_combined: true }).toLowerCase()).toContain('parts');
+  });
+
+  it('says nothing about parts for an ordinary row', () => {
+    expect(describeRemoval({ is_combined: false }).toLowerCase()).not.toContain('labour and its parts');
   });
 });

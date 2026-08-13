@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -12,6 +13,7 @@ import {
 import { apiRequest, ApiRequestError } from '../api/client';
 import {
   describeRecord,
+  describeRemoval,
   isRecollection,
   recordSourceLabel,
   totalRecorded,
@@ -114,6 +116,61 @@ export function ServiceHistoryScreen({ vehicleId, onSignOut }: Props) {
     void load();
   }, [load]);
 
+  const remove = useCallback(
+    (record: ServiceRecord) => {
+      if (!record.id) return;
+
+      /*
+        Confirmed, and the confirmation says what is actually lost rather than
+        asking "are you sure?" — a question the person has no way to answer from
+        the row in front of them. `describeRemoval` supplies the three facts
+        that are invisible on the card: the invoice survives, a combined row
+        takes its parts with it, and due dates are computed from these records.
+      */
+      Alert.alert(
+        'Remove this record?',
+        `“${record.item_description ?? 'This service'}” will be removed. ${describeRemoval(record)}`,
+        [
+          { text: 'Keep', style: 'cancel' },
+          {
+            text: 'Remove',
+            style: 'destructive',
+            onPress: () => {
+              void (async () => {
+                try {
+                  await apiRequest('/delete-maintenance-item', {
+                    method: 'POST',
+                    body: { itemId: record.id, itemType: 'maintenance_line_item' },
+                  });
+                  await load(true);
+                } catch (error) {
+                  const apiError = error as ApiRequestError;
+                  if (apiError.status === 401) {
+                    onSignOut();
+                    return;
+                  }
+                  /*
+                    A 404 is its own message. The route returns one when the
+                    delete matched no rows — the bug it is named for — and
+                    "already gone" is a different thing to tell somebody than
+                    "that failed".
+                  */
+                  Alert.alert(
+                    apiError.status === 404 ? 'Already removed' : 'Could not remove that',
+                    apiError.status === 404
+                      ? 'That record is no longer here. Pull to refresh.'
+                      : (apiError.message ?? 'Try again in a moment.')
+                  );
+                }
+              })();
+            },
+          },
+        ]
+      );
+    },
+    [load, onSignOut]
+  );
+
   if (state.kind === 'loading') {
     return (
       <View style={styles.centre}>
@@ -193,13 +250,31 @@ export function ServiceHistoryScreen({ vehicleId, onSignOut }: Props) {
 
                 {meta ? <Text style={styles.meta}>{meta}</Text> : null}
 
-                {provenance ? (
-                  <Text
-                    style={[styles.provenance, isRecollection(record.source) && styles.recollection]}
-                  >
-                    {provenance}
-                  </Text>
-                ) : null}
+                <View style={styles.foot}>
+                  {provenance ? (
+                    <Text
+                      style={[
+                        styles.provenance,
+                        isRecollection(record.source) && styles.recollection,
+                      ]}
+                    >
+                      {provenance}
+                    </Text>
+                  ) : (
+                    <View />
+                  )}
+
+                  {record.id ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Remove ${record.item_description ?? 'this record'}`}
+                      style={styles.removeCta}
+                      onPress={() => remove(record)}
+                    >
+                      <Text style={styles.removeText}>Remove</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
               </View>
             );
           })}
@@ -229,7 +304,15 @@ const styles = StyleSheet.create({
   cost: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
   meta: { color: '#B8B8B8', fontSize: 13, lineHeight: 19 },
 
-  provenance: { color: '#9A9A9A', fontSize: 12, lineHeight: 17 },
+  /*
+    Provenance and the remove control share a row, with the label given the
+    flexible width. The label is the thing worth reading; the control is the
+    thing worth finding, and neither should push the other off the card.
+  */
+  foot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  provenance: { color: '#9A9A9A', fontSize: 12, lineHeight: 17, flexShrink: 1 },
+  removeCta: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },
+  removeText: { color: '#E0A468', fontSize: 13, fontWeight: '600' },
   /*
     A recollection is tinted rather than merely worded differently. The label
     already says "what you told us at sign-up"; the colour is what survives

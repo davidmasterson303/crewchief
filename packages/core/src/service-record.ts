@@ -87,6 +87,14 @@ export interface ServiceRecord {
   total_cost?: number | null;
   mileage_at_service?: number | null;
   source?: string | null;
+  /**
+   * True when invoice extraction merged a labour line with its matching parts
+   * lines into this one record. Not half of a pair — there is nothing to
+   * orphan — but the row covers more than its description says.
+   */
+  is_combined?: boolean | null;
+  /** The scanned document this was read from, if any. Survives a removal. */
+  source_document_id?: string | null;
 }
 
 /**
@@ -125,6 +133,46 @@ export function formatRecordDate(value: string | null | undefined): string | nul
   const date = new Date(parsed);
   const month = date.toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' });
   return `${date.getUTCDate()} ${month} ${date.getUTCFullYear()}`;
+}
+
+/**
+ * What removing one record actually costs, said before it happens.
+ *
+ * ── Why this is not "are you sure?" ─────────────────────────────────────────
+ *
+ * Deleting a service record is irreversible and the consequences are not
+ * obvious from the row. Three things are worth saying and none of them is
+ * visible on the card:
+ *
+ * **The invoice survives.** `delete-maintenance-item` removes the line from
+ * `maintenance_line_items` and does not touch `vehicle_documents`, so the
+ * scanned document stays and the row can be recreated by re-scanning. That is
+ * the difference between a correction and a loss, and someone deciding needs it.
+ *
+ * **A combined row is more than its title.** Invoice extraction merges a labour
+ * line with its matching parts lines into one record (`app/actions.ts:2890`),
+ * so "Front brake pads & rotors, replace" at £678 may be labour *and* three
+ * parts lines. Removing it removes all of them.
+ *
+ * **The schedule reads these rows.** A service's next due date is counted from
+ * the last record of it, so removing the only record of a job makes that
+ * service look never-done — which is the right answer if it never happened and
+ * a wrong one if the row was merely inaccurate.
+ */
+export function describeRemoval(record: ServiceRecord): string {
+  const parts: string[] = [];
+
+  if (record.source === 'vision' && record.source_document_id) {
+    parts.push('The invoice it came from stays, so this can be scanned again.');
+  }
+
+  if (record.is_combined) {
+    parts.push('This row covers labour and its parts together — all of it goes.');
+  }
+
+  parts.push('Anything due is worked out from these records, so removing it may change a due date.');
+
+  return parts.join(' ');
 }
 
 /**

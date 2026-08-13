@@ -7,6 +7,7 @@
  * something the owner half-remembered on a sign-up screen.
  */
 
+import { Alert } from 'react-native';
 import { render, userEvent, waitFor } from '@testing-library/react-native';
 
 import { ServiceHistoryScreen } from '../ServiceHistoryScreen';
@@ -46,6 +47,10 @@ const INVOICE_ROW = {
   total_cost: 678,
   mileage_at_service: 61_400,
   source: 'vision',
+  // 22 of 35 live rows carry one. Without it the removal copy correctly
+  // withholds the "the invoice survives" reassurance — which is how the first
+  // version of this fixture found out the rule is precise.
+  source_document_id: 'doc-1',
 };
 
 const RECOLLECTION_ROW = {
@@ -61,8 +66,12 @@ function mount() {
   return render(<ServiceHistoryScreen vehicleId="v1" onSignOut={jest.fn()} />);
 }
 
+let alertSpy: jest.SpyInstance;
+
 beforeEach(() => {
   request.mockReset();
+  // Spying rather than stubbing the module keeps the rest of react-native real.
+  alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 });
 
 describe('reading the record', () => {
@@ -187,5 +196,62 @@ describe('failure', () => {
     await user.press(view.getByLabelText('Try again'));
 
     expect(await view.findByText(/Front brake pads/)).toBeTruthy();
+  });
+});
+
+describe('removing a record', () => {
+  /*
+    Irreversible, and the consequences are invisible on the row — the schedule
+    counts a service's next due date from the last record of it. So this is
+    confirmed, and the confirmation says what is lost rather than asking a
+    question the person cannot answer from what is in front of them.
+  */
+  const deletes = () =>
+    request.mock.calls.filter(([path]) => String(path).includes('delete-maintenance-item'));
+
+  it('asks before removing anything', async () => {
+    respondWith([INVOICE_ROW]);
+    const user = userEvent.setup();
+    const view = await mount();
+
+    await user.press(await view.findByLabelText(/Remove Front brake pads/));
+
+    expect(alertSpy).toHaveBeenCalled();
+    expect(deletes()).toHaveLength(0);
+  });
+
+  it('names what removal costs, not just that it is permanent', async () => {
+    respondWith([INVOICE_ROW]);
+    const user = userEvent.setup();
+    const view = await mount();
+
+    await user.press(await view.findByLabelText(/Remove Front brake pads/));
+
+    const [, body] = alertSpy.mock.calls[0];
+    // The consequence that reaches past this screen.
+    expect(String(body).toLowerCase()).toContain('due date');
+    // And the reassurance that this is a correction, not a loss.
+    expect(String(body).toLowerCase()).toContain('invoice');
+  });
+
+  it('deletes only once the confirm is accepted', async () => {
+    respondWith([INVOICE_ROW]);
+    const user = userEvent.setup();
+    const view = await mount();
+
+    await user.press(await view.findByLabelText(/Remove Front brake pads/));
+
+    const buttons = alertSpy.mock.calls[0][2] as Array<{ text: string; onPress?: () => void }>;
+    const confirm = buttons.find((b) => b.text === 'Remove');
+    confirm?.onPress?.();
+
+    await waitFor(() => expect(deletes()).toHaveLength(1));
+
+    const [, init] = deletes()[0] as [string, { method?: string; body?: Record<string, unknown> }];
+    expect(init.method).toBe('POST');
+    // The route's allowlist maps this to `maintenance_line_items`; sending the
+    // wrong type would silently address a different table.
+    expect(init.body!.itemType).toBe('maintenance_line_item');
+    expect(init.body!.itemId).toBe('m1');
   });
 });
