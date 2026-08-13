@@ -2,7 +2,7 @@ import { getServiceRoleClient } from '@/lib/supabase';
 import { requireSession } from '@/lib/api-auth';
 import { vehicleStoragePrefixes } from '@crewchief/core/storage-paths';
 import { logger } from '@crewchief/core/logger';
-import { hasLiveEntitlement } from '@crewchief/core/entitlement';
+import { hasLiveEntitlement, readFailureMeansNoSubscription } from '@crewchief/core/entitlement';
 
 const DOCUMENTS_BUCKET = 'vehicle-documents';
 
@@ -151,14 +151,26 @@ export async function getProfile() {
     .eq('user_id', session.userId)
     .maybeSingle();
 
-  if (entitlementError) {
+  /*
+    A missing table is the one read failure that is NOT ambiguous: nothing can
+    have written a subscription to a table that does not exist. It is also a
+    state this project passes through by construction, because the code ships in
+    one commit and the migration is applied separately — and in that window,
+    failing toward the warning would tell every user to cancel a subscription
+    none of them have.
+  */
+  const tableAbsent = readFailureMeansNoSubscription(
+    (entitlementError as { code?: string } | null)?.code
+  );
+
+  if (entitlementError && !tableAbsent) {
     logger.warn('PROFILE:ENTITLEMENT_READ', 'Could not read entitlement; warning anyway', {
       userId: session.userId,
       message: entitlementError.message,
     });
   }
 
-  const hasLiveSubscription = entitlementError
+  const hasLiveSubscription = entitlementError && !tableAbsent
     ? true
     : hasLiveEntitlement(
         entitlement

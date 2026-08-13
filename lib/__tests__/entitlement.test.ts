@@ -16,7 +16,11 @@
  * Most of the tests below are that asymmetry, one input at a time.
  */
 
-import { resolveEntitledTier, hasLiveEntitlement } from '@crewchief/core/entitlement';
+import {
+  resolveEntitledTier,
+  hasLiveEntitlement,
+  readFailureMeansNoSubscription,
+} from '@crewchief/core/entitlement';
 import { TIERS } from '@crewchief/core/ai/budget';
 
 const NOW = new Date('2026-08-12T12:00:00Z');
@@ -152,5 +156,49 @@ describe('hasLiveEntitlement', () => {
     expect(hasLiveEntitlement({ tier: 'free', expiresAt: FUTURE }, NOW)).toBe(false);
     expect(hasLiveEntitlement(null, NOW)).toBe(false);
     expect(hasLiveEntitlement({ tier: 'paid', expiresAt: 'nonsense' }, NOW)).toBe(false);
+  });
+});
+
+describe('readFailureMeansNoSubscription — the deploy-ordering trap', () => {
+  /*
+    Both read paths fail *toward* the subscription warning, which is right when
+    an existing row cannot be read: a warning withheld from a subscriber is a
+    recurring charge they cannot stop.
+
+    It is wrong in exactly one case, and it is a case this project passes
+    through by construction. The code ships in one commit; the migration that
+    creates `account_entitlements` is applied by hand, separately. In the window
+    between the two, every read errors — so every user is treated as a
+    subscriber and the delete screen tells all of them to go and cancel
+    something that does not exist. On the surface Apple reviews.
+
+    A missing table is not ambiguous. Nothing can have written a subscription to
+    a table that was never created.
+  */
+
+  it('treats a missing table as a definite no', () => {
+    expect(readFailureMeansNoSubscription('PGRST205')).toBe(true); // PostgREST
+    expect(readFailureMeansNoSubscription('42P01')).toBe(true); // Postgres undefined_table
+  });
+
+  it('treats every other failure as unknown, so the warning still shows', () => {
+    /*
+      The important half. A permission error, a timeout or a connection failure
+      says nothing about whether a subscription exists, and guessing "no" there
+      is the expensive direction.
+    */
+    expect(readFailureMeansNoSubscription('42501')).toBe(false); // insufficient_privilege
+    expect(readFailureMeansNoSubscription('PGRST301')).toBe(false); // JWT expired
+    expect(readFailureMeansNoSubscription('57014')).toBe(false); // query_canceled
+    expect(readFailureMeansNoSubscription('')).toBe(false);
+  });
+
+  it('treats an absent code as unknown rather than as a missing table', () => {
+    /*
+      A client that throws without a code is the least informative failure
+      there is, and it must not fall into the confident branch.
+    */
+    expect(readFailureMeansNoSubscription(null)).toBe(false);
+    expect(readFailureMeansNoSubscription(undefined)).toBe(false);
   });
 });

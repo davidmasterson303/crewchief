@@ -116,3 +116,40 @@ export function hasLiveEntitlement(
 function isKnownTier(value: string): value is TierName {
   return Object.prototype.hasOwnProperty.call(TIERS, value);
 }
+
+/**
+ * Postgres/PostgREST codes meaning **the entitlements table is not there.**
+ *
+ * `PGRST205` is PostgREST failing to find the relation in its schema cache;
+ * `42P01` is Postgres' own `undefined_table`.
+ */
+const TABLE_ABSENT_CODES = new Set(['PGRST205', '42P01']);
+
+/**
+ * Whether a failed entitlement read should be treated as "definitely nobody has
+ * a subscription" rather than "we cannot tell".
+ *
+ * ── The deploy-ordering trap this exists to close ───────────────────────────
+ *
+ * Both read paths deliberately fail *toward* warning: an unreadable entitlement
+ * must not cost somebody a subscription they keep paying for after their
+ * account is deleted. That is right when the table exists and the read failed.
+ *
+ * **It is wrong when the table has not been created yet**, and that is a state
+ * this project will actually pass through — the code ships in one commit and
+ * the migration is applied by hand, separately. In the window between, every
+ * read errors, every user is treated as a subscriber, and the delete screen
+ * tells all of them to go and cancel a subscription that does not exist. On the
+ * surface Apple reviews.
+ *
+ * A missing table is not ambiguous: nothing could have written a subscription
+ * to a table that was never created. So it resolves to "no subscription" with
+ * certainty, and every *other* error keeps failing toward the warning.
+ *
+ * This is deploy-order safety expressed as a rule rather than as a runbook
+ * step, because a runbook step is only as good as the person reading it at the
+ * moment they push.
+ */
+export function readFailureMeansNoSubscription(code: string | null | undefined): boolean {
+  return code !== null && code !== undefined && TABLE_ABSENT_CODES.has(code);
+}

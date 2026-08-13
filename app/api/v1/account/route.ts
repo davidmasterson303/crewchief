@@ -5,7 +5,7 @@ import { checkRateLimit, getClientIdentifier, rateLimitResponse } from '@/lib/ra
 import { deleteAccount } from '@/lib/account-data';
 import { requireSession } from '@/lib/api-auth';
 import { getServiceRoleClient } from '@/lib/supabase';
-import { hasLiveEntitlement } from '@crewchief/core/entitlement';
+import { hasLiveEntitlement, readFailureMeansNoSubscription } from '@crewchief/core/entitlement';
 
 export const dynamic = 'force-dynamic';
 
@@ -80,7 +80,7 @@ export async function GET(): Promise<Response> {
     .eq('user_id', session.userId)
     .maybeSingle();
 
-  if (error) {
+  if (error && !readFailureMeansNoSubscription((error as { code?: string }).code)) {
     /*
       Fail toward showing the warning, which is the opposite of how the budget
       path treats the same read failure — and for the same reason inverted.
