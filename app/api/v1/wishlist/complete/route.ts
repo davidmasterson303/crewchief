@@ -90,6 +90,15 @@ export async function POST(request: NextRequest) {
         notes: notes || wishlistItem.notes,
         quantity: 1,
         unit_cost: totalCost,
+        /*
+          Attributed, because the history screen shows provenance per row and an
+          unattributed one is indistinguishable from a record that predates the
+          column. `'manual'` is the right value: a person in the app said this
+          happened. Not `'vision'` — no document was read — and not
+          `'owner-onboarding'`, which `20260808150000` reserved for a
+          recollection given during sign-up.
+        */
+        source: 'manual',
       })
       .select()
       .single();

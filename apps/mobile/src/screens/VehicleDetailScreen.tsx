@@ -114,6 +114,7 @@ export function VehicleDetailScreen({
   onScanInvoice,
   onViewRecalls,
   onOpenWishlist,
+  onOpenHistory,
 }: {
   vehicleId: string;
   onBack: () => void;
@@ -128,6 +129,8 @@ export function VehicleDetailScreen({
   onScanInvoice: () => void;
   onViewRecalls: () => void;
   onOpenWishlist: () => void;
+  /** Track 5.6 follow-on: the phone could write service history and not read it. */
+  onOpenHistory: () => void;
 }) {
   const [state, setState] = useState<State>({ status: 'loading' });
   const [refreshing, setRefreshing] = useState(false);
@@ -271,6 +274,15 @@ export function VehicleDetailScreen({
         <Text style={styles.scanCtaHint}>
           What this car needs, so the advisor can price it
         </Text>
+      </Pressable>
+
+      {/*
+        Placed directly under "Scan an invoice" because that is the action that
+        most often produces a row here — the natural next question after
+        filing something is whether it landed.
+      */}
+      <Pressable style={styles.scanCta} onPress={onOpenHistory} accessibilityRole="button">
+        <Text style={styles.scanCtaText}>Service history</Text>
       </Pressable>
 
       <Pressable style={styles.scanCta} onPress={onScanInvoice} accessibilityRole="button">

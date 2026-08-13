@@ -67,6 +67,7 @@ async function mount() {
     onScanInvoice: jest.fn(),
     onViewRecalls: jest.fn(),
     onOpenWishlist: jest.fn(),
+    onOpenHistory: jest.fn(),
   };
   return { props, view: await render(<VehicleDetailScreen {...props} />) };
 }

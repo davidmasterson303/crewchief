@@ -15,6 +15,7 @@ import { AdvisorScreen } from '../screens/AdvisorScreen';
 import { InvoiceScanScreen } from '../screens/InvoiceScanScreen';
 import { RecallDetailScreen } from '../screens/RecallDetailScreen';
 import { WishlistScreen } from '../screens/WishlistScreen';
+import { ServiceHistoryScreen } from '../screens/ServiceHistoryScreen';
 import { ServiceMilestoneScreen } from '../screens/ServiceMilestoneScreen';
 import { pickInvoiceImage } from '../media/pick-invoice-image';
 import { GarageScreen } from '../screens/GarageScreen';
@@ -123,6 +124,7 @@ export type RootStackParamList = {
     "people may want to add items to wishlist on the go."
   */
   Wishlist: { vehicleId: string; title?: string };
+  ServiceHistory: { vehicleId: string; title?: string };
   /*
     5.6. Where a service-due notification lands. It opened the vehicle screen
     until 7 Aug, on the reasoning that "your oil change is due" needs no
@@ -188,6 +190,7 @@ const linking: LinkingOptions<RootStackParamList> = {
       InvoiceScan: 'vehicle/:vehicleId/scan',
       RecallDetail: 'vehicle/:vehicleId/recalls',
       Wishlist: 'vehicle/:vehicleId/wishlist',
+      ServiceHistory: 'vehicle/:vehicleId/history',
       ServiceMilestone: 'vehicle/:vehicleId/service',
     },
   },
@@ -351,6 +354,12 @@ export function RootNavigator({
                   title: route.params.title,
                 })
               }
+              onOpenHistory={() =>
+                navigation.navigate('ServiceHistory', {
+                  vehicleId: route.params.vehicleId,
+                  title: route.params.title,
+                })
+              }
             />
           )}
         </Stack.Screen>
@@ -408,6 +417,15 @@ export function RootNavigator({
         >
           {({ route }) => (
             <WishlistScreen vehicleId={route.params.vehicleId} onSignOut={onSignOut} />
+          )}
+        </Stack.Screen>
+
+        <Stack.Screen
+          name="ServiceHistory"
+          options={{ title: 'Service history' }}
+        >
+          {({ route }) => (
+            <ServiceHistoryScreen vehicleId={route.params.vehicleId} onSignOut={onSignOut} />
           )}
         </Stack.Screen>
 
