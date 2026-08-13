@@ -99,7 +99,23 @@ interface VehicleResponse {
  * before Track A2a.
  */
 interface MaintenanceResponse {
-  lineItems?: ServiceHistoryRow[] | null;
+  /**
+   * `maintenance_line_items` — the service record.
+   *
+   * ⚠ **Not `lineItems`, which this screen read until 12 Aug 2026.** That key
+   * carries `invoice_line_items`: the raw lines extracted from an uploaded
+   * invoice. They have a `description` and a price and **no `service_date` and
+   * no `mileage_at_service`** — so every lookup built from them returned null,
+   * and the A2a fix below silently did nothing.
+   *
+   * It typechecked because `ServiceHistoryRow` accepts `description` *or*
+   * `item_description`, so invoice rows satisfy the type while being unable to
+   * answer the question. The server sweep has always read the right table
+   * (`route.ts:424`), which is why the notification and the screen it opens
+   * could disagree: the sweep knew when the oil was last changed and this
+   * screen said "unknown".
+   */
+  maintenanceLineItems?: ServiceHistoryRow[] | null;
 }
 
 type State =
@@ -154,7 +170,7 @@ export function ServiceMilestoneScreen({ vehicleId, onSignOut }: Props) {
         name: [vehicle?.year, vehicle?.make, vehicle?.model].filter(Boolean).join(' ') || 'this car',
         mileage,
         schedule: Array.isArray(rawSchedule) ? (rawSchedule as ScheduleEntry[]) : [],
-        history: Array.isArray(history?.lineItems) ? history.lineItems : [],
+        history: Array.isArray(history?.maintenanceLineItems) ? history.maintenanceLineItems : [],
       });
       setReading(String(mileage));
     } catch (error) {
@@ -309,6 +325,12 @@ export function ServiceMilestoneScreen({ vehicleId, onSignOut }: Props) {
     counted from the odometer rather than from when the work was actually done.
 
     `historyLookups` returns all three, so it spreads.
+
+    ⚠ **A2a wired these up and fed them the wrong table.** Until 12 Aug the
+    history came from `lineItems` (`invoice_line_items`), which carries no
+    service date and no mileage — so the lookups still returned null and the
+    bug this comment describes was still live, behind a fix that looked
+    applied. See `MaintenanceResponse` above.
   */
   const services = evaluateSchedule({
     schedule: state.schedule,
