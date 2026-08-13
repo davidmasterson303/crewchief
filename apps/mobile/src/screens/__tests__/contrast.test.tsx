@@ -1,4 +1,4 @@
-import { fireEvent, render } from '@testing-library/react-native';
+import { fireEvent, render, userEvent } from '@testing-library/react-native';
 
 import { GarageScreen } from '../GarageScreen';
 import { VehicleDetailScreen } from '../VehicleDetailScreen';
@@ -418,16 +418,44 @@ describe('the wishlist', () => {
   });
 
   it('reads at AA with the add button disabled', async () => {
-    // The composer is empty on load, so the CTA renders in its disabled fill.
-    // This assertion only means something because that state is an explicit
-    // colour rather than an opacity — see the warning above.
+    /*
+      The composer is behind a control now, so it has to be opened before the
+      disabled CTA exists to audit. Worth keeping rather than deleting: this
+      assertion only means anything because the disabled state is an explicit
+      fill rather than an `opacity` — a parent alpha never reaches `auditText`'s
+      comparison, so an opacity-greyed button would pass while being unreadable.
+    */
     request.mockResolvedValue({ wishlistItems: [] });
 
+    const user = userEvent.setup();
     const view = await render(
       <WishlistScreen vehicleId="db143cdc-e68c-46f0-849e-69f7a1873f58" onSignOut={jest.fn()} />
     );
 
-    await view.findByText('Add to wishlist');
+    await user.press(await view.findByLabelText('Add something to the wishlist'));
+
+    await view.findByLabelText('Add to wishlist');
+    expect(belowFloor(auditText(view))).toEqual([]);
+  });
+
+  it('reads at AA on the mark-done sheet, which writes permanent history', async () => {
+    /*
+      New surface, and the one on this screen where a misread label has a
+      lasting consequence: it writes a `maintenance_line_items` row and deletes
+      the wishlist entry, with no undo.
+    */
+    request.mockResolvedValue({
+      wishlistItems: [{ id: 'w1', item_name: 'Front brake pads', item_type: 'maintenance' }],
+    });
+
+    const user = userEvent.setup();
+    const view = await render(
+      <WishlistScreen vehicleId="db143cdc-e68c-46f0-849e-69f7a1873f58" onSignOut={jest.fn()} />
+    );
+
+    await user.press(await view.findByLabelText('Mark Front brake pads done'));
+    await view.findByLabelText('Mark done');
+
     expect(belowFloor(auditText(view))).toEqual([]);
   });
 

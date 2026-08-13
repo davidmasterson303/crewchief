@@ -119,11 +119,12 @@ describe('adding an item', () => {
     const { view } = await mount();
 
     await view.findByText('Nothing on the list yet');
+    await user.press(view.getByLabelText('Add something to the wishlist'));
     await user.type(view.getByLabelText('What to add to the wishlist'), 'Rear rotors');
     // "Add as Maintenance" only SELECTS the type — the add is its own button.
     // The first draft pressed the chip and expected a POST, which is also how
     // the whitespace case below came to pass vacuously.
-    await user.press(view.getByText('Add to wishlist'));
+    await user.press(view.getByLabelText('Add to wishlist'));
 
     const post = request.mock.calls.find(([, init]) => (init as { method?: string })?.method === 'POST');
     expect(post).toBeDefined();
@@ -143,9 +144,10 @@ describe('adding an item', () => {
     const { view } = await mount();
 
     await view.findByText('Nothing on the list yet');
+    await user.press(view.getByLabelText('Add something to the wishlist'));
     await user.type(view.getByLabelText('What to add to the wishlist'), 'Coilovers');
-    await user.press(view.getByLabelText('Add as Mod'));   // selects
-    await user.press(view.getByText('Add to wishlist'));   // submits
+    await user.press(view.getByLabelText('File as Mod'));   // selects
+    await user.press(view.getByLabelText('Add to wishlist'));   // submits
 
     const post = request.mock.calls.find(([, init]) => (init as { method?: string })?.method === 'POST');
     expect((post![1] as { body: Record<string, unknown> }).body).toMatchObject({
@@ -160,8 +162,9 @@ describe('adding an item', () => {
     const { view } = await mount();
 
     await view.findByText('Nothing on the list yet');
+    await user.press(view.getByLabelText('Add something to the wishlist'));
     await user.type(view.getByLabelText('What to add to the wishlist'), '   ');
-    await user.press(view.getByText('Add to wishlist'));
+    await user.press(view.getByLabelText('Add to wishlist'));
 
     expect(
       request.mock.calls.some(([, init]) => (init as { method?: string })?.method === 'POST')
@@ -179,8 +182,9 @@ describe('adding an item', () => {
     const { view } = await mount();
 
     await view.findByText('Nothing on the list yet');
+    await user.press(view.getByLabelText('Add something to the wishlist'));
     await user.type(view.getByLabelText('What to add to the wishlist'), 'Wipers');
-    await user.press(view.getByText('Add to wishlist'));
+    await user.press(view.getByLabelText('Add to wishlist'));
 
     await waitFor(() =>
       expect(
@@ -204,8 +208,9 @@ describe('adding an item', () => {
 
     const { view } = await mount();
     await view.findByText('Nothing on the list yet');
+    await user.press(view.getByLabelText('Add something to the wishlist'));
     await user.type(view.getByLabelText('What to add to the wishlist'), 'Front brake pads');
-    await user.press(view.getByText('Add to wishlist'));
+    await user.press(view.getByLabelText('Add to wishlist'));
 
     await waitFor(() => expect(alertSpy).toHaveBeenCalled());
     expect(String(alertSpy.mock.calls[0][0])).toMatch(/already on the list/i);
@@ -222,8 +227,9 @@ describe('adding an item', () => {
 
     const { props, view } = await mount();
     await view.findByText('Nothing on the list yet');
+    await user.press(view.getByLabelText('Add something to the wishlist'));
     await user.type(view.getByLabelText('What to add to the wishlist'), 'Rear rotors');
-    await user.press(view.getByText('Add to wishlist'));
+    await user.press(view.getByLabelText('Add to wishlist'));
 
     await waitFor(() => expect(props.onSignOut).toHaveBeenCalledTimes(1));
   });
@@ -282,5 +288,93 @@ describe('removing an item', () => {
         request.mock.calls.some(([, init]) => (init as { method?: string })?.method === 'DELETE')
       ).toBe(true)
     );
+  });
+});
+
+describe('marking an item done', () => {
+  /*
+    The only wishlist action that writes into the car's permanent service
+    history — `POST /api/v1/wishlist/complete` inserts a `maintenance_line_items`
+    row and deletes the wishlist entry. No undo.
+
+    The rules about what a completion needs live in
+    `@crewchief/core/wishlist-completion` and are tested there. These are about
+    the screen obeying them: that the sheet is a deliberate step rather than a
+    row tap, and that nothing is sent until it is confirmed.
+  */
+  const completions = () =>
+    request.mock.calls.filter(([path]) => String(path).includes('complete'));
+
+  it('does not complete anything from the list itself', async () => {
+    // A one-tap Done on a list row would be the cheapest gesture on the screen
+    // attached to its most consequential action.
+    listReturns([item()]);
+    const user = userEvent.setup();
+    const { view } = await mount();
+    const resolved = await view;
+
+    await user.press(resolved.getByLabelText('Mark Front brake pads done'));
+
+    expect(completions()).toHaveLength(0);
+  });
+
+  it('opens a sheet that names where the record goes', async () => {
+    /*
+      The result lands in the service history — somewhere the user is not
+      looking. Naming the destination is what makes this an informed tap.
+    */
+    listReturns([item()]);
+    const user = userEvent.setup();
+    const { view } = await mount();
+    const resolved = await view;
+
+    await user.press(resolved.getByLabelText('Mark Front brake pads done'));
+
+    expect(await resolved.findByText(/service history/i)).toBeTruthy();
+  });
+
+  it('sends the completion once confirmed', async () => {
+    listReturns([item()]);
+    const user = userEvent.setup();
+    const { view } = await mount();
+    const resolved = await view;
+
+    await user.press(resolved.getByLabelText('Mark Front brake pads done'));
+    // DIY is one tap and needs no shop — the fastest honest completion.
+    await user.press(await resolved.findByLabelText('I did it'));
+    await user.press(resolved.getByLabelText('Mark done'));
+
+    const call = completions()[0];
+    expect(call).toBeTruthy();
+
+    const init = call![1] as { method?: string; body?: Record<string, unknown> };
+    expect(init.method).toBe('POST');
+    expect(init.body!.isDIY).toBe(true);
+    // A blank cost is omitted rather than sent as a claimed zero.
+    expect(init.body).not.toHaveProperty('partsCost');
+  });
+
+  it('refuses to send when a shop did the work and none was named', async () => {
+    /*
+      The one required field. Without it the route stores `'Unknown'`, which
+      tells a reader nothing a year later — not even whether it happened.
+    */
+    listReturns([item()]);
+    const user = userEvent.setup();
+    const { view } = await mount();
+    const resolved = await view;
+
+    await user.press(resolved.getByLabelText('Mark Front brake pads done'));
+    await user.press(await resolved.findByLabelText('A shop did it'));
+    await user.press(resolved.getByLabelText('Mark done'));
+
+    expect(completions()).toHaveLength(0);
+    /*
+      Matched on the remedy rather than on "who did the work", which is also the
+      field's own label — the first version of this assertion matched both and
+      failed as ambiguous. The message is the thing being asserted; the label
+      would have been there whether or not the rule fired.
+    */
+    expect(await resolved.findByText(/mark it as DIY/i)).toBeTruthy();
   });
 });
