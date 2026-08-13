@@ -66,6 +66,23 @@ const PAGE_SIZE = 200;
 
 interface SweepSummary {
   vehiclesScanned: number;
+  /**
+   * What the run **decided** to send, before delivery and regardless of
+   * `dryRun`.
+   *
+   * ⚠ These exist because `recallsSent`/`servicesSent` cannot answer the
+   * question a dry run is asked. They only increment inside the delivery loop,
+   * which `dryRun` skips — so a dry run reported zeros no matter what it had
+   * decided, and the route's own docblock advertises it as the way to make the
+   * first production run and to diagnose a suspected runaway.
+   *
+   * A dry run reporting "0 sent" when it would have sent four hundred is worse
+   * than no dry run: it reads as reassurance. Found by running it — the counts
+   * were right there in the plans and never reached the summary.
+   */
+  recallsPlanned: number;
+  servicesPlanned: number;
+  /** What was actually delivered. Always 0 under `dryRun`, by construction. */
   recallsSent: number;
   servicesSent: number;
   /** Dossiers generated this run for cars that had never had one. C4. */
@@ -134,6 +151,8 @@ export async function POST(request: NextRequest) {
 
   const summary: SweepSummary = {
     vehiclesScanned: 0,
+    recallsPlanned: 0,
+    servicesPlanned: 0,
     recallsSent: 0,
     servicesSent: 0,
     schedulesGenerated: 0,
@@ -266,6 +285,14 @@ export async function POST(request: NextRequest) {
   const recallPlan = applySendCap(recallCandidates);
   const servicePlan = applySendCap(serviceCandidates);
   summary.capped = recallPlan.capped || servicePlan.capped;
+
+  /*
+    Recorded before the delivery branch, so a dry run reports what it decided
+    rather than what it sent. This is the line that makes `?dryRun=1` worth
+    running.
+  */
+  summary.recallsPlanned = recallPlan.send.length;
+  summary.servicesPlanned = servicePlan.send.length;
 
   if (summary.capped) {
     /*

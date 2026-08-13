@@ -163,3 +163,46 @@ describe('researchVehicleDossier has a closed caller list', () => {
     expect(call).toBeGreaterThan(guard);
   });
 });
+
+describe('a dry run reports what it decided, not what it sent', () => {
+  /*
+    Found by running the sweep against the live database on 12 Aug — not by a
+    test, and not by reading it.
+
+    `recallsSent` and `servicesSent` only increment inside the delivery loop,
+    which `dryRun` skips. So the first dry run reported `recallsSent: 0` and
+    read as "nothing would happen". It would in fact have sent **two** recall
+    notifications — both real, previously unraised NHTSA airbag campaigns.
+
+    A dry run that reports zero when it would have sent four hundred is worse
+    than no dry run, because it reads as reassurance. The route's own docblock
+    advertises `?dryRun=1` as how the first production run should be made and
+    how a runaway is diagnosed; neither is possible if the summary cannot
+    describe the decision.
+
+    Structural, because exercising this route needs a live database, a secret
+    and a scheduler.
+  */
+  const route = readFileSync(join(ROOT, 'app/api/internal/notify-sweep/route.ts'), 'utf8');
+
+  it('records the planned counts outside the delivery branch', () => {
+    const planned = route.indexOf('summary.recallsPlanned =');
+    const delivery = route.indexOf('if (!dryRun) {', route.indexOf('const recallPlan'));
+
+    expect(planned).toBeGreaterThan(-1);
+    expect(delivery).toBeGreaterThan(-1);
+    // Assigned before the branch that a dry run skips.
+    expect(planned).toBeLessThan(delivery);
+  });
+
+  it('reports planned and sent as separate numbers', () => {
+    /*
+      Collapsing them back into one would re-introduce the bug in a form that
+      looks tidier: a single `recallsSent` that counts decisions would make a
+      real run over-report deliveries that failed.
+    */
+    for (const field of ['recallsPlanned', 'servicesPlanned', 'recallsSent', 'servicesSent']) {
+      expect(route).toContain(field);
+    }
+  });
+});
