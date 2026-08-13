@@ -1,62 +1,76 @@
 # CrewChief roadmap — image pipeline, backdrop, cockpit direction, and responsive web
 
-> ## ⚠ READ THIS FIRST — reconciled 11 Aug 2026
+> ## ⚠ READ THIS FIRST — state as of 13 Aug 2026, 05:00
 >
-> **Everything below this block was written on 2 August and is nine days and ~50 commits stale.**
-> Its design and responsive content is still the tree's record and still worth reading. Its
-> *sequencing* is not, and three of its instructions are actively dead.
+> **Everything below this block was written on 2 August.** Its design and responsive content is
+> still the tree's record and still worth reading. Its *sequencing* is not, and it names work that
+> has been dropped.
 >
 > **This file is authoritative on the tree. It is not authoritative on the plan.** The plan of
 > record is **§0 of `~/Documents/Claude/Projects/davidmasterson.co/CREWCHIEF_ROADMAP_2026-08-02.md`
-> (Rev. G)**. Where the two disagree about what to build next, §0 wins.
+> (Rev. G)**. Start at its **§0.15 — the critical path**, which is seven ordered lines with an
+> owner on each. Where the two files disagree about what to build next, §0 wins.
 >
-> ### Dead instructions — do not act on these
+> ### Current state — re-derive before depending on any of it
 >
-> | Below it says | Reality |
+> | | |
 > |---|---|
-> | Pick up **5.2 Stripe checkout** second, "the next code item on the money track" | ⛔ **Dropped 8 Aug.** The product pivoted to mobile-first sold through the App Store; the web app is a free companion and takes no money. Apple IAP (E8) is the only revenue mechanism |
-> | **`brew install cocoapods`** on David's list | ⛔ **Never possible.** macOS ships Ruby 2.6, CocoaPods needs ≥ 3.0, and there is no Homebrew on this machine. Routed around by EAS cloud builds on 4 Aug |
-> | **Next.js upgrade is "still a pre-submission gate"** | It gates the **web** app, which is no longer what gets submitted. Real, but off the critical path (Track F) |
+> | `main` | **`fc96184`**, pushed. 14 commits on 12 Aug, all deployed |
+> | Web tests | **2300**, green | 
+> | Mobile tests | **174**, green |
+> | Typechecks | Three, all clean |
+> | Migrations | All applied **except `20260813020000`** (TRUNCATE revokes) — Cowork's |
+> | `demo-live` | **~27 commits behind `main`** — the public demo serves pre-v8 design |
 >
-> ### Superseded state claims
+> ### ⛔ Do not act on these — they are dead instructions below
 >
-> - **"Phase 3 stays at ~16 remaining"** — Phase 3 completed 5 Aug and is proven end to end.
-> - **"Erratum T2 blocks 5.2"** — 5.2 is gone. The same question (what a lapsed subscriber
->   reaches) returns under IAP at E7/E8. Ask it there.
-> - **The R13/R14 decision "is David's call"** — R14's half was taken on 8 Aug in the delete
->   direction (`f189679`): `UpcomingMaintenance.tsx` and `LogServiceModal.tsx` are gone.
->   **`components/MaintenanceHistory.tsx` was not in that commit and is still dead** — R13 is
->   still open on exactly the terms this file describes.
-> - Every `main` SHA, test count and promotion state below is from 2 Aug. As of 11 Aug: `main` is
->   `5a36c2d`, web suites are **110 / 2160**, mobile **11 / 149**, three typechecks clean, and
->   `demo-live` is **11 commits behind `main`**.
+> | It says | Reality |
+> |---|---|
+> | Build **5.2 Stripe checkout** | Dropped 8 Aug. Revenue is Apple IAP only |
+> | **`brew install cocoapods`** | Never possible here. Routed around by EAS cloud builds |
+> | Next.js upgrade is a **pre-submission gate** | It gates the web app, which is not what gets submitted. Track F |
+> | "Phase 3 stays at ~16 remaining" | Phase 3 completed 5 Aug |
+> | Erratum T2 blocks 5.2 | 5.2 is gone; the question returns at E7/E8 |
 >
-> ### What has landed since, that this file predates
+> ### The one thing blocking the most
 >
-> **Track A** (a person can sign up and add a car on the phone) — closed 8 Aug, **including R7 /
-> item 14**, the responsive onboarding wizard this file files under "P3, next quarter".
-> **Track C** (push notification scheduler and both triggers) — shipped 8 Aug.
-> **v8** — a design-system refresh across the register, tokens, the button primitive and the logo
-> set, 8 and 11 Aug.
+> **`CRON_SECRET` is unset in production.** Confirmed 12 Aug by probing the deployed endpoint —
+> an unauthenticated `POST /api/internal/notify-sweep` returns `503 {"error":"Not configured"}`,
+> which that route emits **only** when the variable is absent. So the scheduler has fired daily
+> since 8 Aug and nothing has ever been sent. It is David's to set; do not work around it.
 >
-> **12 Aug, and none of it is pushed yet:**
+> ### Rules that arrived with 12 August's work — read before touching these areas
 >
-> - **C4** (`2ce0e7d`) — the nightly sweep now generates a maintenance schedule for cars whose
->   owner never opened a dashboard. It previously skipped them silently and forever, which after
->   the mobile pivot means every car added on the phone. The research core moved to
->   `lib/vehicle-research.ts` and **authorizes nothing** — read its docblock before adding a third
->   caller, and see `vehicle-research-callers.test.ts`, which keeps that list closed.
-> - **E7** (`95a2302`) — `account_entitlements`, the record of who has paid. `resolveTier` is
->   **deleted**; use `resolveEntitledTier` from `@crewchief/core/entitlement`. ⚠ Migration
->   `20260812120000` is written and **not yet applied**, so the table does not exist in the live
->   database yet and every account resolves to `free`.
-> - **E5** (`79d0575`) — a subscriber is warned that deleting their account does not stop Apple
->   billing them. Both surfaces, with a parity guard.
+> - **`lib/vehicle-research.ts` authorizes nothing, by design.** It spends a Pro-model call for
+>   whatever vehicle it is handed. Two callers only, each authorizing differently;
+>   `vehicle-research-callers.test.ts` keeps that list closed. **Never export it from a
+>   `'use server'` file** — every export there is a public POST endpoint.
+> - **The sweep must never generate under `?dryRun=1`.** A dry run that spends money is a trap
+>   sprung by whoever is being careful.
+> - **A dry run reports `recallsPlanned`, not `recallsSent`.** The latter only increments in the
+>   delivery loop `dryRun` skips.
+> - **`account_entitlements` must never become user-writable.** A scoped `FOR ALL` policy is
+>   correct on every other table in this schema and is a free subscription on that one.
+> - **`resolveTier` is deleted.** Use `resolveEntitledTier` from `@crewchief/core/entitlement`.
+> - **A new table in `public` does not inherit the 1 Aug TRUNCATE revoke.** Carry its own
+>   `REVOKE TRUNCATE … FROM authenticated`; `truncate-revoked.test.ts` fails the build otherwise.
+> - **`/load-maintenance-data` returns two things that look like history.** `lineItems` is
+>   `invoice_line_items` — description and price, **no service date**. The service record is
+>   `maintenanceLineItems`. Reading the wrong one was a live bug until 12 Aug.
+> - **When you fix something, grep for the comments that described it.** Four docblocks were found
+>   asserting things that had stopped being true, three of them written by whoever had just made
+>   them false.
 >
-> **Two rules worth knowing before you touch any of it:** the sweep must never generate under
-> `?dryRun=1` (a dry run that spends money is a trap sprung by whoever is being careful), and
-> `account_entitlements` must never become user-writable — a scoped `FOR ALL` policy is correct on
-> every other table in this schema and is a free subscription on that one.
+> ### What landed 12 Aug, all pushed
+>
+> **C4** the sweep's regeneration gap · **E7** `account_entitlements` · **E5** deletion under an
+> Apple subscription · **E4** the privacy manifest · **C5** the notification permission primer ·
+> the mobile **wishlist "Done"** plus its chips and composer · the **service history screen** and
+> record removal · the `ServiceMilestoneScreen` table fix · TRUNCATE revokes · two false docblocks.
+>
+> ⚠ **All of it is verified at the decision layer and unexercised at the surface.** Nothing built
+> on 12 Aug has been rendered on a device — `apps/mobile/ios` has never been generated here. See
+> §0.17 of the plan of record for exactly what each item is and is not proven by.
 
 Source: `Live-Site Audit.dc.html` (2 Aug 2026), grounded in repo `davidmasterson303/crewchief@main` (aa1d73f) and the live demo. Finding refs (F1–F8) and concept refs (1a–1c, 2a–2c) point into that report. Advisor KB was offline for the audit; reconcile against it when reconnected, and stage a `kb_propose` for the decisions below.
 
