@@ -62,6 +62,12 @@ const STATIC_ANALYSIS_SUITES = [
   // scoped `FOR ALL`, which is right on every other table in this schema and
   // here hands any signed-in user the paid tier.
   'entitlement-not-user-writable.test.ts',
+  // Reads apps/mobile/app.json and both package.json files to prove the iOS
+  // privacy manifest still describes the app that ships. There is nothing to
+  // import — the subject is a block of configuration, and the failure it pins
+  // is only observable *after* a build has been spent: Apple cross-checks the
+  // manifest against the App Store Connect answers and rejects a mismatch.
+  'privacy-manifest.test.ts',
   // Reads apps/mobile off disk to prove the Expo client never queries Supabase
   // directly. It cannot import what it checks: those modules are React Native,
   // and loading one under this runner would fail on the transform rather than
