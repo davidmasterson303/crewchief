@@ -39,10 +39,21 @@ import { parseAnswer } from '@crewchief/core/answer-markup';
  * every answer. So this screen keeps exactly one piece of durable state —
  * `sessionId` — and the messages it draws are a **local echo for the eye**, not
  * the record. Reopening the screen starts a new thread; it does not resume the
- * old one, and it does not pretend to. Resuming is a session list, which is
- * `GET`-shaped work no route exposes to a bearer token yet, so building a
- * picker here would mean querying Supabase from the device — the second answer
- * to "who may see what" that `api/client.ts` exists to prevent.
+ * old one, and it does not pretend to.
+ *
+ * ⚠ **The reason given here for that was wrong, and was wrong when written.**
+ * It said resuming "is `GET`-shaped work no route exposes to a bearer token
+ * yet", so a picker would mean querying Supabase from the device. But
+ * `GET /api/v1/consultant/conversations` authorizes through
+ * `authorizeVehicleAccess` — the same bearer-capable path every other call here
+ * uses — and it shipped in **this screen's own commit**, `28ee713`.
+ *
+ * So no route needed building and nothing would have to touch Supabase
+ * directly. What is actually missing is a conversation list in the UI and a
+ * decision about whether reopening resumes the last thread or offers a choice.
+ * That is a product call for Phase 5.5, not a technical blocker — recorded
+ * accurately on 12 Aug 2026 after the original reason was checked and did not
+ * hold.
  *
  * `sessionId` lives in a ref rather than state on purpose. It is read inside an
  * async send and never rendered, so putting it in state would schedule a render

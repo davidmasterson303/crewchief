@@ -74,12 +74,19 @@ export function configureNotificationHandler(): void {
  * treating it as a failure.
  *
  * ⚠ **Where this is called from is a product decision, not a technical one.**
- * iOS allows the prompt exactly once; a "no" can only be undone in Settings. It
- * is currently raised on entry to the signed-in stack, which is defensible —
- * someone with a garage is someone alerts are about — but the better pattern is
- * a screen explaining what CrewChief would tell them *before* the system dialog
- * appears, so the one irreversible prompt is spent on an informed answer. That
- * screen is worth building before submission and is not built.
+ * iOS allows the prompt exactly once; a "no" can only be undone in Settings.
+ *
+ * This used to say the prompt was raised on entry to the signed-in stack and
+ * that the explanatory screen "is worth building before submission and is not
+ * built". **Both halves stopped being true on 12 Aug 2026** — C5 built
+ * `PushPrimer`, and the navigator now registers silently only when permission
+ * already exists.
+ *
+ * So this function is no longer called from anywhere that raises the dialog
+ * uninvited: `GarageScreen` offers the primer once someone has a car, and
+ * `registerForPush` runs from its accept path. `shouldShowPushPrimer` in
+ * `@crewchief/core/push-priming` owns the rule, and
+ * `push-primer-wiring.test.ts` fails if a caller reintroduces the old shape.
  */
 export async function requestPushPermission(): Promise<boolean> {
   try {
