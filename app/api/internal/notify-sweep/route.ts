@@ -112,8 +112,19 @@ export async function POST(request: NextRequest) {
   }
 
   if (!secretMatches(request.headers.get('x-cron-secret'), secret)) {
-    // Deliberately says nothing about why. A caller probing this should not
-    // learn whether the secret was absent, short, or merely wrong.
+    /*
+      Says nothing about *why the supplied secret failed* — absent, short or
+      merely wrong all return this, so nothing here narrows a guess.
+
+      ⚠ It does not hide whether the route is configured at all: the 503 above
+      is distinguishable from this 401, so an anonymous caller can learn that
+      `CRON_SECRET` is unset. That was written as though it were hidden, and it
+      is not. **Keeping it that way is deliberate** — the distinction is how a
+      silently inert sweep gets diagnosed from outside, which is exactly how it
+      was caught on 12 Aug, and it is not worth much to an attacker: "this
+      endpoint refuses everything" is a reason to leave, and neither code helps
+      guess a secret that is being compared in constant time.
+    */
     return Response.json({ success: false, error: 'Unauthorized' }, { status: 401 });
   }
 
