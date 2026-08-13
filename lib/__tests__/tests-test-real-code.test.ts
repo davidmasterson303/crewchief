@@ -74,6 +74,13 @@ const STATIC_ANALYSIS_SUITES = [
   // the transform. The failure it pins — iOS's one irreversible permission
   // dialog raised uninvited — is not observable at runtime on any machine here.
   'push-primer-wiring.test.ts',
+  // Reads the migration corpus to prove no table created after 1 Aug 2026 was
+  // left holding TRUNCATE for `authenticated`. There is nothing to import: the
+  // subject is SQL. RLS cannot gate TRUNCATE — it is table-level — so the
+  // failure it pins is a role able to empty a table outright, past every policy
+  // in the schema. The rule was written in prose on 1 Aug and then ignored four
+  // times, which is what makes it a ratchet rather than a paragraph.
+  'truncate-revoked.test.ts',
   // Reads apps/mobile off disk to prove the Expo client never queries Supabase
   // directly. It cannot import what it checks: those modules are React Native,
   // and loading one under this runner would fail on the transform rather than
