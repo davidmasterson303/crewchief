@@ -138,8 +138,17 @@ function blocker(file: string, seen = new Set<string>()): string | null {
  * Adding a name here without fixing the module fails the assertions below.
  */
 const PORTABLE: string[] = [
-  // Empty: every module that qualified has moved into packages/core/src.
+  // Every module that qualified has moved into packages/core/src.
   // A new portable module in lib/ belongs here until it moves.
+  /*
+    Added 14 Aug with the legal pages. It is constants plus a re-export of
+    `SUBSCRIPTION_CANCEL_PATH` from core, so it qualifies — but it has not been
+    moved into the package, deliberately: two of its three values are visibly
+    unfinished placeholders waiting on Q2, and promoting an unfinished module
+    into the shared package invites a second client to import it and ship the
+    placeholder. It moves when the entity question is answered.
+  */
+  'lib/legal.ts',
 ];
 
 /**
