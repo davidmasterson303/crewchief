@@ -13,6 +13,7 @@ import {
 
 import { apiRequest, ApiRequestError } from '../api/client';
 import { validateMileageUpdate } from '@crewchief/core/mileage-tracking';
+import { status, surface, text } from '../theme';
 import {
   BASELINE_AGE_OPTIONS,
   type BaselineAge,
@@ -182,7 +183,7 @@ export function AddVehicleScreen({ onAdded, onSignOut }: Props) {
             value={year}
             onChangeText={setYear}
             placeholder="Year"
-            placeholderTextColor="rgba(255,255,255,0.35)"
+            placeholderTextColor={text.muted}
             keyboardType="number-pad"
             maxLength={4}
             accessibilityLabel="Model year"
@@ -193,7 +194,7 @@ export function AddVehicleScreen({ onAdded, onSignOut }: Props) {
             value={make}
             onChangeText={setMake}
             placeholder="Make"
-            placeholderTextColor="rgba(255,255,255,0.35)"
+            placeholderTextColor={text.muted}
             autoCapitalize="words"
             accessibilityLabel="Make"
             editable={!busy}
@@ -205,7 +206,7 @@ export function AddVehicleScreen({ onAdded, onSignOut }: Props) {
           value={model}
           onChangeText={setModel}
           placeholder="Model"
-          placeholderTextColor="rgba(255,255,255,0.35)"
+          placeholderTextColor={text.muted}
           autoCapitalize="words"
           accessibilityLabel="Model"
           editable={!busy}
@@ -216,7 +217,7 @@ export function AddVehicleScreen({ onAdded, onSignOut }: Props) {
           value={trim}
           onChangeText={setTrim}
           placeholder="Trim (optional)"
-          placeholderTextColor="rgba(255,255,255,0.35)"
+          placeholderTextColor={text.muted}
           autoCapitalize="words"
           accessibilityLabel="Trim, optional"
           editable={!busy}
@@ -227,7 +228,7 @@ export function AddVehicleScreen({ onAdded, onSignOut }: Props) {
           value={mileage}
           onChangeText={setMileage}
           placeholder="Current mileage"
-          placeholderTextColor="rgba(255,255,255,0.35)"
+          placeholderTextColor={text.muted}
           keyboardType="number-pad"
           accessibilityLabel="Current mileage"
           editable={!busy}
@@ -278,7 +279,7 @@ export function AddVehicleScreen({ onAdded, onSignOut }: Props) {
             value={serviceMileage}
             onChangeText={setServiceMileage}
             placeholder="Mileage at the time (optional)"
-            placeholderTextColor="rgba(255,255,255,0.35)"
+            placeholderTextColor={text.muted}
             keyboardType="number-pad"
             accessibilityLabel="Mileage at last oil change, optional"
             editable={!busy}
@@ -328,7 +329,7 @@ export function AddVehicleScreen({ onAdded, onSignOut }: Props) {
           onPress={() => void submit()}
         >
           {busy ? (
-            <ActivityIndicator color="#080808" />
+            <ActivityIndicator color={text.onInverse} />
           ) : (
             <Text style={styles.submitText}>Add to my garage</Text>
           )}
@@ -350,29 +351,29 @@ export function AddVehicleScreen({ onAdded, onSignOut }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#080808' },
+  container: { flex: 1, backgroundColor: surface.page },
   body: { padding: 24, gap: 12 },
 
-  title: { color: '#fff', fontSize: 26, fontWeight: '700', letterSpacing: -0.5 },
-  subtitle: { color: 'rgba(255,255,255,0.7)', fontSize: 14, marginBottom: 6 },
+  title: { color: text.primary, fontSize: 26, fontWeight: '700', letterSpacing: -0.5 },
+  subtitle: { color: text.secondary, fontSize: 14, marginBottom: 6 },
 
   row: { flexDirection: 'row', gap: 10 },
   grow: { flex: 1 },
   year: { width: 96 },
 
   input: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: surface.raised,
     borderRadius: 12,
     paddingHorizontal: 14,
     // 16px, per RB0 rule 3's floor for any focusable input.
     fontSize: 16,
-    color: '#fff',
+    color: text.primary,
     minHeight: 48,
   },
 
   modsBlock: { gap: 8, marginTop: 8 },
-  modsQuestion: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  modsHint: { color: 'rgba(255,255,255,0.7)', fontSize: 13, lineHeight: 18 },
+  modsQuestion: { color: text.primary, fontSize: 16, fontWeight: '600' },
+  modsHint: { color: text.secondary, fontSize: 13, lineHeight: 18 },
 
   choice: {
     flex: 1,
@@ -380,7 +381,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: surface.raised,
   },
   ageGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   age: {
@@ -388,19 +389,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     justifyContent: 'center',
     borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: surface.raised,
   },
-  ageText: { color: 'rgba(255,255,255,0.75)', fontSize: 14, fontWeight: '600' },
+  ageText: { color: text.secondary, fontSize: 14, fontWeight: '600' },
 
-  choiceOn: { backgroundColor: '#fff' },
-  choiceText: { color: 'rgba(255,255,255,0.75)', fontSize: 15, fontWeight: '600' },
-  choiceTextOn: { color: '#080808' },
+  choiceOn: { backgroundColor: surface.inverse },
+  choiceText: { color: text.secondary, fontSize: 15, fontWeight: '600' },
+  choiceTextOn: { color: text.onInverse },
 
-  error: { color: '#f87171', fontSize: 13, lineHeight: 18 },
+  error: { color: status.dangerText, fontSize: 13, lineHeight: 18 },
 
   submit: {
     marginTop: 8,
-    backgroundColor: '#fff',
+    backgroundColor: surface.inverse,
     borderRadius: 12,
     minHeight: 50,
     alignItems: 'center',
@@ -408,8 +409,8 @@ const styles = StyleSheet.create({
   },
   /* An explicit fill, never `opacity` — the contrast audit cannot composite a
      parent alpha, so a faded control is an unmeasured one. See WishlistScreen. */
-  submitOff: { backgroundColor: '#b8b8b8' },
-  submitText: { color: '#080808', fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
+  submitOff: { backgroundColor: surface.inverseDisabled },
+  submitText: { color: text.onInverse, fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
 
-  footnote: { color: 'rgba(255,255,255,0.6)', fontSize: 12, lineHeight: 18, marginTop: 4 },
+  footnote: { color: text.secondary, fontSize: 12, lineHeight: 18, marginTop: 4 },
 });

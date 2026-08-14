@@ -210,10 +210,24 @@ describe('the advisor CTA, which is dark text on white', () => {
 
 describe('the measurement itself', () => {
   it('agrees with the floor the web guard uses', () => {
-    // `text-contrast-floor.test.ts` sets FLOOR = 50, meaning /50 white. These
-    // two numbers have to keep meaning the same thing.
+    /*
+      `text-contrast-floor.test.ts` sets FLOOR = 50, meaning /50 white. These
+      two numbers have to keep meaning the same thing.
+
+      ⚠ **The lower probe was 45% and had to move.** On the old `#080808`
+      backdrop 45% measured just under 4.5 and made a fine "one step below the
+      floor" sample. On `surface.page` — the warm graphite, which is lighter —
+      it composites to 4.53 and passes, so the assertion was failing for the
+      right reason: the sample was no longer below anything.
+
+      It now probes the two values the token layer actually defines, which is
+      what this test should always have asserted: `text.muted` at 50% is the
+      quietest a string may be, and `text.nonText` at 40% is a hairline token
+      that must never carry a word. Those are the numbers a future change would
+      break, and an arbitrary 45% is not.
+    */
     expect(contrastRatio('rgba(255,255,255,0.5)', SCREEN_BACKGROUND)).toBeGreaterThanOrEqual(4.5);
-    expect(contrastRatio('rgba(255,255,255,0.45)', SCREEN_BACKGROUND)).toBeLessThan(4.5);
+    expect(contrastRatio('rgba(255,255,255,0.4)', SCREEN_BACKGROUND)).toBeLessThan(4.5);
   });
 
   it('composites alpha rather than ignoring it', () => {

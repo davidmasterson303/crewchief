@@ -27,6 +27,7 @@ import {
 import { historyLookups, type ServiceHistoryRow } from '@crewchief/core/service-history';
 import { validateMileageUpdate } from '@crewchief/core/mileage-tracking';
 import { wishlistItemIdentifier } from '@crewchief/core/wishlist-identifier';
+import { border, status, surface, text } from '../theme';
 
 /**
  * Phase 5.6 — where a service-due notification lands.
@@ -265,7 +266,7 @@ export function ServiceMilestoneScreen({ vehicleId, onSignOut }: Props) {
   if (state.kind === 'loading') {
     return (
       <View style={styles.centre}>
-        <ActivityIndicator color="rgba(255,255,255,0.6)" />
+        <ActivityIndicator color={text.secondary} />
       </View>
     );
   }
@@ -457,47 +458,47 @@ const styles = StyleSheet.create({
   body: { padding: 20, gap: 14, paddingBottom: 40 },
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 10 },
 
-  name: { color: '#fff', fontSize: 24, fontWeight: '700', letterSpacing: -0.5 },
-  mileageLine: { color: 'rgba(255,255,255,0.5)', fontSize: 14, marginTop: -10 },
+  name: { color: text.primary, fontSize: 24, fontWeight: '700', letterSpacing: -0.5 },
+  mileageLine: { color: text.muted, fontSize: 14, marginTop: -10 },
 
-  gateLead: { color: '#fff', fontSize: 18, fontWeight: '600' },
-  gateBody: { color: 'rgba(255,255,255,0.7)', fontSize: 14, lineHeight: 20 },
+  gateLead: { color: text.primary, fontSize: 18, fontWeight: '600' },
+  gateBody: { color: text.secondary, fontSize: 14, lineHeight: 20 },
   input: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: surface.raised,
     borderRadius: 12,
     paddingHorizontal: 14,
     fontSize: 16,
-    color: '#fff',
+    color: text.primary,
     minHeight: 48,
   },
 
   primaryCta: {
-    backgroundColor: '#fff',
+    backgroundColor: surface.inverse,
     borderRadius: 12,
     minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryCtaText: { color: '#080808', fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
+  primaryCtaText: { color: text.onInverse, fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
 
-  card: { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 14, padding: 16, gap: 10 },
-  cardTitle: { color: '#fff', fontSize: 17, fontWeight: '700', letterSpacing: -0.2 },
-  reason: { color: 'rgba(255,255,255,0.7)', fontSize: 14, lineHeight: 20 },
-  basis: { color: 'rgba(255,255,255,0.5)', fontSize: 12 },
+  card: { backgroundColor: surface.raised, borderRadius: 14, padding: 16, gap: 10 },
+  cardTitle: { color: text.primary, fontSize: 17, fontWeight: '700', letterSpacing: -0.2 },
+  reason: { color: text.secondary, fontSize: 14, lineHeight: 20 },
+  basis: { color: text.muted, fontSize: 12 },
 
   service: {
     gap: 8,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
+    borderTopColor: border.panel,
   },
   serviceHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  serviceName: { color: '#fff', fontSize: 15, fontWeight: '600', flexShrink: 1 },
-  overdue: { color: '#e0a468', fontSize: 12, fontWeight: '700' },
-  body14: { color: 'rgba(255,255,255,0.7)', fontSize: 14, lineHeight: 20 },
+  serviceName: { color: text.primary, fontSize: 15, fontWeight: '600', flexShrink: 1 },
+  overdue: { color: status.attention, fontSize: 12, fontWeight: '700' },
+  body14: { color: text.secondary, fontSize: 14, lineHeight: 20 },
 
   addCta: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: surface.raised,
     borderRadius: 10,
     minHeight: 44,
     alignItems: 'center',
@@ -505,22 +506,22 @@ const styles = StyleSheet.create({
   },
   /* An explicit fill, never `opacity` — see WishlistScreen: the contrast audit
      cannot see a parent alpha, so a faded control is an unmeasured one. */
-  addCtaDone: { backgroundColor: 'rgba(255,255,255,0.04)' },
-  addCtaText: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  addCtaDoneText: { color: 'rgba(255,255,255,0.6)' },
+  addCtaDone: { backgroundColor: surface.raised },
+  addCtaText: { color: text.primary, fontSize: 14, fontWeight: '600' },
+  addCtaDoneText: { color: text.secondary },
 
-  unknownItem: { color: 'rgba(255,255,255,0.7)', fontSize: 14, lineHeight: 20 },
-  footnote: { color: 'rgba(255,255,255,0.5)', fontSize: 12, lineHeight: 18 },
+  unknownItem: { color: text.secondary, fontSize: 14, lineHeight: 20 },
+  footnote: { color: text.muted, fontSize: 12, lineHeight: 18 },
 
-  errorTitle: { color: '#fff', fontSize: 17, fontWeight: '600' },
-  errorBody: { color: 'rgba(255,255,255,0.5)', fontSize: 14, textAlign: 'center' },
+  errorTitle: { color: text.primary, fontSize: 17, fontWeight: '600' },
+  errorBody: { color: text.muted, fontSize: 14, textAlign: 'center' },
   button: {
     marginTop: 6,
     paddingHorizontal: 18,
     borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: surface.raised,
     minHeight: 44,
     justifyContent: 'center',
   },
-  buttonText: { color: '#fff', fontSize: 14 },
+  buttonText: { color: text.primary, fontSize: 14 },
 });

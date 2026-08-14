@@ -1,6 +1,7 @@
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { PUSH_PRIMER_COPY } from '@crewchief/core/push-priming';
+import { border, brand, surface, text } from '../theme';
 
 /**
  * The screen that comes *before* iOS asks. Phase 5, C5.
@@ -88,41 +89,41 @@ export function PushPrimer({
 }
 
 /*
-  Every colour here is fully opaque and chosen against `#080808`, the same
+  Every colour here is fully opaque and chosen against `surface.page`, the same
   ground the account screen uses. `contrast.test.tsx` enforces a 4.5:1 floor
   with opacity composited in, and a translucent body on a screen this important
   is exactly the shape it catches.
 */
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#080808', justifyContent: 'space-between' },
+  root: { flex: 1, backgroundColor: surface.page, justifyContent: 'space-between' },
   body: { paddingHorizontal: 28, paddingTop: 96, gap: 18 },
-  title: { color: '#FFFFFF', fontSize: 26, fontWeight: '700', lineHeight: 32 },
-  paragraph: { color: '#E6E6E6', fontSize: 16, lineHeight: 24 },
-  detail: { color: '#B8B8B8', fontSize: 14, lineHeight: 21 },
+  title: { color: text.primary, fontSize: 26, fontWeight: '700', lineHeight: 32 },
+  paragraph: { color: text.secondary, fontSize: 16, lineHeight: 24 },
+  detail: { color: text.muted, fontSize: 14, lineHeight: 21 },
 
   actions: { paddingHorizontal: 28, paddingBottom: 56, gap: 12 },
   accept: {
     minHeight: 52,
     borderRadius: 14,
-    backgroundColor: '#0E7490',
+    backgroundColor: brand.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   acceptPressed: { opacity: 0.9 },
   // The v8 paired primary: #0E7490 with light ink measures 5.10:1. The pair
   // moves together — dark ink against this fill is 3.39:1 and fails.
-  acceptText: { color: '#F2FBFD', fontSize: 16, fontWeight: '700' },
+  acceptText: { color: text.onPrimary, fontSize: 16, fontWeight: '700' },
 
   decline: {
     minHeight: 52,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#3A3A3A',
+    borderColor: border.field,
     alignItems: 'center',
     justifyContent: 'center',
   },
   declinePressed: { opacity: 0.9 },
-  declineText: { color: '#E6E6E6', fontSize: 16, fontWeight: '600' },
+  declineText: { color: text.secondary, fontSize: 16, fontWeight: '600' },
 
-  reassurance: { color: '#B8B8B8', fontSize: 13, textAlign: 'center', marginTop: 4 },
+  reassurance: { color: text.muted, fontSize: 13, textAlign: 'center', marginTop: 4 },
 });

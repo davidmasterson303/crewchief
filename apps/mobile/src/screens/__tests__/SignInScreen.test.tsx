@@ -1,7 +1,7 @@
 import { render, userEvent } from '@testing-library/react-native';
 
 import { SignInScreen } from '../SignInScreen';
-import { signIn, signUp } from '../../auth/session';
+import { resetPassword, signIn, signUp } from '../../auth/session';
 
 /**
  * The front door.
@@ -32,6 +32,7 @@ import { signIn, signUp } from '../../auth/session';
 jest.mock('../../auth/session', () => ({
   signIn: jest.fn(),
   signUp: jest.fn(),
+  resetPassword: jest.fn(),
 }));
 
 /*
@@ -48,6 +49,7 @@ jest.mock('../../auth/dev-session', () => ({
 
 const mockSignIn = signIn as jest.MockedFunction<typeof signIn>;
 const mockSignUp = signUp as jest.MockedFunction<typeof signUp>;
+const mockResetPassword = resetPassword as jest.MockedFunction<typeof resetPassword>;
 
 async function fill(
   user: ReturnType<typeof userEvent.setup>,
@@ -62,8 +64,10 @@ async function fill(
 beforeEach(() => {
   mockSignIn.mockReset();
   mockSignUp.mockReset();
+  mockResetPassword.mockReset();
   mockSignIn.mockResolvedValue({ ok: true });
   mockSignUp.mockResolvedValue({ ok: true });
+  mockResetPassword.mockResolvedValue({ ok: true });
 });
 
 describe('what a screen reader finds', () => {
@@ -311,5 +315,134 @@ describe('when the project requires email confirmation', () => {
     await user.press(view.getByText('Sign in'));
 
     expect(mockSignIn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('the documents somebody is agreeing to', () => {
+  /*
+    Added 14 Aug, with the pages themselves — neither existed anywhere in this
+    product before then, so an account was created against terms nobody could
+    read. Apple's 3.1.2 wants both reachable in the binary once subscriptions
+    ship; this puts them at the moment consent is actually given.
+  */
+
+  it('names both documents while creating an account', async () => {
+    const user = userEvent.setup();
+    const view = await render(<SignInScreen />);
+
+    await user.press(view.getByText('New here? Create an account'));
+
+    expect(view.getByText('Terms of Use')).toBeTruthy();
+    expect(view.getByText('Privacy Policy')).toBeTruthy();
+  });
+
+  it('does not claim agreement on the sign-in form', async () => {
+    // Signing in is not the moment consent is given, and a sentence saying it
+    // is would be a false statement on the screen a reviewer opens first.
+    const view = await render(<SignInScreen />);
+
+    expect(view.queryByText('Terms of Use')).toBeNull();
+    expect(view.queryByText('Privacy Policy')).toBeNull();
+  });
+
+  it('tells a screen reader that both leave the app', async () => {
+    const user = userEvent.setup();
+    const view = await render(<SignInScreen />);
+
+    await user.press(view.getByText('New here? Create an account'));
+
+    expect(view.getByLabelText('Terms of Use, opens in your browser')).toBeTruthy();
+    expect(view.getByLabelText('Privacy Policy, opens in your browser')).toBeTruthy();
+  });
+});
+
+describe('the way back in when the password is gone', () => {
+  /*
+    Added 14 Aug. The web app has had `/forgot-password` since before the pivot
+    and this screen had no route to it — so on a mobile-first product the only
+    recovery from a mistyped password was to know, from somewhere outside the
+    app, to go and use a website.
+
+    The interesting risk here is not whether the email sends. It is that a
+    reset control on an unauthenticated screen can answer "does this person
+    have an account", which is the oracle `signIn` is deliberately written to
+    avoid. These tests hold that line.
+  */
+
+  it('offers a way back on the sign-in form', async () => {
+    const view = await render(<SignInScreen />);
+
+    expect(view.getByText('Forgot your password?')).toBeTruthy();
+  });
+
+  it('does not offer it while creating an account', async () => {
+    // There is no password to have forgotten yet, and asking to reset one for
+    // an address with no account is the oracle question in another costume.
+    const user = userEvent.setup();
+    const view = await render(<SignInScreen />);
+
+    await user.press(view.getByText('New here? Create an account'));
+
+    expect(view.queryByText('Forgot your password?')).toBeNull();
+  });
+
+  it('sends the reset for whatever address is in the field', async () => {
+    const user = userEvent.setup();
+    const view = await render(<SignInScreen />);
+
+    await user.type(view.getByPlaceholderText('Email'), 'owner@example.test');
+    await user.press(view.getByText('Forgot your password?'));
+
+    expect(mockResetPassword).toHaveBeenCalledWith('owner@example.test');
+  });
+
+  it('does not require a password to recover a forgotten password', async () => {
+    /*
+      The submit button is gated on both fields. If this control were gated the
+      same way it would be unreachable by the only people who need it — which
+      is the loop it exists to break, and it would have looked fine in every
+      screenshot.
+    */
+    const user = userEvent.setup();
+    const view = await render(<SignInScreen />);
+
+    await user.type(view.getByPlaceholderText('Email'), 'owner@example.test');
+    await user.press(view.getByText('Forgot your password?'));
+
+    expect(mockResetPassword).toHaveBeenCalledTimes(1);
+    expect(view.getByPlaceholderText('Password').props.value).toBe('');
+  });
+
+  it('never says whether the address has an account', async () => {
+    /*
+      The one assertion in this block that is about security rather than
+      behaviour. Supabase answers identically for a known and an unknown
+      address; if this screen ever starts distinguishing them, anyone who
+      downloads the app can enumerate CrewChief's users.
+    */
+    const user = userEvent.setup();
+    const view = await render(<SignInScreen />);
+
+    await user.type(view.getByPlaceholderText('Email'), 'stranger@example.test');
+    await user.press(view.getByText('Forgot your password?'));
+
+    const notice = await view.findByText(/reset link is on its way/i);
+    expect(notice).toBeTruthy();
+    // "If that address has an account" — conditional, never a confirmation.
+    expect(notice.props.children).toMatch(/^if /i);
+    expect(notice.props.children).not.toMatch(/we (sent|found)|your account|that account/i);
+  });
+
+  it('says what to do when the field is empty rather than sending nothing', async () => {
+    const user = userEvent.setup();
+    mockResetPassword.mockResolvedValue({
+      ok: false,
+      error: 'Enter your email address first.',
+    });
+
+    const view = await render(<SignInScreen />);
+    await user.press(view.getByText('Forgot your password?'));
+
+    expect(await view.findByText('Enter your email address first.')).toBeTruthy();
   });
 });

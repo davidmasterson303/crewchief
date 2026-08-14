@@ -31,8 +31,25 @@ import { StyleSheet, Text } from 'react-native';
  * styles, far more truthfully. Neither is a superset of the other.
  */
 
-/** Every CrewChief screen renders on this. */
-export const SCREEN_BACKGROUND = '#080808';
+/**
+ * Every CrewChief screen renders on this.
+ *
+ * ⚠ **Moved from `#080808` to `#100F0D` on 14 Aug** with the v8 token layer.
+ * The old value was a flat neutral black this app invented; `surface.page` is
+ * the warm graphite web has always used, and the two clients looking like two
+ * products was largely this one literal, repeated 27 times.
+ *
+ * **It is lighter**, so every light-on-dark ratio measured here got slightly
+ * *worse* — this constant is the backdrop the whole suite composites against,
+ * so a stale value here would report ratios the app never renders. Changing it
+ * is the point: anything that fails now was already failing on the device.
+ *
+ * Not imported from `../theme` on purpose. A harness that reads the value it is
+ * checking cannot detect the value being wrong — it would agree with any drift.
+ * These two must be kept equal by hand, and `theme-backdrop.test.ts` fails if
+ * they are not.
+ */
+export const SCREEN_BACKGROUND = '#100F0D';
 
 /**
  * WCAG 2.1 AA. Large text — 18pt, or 14pt bold — may use 3:1.

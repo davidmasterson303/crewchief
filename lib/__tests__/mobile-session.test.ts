@@ -67,6 +67,25 @@ jest.mock('../../apps/mobile/src/auth/supabase', () => ({ supabase: { auth } }),
   virtual: true,
 });
 
+/*
+  `session.ts` reads the deployment's base URL from `config.ts` to build the
+  password-reset link. `config.ts` imports `expo-constants`, which ships as ESM
+  and is not in this project's `transformIgnorePatterns` — so without this the
+  suite dies at parse time with "Cannot use import statement outside a module",
+  before a single assertion runs.
+
+  Stubbed rather than transformed, deliberately. What this file tests is what
+  `session.ts` *does*; where the URL comes from is `config.ts`'s job and
+  `mobile-api-client.test.ts` already covers it. Widening the web suite's
+  transform to reach into `apps/mobile/node_modules` would slow every run here
+  to fix one import.
+*/
+jest.mock(
+  '../../apps/mobile/src/config',
+  () => ({ API_BASE_URL: 'https://example.test', API_PREFIX: '/api/v1' }),
+  { virtual: true }
+);
+
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const {
   signIn,

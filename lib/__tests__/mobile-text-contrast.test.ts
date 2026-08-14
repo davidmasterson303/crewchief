@@ -39,9 +39,14 @@
  * ── The floor is the same number, deliberately ─────────────────────────────
  *
  * The web guard's `FLOOR = 50` means `text-white/50`. Measured against this
- * app's `#080808` background, an alpha of **0.50 is 5.32:1** and **0.45 is
- * 4.48:1** — so `/50` is not a round number someone liked, it is the first step
- * that clears 4.5:1. The phone uses the same background and therefore the same
+ * app's `surface.page` background, an alpha of **0.50 is 5.34:1** and **0.40 is
+ * 3.81:1** — so `/50` is not a round number someone liked, it is the step that
+ * clears 4.5:1 with the next one down failing.
+ *
+ * ⚠ Those figures moved on 14 Aug with the page. On the old `#080808` the pair
+ * quoted here was 0.50 = 5.32:1 and 0.45 = 4.48:1; the warm graphite is
+ * lighter, so 0.45 now composites to 4.53 and clears the floor. The floor did
+ * not move — the backdrop did, and 40% is now the first step below it. The phone uses the same background and therefore the same
  * floor, and a client that quietly ran a laxer rule would be the drift the
  * shared-package work exists to prevent.
  */
@@ -49,10 +54,23 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { surface, text as textTokens } from '../../apps/mobile/src/theme';
+
 const MOBILE_SRC = join(__dirname, '..', '..', 'apps', 'mobile', 'src');
 
-/** Every screen in this app renders on `#080808`. */
-const BACKGROUND = 8;
+/**
+ * Every screen in this app renders on `surface.page`.
+ *
+ * ⚠ **Read from the theme, and no longer a single grey channel.** This was the
+ * number `8` — the grey of `#080808` — with `contrastAgainstBackground` doing
+ * grey-on-grey arithmetic. The v8 page is `#100F0D`, a warm graphite whose
+ * three channels differ, so the old shortcut would have quietly reported the
+ * wrong ratio for every site on every screen.
+ */
+const BACKGROUND: [number, number, number] = (() => {
+  const [r, g, b] = (surface.page.replace('#', '').match(/../g) ?? []).map((h) => parseInt(h, 16));
+  return [r, g, b];
+})();
 
 /** WCAG 2.1 AA, normal-size text. */
 const AA_NORMAL = 4.5;
@@ -77,13 +95,45 @@ function channelLuminance(value: number): number {
   return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
 }
 
-/** Grey-on-grey only, which is every text colour in this app that uses alpha. */
+function relativeLuminance([r, g, b]: [number, number, number]): number {
+  return (
+    0.2126 * channelLuminance(r) + 0.7152 * channelLuminance(g) + 0.0722 * channelLuminance(b)
+  );
+}
+
+/** White text at `alpha`, composited over the page and measured in full RGB. */
 function contrastAgainstBackground(alpha: number): number {
-  const composited = alpha * 255 + (1 - alpha) * BACKGROUND;
-  const text = channelLuminance(composited);
-  const background = channelLuminance(BACKGROUND);
-  const [lighter, darker] = text > background ? [text, background] : [background, text];
+  const composited = BACKGROUND.map((c) => alpha * 255 + (1 - alpha) * c) as [
+    number,
+    number,
+    number,
+  ];
+  const ink = relativeLuminance(composited);
+  const background = relativeLuminance(BACKGROUND);
+  const [lighter, darker] = ink > background ? [ink, background] : [background, ink];
   return (lighter + 0.05) / (darker + 0.05);
+}
+
+/**
+ * Resolve `text.<name>` to the alpha it stands for, or `null`.
+ *
+ * ── Why this had to be added ────────────────────────────────────────────────
+ *
+ * This scanner only ever understood literals. The moment the token layer landed
+ * and the last `rgba()` left the screens, it matched nothing — and its own
+ * anti-vacuous guard caught that, which is the only reason it was noticed. "Has
+ * no text below the floor" was still passing, on an empty scan.
+ *
+ * Only white-alpha tokens are resolvable to an alpha, which is exactly the
+ * scope this suite always had: opaque tokens (`text.primary`, `text.disabled`)
+ * were never in range, the first because it is far above the floor and the
+ * second because WCAG 1.4.3 exempts it.
+ */
+function alphaOfToken(name: string): number | null {
+  const value = (textTokens as Record<string, string>)[name];
+  if (!value) return null;
+  const match = /^rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*([\d.]+)\s*\)$/.exec(value);
+  return match ? Number(match[1]) : null;
 }
 
 function sourceFiles(dir: string, acc: string[] = []): string[] {
@@ -112,16 +162,17 @@ interface Site {
  */
 function subFloorSites(): Site[] {
   const pattern =
-    /(\w+)\s*:\s*\{[^}]*?\bcolor:\s*'rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*([\d.]+)\s*\)'/g;
+    /(\w+)\s*:\s*\{[^}]*?\bcolor:\s*(?:'rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*([\d.]+)\s*\)'|text\.(\w+))/g;
 
   const found: Site[] = [];
   for (const file of sourceFiles(MOBILE_SRC)) {
     const source = readFileSync(file, 'utf8');
     for (const match of Array.from(source.matchAll(pattern))) {
-      const [, style, rawAlpha] = match;
+      const [, style, rawAlpha, token] = match;
       if (EXEMPT[style]) continue;
 
-      const alpha = Number(rawAlpha);
+      const alpha = token ? alphaOfToken(token) : Number(rawAlpha);
+      if (alpha === null) continue;
       const ratio = contrastAgainstBackground(alpha);
       if (ratio < AA_NORMAL) {
         found.push({ file: file.slice(MOBILE_SRC.length + 1), style, alpha, ratio });
@@ -137,9 +188,14 @@ describe('mobile text contrast', () => {
     // assertion below pass vacuously forever — which is precisely how the web
     // suite's blind spot went unnoticed for four days.
     const anyColour = sourceFiles(MOBILE_SRC).some((file) =>
-      /\bcolor:\s*'rgba\(/.test(readFileSync(file, 'utf8'))
+      /\bcolor:\s*(?:'rgba\(|text\.)/.test(readFileSync(file, 'utf8'))
     );
     expect(anyColour).toBe(true);
+
+    // And that the resolver actually resolves, rather than returning null for
+    // everything and reducing this suite to a very slow no-op.
+    expect(alphaOfToken('muted')).toBe(0.5);
+    expect(alphaOfToken('primary')).toBeNull();
   });
 
   it('has no text below the AA floor', () => {
@@ -152,7 +208,10 @@ describe('mobile text contrast', () => {
     // The web suite's FLOOR = 50 and this file's 4.5:1 have to keep meaning the
     // same thing. If either moves, this is the assertion that notices.
     expect(contrastAgainstBackground(0.5)).toBeGreaterThanOrEqual(AA_NORMAL);
-    expect(contrastAgainstBackground(0.45)).toBeLessThan(AA_NORMAL);
+    // 40%, not 45% — `text.nonText`, the hairline token that must never carry
+    // a word. On this backdrop 45% clears the floor and is no longer a probe
+    // for anything.
+    expect(contrastAgainstBackground(0.4)).toBeLessThan(AA_NORMAL);
   });
 
   it('documents a reason for every exemption', () => {

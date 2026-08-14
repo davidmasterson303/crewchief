@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Linking,
   Modal,
   Pressable,
   ScrollView,
@@ -10,8 +11,11 @@ import {
   View,
 } from 'react-native';
 
+import { API_BASE_URL } from '../config';
+
 import { deleteAccount, getSubscription } from '../api/account';
 import { ApiRequestError } from '../api/client';
+import { border, brand, status, surface, text } from '../theme';
 import {
   DELETION_CONFIRM_PHRASE,
   DELETION_INVENTORY,
@@ -156,6 +160,40 @@ export function AccountScreen({
             <Text style={styles.actionText}>Sign out</Text>
           </Pressable>
 
+          {/*
+            ── Why these are in the binary rather than only on the website ────
+
+            Guideline 3.1.2 requires an app selling auto-renewable subscriptions
+            to carry functional links to both documents. Neither existed
+            anywhere in this product until 14 Aug — not missing links, missing
+            pages — so this is the half that makes them reachable.
+
+            Above the delete section on purpose. Somebody reading the account
+            screen to work out what happens to their data should meet the policy
+            *before* the irreversible control, not after it.
+          */}
+          <View style={styles.legal}>
+            <Text style={styles.label}>Legal</Text>
+            <Pressable
+              onPress={() => void Linking.openURL(`${API_BASE_URL}/privacy`)}
+              disabled={deleting}
+              accessibilityRole="link"
+              accessibilityLabel="Privacy Policy, opens in your browser"
+              style={styles.legalRow}
+            >
+              <Text style={styles.legalText}>Privacy Policy</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => void Linking.openURL(`${API_BASE_URL}/terms`)}
+              disabled={deleting}
+              accessibilityRole="link"
+              accessibilityLabel="Terms of Use, opens in your browser"
+              style={styles.legalRow}
+            >
+              <Text style={styles.legalText}>Terms of Use</Text>
+            </Pressable>
+          </View>
+
           <View style={styles.danger}>
             <Text style={styles.dangerTitle}>Delete account</Text>
 
@@ -188,7 +226,7 @@ export function AccountScreen({
               value={confirmText}
               onChangeText={setConfirmText}
               placeholder={DELETION_CONFIRM_PHRASE}
-              placeholderTextColor="rgba(255,255,255,0.25)"
+              placeholderTextColor={text.muted}
               autoCapitalize="characters"
               autoCorrect={false}
               editable={!deleting}
@@ -213,7 +251,7 @@ export function AccountScreen({
               ]}
             >
               {deleting ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={text.primary} />
               ) : (
                 <Text style={styles.deleteButtonText}>Delete my account</Text>
               )}
@@ -226,7 +264,7 @@ export function AccountScreen({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#080808' },
+  root: { flex: 1, backgroundColor: surface.page },
   bar: {
     paddingTop: 64,
     paddingHorizontal: 20,
@@ -235,42 +273,51 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
+    borderBottomColor: border.field,
   },
-  title: { color: '#fff', fontSize: 22, fontWeight: '700' },
-  close: { color: '#22d3ee', fontSize: 16, minHeight: 44, lineHeight: 44 },
-  disabledText: { color: 'rgba(255,255,255,0.25)' },
+  title: { color: text.primary, fontSize: 22, fontWeight: '700' },
+  close: { color: brand.accent, fontSize: 16, minHeight: 44, lineHeight: 44 },
+  disabledText: { color: text.disabled },
 
   body: { padding: 20, gap: 24 },
   section: { gap: 4 },
   label: {
-    color: 'rgba(255,255,255,0.5)',
+    color: text.muted,
     fontSize: 12,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
-  value: { color: '#fff', fontSize: 16 },
+  value: { color: text.primary, fontSize: 16 },
 
   action: {
     minHeight: 52,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: border.field,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  actionPressed: { backgroundColor: 'rgba(255,255,255,0.06)' },
-  actionText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  actionPressed: { backgroundColor: surface.raised },
+  actionText: { color: text.primary, fontSize: 16, fontWeight: '600' },
+
+  legal: { gap: 4 },
+  /*
+    44pt minimum, because these are the two rows most likely to be tapped by
+    someone holding the phone one-handed in a car park while deciding whether
+    to trust the thing with a photograph of their driveway.
+  */
+  legalRow: { minHeight: 44, justifyContent: 'center' },
+  legalText: { color: text.secondary, fontSize: 15 },
 
   danger: {
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(248,113,113,0.3)',
-    backgroundColor: 'rgba(248,113,113,0.06)',
+    borderColor: status.dangerWashBorder,
+    backgroundColor: status.dangerWash,
     padding: 18,
     gap: 10,
   },
-  dangerTitle: { color: '#fca5a5', fontSize: 17, fontWeight: '700' },
+  dangerTitle: { color: status.dangerText, fontSize: 17, fontWeight: '700' },
 
   /*
     E5's subscription warning. An amber panel rather than the surrounding red:
@@ -286,41 +333,41 @@ const styles = StyleSheet.create({
   notice: {
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(251,191,36,0.35)',
-    backgroundColor: 'rgba(251,191,36,0.08)',
+    borderColor: status.attentionWashBorder,
+    backgroundColor: status.attentionWash,
     padding: 14,
     gap: 6,
   },
-  noticeHeadline: { color: '#fcd34d', fontSize: 14, fontWeight: '700', lineHeight: 20 },
-  noticeBody: { color: '#fde9b8', fontSize: 13, lineHeight: 19 },
-  dangerBody: { color: 'rgba(255,255,255,0.6)', fontSize: 14, lineHeight: 20 },
-  inventoryItem: { color: 'rgba(255,255,255,0.5)', fontSize: 13, lineHeight: 19 },
+  noticeHeadline: { color: status.attention, fontSize: 14, fontWeight: '700', lineHeight: 20 },
+  noticeBody: { color: status.attention, fontSize: 13, lineHeight: 19 },
+  dangerBody: { color: text.secondary, fontSize: 14, lineHeight: 20 },
+  inventoryItem: { color: text.muted, fontSize: 13, lineHeight: 19 },
 
-  confirmLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 13, marginTop: 6 },
+  confirmLabel: { color: text.secondary, fontSize: 13, marginTop: 6 },
   input: {
     minHeight: 48,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    color: '#fff',
+    borderColor: border.fieldHover,
+    backgroundColor: status.scrim,
+    color: text.primary,
     // 16px so iOS does not zoom the page on focus — the same rule R2 enforces
     // on the web, and the same reason.
     fontSize: 16,
     paddingHorizontal: 14,
     letterSpacing: 2,
   },
-  error: { color: '#fca5a5', fontSize: 13 },
+  error: { color: status.dangerText, fontSize: 13 },
 
   deleteButton: {
     minHeight: 50,
     borderRadius: 12,
-    backgroundColor: '#dc2626',
+    backgroundColor: status.danger,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 4,
   },
-  deleteButtonDisabled: { backgroundColor: 'rgba(220,38,38,0.35)' },
-  deleteButtonPressed: { backgroundColor: '#b91c1c' },
-  deleteButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  deleteButtonDisabled: { backgroundColor: surface.disabled },
+  deleteButtonPressed: { backgroundColor: status.dangerPressed },
+  deleteButtonText: { color: text.primary, fontSize: 16, fontWeight: '700' },
 });

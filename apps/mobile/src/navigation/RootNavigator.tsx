@@ -21,6 +21,7 @@ import { pickInvoiceImage } from '../media/pick-invoice-image';
 import { GarageScreen } from '../screens/GarageScreen';
 import { AddVehicleScreen } from '../screens/AddVehicleScreen';
 import { VehicleDetailScreen } from '../screens/VehicleDetailScreen';
+import { surface, text } from '../theme';
 
 /**
  * The signed-in stack. Phase 3 task 3.5, pulled forward.
@@ -230,10 +231,10 @@ const linking: LinkingOptions<RootStackParamList> = {
 const UNTITLED = 'Vehicle';
 
 const screenOptions = {
-  headerStyle: { backgroundColor: '#080808' },
-  headerTintColor: '#ffffff',
-  headerTitleStyle: { color: '#ffffff' },
-  contentStyle: { backgroundColor: '#080808' },
+  headerStyle: { backgroundColor: surface.page },
+  headerTintColor: text.primary,
+  headerTitleStyle: { color: text.primary },
+  contentStyle: { backgroundColor: surface.page },
 } as const;
 
 export function RootNavigator({

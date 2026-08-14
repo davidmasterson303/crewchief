@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   StyleSheet,
@@ -10,10 +11,12 @@ import {
   View,
 } from 'react-native';
 
+import { API_BASE_URL } from '../config';
 import Logo from '../components/Logo';
-import { signIn, signUp } from '../auth/session';
+import { resetPassword, signIn, signUp } from '../auth/session';
 import { hasDevCredentials, signInWithDevCredentials } from '../auth/dev-session';
 import { checkSharedCore } from '../core-check';
+import { border, build, status, surface, text } from '../theme';
 
 /**
  * Sign in.
@@ -77,6 +80,33 @@ export function SignInScreen() {
     }
   }
 
+  /*
+    Deliberately gated on the email field rather than on `canSubmit`: a reset
+    needs an address and nothing else, and requiring a password to recover a
+    forgotten password is the loop this control exists to break.
+  */
+  async function handleReset() {
+    if (busy) return;
+
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+
+    const result = await resetPassword(email);
+    setBusy(false);
+
+    if (!result.ok) {
+      setError(result.error ?? 'Could not send the reset email.');
+      return;
+    }
+
+    /*
+      "Sent", never "found" — Supabase answers identically for an address with
+      no account, and so does this.
+    */
+    setNotice('If that address has an account, a reset link is on its way.');
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -96,7 +126,7 @@ export function SignInScreen() {
           value={email}
           onChangeText={setEmail}
           placeholder="Email"
-          placeholderTextColor="rgba(255,255,255,0.3)"
+          placeholderTextColor={text.muted}
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="email-address"
@@ -116,7 +146,7 @@ export function SignInScreen() {
           value={password}
           onChangeText={setPassword}
           placeholder="Password"
-          placeholderTextColor="rgba(255,255,255,0.3)"
+          placeholderTextColor={text.muted}
           secureTextEntry
           autoCapitalize="none"
           /*
@@ -149,11 +179,62 @@ export function SignInScreen() {
           accessibilityState={{ disabled: !canSubmit, busy }}
         >
           {busy ? (
-            <ActivityIndicator color="#080808" />
+            <ActivityIndicator color={text.onInverse} />
           ) : (
             <Text style={styles.buttonText}>{isNew ? 'Create account' : 'Sign in'}</Text>
           )}
         </Pressable>
+
+        {/*
+          Shown while creating an account, which is the moment consent is
+          actually given. Apple's 3.1.2 wants these reachable in the binary;
+          putting them at the point of agreement rather than only in the
+          account screen is what makes the sentence true rather than merely
+          compliant.
+        */}
+        {isNew ? (
+          <View style={styles.consent}>
+            <Text style={styles.consentText}>
+              By creating an account you agree to the{' '}
+              <Text
+                style={styles.consentLink}
+                accessibilityRole="link"
+                accessibilityLabel="Terms of Use, opens in your browser"
+                onPress={() => void Linking.openURL(`${API_BASE_URL}/terms`)}
+              >
+                Terms of Use
+              </Text>{' '}
+              and{' '}
+              <Text
+                style={styles.consentLink}
+                accessibilityRole="link"
+                accessibilityLabel="Privacy Policy, opens in your browser"
+                onPress={() => void Linking.openURL(`${API_BASE_URL}/privacy`)}
+              >
+                Privacy Policy
+              </Text>
+              .
+            </Text>
+          </View>
+        ) : null}
+
+        {/*
+          Sign-in only. On the create-account form there is no password to have
+          forgotten, and offering to reset one for an address that may not have
+          an account yet is a question the screen cannot answer without becoming
+          an account-existence oracle — see `resetPassword`.
+        */}
+        {!isNew ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Email me a reset link"
+            onPress={handleReset}
+            disabled={busy}
+            style={styles.switchMode}
+          >
+            <Text style={styles.switchModeText}>Forgot your password?</Text>
+          </Pressable>
+        ) : null}
 
         <Pressable
           accessibilityRole="button"
@@ -293,23 +374,23 @@ function DevCoreCheck() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#080808', justifyContent: 'center' },
+  container: { flex: 1, backgroundColor: surface.page, justifyContent: 'center' },
   form: { padding: 28, gap: 14 },
   lockup: { alignItems: 'flex-start', marginBottom: 4 },
-  subtitle: { color: 'rgba(255,255,255,0.5)', fontSize: 15, marginBottom: 14 },
+  subtitle: { color: text.muted, fontSize: 15, marginBottom: 14 },
   input: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: surface.raised,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: border.field,
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 14,
-    color: '#fff',
+    color: text.primary,
     fontSize: 16,
   },
-  error: { color: '#f87171', fontSize: 13 },
+  error: { color: status.dangerText, fontSize: 13 },
   button: {
-    backgroundColor: '#fff',
+    backgroundColor: surface.inverse,
     borderRadius: 10,
     paddingVertical: 15,
     alignItems: 'center',
@@ -326,19 +407,34 @@ const styles = StyleSheet.create({
     colour literals and sees none here, and no test mounts this screen at all.
     A render test now does.
   */
-  buttonDisabled: { backgroundColor: '#b8b8b8' },
-  notice: { color: '#7dd3a0', fontSize: 13, lineHeight: 18 },
+  buttonDisabled: { backgroundColor: surface.inverseDisabled },
+  notice: { color: status.confirm, fontSize: 13, lineHeight: 18 },
   switchMode: { minHeight: 44, justifyContent: 'center', alignItems: 'center' },
-  switchModeText: { color: 'rgba(255,255,255,0.7)', fontSize: 14 },
-  buttonText: { color: '#080808', fontSize: 16, fontWeight: '600' },
+  switchModeText: { color: text.secondary, fontSize: 14 },
+
+  consent: { paddingTop: 4 },
+  consentText: {
+    color: text.secondary,
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: 'center',
+  },
+  /*
+    Brighter than the sentence around it so the two tappable spans read as
+    controls. They are nested `<Text>` rather than separate Pressables so the
+    line wraps as one sentence — a link that breaks onto its own row reads as a
+    button and changes what the sentence appears to say.
+  */
+  consentLink: { color: text.primary, textDecorationLine: 'underline' },
+  buttonText: { color: text.onInverse, fontSize: 16, fontWeight: '600' },
 
   devCheck: { marginTop: 18, gap: 4 },
   /*
     Quiet when it passes — it is a diagnostic sitting under a product screen and
     should not compete with the sign-in button. #4ade80 and #f87171 both clear
-    the AA floor on #080808 that `78eba74` made a rule.
+    the AA floor on `surface.page` that `78eba74` made a rule.
   */
-  devCheckOk: { color: 'rgba(255,255,255,0.5)', fontSize: 12, textAlign: 'center' },
-  devCheckFail: { color: '#f87171', fontSize: 13, fontWeight: '700', textAlign: 'center' },
-  devCheckDetail: { color: '#f87171', fontSize: 11, textAlign: 'center' },
+  devCheckOk: { color: text.muted, fontSize: 12, textAlign: 'center' },
+  devCheckFail: { color: status.dangerText, fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  devCheckDetail: { color: status.dangerText, fontSize: 11, textAlign: 'center' },
 });

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { border, brand, status, surface, text } from '../theme';
 
 import {
   completionProblems,
@@ -120,7 +121,7 @@ export function MarkDoneSheet({
                 value={draft.shopName}
                 onChangeText={(shopName) => set({ shopName })}
                 placeholder="Who did it"
-                placeholderTextColor="#7A7A7A"
+                placeholderTextColor={text.muted}
                 accessibilityLabel="Shop name"
                 autoCapitalize="words"
               />
@@ -145,7 +146,7 @@ export function MarkDoneSheet({
               value={draft.serviceDate}
               onChangeText={(serviceDate) => set({ serviceDate })}
               placeholder="YYYY-MM-DD"
-              placeholderTextColor="#7A7A7A"
+              placeholderTextColor={text.muted}
               accessibilityLabel="Service date"
               autoCapitalize="none"
               autoCorrect={false}
@@ -165,7 +166,7 @@ export function MarkDoneSheet({
                   value={draft.partsCost}
                   onChangeText={(partsCost) => set({ partsCost })}
                   placeholder="—"
-                  placeholderTextColor="#7A7A7A"
+                  placeholderTextColor={text.muted}
                   accessibilityLabel="Parts cost"
                   keyboardType="decimal-pad"
                 />
@@ -178,7 +179,7 @@ export function MarkDoneSheet({
                   value={draft.laborCost}
                   onChangeText={(laborCost) => set({ laborCost })}
                   placeholder="—"
-                  placeholderTextColor="#7A7A7A"
+                  placeholderTextColor={text.muted}
                   accessibilityLabel="Labour cost"
                   keyboardType="decimal-pad"
                 />
@@ -250,13 +251,13 @@ function Choice({ label, on, onPress }: { label: string; on: boolean; onPress: (
 }
 
 /*
-  Opaque colours throughout, measured against `#080808`.
+  Opaque colours throughout, measured against `surface.page`.
   `mobile-text-contrast.test.ts` composites opacity into its 4.5:1 check, and a
   translucent label on a form that writes permanent history is exactly what it
   exists to catch.
 */
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#080808' },
+  root: { flex: 1, backgroundColor: surface.page },
 
   bar: {
     paddingTop: 64,
@@ -266,34 +267,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  barTitle: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
-  barAction: { color: '#E6E6E6', fontSize: 16, minWidth: 64 },
+  barTitle: { color: text.primary, fontSize: 17, fontWeight: '700' },
+  barAction: { color: text.secondary, fontSize: 16, minWidth: 64 },
   barSpacer: { minWidth: 64 },
-  dim: { color: '#8F8F8F' },
+  dim: { color: text.muted },
 
   body: { paddingHorizontal: 20, paddingBottom: 32, gap: 20 },
-  item: { color: '#FFFFFF', fontSize: 20, fontWeight: '700', lineHeight: 26 },
+  item: { color: text.primary, fontSize: 20, fontWeight: '700', lineHeight: 26 },
 
   field: { gap: 8 },
   labelRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
-  label: { color: '#E6E6E6', fontSize: 14, fontWeight: '600' },
-  hint: { color: '#9A9A9A', fontSize: 12 },
-  problem: { color: '#F2A3A3', fontSize: 13, lineHeight: 18 },
+  label: { color: text.secondary, fontSize: 14, fontWeight: '600' },
+  hint: { color: text.muted, fontSize: 12 },
+  problem: { color: status.dangerText, fontSize: 13, lineHeight: 18 },
 
   input: {
-    backgroundColor: '#161616',
+    backgroundColor: surface.raised,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#2C2C2C',
+    borderColor: border.field,
     paddingHorizontal: 14,
     // 16px is the system floor for a focusable input, adopted as a rule rather
     // than as a browser workaround — see RB0.
     fontSize: 16,
-    color: '#FFFFFF',
+    color: text.primary,
     minHeight: 48,
   },
   inputTight: { marginTop: 8 },
-  inputBad: { borderColor: '#8C4B4B' },
+  inputBad: { borderColor: status.dangerBorder },
 
   chipRow: { flexDirection: 'row', gap: 8 },
   choice: {
@@ -301,31 +302,31 @@ const styles = StyleSheet.create({
     minHeight: 48,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#2C2C2C',
+    borderColor: border.field,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  choiceOn: { backgroundColor: '#0E7490', borderColor: '#0E7490' },
-  choiceText: { color: '#E6E6E6', fontSize: 15, fontWeight: '600' },
+  choiceOn: { backgroundColor: brand.primary, borderColor: brand.primary },
+  choiceText: { color: text.secondary, fontSize: 15, fontWeight: '600' },
   // The v8 paired primary — #0E7490 with light ink measures 5.10:1. The pair
   // moves together; dark ink on this fill is 3.39:1 and fails.
-  choiceTextOn: { color: '#F2FBFD' },
+  choiceTextOn: { color: text.onPrimary },
 
   costRow: { flexDirection: 'row', gap: 12 },
   costCell: { flex: 1 },
 
-  consequence: { color: '#B8B8B8', fontSize: 13, lineHeight: 19 },
+  consequence: { color: text.muted, fontSize: 13, lineHeight: 19 },
 
   footer: { paddingHorizontal: 20, paddingBottom: 40, paddingTop: 8 },
   cta: {
     minHeight: 52,
     borderRadius: 14,
-    backgroundColor: '#0E7490',
+    backgroundColor: brand.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   // An explicit fill rather than `opacity`, so the contrast audit can see it —
   // a parent alpha never reaches the comparison.
-  ctaOff: { backgroundColor: '#4A4A4A' },
-  ctaText: { color: '#F2FBFD', fontSize: 16, fontWeight: '700' },
+  ctaOff: { backgroundColor: surface.disabled },
+  ctaText: { color: text.onPrimary, fontSize: 16, fontWeight: '700' },
 });

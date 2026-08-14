@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 
 import { apiRequest, ApiRequestError } from '../api/client';
+import { status, surface, text } from '../theme';
 import {
   hasRemedy,
   normaliseRecalls,
@@ -144,7 +145,7 @@ export function RecallDetailScreen({ vehicleId, title, onAskAdvisor, onSignOut }
   if (state.kind === 'loading') {
     return (
       <View style={styles.centre}>
-        <ActivityIndicator color="rgba(255,255,255,0.6)" />
+        <ActivityIndicator color={text.secondary} />
       </View>
     );
   }
@@ -180,7 +181,7 @@ export function RecallDetailScreen({ vehicleId, title, onAskAdvisor, onSignOut }
         <RefreshControl
           refreshing={refreshing}
           onRefresh={() => void load(true)}
-          tintColor="rgba(255,255,255,0.5)"
+          tintColor={text.muted}
         />
       }
     >
@@ -284,8 +285,8 @@ const styles = StyleSheet.create({
   body: { padding: 20, gap: 16, paddingBottom: 40 },
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 10 },
 
-  name: { color: '#fff', fontSize: 24, fontWeight: '700', letterSpacing: -0.5 },
-  count: { color: 'rgba(255,255,255,0.5)', fontSize: 14, marginTop: -10 },
+  name: { color: text.primary, fontSize: 24, fontWeight: '700', letterSpacing: -0.5 },
+  count: { color: text.muted, fontSize: 14, marginTop: -10 },
 
   banner: { borderRadius: 14, padding: 16, gap: 6, borderWidth: 1 },
   /*
@@ -294,59 +295,59 @@ const styles = StyleSheet.create({
     unknown backdrop is exactly where the 4.47:1 contrast defect came from on
     the advisor CTA. Both are measured in `mobile-text-contrast`.
   */
-  bannerSevere: { backgroundColor: '#4a0f0f', borderColor: '#7f1d1d' },
-  bannerWarn: { backgroundColor: '#4a3308', borderColor: '#854d0e' },
-  bannerTitle: { color: '#fff', fontSize: 17, fontWeight: '700', letterSpacing: -0.2 },
-  bannerBody: { color: 'rgba(255,255,255,0.85)', fontSize: 14, lineHeight: 20 },
+  bannerSevere: { backgroundColor: status.criticalFill, borderColor: status.criticalBorder },
+  bannerWarn: { backgroundColor: status.attentionFill, borderColor: status.attentionBorder },
+  bannerTitle: { color: text.primary, fontSize: 17, fontWeight: '700', letterSpacing: -0.2 },
+  bannerBody: { color: text.secondary, fontSize: 14, lineHeight: 20 },
 
   card: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: surface.raised,
     borderRadius: 14,
     padding: 16,
     gap: 10,
   },
   component: {
-    color: '#e0a468',
+    color: status.attention,
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 0.6,
   },
-  summary: { color: '#fff', fontSize: 15, lineHeight: 21 },
+  summary: { color: text.primary, fontSize: 15, lineHeight: 21 },
 
   section: { gap: 4 },
   sectionLabel: {
-    color: 'rgba(255,255,255,0.5)',
+    color: text.muted,
     fontSize: 12,
     fontWeight: '600',
     letterSpacing: 0.4,
   },
-  body14: { color: 'rgba(255,255,255,0.7)', fontSize: 14, lineHeight: 20 },
+  body14: { color: text.secondary, fontSize: 14, lineHeight: 20 },
 
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  meta: { color: 'rgba(255,255,255,0.5)', fontSize: 12 },
+  meta: { color: text.muted, fontSize: 12 },
 
   askCta: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: surface.raised,
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: 'center',
     minHeight: 44,
     justifyContent: 'center',
   },
-  askCtaText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  askCtaText: { color: text.primary, fontSize: 14, fontWeight: '600' },
 
-  footnote: { color: 'rgba(255,255,255,0.5)', fontSize: 12, lineHeight: 18 },
+  footnote: { color: text.muted, fontSize: 12, lineHeight: 18 },
 
-  errorTitle: { color: '#fff', fontSize: 17, fontWeight: '600' },
-  errorBody: { color: 'rgba(255,255,255,0.5)', fontSize: 14, textAlign: 'center' },
+  errorTitle: { color: text.primary, fontSize: 17, fontWeight: '600' },
+  errorBody: { color: text.muted, fontSize: 14, textAlign: 'center' },
   button: {
     marginTop: 6,
     paddingHorizontal: 18,
     paddingVertical: 12,
     borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: surface.raised,
     minHeight: 44,
     justifyContent: 'center',
   },
-  buttonText: { color: '#fff', fontSize: 14 },
+  buttonText: { color: text.primary, fontSize: 14 },
 });

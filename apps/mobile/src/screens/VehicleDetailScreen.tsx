@@ -10,6 +10,12 @@ import {
 } from 'react-native';
 
 import { apiRequest, ApiRequestError } from '../api/client';
+import AlertBanner from '../components/AlertBanner';
+import Button from '../components/Button';
+import Card from '../components/Card';
+import ListRow from '../components/ListRow';
+import SectionHeader from '../components/SectionHeader';
+import { border, radius, space, status, surface, text, type } from '../theme';
 import { getHealthBandJudgement, healthBandHex } from '@crewchief/core/health-band';
 
 /**
@@ -181,7 +187,7 @@ export function VehicleDetailScreen({
   if (state.status === 'loading') {
     return (
       <View style={styles.centred}>
-        <ActivityIndicator color="rgba(255,255,255,0.5)" />
+        <ActivityIndicator color={text.muted} />
       </View>
     );
   }
@@ -193,9 +199,12 @@ export function VehicleDetailScreen({
         <Text style={styles.errorBody}>
           It may have been removed from another device.
         </Text>
-        <Pressable style={styles.button} onPress={onBack}>
-          <Text style={styles.buttonText}>Back to garage</Text>
-        </Pressable>
+        <Button
+          label="Back to garage"
+          variant="outline"
+          onPress={onBack}
+          style={styles.stateAction}
+        />
       </View>
     );
   }
@@ -207,14 +216,12 @@ export function VehicleDetailScreen({
           {state.unauthorized ? 'Your session ended' : 'Could not load this vehicle'}
         </Text>
         <Text style={styles.errorBody}>{state.message}</Text>
-        <Pressable
-          style={styles.button}
+        <Button
+          label={state.unauthorized ? 'Sign in again' : 'Try again'}
+          variant="outline"
           onPress={() => (state.unauthorized ? onSignOut() : void load())}
-        >
-          <Text style={styles.buttonText}>
-            {state.unauthorized ? 'Sign in again' : 'Try again'}
-          </Text>
-        </Pressable>
+          style={styles.stateAction}
+        />
       </View>
     );
   }
@@ -232,7 +239,7 @@ export function VehicleDetailScreen({
         <RefreshControl
           refreshing={refreshing}
           onRefresh={() => void load(true)}
-          tintColor="rgba(255,255,255,0.5)"
+          tintColor={text.muted}
         />
       }
     >
@@ -248,53 +255,31 @@ export function VehicleDetailScreen({
       </View>
 
       {/*
-        Above the health card, not below the details.
+        ── The recall, first and as a banner ──────────────────────────────────
 
-        Guideline 4.2 is answered by what an app *does*, and everything else on
-        this screen is a rendering of stored values. Putting the one verb below
-        two cards of read-only data would bury it under exactly the material
-        that makes the app look like a database viewer. It is also the shortest
-        route to the flow with no other entry point: the garage row leads here,
-        and here leads to the advisor.
+        It was a card at the very bottom of the screen, under five rows of
+        read-only detail. A recall is the one thing here that can be
+        time-critical, and burying it under the mileage inverted the screen's
+        priorities. `AlertBanner` is opaque and measured, which a wash over an
+        unknown backdrop is not.
       */}
-      <Pressable style={styles.advisorCta} onPress={onAskAdvisor} accessibilityRole="button">
-        <Text style={styles.advisorCtaText}>Ask the advisor</Text>
-        <Text style={styles.advisorCtaHint}>
-          It already knows this car's history — no need to explain it
-        </Text>
-      </Pressable>
-
-      {/*
-        Secondary to the advisor, deliberately. Both are native-only verbs that
-        answer guideline 4.2, but the advisor is the one someone opens without
-        already holding a piece of paper.
-      */}
-      <Pressable style={styles.scanCta} onPress={onOpenWishlist} accessibilityRole="button">
-        <Text style={styles.scanCtaText}>Wishlist</Text>
-        <Text style={styles.scanCtaHint}>
-          What this car needs, so the advisor can price it
-        </Text>
-      </Pressable>
-
-      {/*
-        Placed directly under "Scan an invoice" because that is the action that
-        most often produces a row here — the natural next question after
-        filing something is whether it landed.
-      */}
-      <Pressable style={styles.scanCta} onPress={onOpenHistory} accessibilityRole="button">
-        <Text style={styles.scanCtaText}>Service history</Text>
-      </Pressable>
-
-      <Pressable style={styles.scanCta} onPress={onScanInvoice} accessibilityRole="button">
-        <Text style={styles.scanCtaText}>Scan an invoice</Text>
-        <Text style={styles.scanCtaHint}>
-          Photograph a bill and its line items are added here
-        </Text>
-      </Pressable>
+      {recalls > 0 && (
+        <Pressable
+          onPress={onViewRecalls}
+          accessibilityRole="button"
+          accessibilityLabel={`View ${recalls} open ${recalls === 1 ? 'recall' : 'recalls'}`}
+        >
+          <AlertBanner
+            tone="critical"
+            headline={`${recalls} open ${recalls === 1 ? 'recall' : 'recalls'}`}
+            body="What it means, and what to do about it"
+          />
+        </Pressable>
+      )}
 
       {score !== null && band && (
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>Health</Text>
+        <Card>
+          <SectionHeader title="Health" />
           <View style={styles.scoreRow}>
             <Text style={[styles.score, { color: healthBandHex(band) }]}>{score}</Text>
             <Text style={[styles.bandLabel, { color: healthBandHex(band) }]}>
@@ -307,11 +292,11 @@ export function VehicleDetailScreen({
             </Text>
           </View>
           {health?.summary ? <Text style={styles.summary}>{health.summary}</Text> : null}
-        </View>
+        </Card>
       )}
 
-      <View style={styles.card}>
-        <Text style={styles.cardLabel}>Details</Text>
+      <Card>
+        <SectionHeader title="Details" />
         <Row
           label="Mileage"
           value={
@@ -340,26 +325,37 @@ export function VehicleDetailScreen({
           label="Objective"
           value={vehicle.ownership_objective ? humanise(vehicle.ownership_objective) : null}
         />
-      </View>
+      </Card>
 
-      {recalls > 0 && (
-        <Pressable
-          style={styles.card}
-          accessibilityRole="button"
-          accessibilityLabel={`View ${recalls} open ${recalls === 1 ? 'recall' : 'recalls'}`}
-          onPress={onViewRecalls}
-        >
-          <Text style={styles.recall}>
-            {recalls} open {recalls === 1 ? 'recall' : 'recalls'}
-          </Text>
-          {/*
-            5.6 replaced "Recall detail is on the web for now." A notification
-            about a recall that lands on a screen telling you to go and use a
-            different device is not a notification worth sending.
-          */}
-          <Text style={styles.errorBody}>What it means, and what to do about it</Text>
-        </Pressable>
-      )}
+      {/*
+        ── Three destinations, as rows rather than as cards ───────────────────
+
+        These were three full-width bordered cards, each with a title and a
+        hint, stacked above the health summary — four boxes competing to be the
+        thing you press, on a screen whose actual job is to tell you about a
+        car. As rows they read as what they are: places to go.
+      */}
+      <Card>
+        <SectionHeader title="This car" />
+        <ListRow label="Service history" onPress={onOpenHistory} value="" />
+        <ListRow label="Wishlist" detail="What it needs, so the advisor can price it" onPress={onOpenWishlist} value="" />
+        <ListRow label="Scan an invoice" detail="Photograph a bill and its lines are filed here" onPress={onScanInvoice} value="" />
+      </Card>
+
+      {/*
+        ── The one filled primary ─────────────────────────────────────────────
+
+        The advisor is the verb this screen exists to lead to, and it is now the
+        only filled control on it. Everything above is either information or a
+        destination.
+
+        It keeps its place near the bottom rather than the top: the earlier
+        version put it first to answer guideline 4.2, but 4.2 is answered by the
+        app *having* the flow, not by where the button sits — and a primary
+        above the health summary asked the question before showing the reason
+        to ask it.
+      */}
+      <Button label="Ask the advisor" onPress={onAskAdvisor} style={styles.primaryAction} />
     </ScrollView>
   );
 }
@@ -379,93 +375,90 @@ function Row({ label, value }: { label: string; value: string | null }) {
 }
 
 const styles = StyleSheet.create({
-  body: { padding: 20, gap: 14 },
+  body: { padding: space.lg, gap: space.md },
 
   headerBlock: { gap: 2 },
-  name: { color: '#fff', fontSize: 26, fontWeight: '700', letterSpacing: -0.5 },
-  trim: { color: 'rgba(255,255,255,0.5)', fontSize: 14 },
+  name: { ...type.editorial, fontSize: 26, lineHeight: 32, color: text.primary, letterSpacing: -0.5 },
+  trim: { ...type.body, color: text.muted },
 
+  /* The same real surface step the garage cards now use — not a 5% wash. */
   card: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 16,
+    backgroundColor: surface.card,
+    borderRadius: radius.card,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    padding: 16,
-    gap: 10,
+    borderColor: border.panel,
+    padding: space.lg,
+    gap: space.sm,
   },
   cardLabel: {
-    color: 'rgba(255,255,255,0.5)',
+    ...type.label,
     fontSize: 11,
-    fontWeight: '600',
+    color: text.muted,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
   },
 
-  scoreRow: { flexDirection: 'row', alignItems: 'baseline', gap: 10 },
+  scoreRow: { flexDirection: 'row', alignItems: 'baseline', gap: space.sm },
   score: { fontSize: 34, fontWeight: '700', lineHeight: 36 },
   bandLabel: {
+    ...type.label,
     fontSize: 11,
-    fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.6,
   },
-  summary: { color: 'rgba(255,255,255,0.7)', fontSize: 14, lineHeight: 20 },
+  summary: { ...type.body, fontSize: 14, lineHeight: 20, color: text.secondary },
 
-  row: { flexDirection: 'row', justifyContent: 'space-between', gap: 16 },
-  rowLabel: { color: 'rgba(255,255,255,0.5)', fontSize: 14 },
-  rowValue: { color: '#fff', fontSize: 14, flexShrink: 1, textAlign: 'right' },
+  row: { flexDirection: 'row', justifyContent: 'space-between', gap: space.lg },
+  rowLabel: { ...type.body, fontSize: 14, color: text.muted },
+  rowValue: { ...type.body, fontSize: 14, color: text.primary, flexShrink: 1, textAlign: 'right' },
 
-  recall: { color: '#e0a468', fontSize: 15, fontWeight: '600' },
+  recall: { ...type.bodyStrong, color: status.attention },
 
   /*
-    White on #080808 rather than the brand cyan. `bg-cyan-600` measures 3.68:1
-    and is an open decision on the web board — pulling it onto a new surface
-    would spread a known sub-floor colour to a second client while the call is
-    still being made. The hint below is 0.55 white on white: 8.6:1, above the
-    4.5:1 floor `78eba74` made a rule.
+    ⚠ **The colours in the two CTAs below are deliberately NOT tokenised.**
+
+    They are measured values with a history. The white fill was chosen over the
+    brand cyan because `bg-cyan-600` was a known 3.68:1 and an open decision on
+    the web board, and the dark ink sat at 4.47:1 — a hair under the floor —
+    behind a shipped comment that claimed 8.6:1 and had measured white-on-white
+    by mistake. The rendered-contrast suite caught it; 0.60 gives 5.35:1.
+
+    Substituting a token here would re-open a question that cost real time to
+    close, and no source scan can catch it because this is dark text on light.
+    Structure moves onto the system; these four colours do not.
   */
   advisorCta: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    paddingVertical: 15,
-    paddingHorizontal: 16,
+    backgroundColor: surface.inverse,
+    borderRadius: radius.card,
+    paddingVertical: space.lg,
+    paddingHorizontal: space.lg,
     gap: 3,
   },
-  advisorCtaText: { color: '#080808', fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
-  /*
-    0.60, not 0.55. **The comment that shipped with this claimed "8.6:1, above
-    the 4.5:1 floor" and was wrong**: it measured white-on-white by mistake,
-    when this is near-black ink on a white button. The real figure was 4.47:1,
-    a hair *under* the floor, and no source scan could have caught it — the
-    scan only reads `rgba(255,255,255,α)` and this is dark text.
-
-    Found by the rendered-contrast suite, which measures each run against the
-    surface it truly lands on. 0.60 gives 5.35:1.
-  */
-  advisorCtaHint: { color: 'rgba(8,8,8,0.6)', fontSize: 13, lineHeight: 18 },
+  advisorCtaText: { color: text.onInverse, fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
+  advisorCtaHint: { color: text.onInverseMuted, fontSize: 13, lineHeight: 18 },
 
   /* Outlined rather than filled, so it reads as the second verb on the screen. */
   scanCta: {
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-    borderRadius: 16,
-    paddingVertical: 15,
-    paddingHorizontal: 16,
+    borderColor: border.field,
+    borderRadius: radius.card,
+    paddingVertical: space.lg,
+    paddingHorizontal: space.lg,
     gap: 3,
   },
-  scanCtaText: { color: '#fff', fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
-  scanCtaHint: { color: 'rgba(255,255,255,0.5)', fontSize: 13, lineHeight: 18 },
+  scanCtaText: { ...type.title, fontSize: 16, fontWeight: '700', color: text.primary, letterSpacing: -0.2 },
+  scanCtaHint: { ...type.value, color: text.muted },
 
-  centred: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 8 },
-  errorTitle: { color: '#fff', fontSize: 17, fontWeight: '600' },
-  errorBody: { color: 'rgba(255,255,255,0.5)', fontSize: 14, textAlign: 'center' },
-  button: {
-    marginTop: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-    borderRadius: 9,
-    paddingVertical: 11,
-    paddingHorizontal: 22,
+  centred: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: space.h1,
+    gap: space.sm,
   },
-  buttonText: { color: '#fff', fontSize: 14 },
+  errorTitle: { ...type.title, color: text.primary },
+  errorBody: { ...type.body, color: text.muted, textAlign: 'center' },
+  stateAction: { marginTop: space.md, paddingHorizontal: space.xxl },
+  /* Full-bleed: the one thing on the screen that is a commitment, not a link. */
+  primaryAction: { alignSelf: 'stretch', marginTop: space.xs },
 });

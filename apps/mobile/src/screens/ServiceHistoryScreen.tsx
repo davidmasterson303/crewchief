@@ -20,6 +20,7 @@ import {
   type ServiceRecord,
 } from '@crewchief/core/service-record';
 import { formatCurrency } from '@crewchief/core/formatting-utils';
+import { border, status, surface, text } from '../theme';
 
 /**
  * What has been done to this car, on the phone.
@@ -174,7 +175,7 @@ export function ServiceHistoryScreen({ vehicleId, onSignOut }: Props) {
   if (state.kind === 'loading') {
     return (
       <View style={styles.centre}>
-        <ActivityIndicator color="#9A9A9A" />
+        <ActivityIndicator color={text.muted} />
       </View>
     );
   }
@@ -202,7 +203,7 @@ export function ServiceHistoryScreen({ vehicleId, onSignOut }: Props) {
     <ScrollView
       contentContainerStyle={styles.body}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} tintColor="#9A9A9A" />
+        <RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} tintColor={text.muted} />
       }
     >
       {state.records.length === 0 ? (
@@ -285,7 +286,7 @@ export function ServiceHistoryScreen({ vehicleId, onSignOut }: Props) {
 }
 
 /*
-  Opaque colours, measured against `#080808`. `mobile-text-contrast.test.ts`
+  Opaque colours, measured against `surface.page`. `mobile-text-contrast.test.ts`
   composites opacity into its 4.5:1 check, and this screen's quietest text is
   the provenance line — which is the one a reader most needs to be able to read.
 */
@@ -294,15 +295,15 @@ const styles = StyleSheet.create({
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 10 },
 
   summary: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
-  summaryCount: { color: '#E6E6E6', fontSize: 15, fontWeight: '600' },
-  summaryCost: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
-  summaryScope: { color: '#9A9A9A', fontSize: 13, fontWeight: '500' },
+  summaryCount: { color: text.secondary, fontSize: 15, fontWeight: '600' },
+  summaryCost: { color: text.primary, fontSize: 15, fontWeight: '700' },
+  summaryScope: { color: text.muted, fontSize: 13, fontWeight: '500' },
 
-  card: { backgroundColor: '#141414', borderRadius: 14, padding: 16, gap: 6 },
+  card: { backgroundColor: surface.raised, borderRadius: 14, padding: 16, gap: 6 },
   head: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
-  name: { color: '#FFFFFF', fontSize: 15, fontWeight: '600', flexShrink: 1 },
-  cost: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
-  meta: { color: '#B8B8B8', fontSize: 13, lineHeight: 19 },
+  name: { color: text.primary, fontSize: 15, fontWeight: '600', flexShrink: 1 },
+  cost: { color: text.primary, fontSize: 15, fontWeight: '700' },
+  meta: { color: text.muted, fontSize: 13, lineHeight: 19 },
 
   /*
     Provenance and the remove control share a row, with the label given the
@@ -310,29 +311,29 @@ const styles = StyleSheet.create({
     thing worth finding, and neither should push the other off the card.
   */
   foot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
-  provenance: { color: '#9A9A9A', fontSize: 12, lineHeight: 17, flexShrink: 1 },
+  provenance: { color: text.muted, fontSize: 12, lineHeight: 17, flexShrink: 1 },
   removeCta: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },
-  removeText: { color: '#E0A468', fontSize: 13, fontWeight: '600' },
+  removeText: { color: status.attention, fontSize: 13, fontWeight: '600' },
   /*
     A recollection is tinted rather than merely worded differently. The label
     already says "what you told us at sign-up"; the colour is what survives
     someone skimming, and skimming is what a list invites.
   */
-  recollection: { color: '#D6B27A' },
+  recollection: { color: status.attention },
 
-  emptyTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
-  emptyBody: { color: '#B8B8B8', fontSize: 14, lineHeight: 20 },
+  emptyTitle: { color: text.primary, fontSize: 16, fontWeight: '600' },
+  emptyBody: { color: text.muted, fontSize: 14, lineHeight: 20 },
 
-  errorTitle: { color: '#FFFFFF', fontSize: 17, fontWeight: '600' },
-  errorBody: { color: '#B8B8B8', fontSize: 14, textAlign: 'center' },
+  errorTitle: { color: text.primary, fontSize: 17, fontWeight: '600' },
+  errorBody: { color: text.muted, fontSize: 14, textAlign: 'center' },
   retry: {
     marginTop: 6,
     paddingHorizontal: 18,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#2C2C2C',
+    borderColor: border.field,
     minHeight: 44,
     justifyContent: 'center',
   },
-  retryText: { color: '#E6E6E6', fontSize: 14, fontWeight: '600' },
+  retryText: { color: text.secondary, fontSize: 14, fontWeight: '600' },
 });

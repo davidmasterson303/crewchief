@@ -9,6 +9,7 @@ import {
   type InvoiceFile,
 } from '../api/documents';
 import { ApiRequestError } from '../api/client';
+import { border, surface, text, type } from '../theme';
 
 /**
  * Phase 3.3 — photograph an invoice and have its line items read.
@@ -238,7 +239,7 @@ export function InvoiceScanScreen({
 
       {state.status === 'working' && (
         <View style={styles.centred}>
-          <ActivityIndicator color="rgba(255,255,255,0.5)" />
+          <ActivityIndicator color={text.muted} />
           <Text style={styles.note}>{state.note}</Text>
         </View>
       )}
@@ -370,34 +371,34 @@ export function InvoiceScanScreen({
 const styles = StyleSheet.create({
   body: { padding: 20, gap: 14, flexGrow: 1 },
   block: { gap: 12 },
-  title: { color: '#fff', fontSize: 22, fontWeight: '700', letterSpacing: -0.3 },
+  title: { color: text.primary, fontSize: 22, fontWeight: '700', letterSpacing: -0.3 },
   /* `body_` because `body` is the container above. */
-  body_: { color: 'rgba(255,255,255,0.5)', fontSize: 15, lineHeight: 22 },
+  body_: { color: text.muted, fontSize: 15, lineHeight: 22 },
 
   centred: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  note: { color: 'rgba(255,255,255,0.5)', fontSize: 14 },
+  note: { color: text.muted, fontSize: 14 },
 
   primary: {
-    backgroundColor: '#fff',
+    backgroundColor: surface.inverse,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
     marginTop: 4,
   },
-  primaryText: { color: '#080808', fontSize: 16, fontWeight: '600' },
+  primaryText: { color: text.onInverse, fontSize: 16, fontWeight: '600' },
 
   secondary: {
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
+    borderColor: border.fieldHover,
     borderRadius: 12,
     paddingVertical: 13,
     alignItems: 'center',
   },
-  secondaryText: { color: '#fff', fontSize: 15 },
+  secondaryText: { color: text.primary, fontSize: 15 },
 
   /* Monospace so an elapsed figure is scannable; dev builds only. */
   diagnostic: {
-    color: 'rgba(255,255,255,0.5)',
+    color: text.muted,
     fontSize: 12,
     fontFamily: 'Menlo',
     marginTop: -4,

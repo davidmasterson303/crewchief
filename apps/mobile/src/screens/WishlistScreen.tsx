@@ -16,6 +16,7 @@ import { wishlistItemIdentifier, type WishlistItemType } from '@crewchief/core/w
 import { formatCurrency } from '@crewchief/core/formatting-utils';
 import { completionPayload, type CompletionDraft } from '@crewchief/core/wishlist-completion';
 import { MarkDoneSheet } from './MarkDoneSheet';
+import { border, brand, status, surface, text, type } from '../theme';
 
 /**
  * Phase 5.6 — the wishlist, on the phone.
@@ -238,7 +239,7 @@ export function WishlistScreen({ vehicleId, onSignOut }: Props) {
   if (state.kind === 'loading') {
     return (
       <View style={styles.centre}>
-        <ActivityIndicator color="rgba(255,255,255,0.6)" />
+        <ActivityIndicator color={text.secondary} />
       </View>
     );
   }
@@ -263,7 +264,7 @@ export function WishlistScreen({ vehicleId, onSignOut }: Props) {
         <RefreshControl
           refreshing={refreshing}
           onRefresh={() => void load(true)}
-          tintColor="rgba(255,255,255,0.5)"
+          tintColor={text.muted}
         />
       }
     >
@@ -283,7 +284,7 @@ export function WishlistScreen({ vehicleId, onSignOut }: Props) {
             value={draft}
             onChangeText={setDraft}
             placeholder="Something this car needs"
-            placeholderTextColor="#7A7A7A"
+            placeholderTextColor={text.muted}
             accessibilityLabel="What to add to the wishlist"
             returnKeyType="done"
             autoFocus
@@ -427,28 +428,28 @@ const styles = StyleSheet.create({
     minHeight: 48,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#2C2C2C',
+    borderColor: border.field,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  openComposerText: { color: '#E6E6E6', fontSize: 15, fontWeight: '600' },
+  openComposerText: { color: text.secondary, fontSize: 15, fontWeight: '600' },
 
   composer: { gap: 10 },
   typeBlock: { gap: 8 },
-  typeLabel: { color: '#9A9A9A', fontSize: 12, fontWeight: '600' },
+  typeLabel: { color: text.muted, fontSize: 12, fontWeight: '600' },
   composerActions: { flexDirection: 'row', gap: 10 },
   composerCancel: {
     minHeight: 48,
     paddingHorizontal: 18,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#2C2C2C',
+    borderColor: border.field,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  composerCancelText: { color: '#E6E6E6', fontSize: 15, fontWeight: '600' },
+  composerCancelText: { color: text.secondary, fontSize: 15, fontWeight: '600' },
   input: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: surface.raised,
     borderRadius: 12,
     paddingHorizontal: 14,
     /*
@@ -458,7 +459,7 @@ const styles = StyleSheet.create({
       field here would be the one place in the product that disagrees.
     */
     fontSize: 16,
-    color: '#fff',
+    color: text.primary,
     minHeight: 48,
   },
 
@@ -466,7 +467,7 @@ const styles = StyleSheet.create({
   typeChip: {
     paddingHorizontal: 14,
     borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: surface.raised,
     /*
       Grown for real rather than given a 44px `::after`-style hit area. These
       wrap in a row with an 8px gap, and R9 recorded what happens when a padded
@@ -477,13 +478,13 @@ const styles = StyleSheet.create({
     minHeight: 44,
     justifyContent: 'center',
   },
-  typeChipOn: { backgroundColor: '#fff' },
-  typeText: { color: 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: '600' },
-  typeTextOn: { color: '#080808' },
+  typeChipOn: { backgroundColor: surface.inverse },
+  typeText: { color: text.secondary, fontSize: 14, fontWeight: '600' },
+  typeTextOn: { color: text.onInverse },
 
   addCta: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: surface.inverse,
     borderRadius: 12,
     minHeight: 48,
     alignItems: 'center',
@@ -503,16 +504,16 @@ const styles = StyleSheet.create({
     A real colour is measured. #8f8f8f against the near-black label reads about
     6.2:1, and taking it darker turns the suite red, which is the whole point.
   */
-  addCtaOff: { backgroundColor: '#8f8f8f' },
-  addCtaText: { color: '#080808', fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
+  addCtaOff: { backgroundColor: surface.inverseDisabled },
+  addCtaText: { color: text.onInverse, fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
 
-  card: { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 14, padding: 16, gap: 8 },
+  card: { backgroundColor: surface.raised, borderRadius: 14, padding: 16, gap: 8 },
   itemHead: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
-  itemName: { color: '#fff', fontSize: 15, fontWeight: '600', flexShrink: 1 },
-  itemCost: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  itemBody: { color: 'rgba(255,255,255,0.7)', fontSize: 14, lineHeight: 20 },
+  itemName: { color: text.primary, fontSize: 15, fontWeight: '600', flexShrink: 1 },
+  itemCost: { color: text.primary, fontSize: 15, fontWeight: '700' },
+  itemBody: { color: text.secondary, fontSize: 14, lineHeight: 20 },
   itemFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  itemMeta: { color: 'rgba(255,255,255,0.5)', fontSize: 12 },
+  itemMeta: { color: text.muted, fontSize: 12 },
   itemActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   /*
     Done is the primary action on a row and Remove is not, so they do not look
@@ -524,25 +525,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#0E7490',
+    borderColor: brand.primary,
     justifyContent: 'center',
   },
-  doneText: { color: '#67C7DE', fontSize: 14, fontWeight: '700' },
+  doneText: { color: brand.accent, fontSize: 14, fontWeight: '700' },
   removeCta: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 },
-  removeText: { color: '#E0A468', fontSize: 14, fontWeight: '600' },
+  removeText: { color: status.attention, fontSize: 14, fontWeight: '600' },
 
-  emptyTitle: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  emptyBody: { color: 'rgba(255,255,255,0.7)', fontSize: 14, lineHeight: 20 },
+  emptyTitle: { color: text.primary, fontSize: 16, fontWeight: '600' },
+  emptyBody: { color: text.secondary, fontSize: 14, lineHeight: 20 },
 
-  errorTitle: { color: '#fff', fontSize: 17, fontWeight: '600' },
-  errorBody: { color: 'rgba(255,255,255,0.5)', fontSize: 14, textAlign: 'center' },
+  errorTitle: { color: text.primary, fontSize: 17, fontWeight: '600' },
+  errorBody: { color: text.muted, fontSize: 14, textAlign: 'center' },
   button: {
     marginTop: 6,
     paddingHorizontal: 18,
     borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: surface.raised,
     minHeight: 44,
     justifyContent: 'center',
   },
-  buttonText: { color: '#fff', fontSize: 14 },
+  buttonText: { color: text.primary, fontSize: 14 },
 });

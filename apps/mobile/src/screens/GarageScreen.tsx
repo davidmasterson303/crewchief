@@ -11,7 +11,20 @@ import {
 } from 'react-native';
 
 import { apiRequest, ApiRequestError } from '../api/client';
+import Button from '../components/Button';
+import Chip from '../components/Chip';
 import Logo from '../components/Logo';
+import { SkeletonCard } from '../components/Skeleton';
+import {
+  border,
+  radius,
+  space,
+  status,
+  surface,
+  text,
+  type,
+  TARGET_MIN,
+} from '../theme';
 import { AccountScreen } from './AccountScreen';
 import { PushPrimer } from '../notifications/PushPrimer';
 import {
@@ -261,9 +274,10 @@ function VehicleCard({
             <Text style={styles.meta}>{humanise(vehicle.vehicle_status)}</Text>
           ) : null}
           {recallCount > 0 ? (
-            <Text style={styles.recall}>
-              {recallCount} recall{recallCount === 1 ? '' : 's'}
-            </Text>
+            <Chip
+              label={`${recallCount} recall${recallCount === 1 ? '' : 's'}`}
+              tone="critical"
+            />
           ) : null}
         </View>
       </View>
@@ -502,8 +516,16 @@ export function GarageScreen({
     return (
       <View style={styles.stateScreen}>
         {header}
-        <View style={styles.centred}>
-          <ActivityIndicator color="rgba(255,255,255,0.5)" />
+        {/*
+          Shaped like the cards that are coming, not a spinner in the middle of
+          an empty screen. A blank second on a cold fetch is indistinguishable
+          from broken, and this is the first screen a reviewer opens.
+
+          Two, because one reads as "a card is loading" and the list is a list.
+        */}
+        <View style={styles.loadingList}>
+          <SkeletonCard lines={2} />
+          <SkeletonCard lines={2} />
         </View>
         {account}
         {primer}
@@ -522,12 +544,17 @@ export function GarageScreen({
           <Text style={styles.errorBody}>
             {state.unauthorized ? 'Your session has expired. Sign in again.' : state.message}
           </Text>
-          <Pressable
-            style={styles.button}
+          {/*
+            `secondary`, not `primary`. Recovering from an error is the only
+            thing to do on this screen, but filling the button in brand colour
+            makes a failure state look like a call to action.
+          */}
+          <Button
+            label={state.unauthorized ? 'Sign in' : 'Try again'}
+            variant="outline"
             onPress={() => (state.unauthorized ? onSignOut() : void load())}
-          >
-            <Text style={styles.buttonText}>{state.unauthorized ? 'Sign in' : 'Try again'}</Text>
-          </Pressable>
+            style={styles.stateAction}
+          />
         </View>
         {account}
         {primer}
@@ -567,7 +594,7 @@ export function GarageScreen({
         <RefreshControl
           refreshing={refreshing}
           onRefresh={() => void load(true)}
-          tintColor="rgba(255,255,255,0.5)"
+          tintColor={text.muted}
         />
       }
       ListHeaderComponent={header}
@@ -593,9 +620,23 @@ export function GarageScreen({
           <Text style={styles.errorBody}>
             Add your first car and CrewChief gets to work on it.
           </Text>
-          <Pressable style={styles.button} onPress={onAddVehicle} accessibilityRole="button">
-            <Text style={styles.buttonText}>Add a car</Text>
-          </Pressable>
+          {/*
+            `primary` here and `secondary` on the error screen above, and the
+            difference is the point: this is the one thing a new account should
+            do, and it is the only filled button on the first screen they meet.
+          */}
+          <Button
+            label="Add a car"
+            /*
+              The header carries an "Add a car" control too. Two buttons with
+              the same spoken name on one screen is ambiguous to a screen reader
+              in a way it is not to the eye, which can use position — so this
+              one is named for where it is.
+            */
+            accessibilityLabel="Add your first car"
+            onPress={onAddVehicle}
+            style={styles.stateAction}
+          />
         </View>
       }
       ListFooterComponent={<DevToken token={accessToken} />}
@@ -612,98 +653,121 @@ const styles = StyleSheet.create({
     It changes nothing once there is a car, because content past one screen
     already exceeds the container.
   */
-  list: { padding: 20, paddingTop: 68, gap: 14, flexGrow: 1 },
+  list: { padding: space.lg, paddingTop: 68, gap: space.md, flexGrow: 1 },
+  loadingList: { gap: space.md },
   /* Loading and error draw the same header as the list, at the same inset. */
-  stateScreen: { flex: 1, padding: 20, paddingTop: 68 },
+  stateScreen: { flex: 1, padding: space.lg, paddingTop: 68 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 18,
+    marginBottom: space.lg,
   },
-  heading: { color: '#fff', fontSize: 30, fontWeight: '700', letterSpacing: -0.6 },
-  headingRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 18 },
+  heading: { ...type.editorial, color: text.primary, letterSpacing: -0.6 },
+  headingRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: space.lg },
   /*
     Brighter than `signOut`, because these two are not equals: adding a car is
     the thing this screen exists to lead to, and Account is somewhere you go
     occasionally. Both clear the 44px target through `minHeight` plus `hitSlop`.
   */
   headerAction: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 14,
+    color: text.secondary,
+    ...type.value,
     fontWeight: '600',
-    minHeight: 44,
-    lineHeight: 44,
+    minHeight: TARGET_MIN,
+    lineHeight: TARGET_MIN,
   },
-  signOut: { color: 'rgba(255,255,255,0.5)', fontSize: 14, minHeight: 44, lineHeight: 44 },
+  signOut: {
+    color: text.muted,
+    ...type.value,
+    minHeight: TARGET_MIN,
+    lineHeight: TARGET_MIN,
+  },
   deletedNotice: {
     position: 'absolute',
     top: 60,
-    left: 16,
-    right: 16,
+    left: space.lg,
+    right: space.lg,
     zIndex: 10,
-    borderRadius: 12,
-    backgroundColor: 'rgba(22,163,74,0.95)',
-    padding: 14,
+    borderRadius: radius.card,
+    backgroundColor: status.confirmFill,
+    padding: space.md,
   },
-  deletedNoticeText: { color: '#fff', fontSize: 14, lineHeight: 20 },
+  deletedNoticeText: { ...type.body, color: text.primary },
 
+  /*
+    A real surface step, not a 5%-white wash.
+
+    This card used to be `rgba(255,255,255,0.05)` over the page background,
+    which composites to roughly two values away from it — so the cards barely
+    separated from the page and the whole list read as flat. `surface.card` is
+    the designed step, and the border can stay subtle because the fill is now
+    doing the work.
+  */
   card: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 16,
+    backgroundColor: surface.card,
+    borderRadius: radius.card,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
+    borderColor: border.panel,
     overflow: 'hidden',
   },
-  photo: { width: '100%', height: 172, backgroundColor: 'rgba(255,255,255,0.04)' },
+  photo: { width: '100%', height: 172, backgroundColor: surface.well },
   photoEmpty: { alignItems: 'center', justifyContent: 'center' },
-  photoEmptyText: { color: 'rgba(255,255,255,0.5)', fontSize: 13 },
+  photoEmptyText: { ...type.value, color: text.muted },
 
-  cardBody: { padding: 16, gap: 10 },
-  cardHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
+  cardBody: { padding: space.lg, gap: space.sm },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: space.md,
+  },
   cardTitleBlock: { flex: 1 },
-  name: { color: '#fff', fontSize: 17, fontWeight: '600' },
-  trim: { color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 2 },
+  name: { ...type.title, color: text.primary },
+  trim: { ...type.value, color: text.muted, marginTop: 2 },
 
   healthBlock: { alignItems: 'flex-end' },
-  score: { fontSize: 24, fontWeight: '700', lineHeight: 26 },
-  bandLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.6 },
-  noScore: { color: 'rgba(255,255,255,0.5)', fontSize: 12 },
-
-  metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
-  meta: { color: 'rgba(255,255,255,0.5)', fontSize: 13 },
-  recall: { color: '#e0a468', fontSize: 13, fontWeight: '600' },
-
-  centred: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 8 },
-  errorTitle: { color: '#fff', fontSize: 17, fontWeight: '600' },
-  errorBody: { color: 'rgba(255,255,255,0.5)', fontSize: 14, textAlign: 'center' },
-  button: {
-    marginTop: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-    borderRadius: 9,
-    paddingVertical: 11,
-    paddingHorizontal: 22,
-  },
-  buttonText: { color: '#fff', fontSize: 14 },
-
-  devBlock: { marginTop: 28, gap: 6 },
-  devHeading: {
-    color: 'rgba(255,255,255,0.5)',
+  score: { ...type.title, fontSize: 24, lineHeight: 26 },
+  bandLabel: {
+    ...type.label,
     fontSize: 11,
-    letterSpacing: 1,
     textTransform: 'uppercase',
+    letterSpacing: 0.6,
   },
+  noScore: { ...type.value, fontSize: 12, color: text.muted },
+
+  metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md },
+  meta: { ...type.value, color: text.muted },
+  recall: { ...type.value, color: status.attention, fontWeight: '600' },
+
+  centred: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: space.h1,
+    gap: space.sm,
+  },
+  errorTitle: { ...type.title, color: text.primary },
+  errorBody: { ...type.body, color: text.muted, textAlign: 'center' },
+  /*
+    Not stretched. These sit under centred text in a column that is as wide as
+    the screen, and a full-bleed button under two centred lines reads as a form
+    submit rather than an offer.
+  */
+  stateAction: { marginTop: space.md, paddingHorizontal: space.xxl },
+
+  devBlock: { marginTop: space.xxl, gap: space.xs },
+  devHeading: { ...type.label, color: text.muted, textTransform: 'uppercase' },
   // Monospaced and small: a JWT is long, and it has to select as one run of
   // text rather than reflow into something that copies back broken.
   devToken: {
-    color: 'rgba(255,255,255,0.7)',
+    color: text.secondary,
     fontSize: 10,
     fontFamily: 'Courier',
-    marginTop: 4,
-    padding: 10,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    marginTop: space.xs,
+    padding: space.sm,
+    borderRadius: radius.well,
+    backgroundColor: surface.well,
   },
 });
