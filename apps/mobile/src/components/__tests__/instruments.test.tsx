@@ -1,4 +1,4 @@
-import { act, render, waitFor } from '@testing-library/react-native';
+import { act, render, userEvent, waitFor } from '@testing-library/react-native';
 import { AccessibilityInfo, processColor } from 'react-native';
 import { R } from '@crewchief/core/cluster-geometry';
 import { getHealthBandJudgement, healthBandHex } from '@crewchief/core/health-band';
@@ -10,7 +10,10 @@ import ClusterGauge from '../ClusterGauge';
 import HealthHistory from '../HealthHistory';
 import ProgressionLadder from '../ProgressionLadder';
 import VehiclePlate from '../VehiclePlate';
-import { DIAL_MIN, build } from '../../theme';
+import GarageBay from '../GarageBay';
+import HealthDrivers from '../HealthDrivers';
+import type { HealthDriver } from '@crewchief/core/health-drivers';
+import { DIAL_MIN, build, text } from '../../theme';
 
 /**
  * The instruments' invariants.
@@ -499,5 +502,181 @@ describe('VehiclePlate', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+});
+
+describe('GarageBay', () => {
+  const WRX = {
+    id: 'v1',
+    year: 2018,
+    make: 'Subaru',
+    model: 'WRX',
+    trim: 'Premium',
+    photo_url: null,
+  };
+
+  it('names the bay and its position, so a swipe has somewhere to land', async () => {
+    const view = await render(
+      <GarageBay vehicle={WRX} score={70} index={1} total={3} active={false} />
+    );
+
+    view.getByText('BAY 02');
+    view.getByText('2 of 3');
+  });
+
+  it('puts the make on the back wall and the car under it, never twice', async () => {
+    /*
+      The wordmark is the make alone. The lockup below carries the full name, so
+      a room that also spelled out "2018 Subaru WRX" would be the garage card's
+      duplication problem moved one screen along.
+    */
+    const view = await render(
+      <GarageBay vehicle={WRX} score={70} index={0} total={1} active={false} />
+    );
+
+    view.getByText('SUBARU');
+    view.getByText('2018 Subaru WRX');
+  });
+
+  it('holds the needle behind a closed door', async () => {
+    /*
+      A sweep that ran behind the shutter would be the animation this screen
+      exists to stage, spent on nothing. An inactive bay has not opened, so its
+      dial has not been released.
+    */
+    jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(false);
+
+    const view = await render(
+      <GarageBay vehicle={WRX} score={70} index={0} total={2} active={false} />
+    );
+
+    // The dial is drawn — it is the reading that waits, not the instrument.
+    expect(hostNodes(view.root, 'RNSVGPath').length).toBeGreaterThan(0);
+    expect(view.queryByText('0')).toBeNull();
+  });
+
+  it('opens the door and lands the reading under reduced motion', async () => {
+    // Reduced motion removes the door rather than shortening it, and the end
+    // state is identical: open, and the needle on the score.
+    jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(true);
+
+    const view = await render(
+      <GarageBay vehicle={WRX} score={70} index={0} total={1} active />
+    );
+    await act(async () => {});
+
+    view.getByText('70');
+  });
+
+  it('says there is no score rather than drawing a dial at zero', async () => {
+    // A dial at 0 asserts a reading. No score is not a zero — the same rule the
+    // garage card has always followed.
+    const view = await render(
+      <GarageBay vehicle={WRX} score={null} index={0} total={1} active={false} />
+    );
+
+    view.getByText('No score yet');
+    expect(view.queryByText('0')).toBeNull();
+  });
+
+  it('makes the car the target and leaves the dial alone', async () => {
+    /*
+      Tapping the car opens the car. A whole-bay press target would swallow the
+      instrument — which is there to be read — and would make "Add photo" a
+      nested tap inside a target the size of the screen.
+    */
+    const onOpen = jest.fn();
+    const view = await render(
+      <GarageBay vehicle={WRX} score={70} index={0} total={1} active={false} onOpen={onOpen} />
+    );
+
+    await userEvent.setup().press(view.getByLabelText('2018 Subaru WRX, open details'));
+
+    expect(onOpen).toHaveBeenCalled();
+  });
+});
+
+describe('HealthDrivers', () => {
+  const driver = (over: Partial<HealthDriver>): HealthDriver => ({
+    key: 'maintenance',
+    label: 'Maintenance',
+    score: 78,
+    detail: '2 services overdue, across 9 tracked services.',
+    ...over,
+  });
+
+  it('shows each driver with the sentence that explains it', async () => {
+    // A number with no account of itself is the black box this product argues
+    // against, and the reason the drivers are computed rather than generated.
+    const view = await render(<HealthDrivers drivers={[driver({})]} />);
+
+    view.getByText('Maintenance');
+    view.getByText('78');
+    view.getByText('2 services overdue, across 9 tracked services.');
+  });
+
+  it('never renders the three as terms in a sum', async () => {
+    /*
+      ⚠ The one thing this component must not do. `health_score` comes from the
+      model and these are computed, so they explain the subject without adding
+      up to the total — and three numbers shown as a sum would claim otherwise.
+    */
+    const view = await render(
+      <HealthDrivers
+        drivers={[
+          driver({}),
+          driver({ key: 'recalls', label: 'Recalls', score: 40 }),
+          driver({ key: 'mileage-load', label: 'Mileage load', score: 66 }),
+        ]}
+      />
+    );
+
+    const rendered = JSON.stringify(view.toJSON());
+    expect(rendered).not.toMatch(/[+=]\s*\d/);
+    expect(rendered).not.toMatch(/total|sum|out of/i);
+  });
+
+  it('bands a driver on the same ramp as the score', async () => {
+    // 40 means the same thing here as it does on the dial, so it wears the
+    // same colour. A second opinion about what 40 looks like is the drift
+    // `health-band.ts` exists to prevent.
+    const view = await render(
+      <HealthDrivers drivers={[driver({ key: 'recalls', label: 'Recalls', score: 40 })]} />
+    );
+
+    const style = Object.assign(
+      {},
+      ...[view.getByText('40').props.style].flat(Infinity).filter(Boolean)
+    ) as { color?: string };
+
+    expect(style.color).toBe(healthBandHex(getHealthBandJudgement(40)));
+  });
+
+  it('shows a dash in muted ink for an unmeasured driver, never a band', async () => {
+    /*
+      Colouring a `null` would assert a condition nobody checked. And the dash
+      never travels alone — the sentence is what turns it from a bug into an
+      honest gap.
+    */
+    const view = await render(
+      <HealthDrivers
+        drivers={[
+          driver({
+            key: 'recalls',
+            label: 'Recalls',
+            score: null,
+            detail: 'Recalls have not been checked for this vehicle.',
+          }),
+        ]}
+      />
+    );
+
+    const style = Object.assign(
+      {},
+      ...[view.getByText('—').props.style].flat(Infinity).filter(Boolean)
+    ) as { color?: string };
+
+    expect(style.color).toBe(text.muted);
+    view.getByText('Recalls have not been checked for this vehicle.');
   });
 });

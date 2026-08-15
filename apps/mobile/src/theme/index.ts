@@ -201,6 +201,28 @@ export const status = {
   scrim: 'rgba(0,0,0,0.4)',
 } as const;
 
+/**
+ * ── The bay ─────────────────────────────────────────────────────────────────
+ *
+ * The garage is a car in a lit room, not a row in a list. Two of these three
+ * values are the only genuinely new colours in this file — the room's own
+ * gradient — and they come from the baseline board rather than from
+ * `globals.css`, because web has no bay at this scale to read them off.
+ *
+ * ⚠ `light` is `brand.accent`, not a fourth value. The board writes it as
+ * `--bay-light-hot`, which is an export-side token with no equivalent in this
+ * repo; its rendered value is the accent cyan the app already carries. Naming a
+ * second copy here is how two cyans start drifting.
+ */
+export const bay = {
+  /** The lit end of the room, up near the ceiling. */
+  roomNear: '#2A2724',
+  /** The far, unlit end. */
+  roomFar: '#111214',
+  /** The batten and the pool of light under the dial. Aliases `brand.accent`. */
+  light: brand.accent,
+} as const;
+
 /** Build continuum paint. Zone selection lives in `@crewchief/core/build-progress`. */
 export const build = {
   stock: '#7D8794',
@@ -312,6 +334,7 @@ export const theme = {
   text,
   brand,
   register,
+  bay,
   status,
   build,
   space,

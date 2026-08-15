@@ -1,20 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native';
 
 import { apiRequest, ApiRequestError } from '../api/client';
 import Button from '../components/Button';
 import AlertBanner from '../components/AlertBanner';
 import Chip from '../components/Chip';
-import ClusterGauge from '../components/ClusterGauge';
-import VehiclePlate from '../components/VehiclePlate';
+import GarageBay from '../components/GarageBay';
 import Logo from '../components/Logo';
 import { SkeletonCard } from '../components/Skeleton';
 import { border, radius, space, status, surface, text, type, TARGET_MIN } from '../theme';
@@ -111,112 +111,87 @@ function humanise(value: string): string {
     .join(' ');
 }
 
-function VehicleCard({
+/**
+ * One bay, wired to a row from the garage payload.
+ *
+ * ── Why this replaced the card ──────────────────────────────────────────────
+ *
+ * The board's line for this screen is *"Home. One car in a lit room, swiped
+ * between."* A card list is a database browser. It was also the shape that had
+ * nowhere to put a 184pt instrument, which is exactly why the bay and the
+ * plinth were deferred out of step 3 rather than built around a placeholder and
+ * then built a second time once the dial existed.
+ *
+ * What the card carried and this keeps: the formatted status (`vehicle_status`
+ * reached the screen as "daily_driver" once, and only looking at it caught
+ * that), the formatted mileage, and the recall count. They move from a meta row
+ * into the identity subtitle and the footer, because a bay has one lockup
+ * rather than a header and a body.
+ */
+function VehicleBay({
   vehicle,
+  index,
+  total,
+  active,
   onOpen,
   onAddPhoto,
   uploading,
 }: {
   vehicle: Vehicle;
-  /*
-    A callback, not a `navigation` prop. This screen stays ignorant of
-    react-navigation so it remains an ordinary component — the navigator is the
-    only file that knows how a route is reached.
-  */
+  index: number;
+  total: number;
+  active: boolean;
   onOpen: () => void;
-  /** Omitted when the app has no picker — see `GarageScreen`'s `pickPhoto`. */
   onAddPhoto?: () => void;
   uploading?: boolean;
 }) {
-  /*
-    The photo lifecycle moved into `VehiclePlate` — the timeout, the two exits
-    from loading, and the fallback are all properties of showing a photograph on
-    a plate rather than of this card, and vehicle detail's 196pt hero needs the
-    identical behaviour.
-  */
-
   const health = first(vehicle.vehicle_health_summary);
   const score = typeof health?.health_score === 'number' ? health.health_score : null;
-  const band = score === null ? null : getHealthBandJudgement(score);
 
   const recalls = first(vehicle.nhtsa_data)?.recalls;
   const recallCount = Array.isArray(recalls) ? recalls.length : 0;
 
-  const name = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ');
+  /*
+    `Premium · Daily driver · 48,210 mi` — the board's subtitle, assembled here
+    because only the screen knows which fields the payload actually carried.
+    Each part is optional and the separator earns its place only when there is
+    something on both sides of it.
+  */
+  const subtitle = [
+    vehicle.trim,
+    vehicle.vehicle_status ? humanise(vehicle.vehicle_status) : null,
+    typeof vehicle.current_mileage === 'number'
+      ? `${miles.format(vehicle.current_mileage)} mi`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
-    <Pressable
-      style={styles.card}
-      onPress={onOpen}
-      accessibilityRole="button"
-      accessibilityLabel={`${name || 'Vehicle'}, open details`}
-    >
-      {/*
-        The identity plate — CC-142, finally on the phone.
-
-        This replaced a grey box reading "No photo". That was a placeholder
-        naming an absence, so a garage of unphotographed cars read as a garage
-        of incomplete records; the plate is a finished design for the same
-        state. See `VehiclePlate` for why the two halves only work together.
-      */}
-      <VehiclePlate
-        photo={vehicle.photo_url}
-        year={vehicle.year}
-        make={vehicle.make}
-        model={vehicle.model}
-        trim={vehicle.trim}
-        onAddPhoto={onAddPhoto}
-        busy={uploading}
-      />
-
-      <View style={styles.cardBody}>
-        <View style={styles.cardHeader}>
-          <View style={styles.cardTitleBlock}>
-            <Text style={styles.name} numberOfLines={1}>
-              {name || 'Vehicle'}
-            </Text>
-            {vehicle.trim ? (
-              <Text style={styles.trim} numberOfLines={1}>
-                {vehicle.trim}
-              </Text>
-            ) : null}
-          </View>
-
-          {band && score !== null ? (
-            /*
-              The row scale of the health instrument — step 4.
-
-              Not a small dial. Under `DIAL_MIN` the ticks stop resolving and an
-              instrument that cannot be read is decoration, so the row is a
-              numeral and a verdict and nothing else. `ClusterGauge` owns that
-              judgement now, which also retires two things this card was doing
-              by hand: an 11pt band label that sat **under the 12pt type floor**,
-              and a second local opinion about how a score is presented.
-            */
-            <ClusterGauge score={score} variant="row" />
-          ) : (
-            /*
-              No score is not a zero. Banding a missing value would paint the
-              card red and assert a condition nobody measured — the same
-              overclaim the provenance work removed from the web this morning.
-            */
-            <Text style={styles.noScore}>No score yet</Text>
-          )}
-        </View>
-
-        <View style={styles.metaRow}>
-          {typeof vehicle.current_mileage === 'number' ? (
-            <Text style={styles.meta}>{miles.format(vehicle.current_mileage)} mi</Text>
-          ) : null}
-          {vehicle.vehicle_status ? (
-            <Text style={styles.meta}>{humanise(vehicle.vehicle_status)}</Text>
-          ) : null}
-          {recallCount > 0 ? (
+    <GarageBay
+      vehicle={vehicle}
+      score={score}
+      index={index}
+      total={total}
+      subtitle={subtitle}
+      active={active}
+      onOpen={onOpen}
+      onAddPhoto={onAddPhoto}
+      uploading={uploading}
+      footer={
+        recallCount > 0 ? (
+          /*
+            Recalls stay on the bay rather than moving to the detail screen.
+            They are the one thing on this payload that can be time-critical,
+            and a garage that shows a car's condition but not its open safety
+            defect is showing the reassuring half.
+          */
+          <View style={styles.bayFooter}>
             <Chip label={`${recallCount} recall${recallCount === 1 ? '' : 's'}`} tone="critical" />
-          ) : null}
-        </View>
-      </View>
-    </Pressable>
+          </View>
+        ) : null
+      }
+    />
   );
 }
 
@@ -296,6 +271,13 @@ export function GarageScreen({
   */
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  /*
+    Which bay is on screen. Drives the batten's "2 of 3" and, more importantly,
+    which bay is allowed to run its door and its needle — see `GarageBay`.
+  */
+  const [bayIndex, setBayIndex] = useState(0);
+
+  const { width } = useWindowDimensions();
 
   const [state, setState] = useState<
     | { status: 'loading' }
@@ -589,23 +571,23 @@ export function GarageScreen({
           <Text style={styles.deletedNoticeText}>{deletedNotice}</Text>
         </View>
       )}
-      <FlatList
-        data={state.vehicles}
-        keyExtractor={(v) => v.id}
-        contentContainerStyle={styles.list}
-        renderItem={({ item }) => (
-          <VehicleCard
-            vehicle={item}
-            onOpen={() =>
-              onOpenVehicle(
-                item.id,
-                [item.year, item.make, item.model].filter(Boolean).join(' ') || 'Vehicle',
-              )
-            }
-            onAddPhoto={pickPhoto ? () => void onAddPhoto(item.id) : undefined}
-            uploading={uploadingId === item.id}
-          />
-        )}
+      {/*
+        ── The garage is a row of bays, swiped between ──────────────────────────
+
+        A **vertical** scroller carrying the header and pull-to-refresh, with a
+        **horizontal** paged scroller of bays inside it. Both directions are
+        needed and a single list cannot give them: a horizontal `FlatList` puts
+        its `ListHeaderComponent` to the *left* of the first item rather than
+        above it, and `RefreshControl` only works on a vertical scroller.
+
+        A paged `ScrollView` rather than a horizontal `FlatList`, deliberately.
+        A garage is a handful of cars — virtualisation buys nothing at that size
+        and costs the thing that matters here, which is that every bay is
+        mounted and only the focused one animates. `active` is what gates the
+        door and the needle; a virtualised list would instead have bays igniting
+        as they scrolled into the window, which is three intros for one glance.
+      */}
+      <ScrollView
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -613,18 +595,11 @@ export function GarageScreen({
             tintColor={text.muted}
           />
         }
-        ListHeaderComponent={header}
-        ListEmptyComponent={
-          /*
-          An account with no cars is the ordinary first-run state, not a
-          failure — so it says what to do next rather than apologising.
+        contentContainerStyle={styles.page}
+      >
+        {header}
 
-          It sits in its own centring view because `styles.centred` is
-          `flex: 1`, and a flex child of a FlatList's content container has no
-          height to fill unless that container grows: `contentContainerStyle`
-          carries `flexGrow: 1` for exactly this. Without it the first thing a
-          new user ever sees is three lines crushed under the title.
-        */
+        {state.vehicles.length === 0 ? (
           <View style={styles.centred}>
             <Text style={styles.errorTitle}>No vehicles yet</Text>
             {/*
@@ -654,9 +629,44 @@ export function GarageScreen({
               style={styles.stateAction}
             />
           </View>
-        }
-        ListFooterComponent={<DevToken token={accessToken} />}
-      />
+        ) : (
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            /*
+              Momentum, not `onScroll`. The batten reads "BAY 02 · 2 of 3", and
+              updating it mid-drag would have it flicker through every bay the
+              finger passes rather than naming the one that was landed on.
+            */
+            onMomentumScrollEnd={(event) =>
+              setBayIndex(Math.round(event.nativeEvent.contentOffset.x / width))
+            }
+          >
+            {state.vehicles.map((vehicle, index) => (
+              <View key={vehicle.id} style={{ width }}>
+                <VehicleBay
+                  vehicle={vehicle}
+                  index={index}
+                  total={state.vehicles.length}
+                  active={index === bayIndex}
+                  onOpen={() =>
+                    onOpenVehicle(
+                      vehicle.id,
+                      [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ') ||
+                        'Vehicle',
+                    )
+                  }
+                  onAddPhoto={pickPhoto ? () => void onAddPhoto(vehicle.id) : undefined}
+                  uploading={uploadingId === vehicle.id}
+                />
+              </View>
+            ))}
+          </ScrollView>
+        )}
+
+        <DevToken token={accessToken} />
+      </ScrollView>
       {account}
       {primer}
     </>
@@ -669,7 +679,15 @@ const styles = StyleSheet.create({
     It changes nothing once there is a car, because content past one screen
     already exceeds the container.
   */
-  list: { padding: space.lg, paddingTop: 68, gap: space.md, flexGrow: 1 },
+  /**
+   * The vertical page the bays sit on.
+   *
+   * No horizontal padding — a paged scroller's pages must be exactly the screen
+   * width or the paging lands off-centre, so the inset lives inside each bay
+   * instead. `flexGrow` is what lets the empty state centre itself.
+   */
+  page: { paddingTop: 68, paddingBottom: space.lg, gap: space.md, flexGrow: 1 },
+  bayFooter: { paddingHorizontal: space.lg, flexDirection: 'row' },
   loadingList: { gap: space.md },
   /* Loading and error draw the same header as the list, at the same inset. */
   stateScreen: { flex: 1, padding: space.lg, paddingTop: 68 },
@@ -678,6 +696,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: space.lg,
+    /*
+      The header carries its own inset now. The page it sits on cannot: a paged
+      horizontal scroller's pages have to be exactly the screen width, so the
+      padding that used to live on the list's content container moved into the
+      header and into each bay.
+    */
+    paddingHorizontal: space.lg,
   },
   heading: { ...type.editorial, color: text.primary, letterSpacing: -0.6 },
   headingRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },

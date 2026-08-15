@@ -10,10 +10,12 @@ import {
 } from 'react-native';
 
 import { apiRequest, ApiRequestError } from '../api/client';
+import type { HealthDriver } from '@crewchief/core/health-drivers';
 import AlertBanner from '../components/AlertBanner';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import ClusterGauge from '../components/ClusterGauge';
+import HealthDrivers from '../components/HealthDrivers';
 import ListRow from '../components/ListRow';
 import SectionHeader from '../components/SectionHeader';
 import { border, radius, space, status, surface, text, type } from '../theme';
@@ -109,7 +111,7 @@ function humanise(value: string): string {
 
 type State =
   | { status: 'loading' }
-  | { status: 'ok'; vehicle: Vehicle }
+  | { status: 'ok'; vehicle: Vehicle; drivers: HealthDriver[] }
   | { status: 'missing' }
   | { status: 'error'; message: string; unauthorized: boolean };
 
@@ -154,14 +156,27 @@ export function VehicleDetailScreen({
           something else routes here with a value that is not a uuid, a raw
           interpolation is a query-string injection rather than a 400.
         */
-        const body = await apiRequest<{ vehicle?: Vehicle }>(
-          `/load-vehicle?vehicleId=${encodeURIComponent(vehicleId)}`
+        const body = await apiRequest<{ vehicle?: Vehicle; health_drivers?: HealthDriver[] }>(
+          `/load-vehicle?vehicleId=${encodeURIComponent(vehicleId)}`,
         );
         if (!body.vehicle) {
           setState({ status: 'missing' });
           return;
         }
-        setState({ status: 'ok', vehicle: body.vehicle });
+        /*
+          `health_drivers` is top level rather than folded into `vehicle`,
+          because they are derived and the vehicle object is the row — mixing
+          them would let a caller believe it could write one back.
+
+          Defaulted to empty rather than assumed present: a deployment where the
+          route predates this field should render a health card without drivers,
+          not a screen that throws.
+        */
+        setState({
+          status: 'ok',
+          vehicle: body.vehicle,
+          drivers: Array.isArray(body.health_drivers) ? body.health_drivers : [],
+        });
       } catch (error) {
         const apiError = error as ApiRequestError;
         // 404 is a state, not a failure — see the header.
@@ -178,7 +193,7 @@ export function VehicleDetailScreen({
         setRefreshing(false);
       }
     },
-    [vehicleId]
+    [vehicleId],
   );
 
   useEffect(() => {
@@ -197,9 +212,7 @@ export function VehicleDetailScreen({
     return (
       <View style={styles.centred}>
         <Text style={styles.errorTitle}>This vehicle is no longer here</Text>
-        <Text style={styles.errorBody}>
-          It may have been removed from another device.
-        </Text>
+        <Text style={styles.errorBody}>It may have been removed from another device.</Text>
         <Button
           label="Back to garage"
           variant="outline"
@@ -227,7 +240,7 @@ export function VehicleDetailScreen({
     );
   }
 
-  const { vehicle } = state;
+  const { vehicle, drivers } = state;
   const health = first(vehicle.vehicle_health_summary);
   const score = typeof health?.health_score === 'number' ? health.health_score : null;
   const band = score === null ? null : getHealthBandJudgement(score);
@@ -294,6 +307,18 @@ export function VehicleDetailScreen({
             <ClusterGauge score={score} />
           </View>
           {health?.summary ? <Text style={styles.summary}>{health.summary}</Text> : null}
+
+          {/*
+            The three score drivers — the endpoint gained them on 15 Aug.
+
+            ⚠ Below the summary rather than beside the dial, and that placement
+            is the honest one: they explain the subject without adding up to the
+            reading above them. Putting three numbers next to a total invites
+            arithmetic that does not hold — `health_score` comes from the model
+            and these are computed from the schedule, the recall list and
+            mileage against age.
+          */}
+          <HealthDrivers drivers={drivers} />
         </Card>
       )}
 
@@ -315,10 +340,7 @@ export function VehicleDetailScreen({
               : null
           }
         />
-        <Row
-          label="Use"
-          value={vehicle.vehicle_status ? humanise(vehicle.vehicle_status) : null}
-        />
+        <Row label="Use" value={vehicle.vehicle_status ? humanise(vehicle.vehicle_status) : null} />
         <Row
           label="Goal"
           value={vehicle.performance_mindedness ? humanise(vehicle.performance_mindedness) : null}
@@ -340,8 +362,18 @@ export function VehicleDetailScreen({
       <Card>
         <SectionHeader title="This car" />
         <ListRow label="Service history" onPress={onOpenHistory} value="" />
-        <ListRow label="Wishlist" detail="What it needs, so the advisor can price it" onPress={onOpenWishlist} value="" />
-        <ListRow label="Scan an invoice" detail="Photograph a bill and its lines are filed here" onPress={onScanInvoice} value="" />
+        <ListRow
+          label="Wishlist"
+          detail="What it needs, so the advisor can price it"
+          onPress={onOpenWishlist}
+          value=""
+        />
+        <ListRow
+          label="Scan an invoice"
+          detail="Photograph a bill and its lines are filed here"
+          onPress={onScanInvoice}
+          value=""
+        />
       </Card>
 
       {/*
@@ -380,7 +412,13 @@ const styles = StyleSheet.create({
   body: { padding: space.lg, gap: space.md },
 
   headerBlock: { gap: 2 },
-  name: { ...type.editorial, fontSize: 26, lineHeight: 32, color: text.primary, letterSpacing: -0.5 },
+  name: {
+    ...type.editorial,
+    fontSize: 26,
+    lineHeight: 32,
+    color: text.primary,
+    letterSpacing: -0.5,
+  },
   trim: { ...type.body, color: text.muted },
 
   /* The same real surface step the garage cards now use — not a 5% wash. */
@@ -441,7 +479,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.lg,
     gap: 3,
   },
-  scanCtaText: { ...type.title, fontSize: 16, fontWeight: '700', color: text.primary, letterSpacing: -0.2 },
+  scanCtaText: {
+    ...type.title,
+    fontSize: 16,
+    fontWeight: '700',
+    color: text.primary,
+    letterSpacing: -0.2,
+  },
   scanCtaHint: { ...type.value, color: text.muted },
 
   centred: {

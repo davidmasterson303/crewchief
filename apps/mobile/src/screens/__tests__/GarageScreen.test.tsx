@@ -105,10 +105,22 @@ describe('the garage', () => {
     const view = await renderGarage();
 
     expect(await view.findByText('2015 BMW M235i')).toBeTruthy();
-    // Formatted, not raw. `vehicle_status` reached the screen as
-    // "daily_driver" once, and only looking at it caught that.
-    expect(view.getByText('Daily Driver')).toBeTruthy();
-    expect(view.getByText('66,000 mi')).toBeTruthy();
+
+    /*
+      The trim, the status and the mileage are one subtitle now — the bay has a
+      single identity lockup where the card had a header and a meta row. The
+      claims are unchanged and both still matter:
+
+        - **Formatted, not raw.** `vehicle_status` reached the screen as
+          "daily_driver" once, and only looking at it caught that.
+        - **Grouped, not concatenated.** The separator earns its place only
+          when there is something on both sides, so a car with no trim must not
+          render a leading "· ".
+    */
+    expect(view.getByText('xDrive · Daily Driver · 66,000 mi')).toBeTruthy();
+
+    // Recalls stay on the bay. A garage that shows condition but not an open
+    // safety defect is showing the reassuring half.
     expect(view.getByText('2 recalls')).toBeTruthy();
   });
 });
