@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 
+import Card from '../components/Card';
 import { apiRequest, ApiRequestError } from '../api/client';
 import { wishlistItemIdentifier, type WishlistItemType } from '@crewchief/core/wishlist-identifier';
 import { formatCurrency } from '@crewchief/core/formatting-utils';
@@ -361,16 +362,16 @@ export function WishlistScreen({ vehicleId, onSignOut }: Props) {
       )}
 
       {state.items.length === 0 ? (
-        <View style={styles.card}>
+        <Card style={styles.cardGap}>
           <Text style={styles.emptyTitle}>Nothing on the list yet</Text>
           <Text style={styles.emptyBody}>
             Add what this car needs as you think of it. The advisor uses this list when it
             works out what a job would cost.
           </Text>
-        </View>
+        </Card>
       ) : (
         state.items.map((item) => (
-          <View key={item.id} style={styles.card}>
+          <Card key={item.id} style={styles.cardGap}>
             <View style={styles.itemHead}>
               <Text style={styles.itemName}>{item.item_name}</Text>
               {estimate(item) && <Text style={styles.itemCost}>{estimate(item)}</Text>}
@@ -399,7 +400,7 @@ export function WishlistScreen({ vehicleId, onSignOut }: Props) {
                 </Pressable>
               </View>
             </View>
-          </View>
+          </Card>
         ))
       )}
 
@@ -507,7 +508,20 @@ const styles = StyleSheet.create({
   addCtaOff: { backgroundColor: surface.inverseDisabled },
   addCtaText: { color: text.onInverse, fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
 
-  card: { backgroundColor: surface.raised, borderRadius: radius.card, padding: 16, gap: 8 },
+  /**
+   * The card, on the ladder rather than beside it.
+   *
+   * ⚠ This was a **private copy** — `surface.raised` with no border, where the
+   * `Card` primitive is `surface.card` with `border.panel`. `raised` is the
+   * ladder's step for bars, tab strips and chips; a card painted on it sits one
+   * step off from every other card in the app, which is precisely the "twelve
+   * slightly different containers" the primitive set was built to end.
+   *
+   * The gap is kept as it was. Padding and gaps across this app want a pass
+   * with a designer's eye rather than a find-and-replace — see the note in
+   * `mobile-radius-scale.test.ts` on why that rule was scoped to radius.
+   */
+  cardGap: { gap: 8 },
   itemHead: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
   itemName: { color: text.primary, fontSize: 15, fontWeight: '600', flexShrink: 1 },
   itemCost: { color: text.primary, fontSize: 15, fontWeight: '700' },

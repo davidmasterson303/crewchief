@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 
+import Card from '../components/Card';
 import { apiRequest, ApiRequestError } from '../api/client';
 import { radius, status, surface, text } from '../theme';
 import {
@@ -207,7 +208,7 @@ export function RecallDetailScreen({ vehicleId, title, onAskAdvisor, onSignOut }
       </Text>
 
       {state.recalls.length === 0 && (
-        <View style={styles.card}>
+        <Card style={styles.cardGap}>
           {/*
             Not "you have no recalls". This app reads NHTSA's list, and an
             empty list is a statement about that list rather than about the car.
@@ -216,11 +217,11 @@ export function RecallDetailScreen({ vehicleId, title, onAskAdvisor, onSignOut }
             NHTSA has no open recalls listed for this vehicle. That is their record, not a
             guarantee — a dealer can check against the VIN.
           </Text>
-        </View>
+        </Card>
       )}
 
       {state.recalls.map((recall, index) => (
-        <View key={recall.campaignNumber ?? `recall-${index}`} style={styles.card}>
+        <Card key={recall.campaignNumber ?? `recall-${index}`} style={styles.cardGap}>
           {recall.component && <Text style={styles.component}>{recall.component}</Text>}
 
           {recall.summary && <Text style={styles.summary}>{recall.summary}</Text>}
@@ -268,7 +269,7 @@ export function RecallDetailScreen({ vehicleId, title, onAskAdvisor, onSignOut }
           >
             <Text style={styles.askCtaText}>Ask the advisor about this</Text>
           </Pressable>
-        </View>
+        </Card>
       ))}
 
       {state.recalls.length > 0 && (
@@ -300,12 +301,20 @@ const styles = StyleSheet.create({
   bannerTitle: { color: text.primary, fontSize: 17, fontWeight: '700', letterSpacing: -0.2 },
   bannerBody: { color: text.secondary, fontSize: 14, lineHeight: 20 },
 
-  card: {
-    backgroundColor: surface.raised,
-    borderRadius: radius.card,
-    padding: 16,
-    gap: 10,
-  },
+  /**
+   * The card, on the ladder rather than beside it.
+   *
+   * ⚠ This was a **private copy** — `surface.raised` with no border, where the
+   * `Card` primitive is `surface.card` with `border.panel`. `raised` is the
+   * ladder's step for bars, tab strips and chips; a card painted on it sits one
+   * step off from every other card in the app, which is precisely the "twelve
+   * slightly different containers" the primitive set was built to end.
+   *
+   * The gap is kept as it was. Padding and gaps across this app want a pass
+   * with a designer's eye rather than a find-and-replace — see the note in
+   * `mobile-radius-scale.test.ts` on why that rule was scoped to radius.
+   */
+  cardGap: { gap: 10 },
   component: {
     color: status.attention,
     fontSize: 12,

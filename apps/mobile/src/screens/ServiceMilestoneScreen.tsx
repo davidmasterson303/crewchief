@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 
+import Card from '../components/Card';
 import { apiRequest, ApiRequestError } from '../api/client';
 import {
   evaluateSchedule,
@@ -354,14 +355,14 @@ export function ServiceMilestoneScreen({ vehicleId, onSignOut }: Props) {
           onAdd={addToWishlist}
         />
       ) : (
-        <View style={styles.card}>
+        <Card style={styles.cardGap}>
           <Text style={styles.cardTitle}>Nothing due right now</Text>
           <Text style={styles.body14}>
             {services.length === 0
               ? 'This car has no structured service schedule yet, so nothing can be worked out from its mileage.'
               : 'The next service is far enough out that it is not worth a trip.'}
           </Text>
-        </View>
+        </Card>
       )}
 
       {/*
@@ -370,7 +371,7 @@ export function ServiceMilestoneScreen({ vehicleId, onSignOut }: Props) {
         went missing from every car in the product.
       */}
       {unknowns.length > 0 && (
-        <View style={styles.card}>
+        <Card style={styles.cardGap}>
           <Text style={styles.cardTitle}>Timed by date, not mileage</Text>
           <Text style={styles.body14}>
             Nothing on record says when these were last done, so there is no due date to work
@@ -382,7 +383,7 @@ export function ServiceMilestoneScreen({ vehicleId, onSignOut }: Props) {
               {service.intervalMonths ? ` — every ${service.intervalMonths} months` : ''}
             </Text>
           ))}
-        </View>
+        </Card>
       )}
 
       <Text style={styles.footnote}>{SCHEDULE_BASIS_LABELS['generated-schedule']}</Text>
@@ -404,7 +405,7 @@ function MilestoneBlock({
   const basis = milestoneBasis(milestone.services);
 
   return (
-    <View style={styles.card}>
+    <Card style={styles.cardGap}>
       <Text style={styles.cardTitle}>
         {milestone.mileage === null
           ? 'Next service'
@@ -450,7 +451,7 @@ function MilestoneBlock({
           </View>
         );
       })}
-    </View>
+    </Card>
   );
 }
 
@@ -481,7 +482,20 @@ const styles = StyleSheet.create({
   },
   primaryCtaText: { color: text.onInverse, fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
 
-  card: { backgroundColor: surface.raised, borderRadius: radius.card, padding: 16, gap: 10 },
+  /**
+   * The card, on the ladder rather than beside it.
+   *
+   * ⚠ This was a **private copy** — `surface.raised` with no border, where the
+   * `Card` primitive is `surface.card` with `border.panel`. `raised` is the
+   * ladder's step for bars, tab strips and chips; a card painted on it sits one
+   * step off from every other card in the app, which is precisely the "twelve
+   * slightly different containers" the primitive set was built to end.
+   *
+   * The gap is kept as it was. Padding and gaps across this app want a pass
+   * with a designer's eye rather than a find-and-replace — see the note in
+   * `mobile-radius-scale.test.ts` on why that rule was scoped to radius.
+   */
+  cardGap: { gap: 10 },
   cardTitle: { color: text.primary, fontSize: 17, fontWeight: '700', letterSpacing: -0.2 },
   reason: { color: text.secondary, fontSize: 14, lineHeight: 20 },
   basis: { color: text.muted, fontSize: 12 },

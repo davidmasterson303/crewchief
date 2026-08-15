@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 
+import Card from '../components/Card';
 import { apiRequest, ApiRequestError } from '../api/client';
 import {
   describeRecord,
@@ -207,12 +208,12 @@ export function ServiceHistoryScreen({ vehicleId, onSignOut }: Props) {
       }
     >
       {state.records.length === 0 ? (
-        <View style={styles.card}>
+        <Card style={styles.cardGap}>
           <Text style={styles.emptyTitle}>Nothing recorded yet</Text>
           <Text style={styles.emptyBody}>
             Scan an invoice, or mark something done on the wishlist, and it will appear here.
           </Text>
-        </View>
+        </Card>
       ) : (
         <>
           <View style={styles.summary}>
@@ -241,7 +242,7 @@ export function ServiceHistoryScreen({ vehicleId, onSignOut }: Props) {
             const meta = describeRecord(record);
 
             return (
-              <View key={record.id ?? `${record.item_description}-${index}`} style={styles.card}>
+              <Card key={record.id ?? `${record.item_description}-${index}`} style={styles.cardGap}>
                 <View style={styles.head}>
                   <Text style={styles.name}>{record.item_description ?? 'Service'}</Text>
                   {typeof record.total_cost === 'number' && record.total_cost > 0 && (
@@ -276,7 +277,7 @@ export function ServiceHistoryScreen({ vehicleId, onSignOut }: Props) {
                     </Pressable>
                   ) : null}
                 </View>
-              </View>
+              </Card>
             );
           })}
         </>
@@ -299,7 +300,20 @@ const styles = StyleSheet.create({
   summaryCost: { color: text.primary, fontSize: 15, fontWeight: '700' },
   summaryScope: { color: text.muted, fontSize: 13, fontWeight: '500' },
 
-  card: { backgroundColor: surface.raised, borderRadius: radius.card, padding: 16, gap: 6 },
+  /**
+   * The card, on the ladder rather than beside it.
+   *
+   * ⚠ This was a **private copy** — `surface.raised` with no border, where the
+   * `Card` primitive is `surface.card` with `border.panel`. `raised` is the
+   * ladder's step for bars, tab strips and chips; a card painted on it sits one
+   * step off from every other card in the app, which is precisely the "twelve
+   * slightly different containers" the primitive set was built to end.
+   *
+   * The gap is kept as it was. Padding and gaps across this app want a pass
+   * with a designer's eye rather than a find-and-replace — see the note in
+   * `mobile-radius-scale.test.ts` on why that rule was scoped to radius.
+   */
+  cardGap: { gap: 6 },
   head: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
   name: { color: text.primary, fontSize: 15, fontWeight: '600', flexShrink: 1 },
   cost: { color: text.primary, fontSize: 15, fontWeight: '700' },
