@@ -85,7 +85,23 @@ REVOKE TRUNCATE ON public.account_entitlements FROM authenticated;
 
   The heuristic reads statement *shapes*, not consequences. So "this migration is
   additive" and "the modal will stay quiet" are different claims, and only the
-  first is ours to make. Future headers should predict the modal only when a
-  migration contains no DROP and no REVOKE at all — and should say, as this one
-  does, that firing is expected when it does.
+  first is ours to make.
+
+  ## ⚠ And a correction to the correction — 15 August
+
+  **This header's own prediction was also wrong.** It says twice that the modal
+  *will* fire here. Cowork applied these four statements in the SQL editor on
+  15 August and **it did not fire** — four REVOKEs, executed straight through.
+
+  So the score is four predictions and four misses: three headers said the modal
+  would stay quiet and it fired, this one said it would fire and it did not. The
+  12 August observation does not generalise the way it was written — whatever
+  trips the heuristic, `REVOKE TRUNCATE ON public.<table>` is not it, and
+  `DROP POLICY IF EXISTS` may have been doing the work all along.
+
+  **The rule that survives: do not predict the modal at all.** It is a vendor
+  heuristic this repo has no model of, it changes without notice, and every
+  attempt to describe it has cost a later author a wrong expectation. State what
+  the migration *does* — additive, restrictive, destructive — which is knowable,
+  and leave the dashboard's behaviour to the person watching it.
 */
