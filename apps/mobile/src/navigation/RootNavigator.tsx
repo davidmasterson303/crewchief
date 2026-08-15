@@ -373,6 +373,8 @@ export function RootNavigator({
                   title: route.params.title,
                 })
               }
+              // The same seam as the garage's. See `pick-image.ts`.
+              pickPhoto={() => pickVehiclePhoto('library')}
             />
           )}
         </Stack.Screen>

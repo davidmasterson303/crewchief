@@ -223,6 +223,29 @@ export const bay = {
   light: brand.accent,
 } as const;
 
+/**
+ * ── The plinth ──────────────────────────────────────────────────────────────
+ *
+ * The block the hero dial stands on. It is the page colour at 92% — `fill` is
+ * `surface.page` with an alpha, not a fourth grey — so it reads as a slab cut
+ * from the same material rather than a card floating on it.
+ *
+ * ⚠ **No blur anywhere near it.** The 92% is what makes it look like glass, and
+ * it must stay a flat fill: a real backdrop blur would cost a native module,
+ * would drop frames under a sweeping needle, and — the actual reason — an
+ * unknown blurred backdrop is precisely where the 1.09:1 advisor button came
+ * from. A plinth whose contrast depends on what happens to be behind it is not
+ * a surface, it is a hazard.
+ */
+export const plinth = {
+  /** `surface.page` at 0.92. Same material, standing proud of it. */
+  fill: 'rgba(16,15,13,0.92)',
+  /** 1px edge. Lighter than `border.panel` because the slab has a lit top. */
+  edge: 'rgba(255,255,255,0.09)',
+  /** The inset catch-light along the top edge — a milled edge, not a shadow. */
+  catchLight: 'rgba(255,255,255,0.16)',
+} as const;
+
 /** Build continuum paint. Zone selection lives in `@crewchief/core/build-progress`. */
 export const build = {
   stock: '#7D8794',
@@ -335,6 +358,7 @@ export const theme = {
   brand,
   register,
   bay,
+  plinth,
   status,
   build,
   space,

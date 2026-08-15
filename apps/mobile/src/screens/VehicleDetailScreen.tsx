@@ -10,16 +10,28 @@ import {
 } from 'react-native';
 
 import { apiRequest, ApiRequestError } from '../api/client';
+import { uploadVehiclePhoto } from '../api/photos';
+import type { InvoiceFile } from '../api/documents';
 import type { HealthDriver } from '@crewchief/core/health-drivers';
+import { buildPosition } from '@crewchief/core/build-progress';
+import { nextRungs, showsModifications } from '@crewchief/core/mod-progression';
 import AlertBanner from '../components/AlertBanner';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import ClusterGauge from '../components/ClusterGauge';
 import HealthDrivers from '../components/HealthDrivers';
+import HealthHistory, { type HealthReading } from '../components/HealthHistory';
+import BuildGauge from '../components/BuildGauge';
+import ProgressionLadder from '../components/ProgressionLadder';
+import Plinth from '../components/Plinth';
+import VehiclePlate from '../components/VehiclePlate';
 import ListRow from '../components/ListRow';
 import SectionHeader from '../components/SectionHeader';
 import { border, radius, space, status, surface, text, type } from '../theme';
 import { getHealthBandJudgement } from '@crewchief/core/health-band';
+
+/** The board's hero height for the photograph on this screen. */
+const PHOTO_HERO = 196;
 
 /**
  * Phase 3.2, second half — the detail behind a garage row.
@@ -29,20 +41,22 @@ import { getHealthBandJudgement } from '@crewchief/core/health-band';
  *
  * ── One request, and no photograph ──────────────────────────────────────────
  *
- * `GET /api/v1/load-vehicle?vehicleId=…` returns the vehicle and its knowledge
- * base in one round trip, already stripped of `custom_image_url` and carrying a
- * signed `photo_url`. **This screen deliberately does not draw that photo yet.**
+ * `GET /api/v1/load-vehicle?vehicleId=…` returns the vehicle, its knowledge
+ * base, the computed health drivers and the score history in one round trip —
+ * already stripped of `custom_image_url` and carrying a signed `photo_url`.
  *
- * The signed URL points at the stored original, and the one real photo on this
- * account is a 2.3 MB legacy upload that predates the browser downscale — it
- * never decodes on the simulator. The garage card carries a timeout so it
- * degrades to a plate; repeating that machinery here to show the same picture
- * twice as large would double a net rather than remove the need for one.
+ * ── The photograph, which this screen used to decline to draw ───────────────
  *
- * **Not deferred pending a server-side transform** — that fix was tried on
- * 2 Aug and Supabase image transformation is not enabled for this tenant. It is
- * deferred pending either that paid feature or a derivative generated at
- * upload, and until then the honest version of this screen has no photo on it.
+ * It did, and the reason was sound at the time: the signed URL points at the
+ * stored original, the one real photo on this account is a 2.3 MB legacy upload
+ * that never decodes on a device, and repeating the garage card's timeout
+ * machinery here would have doubled a net rather than removed the need for one.
+ *
+ * All three parts of that changed on 15 Aug. The net is now **one component** —
+ * `VehiclePlate` owns the timeout, the two exits from loading and the fallback,
+ * so the hero reuses it rather than copying it. And the plate is no longer a
+ * dead end: `/api/v1/upload-photo` means a car that falls back to it can be
+ * given a picture from this screen.
  * `GarageScreen`'s `PHOTO_TIMEOUT_MS` docblock carries the full measurement.
  *
  * ── States, and which ones are not errors ───────────────────────────────────
@@ -89,6 +103,14 @@ interface Vehicle {
   */
   performance_mindedness?: string | null;
   ownership_objective?: string | null;
+  /**
+   * The signed URL, resolved from `custom_image_url` by the route.
+   *
+   * ⚠ It has been on this payload since `2eb172a` — the roadmap listed it as a
+   * missing API field on 15 Aug and it was already there. The screen simply
+   * declared it and never drew it.
+   */
+  photo_url?: string | null;
   /* Both embedded shapes accepted, for the reason GarageScreen sets out. */
   vehicle_health_summary?: HealthSummary | HealthSummary[] | null;
   nhtsa_data?: { recalls?: unknown[] | null } | { recalls?: unknown[] | null }[] | null;
@@ -109,9 +131,27 @@ function humanise(value: string): string {
     .join(' ');
 }
 
+/**
+ * The slice of the knowledge base this screen reads.
+ *
+ * Deliberately not the whole dossier's type. `load-vehicle` returns
+ * `vehicle_knowledge_base` with `select('*')`, and declaring every column here
+ * would make the screen's contract a mirror of that table — the exact problem
+ * `VEHICLE_COLUMNS` was written to stop on the route side.
+ */
+interface Knowledge {
+  common_mods?: Array<{ name: string; purpose?: string; difficulty?: string }> | null;
+}
+
 type State =
   | { status: 'loading' }
-  | { status: 'ok'; vehicle: Vehicle; drivers: HealthDriver[] }
+  | {
+      status: 'ok';
+      vehicle: Vehicle;
+      drivers: HealthDriver[];
+      history: HealthReading[];
+      knowledge: Knowledge | null;
+    }
   | { status: 'missing' }
   | { status: 'error'; message: string; unauthorized: boolean };
 
@@ -124,6 +164,7 @@ export function VehicleDetailScreen({
   onViewRecalls,
   onOpenWishlist,
   onOpenHistory,
+  pickPhoto,
 }: {
   vehicleId: string;
   onBack: () => void;
@@ -138,16 +179,32 @@ export function VehicleDetailScreen({
   onScanInvoice: () => void;
   onViewRecalls: () => void;
   onOpenWishlist: () => void;
+  /**
+   * The picker seam — this screen never imports `expo-image-picker`.
+   *
+   * Same reasoning as `GarageScreen` and `InvoiceScanScreen`: it is a native
+   * module, a build that lacks it crashes on launch the moment anything in the
+   * graph imports it, and taking it as a prop is what lets this screen mount in
+   * a test. Omitted means the plate has no control rather than a broken one.
+   */
+  pickPhoto?: () => Promise<InvoiceFile | null>;
   /** Track 5.6 follow-on: the phone could write service history and not read it. */
   onOpenHistory: () => void;
 }) {
   const [state, setState] = useState<State>({ status: 'loading' });
   const [refreshing, setRefreshing] = useState(false);
 
+  const [uploading, setUploading] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+
   const load = useCallback(
     async (isRefresh = false) => {
       if (isRefresh) setRefreshing(true);
       else setState({ status: 'loading' });
+
+      // A photo error does not survive a reload — `AlertBanner` is an alert
+      // rather than a dialog, so refresh is what dismisses it.
+      setPhotoError(null);
 
       try {
         /*
@@ -156,9 +213,12 @@ export function VehicleDetailScreen({
           something else routes here with a value that is not a uuid, a raw
           interpolation is a query-string injection rather than a 400.
         */
-        const body = await apiRequest<{ vehicle?: Vehicle; health_drivers?: HealthDriver[] }>(
-          `/load-vehicle?vehicleId=${encodeURIComponent(vehicleId)}`,
-        );
+        const body = await apiRequest<{
+          vehicle?: Vehicle;
+          health_drivers?: HealthDriver[];
+          health_history?: HealthReading[];
+          knowledge?: Knowledge | null;
+        }>(`/load-vehicle?vehicleId=${encodeURIComponent(vehicleId)}`);
         if (!body.vehicle) {
           setState({ status: 'missing' });
           return;
@@ -176,6 +236,8 @@ export function VehicleDetailScreen({
           status: 'ok',
           vehicle: body.vehicle,
           drivers: Array.isArray(body.health_drivers) ? body.health_drivers : [],
+          history: Array.isArray(body.health_history) ? body.health_history : [],
+          knowledge: body.knowledge ?? null,
         });
       } catch (error) {
         const apiError = error as ApiRequestError;
@@ -199,6 +261,37 @@ export function VehicleDetailScreen({
   useEffect(() => {
     void load();
   }, [load]);
+
+  /**
+   * Add or replace this car's photograph.
+   *
+   * The same three outcomes the garage handles, and the same rule about which
+   * of them is an error: **dismissal is not one.** The picker resolving `null`
+   * returns the screen to idle silently — showing "cancelled" after a
+   * deliberate tap on Cancel is how an app feels accusatory.
+   *
+   * Reloads rather than patching `photo_url` in place. The upload returns a
+   * signed URL and the payload carries one the server signed its own way;
+   * writing one into state the next refresh overwrites is the disagreement that
+   * reads as a photo flickering back to the plate.
+   */
+  const onAddPhoto = useCallback(async () => {
+    if (!pickPhoto) return;
+    setPhotoError(null);
+
+    try {
+      const file = await pickPhoto();
+      if (!file) return;
+
+      setUploading(true);
+      await uploadVehiclePhoto(vehicleId, file);
+      await load(true);
+    } catch (error) {
+      setPhotoError(error instanceof Error ? error.message : 'That photo could not be saved.');
+    } finally {
+      setUploading(false);
+    }
+  }, [pickPhoto, vehicleId, load]);
 
   if (state.status === 'loading') {
     return (
@@ -240,7 +333,30 @@ export function VehicleDetailScreen({
     );
   }
 
-  const { vehicle, drivers } = state;
+  const { vehicle, drivers, history, knowledge } = state;
+
+  /*
+    ── The build dial and the ladder, from the knowledge base ─────────────────
+
+    ⚠ `completed` is empty, and it is empty **everywhere**: `modification_tracking`
+    holds no rows across the entire product — re-confirmed against the live
+    database on 15 Aug. So every car reads Stock with the ladder on its first
+    rung, and that is the honest state rather than a placeholder.
+
+    `mod-progression.ts` makes the same argument for the ladder: with no
+    history, the first step genuinely is the first step. The dial says the same
+    thing in glass — a needle at rest is a car nobody has recorded work on, not
+    a car in poor condition, which is why it never borrows the health ramp.
+  */
+  const completed: string[] = [];
+  const build = buildPosition([]);
+  const rungs = showsModifications(vehicle.performance_mindedness)
+    ? nextRungs({
+        mods: Array.isArray(knowledge?.common_mods) ? knowledge.common_mods : [],
+        completed,
+        mindedness: vehicle.performance_mindedness,
+      })
+    : [];
   const health = first(vehicle.vehicle_health_summary);
   const score = typeof health?.health_score === 'number' ? health.health_score : null;
   const band = score === null ? null : getHealthBandJudgement(score);
@@ -257,6 +373,36 @@ export function VehicleDetailScreen({
         />
       }
     >
+      {/*
+        The 196pt photo hero — no longer deferred.
+
+        Three things changed on 15 Aug and all three were prerequisites:
+        `photo_url` turned out to have been on this payload since `2eb172a`;
+        `VehiclePlate` moved the timeout and the fallback into one component, so
+        showing a photo here reuses that net rather than doubling it; and
+        `/api/v1/upload-photo` means a car that lands on the plate can be given
+        a picture from this screen instead of being stuck there.
+
+        ⚠ It will show the plate on this account until the M235i's 2.3 MB
+        original is replaced — that file has never decoded on a device. That is
+        the fallback working, not the hero failing, and the control to fix it is
+        on the plate itself.
+      */}
+      {photoError && (
+        <AlertBanner tone="critical" headline="That photo was not saved" body={photoError} />
+      )}
+
+      <VehiclePlate
+        photo={vehicle.photo_url}
+        year={vehicle.year}
+        make={vehicle.make}
+        model={vehicle.model}
+        trim={vehicle.trim}
+        height={PHOTO_HERO}
+        onAddPhoto={pickPhoto ? () => void onAddPhoto() : undefined}
+        busy={uploading}
+      />
+
       <View style={styles.headerBlock}>
         <Text style={styles.name}>
           {[vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ')}
@@ -303,9 +449,18 @@ export function VehicleDetailScreen({
             width; and it sweeps at ignition, which the garage row does not — a
             column of three dials all sweeping at once reads as noise.
           */}
-          <View style={styles.heroDial}>
+          {/*
+            The dial stands on a plinth rather than on the card.
+
+            A 184pt instrument dropped straight onto a panel is a picture of an
+            instrument. The slab is what makes it an object — and it is the
+            other half of what was deferred out of step 3 with the bay, for the
+            same reason: both are shaped by the dial, so building them around a
+            placeholder meant building them twice.
+          */}
+          <Plinth>
             <ClusterGauge score={score} />
-          </View>
+          </Plinth>
           {health?.summary ? <Text style={styles.summary}>{health.summary}</Text> : null}
 
           {/*
@@ -319,6 +474,45 @@ export function VehicleDetailScreen({
             mileage against age.
           */}
           <HealthDrivers drivers={drivers} />
+
+          {/*
+            Score over time.
+
+            ⚠ **Renders nothing on this account today**, and that is correct:
+            there is one recorded reading for the real car and a chart needs
+            two. The sweep writes one per vehicle per run, so it fills in on its
+            own — which is why the plumbing is here rather than waiting for the
+            data to exist first.
+          */}
+          <HealthHistory history={history} />
+        </Card>
+      )}
+
+      {/*
+        ── The build, and why it is a second card rather than a second dial ────
+
+        The board's screen 03 names these as "the two instruments web has and
+        mobile does not". They are siblings, not variants: the health gauge is
+        hardwired to health semantics and **a low build reading is stock, not a
+        fault** — reusing it would render an unmodified car as a critical
+        failure and announce it as one.
+
+        Shown only when the owner has not said "stock". `showsModifications` is
+        the one genuine off switch, and it is "not now" rather than "never".
+      */}
+      {showsModifications(vehicle.performance_mindedness) && (
+        <Card>
+          <SectionHeader title="Build" />
+          <View style={styles.buildDial}>
+            <BuildGauge position={build} />
+          </View>
+
+          {/*
+            The ladder answers the question the dial does not: why this next,
+            and not the turbo. A recommendation with no visible reasoning is a
+            black box, and this product's whole argument is that it is not one.
+          */}
+          {rungs.length > 0 && <ProgressionLadder next={rungs[0].role} />}
         </Card>
       )}
 
@@ -438,7 +632,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
   },
 
-  heroDial: { alignItems: 'center', paddingVertical: space.sm },
+  buildDial: { alignItems: 'center' },
   summary: { ...type.body, fontSize: 14, lineHeight: 20, color: text.secondary },
 
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: space.lg },

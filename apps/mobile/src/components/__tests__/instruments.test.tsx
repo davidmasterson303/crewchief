@@ -12,8 +12,9 @@ import ProgressionLadder from '../ProgressionLadder';
 import VehiclePlate from '../VehiclePlate';
 import GarageBay from '../GarageBay';
 import HealthDrivers from '../HealthDrivers';
+import Plinth from '../Plinth';
 import type { HealthDriver } from '@crewchief/core/health-drivers';
-import { DIAL_MIN, build, text } from '../../theme';
+import { DIAL_MIN, build, plinth, text } from '../../theme';
 
 /**
  * The instruments' invariants.
@@ -678,5 +679,45 @@ describe('HealthDrivers', () => {
 
     expect(style.color).toBe(text.muted);
     view.getByText('Recalls have not been checked for this vehicle.');
+  });
+});
+
+describe('Plinth', () => {
+  it('is a flat fill and never a blur', async () => {
+    /*
+      ⚠ The rule, not a preference. `plinth.fill` is the page colour at 92%,
+      which is what reads as glass — and it must stay flat: a real backdrop blur
+      costs a native module, would drop frames under a sweeping needle, and,
+      deciding it, a surface whose contrast depends on whatever is behind it is
+      where the 1.09:1 advisor button came from.
+
+      Asserted on the rendered tree because a blur would arrive as a different
+      host component, which no source scan of this file would catch.
+    */
+    const view = await render(
+      <Plinth>
+        <ClusterGauge score={70} variant="row" />
+      </Plinth>
+    );
+
+    const rendered = JSON.stringify(view.toJSON());
+    expect(rendered).not.toMatch(/BlurView|blurRadius|blurAmount|backdropFilter/i);
+    expect(rendered).toContain(plinth.fill);
+  });
+
+  it('lights its top edge rather than casting a shadow', async () => {
+    /*
+      A shadow would put the slab *on* something. A lit edge says it was milled
+      and is being lit from where the bay's light already comes from.
+    */
+    const view = await render(
+      <Plinth>
+        <ClusterGauge score={70} variant="row" />
+      </Plinth>
+    );
+
+    const rendered = JSON.stringify(view.toJSON());
+    expect(rendered).toContain(plinth.catchLight);
+    expect(rendered).not.toMatch(/shadowOffset|shadowRadius|elevation/);
   });
 });

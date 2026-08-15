@@ -122,13 +122,33 @@ export async function GET(request: NextRequest): Promise<Response> {
       This is a single-vehicle detail read; the garage list must not copy it —
       that is the per-row cost the same document argues against.
     */
-    const [vehicleResult, knowledgeResult, historyResult] = await Promise.all([
+    const [vehicleResult, knowledgeResult, historyResult, healthHistoryResult] =
+      await Promise.all([
       supabase.from('vehicles').select(VEHICLE_COLUMNS).eq('id', vehicleId).maybeSingle(),
       supabase.from('vehicle_knowledge_base').select('*').eq('vehicle_id', vehicleId).maybeSingle(),
       supabase
         .from('maintenance_line_items')
         .select('item_description, service_date, mileage_at_service, source')
         .eq('vehicle_id', vehicleId),
+      /*
+        Score over time — the fourth instrument, 15 Aug.
+
+        Bounded at 30 readings and ordered oldest-first, which is the order a
+        chart draws in. The bound is not defensive: the sweep writes a row per
+        vehicle per run, so this table grows without limit and a detail screen
+        that fetched all of it would get slower every night it ran.
+
+        ⚠ **Invisible on this account today**, and that is correct rather than
+        broken: there is exactly one recorded reading for the real car, and
+        `HealthHistory` declines to draw a chart from a single point. The
+        plumbing is here so it fills in on its own as the sweep runs.
+      */
+      supabase
+        .from('vehicle_health_history')
+        .select('health_score, recorded_at')
+        .eq('vehicle_id', vehicleId)
+        .order('recorded_at', { ascending: true })
+        .limit(30),
     ]);
 
     const { data: vehicleData, error: vehicleError } = vehicleResult;
@@ -212,6 +232,12 @@ export async function GET(request: NextRequest): Promise<Response> {
         could write one back.
       */
       health_drivers: drivers,
+      /*
+        Same degrade as the service history: a failed read is an empty chart,
+        never a 500. A detail screen that refuses to render because it could not
+        draw a trend line is worse than one without the trend line.
+      */
+      health_history: healthHistoryResult.error ? [] : (healthHistoryResult.data ?? []),
     } as ApiResponse);
   } catch (error) {
     logger.error('API:LOAD_VEHICLE', error as Error);
