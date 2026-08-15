@@ -13,10 +13,11 @@ import { apiRequest, ApiRequestError } from '../api/client';
 import AlertBanner from '../components/AlertBanner';
 import Button from '../components/Button';
 import Card from '../components/Card';
+import ClusterGauge from '../components/ClusterGauge';
 import ListRow from '../components/ListRow';
 import SectionHeader from '../components/SectionHeader';
 import { border, radius, space, status, surface, text, type } from '../theme';
-import { getHealthBandJudgement, healthBandHex } from '@crewchief/core/health-band';
+import { getHealthBandJudgement } from '@crewchief/core/health-band';
 
 /**
  * Phase 3.2, second half — the detail behind a garage row.
@@ -280,16 +281,17 @@ export function VehicleDetailScreen({
       {score !== null && band && (
         <Card>
           <SectionHeader title="Health" />
-          <View style={styles.scoreRow}>
-            <Text style={[styles.score, { color: healthBandHex(band) }]}>{score}</Text>
-            <Text style={[styles.bandLabel, { color: healthBandHex(band) }]}>
-              {/*
-                `label` here, `short` on the garage row. The module sets both
-                deliberately and says `label` is canonical — the row abbreviates
-                because it has a card's width, and this screen does not have to.
-              */}
-              {band.label}
-            </Text>
+          {/*
+            The hero instrument — step 4.
+
+            One dial per screen, and on vehicle detail this is it. `ClusterGauge`
+            carries the canonical `label` rather than the garage row's `short`,
+            because the module sets both deliberately and this screen has the
+            width; and it sweeps at ignition, which the garage row does not — a
+            column of three dials all sweeping at once reads as noise.
+          */}
+          <View style={styles.heroDial}>
+            <ClusterGauge score={score} />
           </View>
           {health?.summary ? <Text style={styles.summary}>{health.summary}</Text> : null}
         </Card>
@@ -398,14 +400,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
   },
 
-  scoreRow: { flexDirection: 'row', alignItems: 'baseline', gap: space.sm },
-  score: { fontSize: 34, fontWeight: '700', lineHeight: 36 },
-  bandLabel: {
-    ...type.label,
-    fontSize: 11,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
+  heroDial: { alignItems: 'center', paddingVertical: space.sm },
   summary: { ...type.body, fontSize: 14, lineHeight: 20, color: text.secondary },
 
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: space.lg },

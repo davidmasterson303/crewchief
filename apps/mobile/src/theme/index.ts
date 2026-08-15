@@ -120,6 +120,28 @@ export const brand = {
 } as const;
 
 /**
+ * ── The register, as tokens and nothing else ────────────────────────────────
+ *
+ * The rule is that **no component may branch on register**. One theme scope,
+ * token overrides only — that is how the cost of carrying two treatments stops
+ * being permanent, and it is why this is a token rather than a `variant` prop
+ * threaded through the instruments.
+ *
+ * `accent` is web's `--register-accent`, which resolves to `--info` in the
+ * default register and to `--build-far` under `.register-sport`. Only the
+ * standard value is here because the phone has no sport scope yet; when it gets
+ * one, this object is what changes and no component moves.
+ *
+ * ⚠ The amber the sport register uses is `build.far`, and it is already in this
+ * file. Reaching for it directly to "preview sport" is the branch this rule
+ * exists to prevent.
+ */
+export const register = {
+  /** Web `--register-accent` in the default register — `--info`. */
+  accent: '#8FB4C4',
+} as const;
+
+/**
  * Status colours.
  *
  * ⚠ **The health band is not here.** Thresholds, wording and colour are owned
@@ -289,6 +311,7 @@ export const theme = {
   border,
   text,
   brand,
+  register,
   status,
   build,
   space,

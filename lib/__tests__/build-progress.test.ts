@@ -16,7 +16,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
+  REDLINE_FROM,
   buildPosition,
+  buildRampFor,
   buildSummary,
   effortOf,
   needleFor,
@@ -158,5 +160,55 @@ describe('one instrument, two readings', () => {
     expect(gauge).toContain('2.7 * score - 135');
     expect(angleFor(0)).toBe(-135);
     expect(angleFor(100)).toBe(135);
+  });
+});
+
+/**
+ * The build dial's paint, pinned across two clients.
+ *
+ * `buildRampFor` and `REDLINE_FROM` moved into core when the phone grew its own
+ * `BuildGauge`: React Native has no `var(--build-far)`, so the mobile dial has
+ * to make the same region choice from its own token layer, and a second copy of
+ * `needle >= 70` is a second copy.
+ *
+ * `components/BuildGauge.tsx` still carries its literals, deliberately — the
+ * same reasoning `cluster-geometry` states above. It works, it is covered, and
+ * rewriting a shipped component to prove a point about duplication is how a
+ * working thing breaks. This pins them instead, so the two dials cannot start
+ * disagreeing about where a build turns amber.
+ */
+describe('one ramp, two clients', () => {
+  const web = readFileSync(
+    join(__dirname, '..', '..', 'components', 'BuildGauge.tsx'),
+    'utf8'
+  );
+
+  it('shares the redline', () => {
+    expect(web).toContain(`const REDLINE_FROM = ${REDLINE_FROM}`);
+    expect(REDLINE_FROM).toBe(82);
+  });
+
+  it('shares the three ramp thresholds', () => {
+    expect(web).toContain('needle >= 70');
+    expect(web).toContain('needle >= 40');
+    expect(web).toContain('needle >= 12');
+
+    expect(buildRampFor(70)).toBe('far');
+    expect(buildRampFor(69)).toBe('warm');
+    expect(buildRampFor(40)).toBe('warm');
+    expect(buildRampFor(39)).toBe('mild');
+    expect(buildRampFor(12)).toBe('mild');
+    expect(buildRampFor(11)).toBe('stock');
+  });
+
+  it('never puts a stock reading in a health band s territory', () => {
+    /*
+      The rule the phone's dial is tested against too, stated here because it is
+      a property of the ramp rather than of either renderer: **a low reading is
+      stock, not a fault.** `stock` is the region for everything under 12, and
+      there is no region above it that a zero reading can fall into.
+    */
+    expect(buildRampFor(0)).toBe('stock');
+    expect(buildRampFor(buildPosition([]).needle)).toBe('stock');
   });
 });

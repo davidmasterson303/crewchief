@@ -13,6 +13,7 @@ import {
 import { apiRequest, ApiRequestError } from '../api/client';
 import Button from '../components/Button';
 import Chip from '../components/Chip';
+import ClusterGauge from '../components/ClusterGauge';
 import Logo from '../components/Logo';
 import { SkeletonCard } from '../components/Skeleton';
 import {
@@ -34,7 +35,7 @@ import {
   registerForPush,
 } from '../notifications/register';
 import { shouldShowPushPrimer } from '@crewchief/core/push-priming';
-import { getHealthBandJudgement, healthBandHex } from '@crewchief/core/health-band';
+import { getHealthBandJudgement } from '@crewchief/core/health-band';
 
 /**
  * Phase 3.2 — the garage, read only.
@@ -52,9 +53,11 @@ import { getHealthBandJudgement, healthBandHex } from '@crewchief/core/health-ba
  * the first place, at two-clients scale, where nobody notices until a phone and
  * a laptop are held side by side.
  *
- * `healthBandHex` exists because React Native's StyleSheet has no `rgba()`
- * string form, so the shared `r,g,b` channels have to become a hex literal
- * somewhere. Somewhere is core, once, rather than here.
+ * Since step 4 this screen no longer paints a score itself. `ClusterGauge`'s
+ * row variant owns the presentation and reads the band internally; the band is
+ * still resolved here because the card needs to know whether there *is* a
+ * score at all — a missing score is not a zero, and banding one would paint the
+ * card red about a condition nobody measured.
  *
  * ── The states this has to render ───────────────────────────────────────────
  *
@@ -252,10 +255,17 @@ function VehicleCard({
           </View>
 
           {band && score !== null ? (
-            <View style={styles.healthBlock}>
-              <Text style={[styles.score, { color: healthBandHex(band) }]}>{score}</Text>
-              <Text style={[styles.bandLabel, { color: healthBandHex(band) }]}>{band.short}</Text>
-            </View>
+            /*
+              The row scale of the health instrument — step 4.
+
+              Not a small dial. Under `DIAL_MIN` the ticks stop resolving and an
+              instrument that cannot be read is decoration, so the row is a
+              numeral and a verdict and nothing else. `ClusterGauge` owns that
+              judgement now, which also retires two things this card was doing
+              by hand: an 11pt band label that sat **under the 12pt type floor**,
+              and a second local opinion about how a score is presented.
+            */
+            <ClusterGauge score={score} variant="row" />
           ) : (
             /*
               No score is not a zero. Banding a missing value would paint the
@@ -727,14 +737,6 @@ const styles = StyleSheet.create({
   name: { ...type.title, color: text.primary },
   trim: { ...type.value, color: text.muted, marginTop: 2 },
 
-  healthBlock: { alignItems: 'flex-end' },
-  score: { ...type.title, fontSize: 24, lineHeight: 26 },
-  bandLabel: {
-    ...type.label,
-    fontSize: 11,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
   noScore: { ...type.value, fontSize: 12, color: text.muted },
 
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md },
