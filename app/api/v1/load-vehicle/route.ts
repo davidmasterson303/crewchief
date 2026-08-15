@@ -4,8 +4,25 @@ import type { ApiResponse } from '@crewchief/core/types';
 import { checkRateLimit, getClientIdentifier, rateLimitResponse } from '@/lib/rate-limit';
 import { authorizeVehicleAccess } from '@/lib/api-auth';
 import { resolveVehiclePhoto } from '@/lib/vehicle-photo';
+import { evaluateSchedule } from '@crewchief/core/service-due';
+import { historyLookups } from '@crewchief/core/service-history';
+import { healthDrivers } from '@crewchief/core/health-drivers';
 
 export const dynamic = 'force-dynamic';
+
+/**
+ * One embedded row, whichever shape PostgREST chose.
+ *
+ * An embedded one-to-one arrives as an object and a one-to-many as an array,
+ * and `nhtsa_data` is declared one-to-one but comes back either way depending
+ * on how the relationship is inferred. Both mobile screens carry the same
+ * helper for the same reason — a wrong guess here reads as a car with no
+ * recalls rather than as a shape mismatch, which is the quiet direction to be
+ * wrong in.
+ */
+function embedded<T>(value: unknown): T | undefined {
+  return (Array.isArray(value) ? value[0] : (value ?? undefined)) as T | undefined;
+}
 
 /**
  * The columns this endpoint promises. Declared rather than `select('*')`.
@@ -89,9 +106,29 @@ export async function GET(request: NextRequest): Promise<Response> {
 
     const supabase = access.client;
 
-    const [vehicleResult, knowledgeResult] = await Promise.all([
+    /*
+      The third query is the health card's three drivers — 15 Aug.
+
+      ⚠ It is here rather than in a migration, and that is a deliberate change
+      of shape from `docs/step4-api-gaps.md`, which proposed three stored
+      columns written by the nightly sweep. **Stored numbers would need a
+      writer, would go stale between sweeps, and could disagree with the
+      schedule they were derived from.** Every input the drivers need is either
+      already on this response or is this one extra row, so they are derived at
+      read and cannot drift from the facts they describe.
+
+      Parallel with the two that were already here, so the cost is a round trip
+      this request was waiting through anyway rather than a third one in series.
+      This is a single-vehicle detail read; the garage list must not copy it —
+      that is the per-row cost the same document argues against.
+    */
+    const [vehicleResult, knowledgeResult, historyResult] = await Promise.all([
       supabase.from('vehicles').select(VEHICLE_COLUMNS).eq('id', vehicleId).maybeSingle(),
       supabase.from('vehicle_knowledge_base').select('*').eq('vehicle_id', vehicleId).maybeSingle(),
+      supabase
+        .from('maintenance_line_items')
+        .select('item_description, service_date, mileage_at_service, source')
+        .eq('vehicle_id', vehicleId),
     ]);
 
     const { data: vehicleData, error: vehicleError } = vehicleResult;
@@ -125,12 +162,56 @@ export async function GET(request: NextRequest): Promise<Response> {
       supabase
     );
 
+    /*
+      ── The drivers, and how each one fails ────────────────────────────────
+
+      `historyResult.error` is **not** fatal and must not be. A demo read runs
+      on the anon client, where `maintenance_line_items` may be unreachable
+      under RLS, and a detail screen that 500s because it could not enrich a
+      card is worse than one that says "no record to count from". So a failed
+      history read degrades to no history: every mileage-driven service still
+      evaluates from the odometer, and the time-only ones report `unknown`,
+      which the maintenance driver is explicitly built not to charge for.
+
+      A missing schedule degrades the same way — `maintenanceDriver` returns a
+      null score with a sentence rather than a zero.
+    */
+    const schedule = knowledgeData?.maintenance_schedule;
+    const history = historyResult.error ? [] : (historyResult.data ?? []);
+
+    const services = Array.isArray(schedule)
+      ? evaluateSchedule({
+          schedule,
+          currentMileage: (vehicle.current_mileage as number | null) ?? 0,
+          ...historyLookups(history),
+        })
+      : [];
+
+    const drivers = healthDrivers({
+      services,
+      /*
+        `undefined` when the embed is absent, which the driver reads as "never
+        checked" rather than "none". An empty array means NHTSA was asked and
+        had nothing; those are different claims and only one of them is safe to
+        make.
+      */
+      recalls: embedded<{ recalls?: unknown }>(vehicle.nhtsa_data)?.recalls,
+      currentMileage: vehicle.current_mileage as number | null,
+      year: vehicle.year as number | null,
+    });
+
     logger.info('API:LOAD_VEHICLE', 'Vehicle loaded successfully', { vehicleId });
 
     return Response.json({
       success: true,
       vehicle: { ...vehicle, photo_url },
       knowledge: knowledgeData,
+      /*
+        Top level rather than folded into `vehicle`. These are *derived* and the
+        vehicle object is the row — mixing them would make a caller believe it
+        could write one back.
+      */
+      health_drivers: drivers,
     } as ApiResponse);
   } catch (error) {
     logger.error('API:LOAD_VEHICLE', error as Error);

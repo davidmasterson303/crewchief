@@ -123,3 +123,81 @@ export function isSemanticHue(hue: number): boolean {
   const h = ((hue % 360) + 360) % 360;
   return SEMANTIC_HUE_RANGES.some(([lo, hi]) => h >= lo && h <= hi);
 }
+
+/**
+ * ── The same field, for a client with no CSS ────────────────────────────────
+ *
+ * `vehicleField` returns `oklch()` stops inside a `linear-gradient()` string.
+ * React Native can parse neither: `oklch` is not in its colour grammar, and
+ * there is no gradient in its StyleSheet at all.
+ *
+ * The split is the one `health-band.ts` argues. **What colour a make gets is a
+ * deterministic product decision and lives here**; how it is expressed is
+ * presentation and stays with the platform — a CSS gradient on web, two hex
+ * stops and an angle fed to `react-native-svg` on the phone.
+ *
+ * ⚠ The conversion has to be real rather than approximate. A BMW plate that is
+ * one blue in a browser and a different blue on a phone is the two-clients bug
+ * this codebase keeps paying for, and it would be invisible until someone held
+ * the two side by side — which is exactly how the health band's wording drifted.
+ */
+
+/** Cube, kept named because it is the OKLab step people delete by accident. */
+const cube = (value: number) => value * value * value;
+
+/** Linear-light channel → sRGB, the standard piecewise transfer function. */
+function encodeSrgb(channel: number): number {
+  const clipped = Math.max(0, Math.min(1, channel));
+  const encoded =
+    clipped <= 0.0031308 ? 12.92 * clipped : 1.055 * Math.pow(clipped, 1 / 2.4) - 0.055;
+  return Math.round(encoded * 255);
+}
+
+/**
+ * `oklch(L C H)` → `#rrggbb`.
+ *
+ * OKLCh → OKLab → linear sRGB → sRGB, with the standard matrices. Values
+ * outside the sRGB gamut are clipped per channel, which is what a browser does
+ * too — the field's stops are dark and low-chroma by construction, so nothing
+ * here is near an edge.
+ */
+export function oklchToHex(lightness: number, chroma: number, hue: number): string {
+  const radians = (hue * Math.PI) / 180;
+  const a = chroma * Math.cos(radians);
+  const b = chroma * Math.sin(radians);
+
+  const l = cube(lightness + 0.3963377774 * a + 0.2158037573 * b);
+  const m = cube(lightness - 0.1055613458 * a - 0.0638541728 * b);
+  const s = cube(lightness - 0.0894841775 * a - 1.291485548 * b);
+
+  const red = encodeSrgb(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s);
+  const green = encodeSrgb(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s);
+  const blue = encodeSrgb(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s);
+
+  return `#${[red, green, blue].map((c) => c.toString(16).padStart(2, '0')).join('')}`;
+}
+
+export interface VehicleFieldStops {
+  /** The lighter stop, at 0%. */
+  from: string;
+  /** The darker stop, at 100%. */
+  to: string;
+  /** CSS gradient angle in degrees — 0 points up, 90 points right. */
+  angle: number;
+}
+
+/**
+ * The field as two hex stops, for a renderer that cannot read `oklch()`.
+ *
+ * The same three axes as `vehicleField` and the same hash, so a make's plate is
+ * the same colour on every client. Only the notation changes.
+ */
+export function vehicleFieldStops(make: string | null | undefined): VehicleFieldStops {
+  const field = vehicleField(make);
+
+  return {
+    from: oklchToHex(0.278, 0.048 * field.chromaFactor, field.hue),
+    to: oklchToHex(0.138, 0.024 * field.chromaFactor, (field.hue + 22) % 360),
+    angle: field.angle,
+  };
+}

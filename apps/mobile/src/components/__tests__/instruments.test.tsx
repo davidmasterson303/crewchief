@@ -3,11 +3,13 @@ import { AccessibilityInfo, processColor } from 'react-native';
 import { R } from '@crewchief/core/cluster-geometry';
 import { getHealthBandJudgement, healthBandHex } from '@crewchief/core/health-band';
 import { REDLINE_FROM, buildPosition } from '@crewchief/core/build-progress';
+import { vehicleFieldStops } from '@crewchief/core/vehicle-identity';
 
 import BuildGauge from '../BuildGauge';
 import ClusterGauge from '../ClusterGauge';
 import HealthHistory from '../HealthHistory';
 import ProgressionLadder from '../ProgressionLadder';
+import VehiclePlate from '../VehiclePlate';
 import { DIAL_MIN, build } from '../../theme';
 
 /**
@@ -418,5 +420,84 @@ describe('HealthHistory', () => {
 
     expect(ys).toHaveLength(3);
     expect(Math.max(...ys)).toBeGreaterThan(Math.min(...ys) + 10);
+  });
+});
+
+describe('VehiclePlate', () => {
+  it('names the car instead of naming the absence', async () => {
+    /*
+      ⚠ The defect this replaced. The card rendered a grey box reading "No
+      photo" — a placeholder that names an absence, so a garage of
+      unphotographed cars read as a garage of incomplete records. CC-142's
+      answer is a finished design for the same state.
+    */
+    const view = await render(
+      <VehiclePlate year={2015} make="BMW" model="M235i" trim="xDrive" />
+    );
+
+    view.getByText('M235i');
+    view.getByText('2015 BMW · xDrive');
+    expect(view.queryByText(/no photo/i)).toBeNull();
+  });
+
+  it('paints the field under a photograph as well as instead of one', async () => {
+    // Not only a fallback — it is what shows for the instant before a photo
+    // decodes, so the card never flashes an empty rectangle on its way to one.
+    const view = await render(
+      <VehiclePlate photo="https://example.test/car.jpg" make="BMW" model="M235i" />
+    );
+
+    expect(hostNodes(view.root, 'RNSVGRect')).toHaveLength(1);
+    // The lockup stands down when there is a photo — the card body already
+    // names the car, and printing it twice says the same thing twice.
+    expect(view.queryByText('M235i')).toBeNull();
+  });
+
+  it('gives a make the same field on this client as on the other one', async () => {
+    /*
+      The whole reason `vehicleFieldStops` is in core. A BMW plate that is one
+      blue in a browser and a different blue on a phone is two designs, and the
+      drift would be invisible until someone held them side by side.
+    */
+    const stops = vehicleFieldStops('BMW');
+    const view = await render(<VehiclePlate make="BMW" model="M235i" />);
+
+    /*
+      react-native-svg flattens a gradient to `[offset, colour, offset, colour]`
+      and its colours come out **signed** where `processColor` returns unsigned.
+      `>>> 0` puts both on the same side of 2^31 rather than this file deciding
+      which representation is the real one.
+    */
+    const colours = hostNodes(view.root, 'RNSVGLinearGradient')
+      .flatMap((props) => (Array.isArray(props.gradient) ? props.gradient : []))
+      .map((value) => Number(value) >>> 0);
+
+    expect(colours).toContain(paintOf(stops.from) >>> 0);
+    expect(colours).toContain(paintOf(stops.to) >>> 0);
+  });
+
+  it('falls back to the lockup when a photo never resolves', async () => {
+    /*
+      An RN `Image` on a URL that hangs stays loading forever — it draws
+      nothing and `onError` never fires, so a fallback gated on failure is
+      unreachable. Measured on the simulator on 1 Aug against this account's
+      own 2.3 MB original, which is still stored.
+    */
+    jest.useFakeTimers();
+    try {
+      const view = await render(
+        <VehiclePlate photo="https://example.test/hangs.jpg" make="BMW" model="M235i" />
+      );
+
+      expect(view.queryByText('M235i')).toBeNull();
+
+      await act(async () => {
+        jest.advanceTimersByTime(6000);
+      });
+
+      view.getByText('M235i');
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

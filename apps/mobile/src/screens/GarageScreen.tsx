@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -14,18 +13,10 @@ import { apiRequest, ApiRequestError } from '../api/client';
 import Button from '../components/Button';
 import Chip from '../components/Chip';
 import ClusterGauge from '../components/ClusterGauge';
+import VehiclePlate from '../components/VehiclePlate';
 import Logo from '../components/Logo';
 import { SkeletonCard } from '../components/Skeleton';
-import {
-  border,
-  radius,
-  space,
-  status,
-  surface,
-  text,
-  type,
-  TARGET_MIN,
-} from '../theme';
+import { border, radius, space, status, surface, text, type, TARGET_MIN } from '../theme';
 import { AccountScreen } from './AccountScreen';
 import { PushPrimer } from '../notifications/PushPrimer';
 import {
@@ -103,53 +94,6 @@ function first<T>(value: T | T[] | null | undefined): T | undefined {
 const miles = new Intl.NumberFormat('en-US');
 
 /**
- * How long a photo may stay unresolved before the card gives up on it.
- *
- * This is a safety net, not the fix. `/api/v1/vehicles` signs a URL to the
- * **original** upload, and the one on this account is 3000×4000 at 2.3 MB —
- * roughly 48 MB decoded to RGBA, to fill a 172pt-tall card. It never renders
- * here and never errors, so without a timeout the plate below is unreachable.
- *
- * Measured 1 Aug, in this order, because the first three readings were wrong:
- *
- *   - `fetch` of the URL from inside the app did not resolve in 8s, while a
- *     control fetch to the API host returned 200. **That comparison was
- *     invalid** — React Native's `fetch` runs on XMLHttpRequest and buffers the
- *     whole body, so it measured 2.3 MB against a few hundred bytes of JSON,
- *     not reachability.
- *   - Cowork fetched the same signed URL from the host: 200, image/jpeg, all
- *     2.3 MB in 1.23s. The object and the URL are fine.
- *   - 90s timeout: still nothing. So it is not slow, it is stuck.
- *   - A tiny inline PNG beside it rendered immediately. So `Image` is fine and
- *     this file specifically is not decodable here.
- *
- * **The fix this comment used to recommend does not exist.** It said to sign a
- * *transformed* URL sized for a list. `47af5c4` tried that the next day and
- * Supabase image transformation returns `FeatureNotEnabled` for this tenant —
- * verified against the live API, not inferred from a pricing page. The server
- * cannot re-encode either: `sharp` is a devDependency whose outputs are
- * committed precisely because Netlify never runs it.
- *
- * What is actually true now:
- *
- *   - **This object is legacy.** 2,328,761 bytes, uploaded 2026-07-28 00:42
- *     UTC, sixteen hours before `eb320f9` wired the browser downscale. It is
- *     the one file the client-side fix could never have caught.
- *   - **New uploads cannot repeat it.** `47af5c4` put a 1.5 MB ceiling at
- *     `uploadVehiclePhoto`, the one chokepoint every upload passes, against a
- *     150 KB target — so a file arriving above it means the downscale did not
- *     run, which is the case worth refusing rather than storing forever.
- *   - **The remaining instance is fixable by hand in about thirty seconds**:
- *     re-upload the M235i photo in the web app and it downscales on the way in.
- *
- * So this timeout stays, because a phone on a weak connection produces the same
- * shape as an undecodable file and both have to land somewhere. A genuinely
- * card-sized image still needs either the paid transform feature or a
- * derivative generated at upload — both decisions with a cost, neither taken.
- */
-const PHOTO_TIMEOUT_MS = 6000;
-
-/**
  * `vehicle_status` is a database enum — `daily_driver`, `weekend_car`. It
  * reached the screen raw on the first render, reading "daily_driver" under the
  * car's name.
@@ -177,34 +121,11 @@ function VehicleCard({
   onOpen: () => void;
 }) {
   /*
-    ── Two exits from "loading", not one ──────────────────────────────────────
-
-    A React Native `Image` pointed at a URL that never responds stays loading
-    indefinitely. It draws nothing and `onError` never fires, because nothing
-    has failed — so a fallback gated on failure is unreachable, and the card
-    shows a blank rectangle the colour of itself, forever.
-
-    That is not hypothetical. Measured on the simulator, 1 Aug: inside one
-    render, a `fetch` of the API host returned 200 while a `fetch` of this
-    vehicle's signed storage URL did not resolve within eight seconds. Same app,
-    same network, same moment. The request hangs; it does not fail.
-
-    Whatever the cause on the host side, a phone on a weak connection produces
-    the identical shape, which makes it a product state rather than an
-    environment quirk. So loading exits on an error *or* on running out of
-    patience, and both land on the plate — a picture that has not arrived and a
-    picture that does not exist look the same to the person holding the phone,
-    and both mean "no photo".
+    The photo lifecycle moved into `VehiclePlate` — the timeout, the two exits
+    from loading, and the fallback are all properties of showing a photograph on
+    a plate rather than of this card, and vehicle detail's 196pt hero needs the
+    identical behaviour.
   */
-  const [photoFailed, setPhotoFailed] = useState(false);
-  const [photoLoaded, setPhotoLoaded] = useState(false);
-  const showPhoto = Boolean(vehicle.photo_url) && !photoFailed;
-
-  useEffect(() => {
-    if (!vehicle.photo_url || photoLoaded || photoFailed) return;
-    const timer = setTimeout(() => setPhotoFailed(true), PHOTO_TIMEOUT_MS);
-    return () => clearTimeout(timer);
-  }, [vehicle.photo_url, photoLoaded, photoFailed]);
 
   const health = first(vehicle.vehicle_health_summary);
   const score = typeof health?.health_score === 'number' ? health.health_score : null;
@@ -222,24 +143,21 @@ function VehicleCard({
       accessibilityRole="button"
       accessibilityLabel={`${name || 'Vehicle'}, open details`}
     >
-      {showPhoto ? (
-        <Image
-          source={{ uri: vehicle.photo_url! }}
-          style={styles.photo}
-          resizeMode="cover"
-          onLoad={() => setPhotoLoaded(true)}
-          onError={() => setPhotoFailed(true)}
-        />
-      ) : (
-        /*
-          A car with no photograph is ordinary, and the web garage learned not
-          to hide anything behind having one. The plate keeps the card's shape
-          so a garage of mixed vehicles does not look ragged.
-        */
-        <View style={[styles.photo, styles.photoEmpty]}>
-          <Text style={styles.photoEmptyText}>No photo</Text>
-        </View>
-      )}
+      {/*
+        The identity plate — CC-142, finally on the phone.
+
+        This replaced a grey box reading "No photo". That was a placeholder
+        naming an absence, so a garage of unphotographed cars read as a garage
+        of incomplete records; the plate is a finished design for the same
+        state. See `VehiclePlate` for why the two halves only work together.
+      */}
+      <VehiclePlate
+        photo={vehicle.photo_url}
+        year={vehicle.year}
+        make={vehicle.make}
+        model={vehicle.model}
+        trim={vehicle.trim}
+      />
 
       <View style={styles.cardBody}>
         <View style={styles.cardHeader}>
@@ -284,10 +202,7 @@ function VehicleCard({
             <Text style={styles.meta}>{humanise(vehicle.vehicle_status)}</Text>
           ) : null}
           {recallCount > 0 ? (
-            <Chip
-              label={`${recallCount} recall${recallCount === 1 ? '' : 's'}`}
-              tone="critical"
-            />
+            <Chip label={`${recallCount} recall${recallCount === 1 ? '' : 's'}`} tone="critical" />
           ) : null}
         </View>
       </View>
@@ -318,8 +233,8 @@ function DevToken({ token }: { token: string }) {
     <View style={styles.devBlock}>
       <Text style={styles.devHeading}>Access token — dev builds only</Text>
       <Text style={styles.errorBody}>
-        Long-press to select and copy. Set as MOBILE_TEST_TOKEN to run the
-        credentialed contract checks.
+        Long-press to select and copy. Set as MOBILE_TEST_TOKEN to run the credentialed contract
+        checks.
       </Text>
       <Text selectable style={styles.devToken}>
         {token}
@@ -390,7 +305,7 @@ export function GarageScreen({
           dismissedOn,
           vehicleCount: state.vehicles.length,
           today: new Date().toISOString().slice(0, 10),
-        })
+        }),
       );
     })();
 
@@ -574,42 +489,42 @@ export function GarageScreen({
 
   return (
     <>
-    {deletedNotice && (
-      /*
+      {deletedNotice && (
+        /*
         Apple asks for confirmation that deletion actually happened, and this
         is the last thing the account's owner will ever see from the app — the
         session is cleared the moment they dismiss it, so there is nothing left
         to inspect afterwards. It names what went, rather than saying "done".
       */
-      <View style={styles.deletedNotice}>
-        <Text style={styles.deletedNoticeText}>{deletedNotice}</Text>
-      </View>
-    )}
-    <FlatList
-      data={state.vehicles}
-      keyExtractor={(v) => v.id}
-      contentContainerStyle={styles.list}
-      renderItem={({ item }) => (
-        <VehicleCard
-          vehicle={item}
-          onOpen={() =>
-            onOpenVehicle(
-              item.id,
-              [item.year, item.make, item.model].filter(Boolean).join(' ') || 'Vehicle'
-            )
-          }
-        />
+        <View style={styles.deletedNotice}>
+          <Text style={styles.deletedNoticeText}>{deletedNotice}</Text>
+        </View>
       )}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => void load(true)}
-          tintColor={text.muted}
-        />
-      }
-      ListHeaderComponent={header}
-      ListEmptyComponent={
-        /*
+      <FlatList
+        data={state.vehicles}
+        keyExtractor={(v) => v.id}
+        contentContainerStyle={styles.list}
+        renderItem={({ item }) => (
+          <VehicleCard
+            vehicle={item}
+            onOpen={() =>
+              onOpenVehicle(
+                item.id,
+                [item.year, item.make, item.model].filter(Boolean).join(' ') || 'Vehicle',
+              )
+            }
+          />
+        )}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void load(true)}
+            tintColor={text.muted}
+          />
+        }
+        ListHeaderComponent={header}
+        ListEmptyComponent={
+          /*
           An account with no cars is the ordinary first-run state, not a
           failure — so it says what to do next rather than apologising.
 
@@ -619,40 +534,40 @@ export function GarageScreen({
           carries `flexGrow: 1` for exactly this. Without it the first thing a
           new user ever sees is three lines crushed under the title.
         */
-        <View style={styles.centred}>
-          <Text style={styles.errorTitle}>No vehicles yet</Text>
-          {/*
+          <View style={styles.centred}>
+            <Text style={styles.errorTitle}>No vehicles yet</Text>
+            {/*
             This read "Add a car on the web and it will appear here." — the
             mobile-first problem in one sentence. A new user's first screen sent
             them to a different product to become a user at all, which an App
             Store reviewer would have hit before anything else.
           */}
-          <Text style={styles.errorBody}>
-            Add your first car and CrewChief gets to work on it.
-          </Text>
-          {/*
+            <Text style={styles.errorBody}>
+              Add your first car and CrewChief gets to work on it.
+            </Text>
+            {/*
             `primary` here and `secondary` on the error screen above, and the
             difference is the point: this is the one thing a new account should
             do, and it is the only filled button on the first screen they meet.
           */}
-          <Button
-            label="Add a car"
-            /*
+            <Button
+              label="Add a car"
+              /*
               The header carries an "Add a car" control too. Two buttons with
               the same spoken name on one screen is ambiguous to a screen reader
               in a way it is not to the eye, which can use position — so this
               one is named for where it is.
             */
-            accessibilityLabel="Add your first car"
-            onPress={onAddVehicle}
-            style={styles.stateAction}
-          />
-        </View>
-      }
-      ListFooterComponent={<DevToken token={accessToken} />}
-    />
-    {account}
-        {primer}
+              accessibilityLabel="Add your first car"
+              onPress={onAddVehicle}
+              style={styles.stateAction}
+            />
+          </View>
+        }
+        ListFooterComponent={<DevToken token={accessToken} />}
+      />
+      {account}
+      {primer}
     </>
   );
 }
@@ -722,9 +637,6 @@ const styles = StyleSheet.create({
     borderColor: border.panel,
     overflow: 'hidden',
   },
-  photo: { width: '100%', height: 172, backgroundColor: surface.well },
-  photoEmpty: { alignItems: 'center', justifyContent: 'center' },
-  photoEmptyText: { ...type.value, color: text.muted },
 
   cardBody: { padding: space.lg, gap: space.sm },
   cardHeader: {
