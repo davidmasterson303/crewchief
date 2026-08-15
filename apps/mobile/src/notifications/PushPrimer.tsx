@@ -1,7 +1,8 @@
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, StyleSheet, Text, View } from 'react-native';
 
+import Button from '../components/Button';
 import { PUSH_PRIMER_COPY } from '@crewchief/core/push-priming';
-import { border, brand, radius, surface, text } from '../theme';
+import { surface, text } from '../theme';
 
 /**
  * The screen that comes *before* iOS asks. Phase 5, C5.
@@ -63,23 +64,21 @@ export function PushPrimer({
         </View>
 
         <View style={styles.actions}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={PUSH_PRIMER_COPY.accept}
-            onPress={onAccept}
-            style={({ pressed }) => [styles.accept, pressed && styles.acceptPressed]}
-          >
-            <Text style={styles.acceptText}>{PUSH_PRIMER_COPY.accept}</Text>
-          </Pressable>
+          {/*
+            The primitive, not a private pair.
 
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={PUSH_PRIMER_COPY.decline}
-            onPress={onDecline}
-            style={({ pressed }) => [styles.decline, pressed && styles.declinePressed]}
-          >
-            <Text style={styles.declineText}>{PUSH_PRIMER_COPY.decline}</Text>
-          </Pressable>
+            These were two hand-rolled `Pressable`s that reimplemented `primary`
+            and `outline` — and reimplemented them differently. Their pressed
+            state was `opacity: 0.9`, which fades the **label** along with the
+            fill; `Button`'s rule is that pressed deepens and never lightens, so
+            the ink keeps its full strength. They also carried the card radius
+            on a button, and their own 52pt height where the primitive already
+            holds the 44pt floor.
+
+            One control, one set of states, one place to fix them.
+          */}
+          <Button label={PUSH_PRIMER_COPY.accept} onPress={onAccept} />
+          <Button label={PUSH_PRIMER_COPY.decline} onPress={onDecline} variant="outline" />
 
           <Text style={styles.reassurance}>{PUSH_PRIMER_COPY.reassurance}</Text>
         </View>
@@ -102,28 +101,6 @@ const styles = StyleSheet.create({
   detail: { color: text.muted, fontSize: 14, lineHeight: 21 },
 
   actions: { paddingHorizontal: 28, paddingBottom: 56, gap: 12 },
-  accept: {
-    minHeight: 52,
-    borderRadius: radius.card,
-    backgroundColor: brand.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  acceptPressed: { opacity: 0.9 },
-  // The v8 paired primary: #0E7490 with light ink measures 5.10:1. The pair
-  // moves together — dark ink against this fill is 3.39:1 and fails.
-  acceptText: { color: text.onPrimary, fontSize: 16, fontWeight: '700' },
-
-  decline: {
-    minHeight: 52,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: border.field,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  declinePressed: { opacity: 0.9 },
-  declineText: { color: text.secondary, fontSize: 16, fontWeight: '600' },
 
   reassurance: { color: text.muted, fontSize: 13, textAlign: 'center', marginTop: 4 },
 });
