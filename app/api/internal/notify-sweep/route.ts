@@ -12,6 +12,7 @@ import {
   isWorthNotifying,
   milestoneReason,
   nextMilestone,
+  nextService,
 } from '@crewchief/core/service-due';
 import { historyLookups } from '@crewchief/core/service-history';
 import {
@@ -464,6 +465,41 @@ async function collectService(
     today,
     ...historyLookups(history ?? []),
   });
+
+  /*
+    ── The garage row's next service, written back ────────────────────────────
+
+    ⚠ **Before the raise gate below, and that ordering is the whole point.**
+    Put this after it and only the cars that earned a notification would ever
+    have a stored next service — which is a quiet way of leaving most of the
+    garage blank while looking like it works.
+
+    `nextService` rather than `nextMilestone`: the row asks what is next, not
+    whether it is worth interrupting someone about. A card that went blank
+    because the next service is far away would be hiding the reassuring answer.
+
+    Best-effort. A failed write is not a reason to skip a notification — the
+    sweep's actual job — so it is logged and stepped over. The column simply
+    keeps yesterday's value, which `next_service_updated_at` makes visible.
+  */
+  const upcoming = nextService(services);
+
+  const { error: nextServiceError } = await client
+    .from('vehicles')
+    .update({
+      next_service_label: upcoming?.service ?? null,
+      // Null when the service is date-driven. Not zero — see the migration.
+      next_service_at_miles: upcoming?.dueAtMiles ?? null,
+      next_service_updated_at: new Date().toISOString(),
+    })
+    .eq('id', vehicle.id);
+
+  if (nextServiceError) {
+    logger.warn('CRON:SWEEP', 'Could not store the next service', {
+      vehicleId: vehicle.id,
+      error: nextServiceError.message,
+    });
+  }
 
   const milestone = nextMilestone(services, { horizonMiles: 5_000 });
 

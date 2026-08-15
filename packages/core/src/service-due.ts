@@ -533,3 +533,36 @@ function overdueBy(service: ServiceDue): number {
 
   return Math.abs(service.milesRemaining ?? 0);
 }
+
+/**
+ * The next thing this car needs — with no opinion about whether to interrupt.
+ *
+ * ── Why this is not `nextMilestone` with a bigger horizon ───────────────────
+ *
+ * `nextMilestone` answers *"is there a visit worth raising"*, and it says no in
+ * two ways that are right for a notification and wrong for a garage row: it
+ * returns `null` past its horizon, and again for a time-driven service that is
+ * merely `soon`. A card that reads "Next service" must not go blank because the
+ * next service happens to be far away — far away **is** the answer, and it is a
+ * reassuring one.
+ *
+ * Same split `isWorthNotifying` already makes, one step earlier: what is next is
+ * a fact, whether to interrupt someone about it is a judgement.
+ *
+ * `unknown` services are excluded for the reason `nextMilestone` excludes them —
+ * a service with no record to count from has no due point, so calling it "next"
+ * would be inventing one. A car whose every service is unknown returns `null`,
+ * which the caller must render as *"no schedule yet"* rather than *"nothing
+ * due"*: those are different claims and only one of them is safe.
+ */
+export function nextService(services: ServiceDue[]): ServiceDue | null {
+  const bookable = services.filter((service) => service.status !== 'unknown');
+
+  const ordered = [...bookable].sort(
+    (a, b) =>
+      STATUS_URGENCY[a.status] - STATUS_URGENCY[b.status] ||
+      (a.milesRemaining ?? Number.MAX_SAFE_INTEGER) - (b.milesRemaining ?? Number.MAX_SAFE_INTEGER)
+  );
+
+  return ordered[0] ?? null;
+}
