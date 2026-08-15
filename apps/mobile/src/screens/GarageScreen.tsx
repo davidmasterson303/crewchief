@@ -11,6 +11,7 @@ import {
 
 import { apiRequest, ApiRequestError } from '../api/client';
 import Button from '../components/Button';
+import AlertBanner from '../components/AlertBanner';
 import Chip from '../components/Chip';
 import ClusterGauge from '../components/ClusterGauge';
 import VehiclePlate from '../components/VehiclePlate';
@@ -26,6 +27,8 @@ import {
   registerForPush,
 } from '../notifications/register';
 import { shouldShowPushPrimer } from '@crewchief/core/push-priming';
+import { uploadVehiclePhoto } from '../api/photos';
+import type { InvoiceFile } from '../api/documents';
 import { getHealthBandJudgement } from '@crewchief/core/health-band';
 
 /**
@@ -111,6 +114,8 @@ function humanise(value: string): string {
 function VehicleCard({
   vehicle,
   onOpen,
+  onAddPhoto,
+  uploading,
 }: {
   vehicle: Vehicle;
   /*
@@ -119,6 +124,9 @@ function VehicleCard({
     only file that knows how a route is reached.
   */
   onOpen: () => void;
+  /** Omitted when the app has no picker — see `GarageScreen`'s `pickPhoto`. */
+  onAddPhoto?: () => void;
+  uploading?: boolean;
 }) {
   /*
     The photo lifecycle moved into `VehiclePlate` — the timeout, the two exits
@@ -157,6 +165,8 @@ function VehicleCard({
         make={vehicle.make}
         model={vehicle.model}
         trim={vehicle.trim}
+        onAddPhoto={onAddPhoto}
+        busy={uploading}
       />
 
       <View style={styles.cardBody}>
@@ -249,6 +259,7 @@ export function GarageScreen({
   onSignOut,
   onOpenVehicle,
   onAddVehicle,
+  pickPhoto,
 }: {
   accessToken: string;
   email: string | null;
@@ -256,6 +267,18 @@ export function GarageScreen({
   /** Title travels with the id so the detail header is right during the fetch. */
   onOpenVehicle: (vehicleId: string, title: string) => void;
   onAddVehicle: () => void;
+  /**
+   * The picker, injected — this screen never imports `expo-image-picker`.
+   *
+   * `src/media/pick-image.ts` is the one module that does, for the reason set
+   * out there: it is a native module, and a build that lacks it crashes on
+   * launch the moment anything in the graph imports it. Taking it as a prop is
+   * the same seam `InvoiceScanScreen` uses, and it is what lets this screen
+   * mount in a test.
+   *
+   * Omitted means no photo control at all rather than a control that fails.
+   */
+  pickPhoto?: () => Promise<InvoiceFile | null>;
 }) {
   /*
     App Store 5.1.1(v). The account surface is one tap from here because the
@@ -265,6 +288,15 @@ export function GarageScreen({
   */
   const [accountOpen, setAccountOpen] = useState(false);
   const [deletedNotice, setDeletedNotice] = useState<string | null>(null);
+  /*
+    Which car's photo is uploading, and what went wrong if it did.
+
+    Keyed by vehicle id rather than a single boolean: a garage is a list, and a
+    flag would put the spinner on every plate at once.
+  */
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+
   const [state, setState] = useState<
     | { status: 'loading' }
     | { status: 'ok'; vehicles: Vehicle[] }
@@ -336,6 +368,13 @@ export function GarageScreen({
     if (isRefresh) setRefreshing(true);
     else setState({ status: 'loading' });
 
+    /*
+      A photo error does not survive a reload. `AlertBanner` has no dismiss
+      affordance — it is an alert, not a dialog — so pull-to-refresh is the
+      gesture that clears it, alongside simply trying again.
+    */
+    setPhotoError(null);
+
     try {
       const body = await apiRequest<{ vehicles?: Vehicle[] }>('/vehicles');
       setState({ status: 'ok', vehicles: body.vehicles ?? [] });
@@ -350,6 +389,47 @@ export function GarageScreen({
       if (isRefresh) setRefreshing(false);
     }
   }, []);
+
+  /**
+   * Add or replace a car's photograph.
+   *
+   * ── The three outcomes, and only one is an error ────────────────────────────
+   *
+   *   - **Dismissed.** `pickVehiclePhoto` resolves `null`, and that is not a
+   *     failure — the screen returns to idle silently. Showing "cancelled" for
+   *     a deliberate tap on Cancel is how an app feels accusatory.
+   *   - **Refused.** Permission denied, wrong type, or over the stored ceiling.
+   *     Every one of these carries a sentence written for the owner, so the
+   *     message is shown as-is rather than replaced with a generic one — ⚠ the
+   *     size ceiling is genuinely reachable from a phone, because there is no
+   *     image manipulator in this build to cap a dimension with.
+   *   - **Stored.** The list is refetched rather than patched in place. The
+   *     upload returns a signed URL, but the garage row also carries a
+   *     `photo_url` the server signs its own way, and writing one into a row
+   *     the next refresh overwrites is the kind of disagreement that reads as a
+   *     photo flickering back to the plate.
+   */
+  const onAddPhoto = useCallback(
+    async (vehicleId: string) => {
+      if (!pickPhoto) return;
+
+      setPhotoError(null);
+
+      try {
+        const file = await pickPhoto();
+        if (!file) return;
+
+        setUploadingId(vehicleId);
+        await uploadVehiclePhoto(vehicleId, file);
+        await load(true);
+      } catch (error) {
+        setPhotoError(error instanceof Error ? error.message : 'That photo could not be saved.');
+      } finally {
+        setUploadingId(null);
+      }
+    },
+    [pickPhoto, load],
+  );
 
   useEffect(() => {
     void load();
@@ -489,6 +569,15 @@ export function GarageScreen({
 
   return (
     <>
+      {photoError && (
+        /*
+          Above the list rather than replacing it. A failed photo is a nuisance,
+          not a state the garage has to stop for — and the most likely one, an
+          oversized capture, is fixed by choosing a different picture right
+          away. Cleared by trying again or by pulling to refresh.
+        */
+        <AlertBanner tone="critical" headline="That photo was not saved" body={photoError} />
+      )}
       {deletedNotice && (
         /*
         Apple asks for confirmation that deletion actually happened, and this
@@ -513,6 +602,8 @@ export function GarageScreen({
                 [item.year, item.make, item.model].filter(Boolean).join(' ') || 'Vehicle',
               )
             }
+            onAddPhoto={pickPhoto ? () => void onAddPhoto(item.id) : undefined}
+            uploading={uploadingId === item.id}
           />
         )}
         refreshControl={

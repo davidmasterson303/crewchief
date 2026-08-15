@@ -72,7 +72,18 @@ const M235I = {
  * `view.findByText is not a function`, or an unpopulated `screen` reporting
  * that render "has not been called", neither of which names the cause.
  */
-function renderGarage(overrides: { onAddVehicle?: () => void } = {}) {
+function renderGarage(
+  overrides: {
+    onAddVehicle?: () => void;
+    /*
+      The picker seam. `src/media/pick-image.ts` is the only module that imports
+      `expo-image-picker`, and the screen takes the picker as a prop for exactly
+      this reason — a native module in the graph crashes a build that lacks it,
+      and there is no picker at all in a test runner.
+    */
+    pickPhoto?: () => Promise<unknown>;
+  } = {}
+) {
   return render(
     <GarageScreen
       accessToken="test-token"
@@ -80,6 +91,7 @@ function renderGarage(overrides: { onAddVehicle?: () => void } = {}) {
       onSignOut={jest.fn()}
       onOpenVehicle={jest.fn()}
       onAddVehicle={overrides.onAddVehicle ?? jest.fn()}
+      pickPhoto={overrides.pickPhoto as never}
     />
   );
 }
@@ -221,5 +233,103 @@ describe('adding a car', () => {
     await user.press(view.getByLabelText('Add a car'));
 
     expect(onAddVehicle).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('adding a photograph', () => {
+  const PICKED = {
+    uri: 'file:///tmp/car.jpg',
+    name: 'car.jpg',
+    type: 'image/jpeg',
+    size: 400 * 1024,
+  };
+
+  it('offers no control when the build has no picker', async () => {
+    /*
+      Omitted means no control, never a control that fails. The picker is a
+      native module and a build without it cannot be asked for a photograph —
+      showing the button anyway would be a dead end dressed as an affordance.
+    */
+    request.mockResolvedValue({ vehicles: [M235I] });
+
+    const view = await renderGarage();
+    await view.findByText('2015 BMW M235i');
+
+    expect(view.queryByLabelText('Add photo')).toBeNull();
+  });
+
+  it('offers Add photo on a car that has none', async () => {
+    /*
+      ⚠ The defect David found on 15 Aug. The identity plate is a finished
+      design for a car with no photograph, and it was the only reachable state —
+      a plate you cannot replace is a dead end rather than a fallback.
+    */
+    request.mockResolvedValue({ vehicles: [M235I] });
+
+    const view = await renderGarage({ pickPhoto: jest.fn() });
+    await view.findByText('2015 BMW M235i');
+
+    expect(view.getByLabelText('Add photo')).toBeTruthy();
+  });
+
+  it('says nothing at all when the picker is dismissed', async () => {
+    /*
+      Dismissal is not a failure, and it must stay distinguishable from one.
+      Showing "cancelled" after a deliberate tap on Cancel is how an app feels
+      accusatory.
+    */
+    request.mockResolvedValue({ vehicles: [M235I] });
+    const pickPhoto = jest.fn().mockResolvedValue(null);
+
+    const view = await renderGarage({ pickPhoto });
+    await view.findByText('2015 BMW M235i');
+
+    await userEvent.setup().press(view.getByLabelText('Add photo'));
+
+    await waitFor(() => expect(pickPhoto).toHaveBeenCalled());
+    expect(view.queryByText('That photo was not saved')).toBeNull();
+  });
+
+  it('shows the refusal the owner can act on', async () => {
+    /*
+      The size ceiling is genuinely reachable from a phone — there is no image
+      manipulator in this build to cap a dimension with — so its message names
+      the numbers and reaches the screen intact rather than becoming a generic
+      failure.
+    */
+    request.mockResolvedValue({ vehicles: [M235I] });
+    const pickPhoto = jest
+      .fn()
+      .mockResolvedValue({ ...PICKED, size: 3 * 1024 * 1024 });
+
+    const view = await renderGarage({ pickPhoto });
+    await view.findByText('2015 BMW M235i');
+
+    await userEvent.setup().press(view.getByLabelText('Add photo'));
+
+    expect(await view.findByText(/the limit is 1\.5 MB/)).toBeTruthy();
+  });
+
+  it('refetches the garage after a photo lands, rather than patching the row', async () => {
+    /*
+      The upload returns a signed URL, but the garage row carries a `photo_url`
+      the server signs its own way. Writing one into a row the next refresh
+      overwrites is the disagreement that reads as a photo flickering back to
+      the plate.
+    */
+    request.mockResolvedValue({ vehicles: [M235I] });
+    const pickPhoto = jest.fn().mockResolvedValue(PICKED);
+
+    const view = await renderGarage({ pickPhoto });
+    await view.findByText('2015 BMW M235i');
+
+    const before = request.mock.calls.length;
+    await userEvent.setup().press(view.getByLabelText('Add photo'));
+
+    await waitFor(() => {
+      const paths = request.mock.calls.slice(before).map((call) => call[0]);
+      expect(paths).toContain('/upload-photo');
+      expect(paths).toContain('/vehicles');
+    });
   });
 });

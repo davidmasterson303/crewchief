@@ -36,13 +36,29 @@ no-photo state is a deterministic make-derived field with the car named on it �
 and mobile never got it. Now built as `VehiclePlate`, with the field coming from
 `vehicleFieldStops` in core so a make is the same colour on both clients.
 
-**There is no way to add a vehicle photo from the phone, and it is not a missing
-button.** `uploadVehiclePhoto` is a Next server action on the cookie session;
-there is no bearer-capable route, so mobile has nothing to point a CTA at.
-Adding one is a new endpoint plus a picker — `expo-image-picker` is already
-installed and `media/pick-invoice-image.ts` is the template — at roughly 1 ed.
-**Web's CTA is fine, including on touch**: `@media (hover: none)` pins the photo
-overlay visible, so the M235i re-upload can be done in a browser today.
+**There was no way to add a vehicle photo from the phone — ✅ built 15 Aug.**
+`uploadVehiclePhoto` is a Next server action on the cookie session, so there was
+no bearer route and mobile had nothing to point a CTA at. `POST
+/api/v1/upload-photo` is that route, on `upload-document`'s shape: authorize
+through `lib/api-auth` for the **status code**, then delegate to the action.
+The picker seam widened rather than multiplying — `media/pick-image.ts` is still
+the only module importing `expo-image-picker`.
+
+⚠ **One limit, and it is a decision waiting for David.** The web path downscales
+in the browser before upload; the phone has no canvas and **`expo-image-manipulator`
+is not in this build**, so it can only lower encoder quality (0.45) and cannot
+cap a dimension. A 12MP capture lands under the 1.5 MB ceiling in the ordinary
+case — but that is a probability, not a guarantee, so the flow is built to fail
+legibly: the server returns its refusal with the numbers in it and the garage
+shows that sentence.
+
+**Raising the ceiling is not the fix.** It exists because this account still
+holds a 2.3 MB original that has never decoded on a device; raising it
+reintroduces that bug for the next car. The guarantee costs
+`expo-image-manipulator` and **one of the month's cloud builds**.
+
+**Web's CTA was never broken, including on touch**: `@media (hover: none)` pins
+the photo overlay visible.
 
 One real caveat, and it is the one that stopped the garage card: the signed URL
 points at the **original** upload. `VehiclePlate`'s `PHOTO_TIMEOUT_MS` comment

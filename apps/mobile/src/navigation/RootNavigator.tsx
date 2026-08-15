@@ -17,7 +17,7 @@ import { RecallDetailScreen } from '../screens/RecallDetailScreen';
 import { WishlistScreen } from '../screens/WishlistScreen';
 import { ServiceHistoryScreen } from '../screens/ServiceHistoryScreen';
 import { ServiceMilestoneScreen } from '../screens/ServiceMilestoneScreen';
-import { pickInvoiceImage } from '../media/pick-invoice-image';
+import { pickInvoiceImage, pickVehiclePhoto } from '../media/pick-image';
 import { GarageScreen } from '../screens/GarageScreen';
 import { AddVehicleScreen } from '../screens/AddVehicleScreen';
 import { VehicleDetailScreen } from '../screens/VehicleDetailScreen';
@@ -293,6 +293,18 @@ export function RootNavigator({
                 navigation.navigate('VehicleDetail', { vehicleId, title })
               }
               onAddVehicle={() => navigation.navigate('AddVehicle')}
+              /*
+                The same seam as the invoice picker. `pick-image.ts` is the only
+                module that imports `expo-image-picker`, so the screen takes the
+                picker rather than reaching for a native module it would then be
+                unable to mount without.
+
+                Library rather than camera by default: a car photograph is
+                almost always one already taken, and the simulator has no camera
+                at all — a camera-first default could never be exercised on the
+                machine this is developed on.
+              */
+              pickPhoto={() => pickVehiclePhoto('library')}
             />
           )}
         </Stack.Screen>
@@ -392,10 +404,7 @@ export function RootNavigator({
           )}
         </Stack.Screen>
 
-        <Stack.Screen
-          name="RecallDetail"
-          options={{ title: 'Recalls' }}
-        >
+        <Stack.Screen name="RecallDetail" options={{ title: 'Recalls' }}>
           {({ route, navigation }) => (
             <RecallDetailScreen
               vehicleId={route.params.vehicleId}
@@ -412,42 +421,30 @@ export function RootNavigator({
           )}
         </Stack.Screen>
 
-        <Stack.Screen
-          name="Wishlist"
-          options={{ title: 'Wishlist' }}
-        >
+        <Stack.Screen name="Wishlist" options={{ title: 'Wishlist' }}>
           {({ route }) => (
             <WishlistScreen vehicleId={route.params.vehicleId} onSignOut={onSignOut} />
           )}
         </Stack.Screen>
 
-        <Stack.Screen
-          name="ServiceHistory"
-          options={{ title: 'Service history' }}
-        >
+        <Stack.Screen name="ServiceHistory" options={{ title: 'Service history' }}>
           {({ route }) => (
             <ServiceHistoryScreen vehicleId={route.params.vehicleId} onSignOut={onSignOut} />
           )}
         </Stack.Screen>
 
-        <Stack.Screen
-          name="ServiceMilestone"
-          options={{ title: 'Service due' }}
-        >
+        <Stack.Screen name="ServiceMilestone" options={{ title: 'Service due' }}>
           {({ route }) => (
             <ServiceMilestoneScreen vehicleId={route.params.vehicleId} onSignOut={onSignOut} />
           )}
         </Stack.Screen>
 
-        <Stack.Screen
-          name="InvoiceScan"
-          options={{ title: 'Scan an invoice' }}
-        >
+        <Stack.Screen name="InvoiceScan" options={{ title: 'Scan an invoice' }}>
           {({ route }) => (
             <InvoiceScanScreen
               vehicleId={route.params.vehicleId}
               /*
-                The seam. `pick-invoice-image.ts` is the only module that will
+                The seam. `pick-image.ts` is the only module that will
                 import expo-image-picker, so this screen stays free of native
                 imports and one file changes when the build lands.
               */

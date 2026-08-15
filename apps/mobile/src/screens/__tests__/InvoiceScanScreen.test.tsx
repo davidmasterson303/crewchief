@@ -16,7 +16,7 @@ import { ApiRequestError } from '../../api/client';
  * ── Nothing native is mocked, by design ─────────────────────────────────────
  *
  * `pickImage` is a **prop**. The screen never imports `expo-image-picker` —
- * `src/media/pick-invoice-image.ts` is the only module that does. So the picker
+ * `src/media/pick-image.ts` is the only module that does. So the picker
  * is injected here as a plain function, and these tests exercise the real
  * component with no native stubbing at all. That injection is why this screen
  * is testable and the camera path is not a black box.

@@ -96,7 +96,7 @@ export function InvoiceScanScreen({
    * Resolves to the chosen image, or `null` if the picker was dismissed.
    *
    * Injected so this file stays free of native imports — see the header.
-   * `src/media/pick-invoice-image.ts` is the real implementation and the only
+   * `src/media/pick-image.ts` is the real implementation and the only
    * module that imports `expo-image-picker`.
    */
   pickImage: (source: 'camera' | 'library') => Promise<InvoiceFile | null>;

@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { vehicleFieldStops } from '@crewchief/core/vehicle-identity';
 
-import { radius, space, text, type } from '../theme';
+import { TARGET_MIN, border, radius, space, surface, text, type } from '../theme';
 
 /**
  * The identity plate — the phone's version of CC-142.
@@ -108,6 +108,8 @@ export default function VehiclePlate({
   model,
   trim,
   height = 172,
+  onAddPhoto,
+  busy = false,
 }: {
   /** Signed URL, or null when there is none. */
   photo?: string | null;
@@ -125,6 +127,16 @@ export default function VehiclePlate({
    * ratio on a screen whose width the card does not choose.
    */
   height?: number;
+  /**
+   * Called when the owner asks to add or replace the photograph.
+   *
+   * Omitted means no control, and the plate is read-only. Kept as a callback so
+   * this component stays presentational — the picker, the upload and the error
+   * belong to the screen, exactly as `GarageScreen` takes `onOpenVehicle`.
+   */
+  onAddPhoto?: () => void;
+  /** An upload is in flight. Blocks a second tap and says why the plate is busy. */
+  busy?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -218,6 +230,38 @@ export default function VehiclePlate({
           ) : null}
         </View>
       )}
+
+      {/*
+        The control, and it is the half that was missing.
+
+        A plate with no way to replace it is a dead end rather than a fallback —
+        the reason David could see the no-photo state and do nothing about it on
+        15 Aug. Web puts the same control over its plate, revealed on hover and
+        pinned visible under `@media (hover: none)` because a touch device has
+        no hover; there is no hover here at all, so it is simply always visible.
+
+        A nested `Pressable` takes its own touches rather than bubbling, so this
+        does not open the vehicle by accident — but it is deliberately in the
+        corner and small, because the card's whole face is the primary target
+        and this must not compete with it.
+      */}
+      {onAddPhoto ? (
+        <Pressable
+          onPress={onAddPhoto}
+          disabled={busy}
+          style={styles.action}
+          hitSlop={space.sm}
+          accessibilityRole="button"
+          accessibilityState={{ busy, disabled: busy }}
+          accessibilityLabel={showPhoto ? 'Change photo' : 'Add photo'}
+        >
+          {busy ? (
+            <ActivityIndicator size="small" color={text.primary} />
+          ) : (
+            <Text style={styles.actionLabel}>{showPhoto ? 'Change photo' : 'Add photo'}</Text>
+          )}
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -241,4 +285,32 @@ const styles = StyleSheet.create({
    */
   model: { ...type.editorial, color: text.primary },
   subtitle: { ...type.value, color: text.secondary },
+
+  /**
+   * Top-right, clear of the lockup at the bottom.
+   *
+   * On the 44pt floor even though the label is 12pt type — `hitSlop` is not a
+   * substitute, and this sits over a photograph where a mis-tap opens the
+   * vehicle instead.
+   */
+  action: {
+    position: 'absolute',
+    top: space.sm,
+    right: space.sm,
+    minHeight: TARGET_MIN,
+    minWidth: TARGET_MIN,
+    paddingHorizontal: space.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.pill,
+    /*
+      A solid fill, not a wash. This sits over an unknown photograph, and a
+      translucent chip over an unknown backdrop is exactly where the 1.09:1
+      advisor button came from.
+    */
+    backgroundColor: surface.raised,
+    borderWidth: 1,
+    borderColor: border.field,
+  },
+  actionLabel: { ...type.label, color: text.primary },
 });
