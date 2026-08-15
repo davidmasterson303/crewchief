@@ -1,7 +1,7 @@
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { PUSH_PRIMER_COPY } from '@crewchief/core/push-priming';
-import { border, brand, surface, text } from '../theme';
+import { border, brand, radius, surface, text } from '../theme';
 
 /**
  * The screen that comes *before* iOS asks. Phase 5, C5.
@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
   actions: { paddingHorizontal: 28, paddingBottom: 56, gap: 12 },
   accept: {
     minHeight: 52,
-    borderRadius: 14,
+    borderRadius: radius.card,
     backgroundColor: brand.primary,
     alignItems: 'center',
     justifyContent: 'center',
@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
 
   decline: {
     minHeight: 52,
-    borderRadius: 14,
+    borderRadius: radius.card,
     borderWidth: 1,
     borderColor: border.field,
     alignItems: 'center',

@@ -16,7 +16,7 @@ import { wishlistItemIdentifier, type WishlistItemType } from '@crewchief/core/w
 import { formatCurrency } from '@crewchief/core/formatting-utils';
 import { completionPayload, type CompletionDraft } from '@crewchief/core/wishlist-completion';
 import { MarkDoneSheet } from './MarkDoneSheet';
-import { border, brand, status, surface, text, type } from '../theme';
+import { border, brand, radius, status, surface, text, type } from '../theme';
 
 /**
  * Phase 5.6 — the wishlist, on the phone.
@@ -426,7 +426,7 @@ const styles = StyleSheet.create({
   */
   openComposer: {
     minHeight: 48,
-    borderRadius: 12,
+    borderRadius: radius.button,
     borderWidth: 1,
     borderColor: border.field,
     alignItems: 'center',
@@ -441,7 +441,7 @@ const styles = StyleSheet.create({
   composerCancel: {
     minHeight: 48,
     paddingHorizontal: 18,
-    borderRadius: 12,
+    borderRadius: radius.button,
     borderWidth: 1,
     borderColor: border.field,
     alignItems: 'center',
@@ -450,7 +450,7 @@ const styles = StyleSheet.create({
   composerCancelText: { color: text.secondary, fontSize: 15, fontWeight: '600' },
   input: {
     backgroundColor: surface.raised,
-    borderRadius: 12,
+    borderRadius: radius.button,
     paddingHorizontal: 14,
     /*
       16px, not 14. iOS Safari's zoom rule does not apply to a native
@@ -466,7 +466,7 @@ const styles = StyleSheet.create({
   typeRow: { flexDirection: 'row', gap: 8 },
   typeChip: {
     paddingHorizontal: 14,
-    borderRadius: 10,
+    borderRadius: radius.button,
     backgroundColor: surface.raised,
     /*
       Grown for real rather than given a 44px `::after`-style hit area. These
@@ -485,7 +485,7 @@ const styles = StyleSheet.create({
   addCta: {
     flex: 1,
     backgroundColor: surface.inverse,
-    borderRadius: 12,
+    borderRadius: radius.button,
     minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
@@ -507,7 +507,7 @@ const styles = StyleSheet.create({
   addCtaOff: { backgroundColor: surface.inverseDisabled },
   addCtaText: { color: text.onInverse, fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
 
-  card: { backgroundColor: surface.raised, borderRadius: 14, padding: 16, gap: 8 },
+  card: { backgroundColor: surface.raised, borderRadius: radius.card, padding: 16, gap: 8 },
   itemHead: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
   itemName: { color: text.primary, fontSize: 15, fontWeight: '600', flexShrink: 1 },
   itemCost: { color: text.primary, fontSize: 15, fontWeight: '700' },
@@ -523,7 +523,7 @@ const styles = StyleSheet.create({
   doneCta: {
     minHeight: 44,
     paddingHorizontal: 14,
-    borderRadius: 10,
+    borderRadius: radius.button,
     borderWidth: 1,
     borderColor: brand.primary,
     justifyContent: 'center',
@@ -540,7 +540,7 @@ const styles = StyleSheet.create({
   button: {
     marginTop: 6,
     paddingHorizontal: 18,
-    borderRadius: 10,
+    borderRadius: radius.button,
     backgroundColor: surface.raised,
     minHeight: 44,
     justifyContent: 'center',

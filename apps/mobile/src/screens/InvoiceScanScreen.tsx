@@ -9,7 +9,7 @@ import {
   type InvoiceFile,
 } from '../api/documents';
 import { ApiRequestError } from '../api/client';
-import { border, surface, text, type } from '../theme';
+import { border, radius, surface, text, type } from '../theme';
 
 /**
  * Phase 3.3 — photograph an invoice and have its line items read.
@@ -380,7 +380,7 @@ const styles = StyleSheet.create({
 
   primary: {
     backgroundColor: surface.inverse,
-    borderRadius: 12,
+    borderRadius: radius.button,
     paddingVertical: 14,
     alignItems: 'center',
     marginTop: 4,
@@ -390,7 +390,7 @@ const styles = StyleSheet.create({
   secondary: {
     borderWidth: 1,
     borderColor: border.fieldHover,
-    borderRadius: 12,
+    borderRadius: radius.button,
     paddingVertical: 13,
     alignItems: 'center',
   },

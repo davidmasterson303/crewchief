@@ -4,7 +4,7 @@ import { getHealthBandJudgement } from '@crewchief/core/health-band';
 
 import BayRoom, { BAY_ROOM_HEIGHT, BayLightPool } from './BayRoom';
 import ClusterGauge from './ClusterGauge';
-import { bay, space, surface, text, type, TABULAR } from '../theme';
+import { TABULAR, bay, radius, space, surface, text, type } from '../theme';
 import { useReducedMotion } from '../motion/reduced-motion';
 
 /**
@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
   },
   position: { ...type.label, fontWeight: '500', letterSpacing: 0, color: text.muted, ...TABULAR },
 
-  shutter: { backgroundColor: surface.nav, borderRadius: 20 },
+  shutter: { backgroundColor: surface.nav, borderRadius: radius.hero },
 
   identity: { gap: 3 },
   /**

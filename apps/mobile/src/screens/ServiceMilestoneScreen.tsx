@@ -27,7 +27,7 @@ import {
 import { historyLookups, type ServiceHistoryRow } from '@crewchief/core/service-history';
 import { validateMileageUpdate } from '@crewchief/core/mileage-tracking';
 import { wishlistItemIdentifier } from '@crewchief/core/wishlist-identifier';
-import { border, status, surface, text } from '../theme';
+import { border, radius, status, surface, text } from '../theme';
 
 /**
  * Phase 5.6 — where a service-due notification lands.
@@ -465,7 +465,7 @@ const styles = StyleSheet.create({
   gateBody: { color: text.secondary, fontSize: 14, lineHeight: 20 },
   input: {
     backgroundColor: surface.raised,
-    borderRadius: 12,
+    borderRadius: radius.button,
     paddingHorizontal: 14,
     fontSize: 16,
     color: text.primary,
@@ -474,14 +474,14 @@ const styles = StyleSheet.create({
 
   primaryCta: {
     backgroundColor: surface.inverse,
-    borderRadius: 12,
+    borderRadius: radius.button,
     minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
   },
   primaryCtaText: { color: text.onInverse, fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
 
-  card: { backgroundColor: surface.raised, borderRadius: 14, padding: 16, gap: 10 },
+  card: { backgroundColor: surface.raised, borderRadius: radius.card, padding: 16, gap: 10 },
   cardTitle: { color: text.primary, fontSize: 17, fontWeight: '700', letterSpacing: -0.2 },
   reason: { color: text.secondary, fontSize: 14, lineHeight: 20 },
   basis: { color: text.muted, fontSize: 12 },
@@ -499,7 +499,7 @@ const styles = StyleSheet.create({
 
   addCta: {
     backgroundColor: surface.raised,
-    borderRadius: 10,
+    borderRadius: radius.button,
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
@@ -518,7 +518,7 @@ const styles = StyleSheet.create({
   button: {
     marginTop: 6,
     paddingHorizontal: 18,
-    borderRadius: 10,
+    borderRadius: radius.button,
     backgroundColor: surface.raised,
     minHeight: 44,
     justifyContent: 'center',

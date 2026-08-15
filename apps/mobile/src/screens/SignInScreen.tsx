@@ -16,7 +16,7 @@ import Logo from '../components/Logo';
 import { resetPassword, signIn, signUp } from '../auth/session';
 import { hasDevCredentials, signInWithDevCredentials } from '../auth/dev-session';
 import { checkSharedCore } from '../core-check';
-import { border, build, status, surface, text } from '../theme';
+import { border, build, radius, status, surface, text } from '../theme';
 
 /**
  * Sign in.
@@ -382,7 +382,7 @@ const styles = StyleSheet.create({
     backgroundColor: surface.raised,
     borderWidth: 1,
     borderColor: border.field,
-    borderRadius: 10,
+    borderRadius: radius.well,
     paddingHorizontal: 14,
     paddingVertical: 14,
     color: text.primary,
@@ -391,7 +391,7 @@ const styles = StyleSheet.create({
   error: { color: status.dangerText, fontSize: 13 },
   button: {
     backgroundColor: surface.inverse,
-    borderRadius: 10,
+    borderRadius: radius.button,
     paddingVertical: 15,
     alignItems: 'center',
     marginTop: 6,

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { border, brand, status, surface, text } from '../theme';
+import { border, brand, radius, status, surface, text } from '../theme';
 
 import {
   completionProblems,
@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
 
   input: {
     backgroundColor: surface.raised,
-    borderRadius: 12,
+    borderRadius: radius.button,
     borderWidth: 1,
     borderColor: border.field,
     paddingHorizontal: 14,
@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
   choice: {
     flex: 1,
     minHeight: 48,
-    borderRadius: 12,
+    borderRadius: radius.button,
     borderWidth: 1,
     borderColor: border.field,
     alignItems: 'center',
@@ -320,7 +320,7 @@ const styles = StyleSheet.create({
   footer: { paddingHorizontal: 20, paddingBottom: 40, paddingTop: 8 },
   cta: {
     minHeight: 52,
-    borderRadius: 14,
+    borderRadius: radius.card,
     backgroundColor: brand.primary,
     alignItems: 'center',
     justifyContent: 'center',

@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 
 import { apiRequest, ApiRequestError } from '../api/client';
-import { status, surface, text } from '../theme';
+import { radius, status, surface, text } from '../theme';
 import {
   hasRemedy,
   normaliseRecalls,
@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
   name: { color: text.primary, fontSize: 24, fontWeight: '700', letterSpacing: -0.5 },
   count: { color: text.muted, fontSize: 14, marginTop: -10 },
 
-  banner: { borderRadius: 14, padding: 16, gap: 6, borderWidth: 1 },
+  banner: { borderRadius: radius.card, padding: 16, gap: 6, borderWidth: 1 },
   /*
     Solid fills rather than tinted transparency. These two carry the only
     instructions on the screen that are time-critical, and a wash over an
@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
 
   card: {
     backgroundColor: surface.raised,
-    borderRadius: 14,
+    borderRadius: radius.card,
     padding: 16,
     gap: 10,
   },
@@ -328,7 +328,7 @@ const styles = StyleSheet.create({
 
   askCta: {
     backgroundColor: surface.raised,
-    borderRadius: 10,
+    borderRadius: radius.button,
     paddingVertical: 12,
     alignItems: 'center',
     minHeight: 44,
@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
     paddingHorizontal: 18,
     paddingVertical: 12,
-    borderRadius: 10,
+    borderRadius: radius.button,
     backgroundColor: surface.raised,
     minHeight: 44,
     justifyContent: 'center',

@@ -20,7 +20,7 @@ import {
   type ServiceRecord,
 } from '@crewchief/core/service-record';
 import { formatCurrency } from '@crewchief/core/formatting-utils';
-import { border, status, surface, text } from '../theme';
+import { border, radius, status, surface, text } from '../theme';
 
 /**
  * What has been done to this car, on the phone.
@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
   summaryCost: { color: text.primary, fontSize: 15, fontWeight: '700' },
   summaryScope: { color: text.muted, fontSize: 13, fontWeight: '500' },
 
-  card: { backgroundColor: surface.raised, borderRadius: 14, padding: 16, gap: 6 },
+  card: { backgroundColor: surface.raised, borderRadius: radius.card, padding: 16, gap: 6 },
   head: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
   name: { color: text.primary, fontSize: 15, fontWeight: '600', flexShrink: 1 },
   cost: { color: text.primary, fontSize: 15, fontWeight: '700' },
@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
   retry: {
     marginTop: 6,
     paddingHorizontal: 18,
-    borderRadius: 10,
+    borderRadius: radius.button,
     borderWidth: 1,
     borderColor: border.field,
     minHeight: 44,

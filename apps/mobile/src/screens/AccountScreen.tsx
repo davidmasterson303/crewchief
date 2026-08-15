@@ -15,7 +15,7 @@ import { API_BASE_URL } from '../config';
 
 import { deleteAccount, getSubscription } from '../api/account';
 import { ApiRequestError } from '../api/client';
-import { border, brand, status, surface, text } from '../theme';
+import { border, brand, radius, status, surface, text } from '../theme';
 import {
   DELETION_CONFIRM_PHRASE,
   DELETION_INVENTORY,
@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
 
   action: {
     minHeight: 52,
-    borderRadius: 14,
+    borderRadius: radius.card,
     borderWidth: 1,
     borderColor: border.field,
     alignItems: 'center',
@@ -310,7 +310,7 @@ const styles = StyleSheet.create({
   legalText: { color: text.secondary, fontSize: 15 },
 
   danger: {
-    borderRadius: 16,
+    borderRadius: radius.card,
     borderWidth: 1,
     borderColor: status.dangerWashBorder,
     backgroundColor: status.dangerWash,
@@ -331,7 +331,7 @@ const styles = StyleSheet.create({
     exactly the shape it catches.
   */
   notice: {
-    borderRadius: 12,
+    borderRadius: radius.button,
     borderWidth: 1,
     borderColor: status.attentionWashBorder,
     backgroundColor: status.attentionWash,
@@ -346,7 +346,7 @@ const styles = StyleSheet.create({
   confirmLabel: { color: text.secondary, fontSize: 13, marginTop: 6 },
   input: {
     minHeight: 48,
-    borderRadius: 12,
+    borderRadius: radius.button,
     borderWidth: 1,
     borderColor: border.fieldHover,
     backgroundColor: status.scrim,
@@ -361,7 +361,7 @@ const styles = StyleSheet.create({
 
   deleteButton: {
     minHeight: 50,
-    borderRadius: 12,
+    borderRadius: radius.button,
     backgroundColor: status.danger,
     alignItems: 'center',
     justifyContent: 'center',
