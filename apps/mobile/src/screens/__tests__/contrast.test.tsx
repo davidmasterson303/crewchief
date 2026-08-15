@@ -10,6 +10,11 @@ import { SignInScreen } from '../SignInScreen';
 import { AddVehicleScreen } from '../AddVehicleScreen';
 import { apiRequest, ApiRequestError } from '../../api/client';
 import { auditText, belowFloor, contrastRatio, SCREEN_BACKGROUND } from '../../test-support/contrast';
+import BayRoom from '../../components/BayRoom';
+import ClusterGauge from '../../components/ClusterGauge';
+import HealthDrivers from '../../components/HealthDrivers';
+import Plinth from '../../components/Plinth';
+import { bay, surface } from '../../theme';
 
 /**
  * The AA floor, measured on rendered screens.
@@ -656,6 +661,30 @@ describe('add a car', () => {
     // Both the selected and unselected chip, since they are different fills.
     await view.findByText('Not for me');
     expect(belowFloor(auditText(view))).toEqual([]);
-  });
 
+  });
 });
+
+/*
+  ⚠ ⚠ **DO NOT ADD A TEST BELOW THIS LINE.** ⚠ ⚠
+
+  Every `render` that happens after the test above returns a tree whose
+  `toJSON()` is **null**. Audits of it are empty, and because every assertion
+  in this file has the shape `expect(belowFloor(...)).toEqual([])`, an empty
+  audit **passes**. A test added here measures nothing and says so in green.
+
+  Found on 15 Aug by adding four cases below and watching all four pass while
+  proving nothing — caught only by an anti-vacuous guard, which is the third
+  time in this repo that a guard rather than a test has been the thing that
+  noticed. Bisected with `-t` to this exact case: pair it with any later render
+  and that render comes back null; drop it and the same renders are fine.
+
+  **The mechanism is not yet understood.** Filling this form starts work that
+  outlives the assertions, and flushing with `await act(async () => {})` here
+  does *not* fix it — so it is not simply a pending state update. It wants a
+  real diagnosis rather than a guess.
+
+  Until then, new surfaces are audited in `surface-contrast.test.tsx`, which is
+  a separate file and therefore a separate module registry and renderer.
+*/
+
