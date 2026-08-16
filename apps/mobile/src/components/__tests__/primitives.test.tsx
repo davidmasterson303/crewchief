@@ -207,3 +207,86 @@ describe('pressed states', () => {
     expect(view.getByRole('button')).toBeTruthy();
   });
 });
+
+describe('Button — the inverse variant', () => {
+  /*
+    The treatment that lived as a private copy in six screens before it was a
+    variant: sign-in, add-vehicle, the wishlist, the advisor, the invoice scan
+    and the service milestone. Four tokens existed for it and no primitive
+    owned any of them, so the copies drifted — 15pt against 16, weight 600
+    against 700, letter-spacing on some and not others — on the app's most
+    important control.
+  */
+  it('wears the light fill a control that outranks everything gets', async () => {
+    const view = await render(
+      <Button label="Sign in" variant="inverse" onPress={jest.fn()} />
+    );
+
+    expect(flat(view.getByLabelText('Sign in').props.style).backgroundColor).toBe(
+      surface.inverse
+    );
+  });
+
+  it('stays light when disabled, and keeps its ink dark', async () => {
+    /*
+      ⚠ The defect the rendered contrast suite caught within a minute of this
+      variant existing. The first version muffled the label to
+      `text.onInverseMuted`, which measures **4.17:1** on the disabled fill and
+      failed both sign-in states.
+
+      `surface.inverseDisabled`'s own note in the theme had the answer — it
+      "keeps its ink near 9:1 while reading as off". The dimmed fill is the
+      whole signal; the ink does not dim with it. WCAG 1.4.3 exempts disabled
+      controls, and taking that exemption is how one becomes unreadable rather
+      than unavailable.
+    */
+    const view = await render(
+      <Button label="Sign in" variant="inverse" disabled onPress={jest.fn()} />
+    );
+    const control = view.getByLabelText('Sign in');
+
+    expect(flat(control.props.style).backgroundColor).toBe(surface.inverseDisabled);
+    expect(flat(control.props.style).opacity).toBeUndefined();
+    expect(flat(view.getByText('Sign in').props.style).color).toBe(text.onInverse);
+  });
+
+  it('keeps its accessible name while working', async () => {
+    // The label is swapped for a spinner, so a control named by its child goes
+    // anonymous exactly when it has something to say.
+    const view = await render(
+      <Button label="Create account" variant="inverse" busy onPress={jest.fn()} />
+    );
+
+    const control = view.getByLabelText('Create account');
+    expect(control.props.accessibilityState).toMatchObject({ busy: true, disabled: true });
+  });
+
+  it('spins in ink that is visible on a white control', async () => {
+    /*
+      The platform default and `text.primary` are both white. On this fill that
+      is a control which looks empty at exactly the moment it is working.
+    */
+    const view = await render(
+      <Button label="Sign in" variant="inverse" busy onPress={jest.fn()} />
+    );
+
+    /*
+      Walked out of the rendered tree rather than queried: RNTL v14 has no
+      type query, and a spinner has no accessible name to find it by — which
+      is the whole reason the *button* has to carry one.
+    */
+    const spinners: Array<Record<string, unknown>> = [];
+    const walk = (node: unknown) => {
+      if (!node || typeof node !== 'object') return;
+      const host = node as { type?: unknown; props?: Record<string, unknown>; children?: unknown[] };
+      if (typeof host.type === 'string' && host.type.includes('ActivityIndicator') && host.props) {
+        spinners.push(host.props);
+      }
+      for (const child of host.children ?? []) walk(child);
+    };
+    walk(view.toJSON());
+
+    expect(spinners).toHaveLength(1);
+    expect(spinners[0].color).toBe(text.onInverse);
+  });
+});

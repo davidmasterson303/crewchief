@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 
 import { API_BASE_URL } from '../config';
+import Button from '../components/Button';
+import Field from '../components/Field';
 import Logo from '../components/Logo';
 import { resetPassword, signIn, signUp } from '../auth/session';
 import { hasDevCredentials, signInWithDevCredentials } from '../auth/dev-session';
@@ -121,32 +123,36 @@ export function SignInScreen() {
           {isNew ? 'Create your garage' : 'Sign in to your garage'}
         </Text>
 
-        <TextInput
-          style={styles.input}
+        {/*
+          `Field`, not two hand-rolled inputs.
+
+          The primitive already holds what this screen was doing by hand — the
+          16px floor that is not overridable, because under it iOS zooms on
+          focus and does not zoom back — and it adds what this screen could
+          not: a **visible** label.
+
+          That is the upgrade rather than a side effect. The note that stood
+          here was right that a placeholder is not a label: VoiceOver reads it
+          as the field's *value* while empty, and once someone types it is gone
+          entirely. Working around that with `accessibilityLabel` fixed the
+          screen reader and left the sighted case — a form whose labels vanish
+          as you fill it in. The primitive labels it for everyone.
+        */}
+        <Field
+          label="Email"
           value={email}
           onChangeText={setEmail}
-          placeholder="Email"
-          placeholderTextColor={text.muted}
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="email-address"
           textContentType="username"
-          /*
-            A placeholder is not a label. VoiceOver reads it as the field's
-            *value* when the field is empty, and once someone types their
-            address it is gone entirely — so a screen-reader user re-reading the
-            form finds two unlabelled boxes containing an email and some dots.
-          */
-          accessibilityLabel="Email"
           editable={!busy}
         />
 
-        <TextInput
-          style={styles.input}
+        <Field
+          label="Password"
           value={password}
           onChangeText={setPassword}
-          placeholder="Password"
-          placeholderTextColor={text.muted}
           secureTextEntry
           autoCapitalize="none"
           /*
@@ -156,7 +162,6 @@ export function SignInScreen() {
             saved, which is why this was here before sign-up existed.
           */
           textContentType={isNew ? 'newPassword' : 'password'}
-          accessibilityLabel="Password"
           editable={!busy}
           onSubmitEditing={handleSubmit}
         />
@@ -164,26 +169,23 @@ export function SignInScreen() {
         {error ? <Text style={styles.error}>{error}</Text> : null}
         {notice ? <Text style={styles.notice}>{notice}</Text> : null}
 
-        <Pressable
-          style={[styles.button, !canSubmit && styles.buttonDisabled]}
+        {/*
+          The inverse CTA, from the primitive rather than a sixth private copy.
+
+          `Button` carries the whole treatment: the white fill for a control
+          that has to outrank everything, the disabled fill that stays light so
+          an unavailable control does not read as a different one appearing,
+          and the rule this screen already understood — the accessible name
+          survives the spinner, because a control named by its `<Text>` child
+          goes anonymous at exactly the moment it has something to say.
+        */}
+        <Button
+          label={isNew ? 'Create account' : 'Sign in'}
+          variant="inverse"
           onPress={handleSubmit}
           disabled={!canSubmit}
-          accessibilityRole="button"
-          /*
-            Named explicitly rather than by its `<Text>` child, because the
-            child is swapped for a spinner while `busy` — so the control loses
-            its accessible name at exactly the moment someone most needs to know
-            what it is doing. `accessibilityState.busy` is what says "working".
-          */
-          accessibilityLabel={isNew ? 'Create account' : 'Sign in'}
-          accessibilityState={{ disabled: !canSubmit, busy }}
-        >
-          {busy ? (
-            <ActivityIndicator color={text.onInverse} />
-          ) : (
-            <Text style={styles.buttonText}>{isNew ? 'Create account' : 'Sign in'}</Text>
-          )}
-        </Pressable>
+          busy={busy}
+        />
 
         {/*
           Shown while creating an account, which is the moment consent is

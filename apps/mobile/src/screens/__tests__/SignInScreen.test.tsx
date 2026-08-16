@@ -57,8 +57,8 @@ async function fill(
   email = 'owner@example.test',
   password = 'correct-horse'
 ) {
-  await user.type(view.getByPlaceholderText('Email'), email);
-  await user.type(view.getByPlaceholderText('Password'), password);
+  await user.type(view.getByLabelText('Email'), email);
+  await user.type(view.getByLabelText('Password'), password);
 }
 
 beforeEach(() => {
@@ -148,7 +148,7 @@ describe('signing in', () => {
     const user = userEvent.setup();
     const view = await render(<SignInScreen />);
 
-    await user.type(view.getByPlaceholderText('Email'), 'owner@example.test');
+    await user.type(view.getByLabelText('Email'), 'owner@example.test');
     await user.press(view.getByText('Sign in'));
 
     expect(mockSignIn).not.toHaveBeenCalled();
@@ -296,7 +296,7 @@ describe('when the project requires email confirmation', () => {
     await user.press(view.getByText('Create account'));
 
     await view.findByText(/check your email/i);
-    expect(view.getByPlaceholderText('Password').props.value).toBe('');
+    expect(view.getByLabelText('Password').props.value).toBe('');
   });
 
   it('leaves the screen usable, so they can sign in once confirmed', async () => {
@@ -311,7 +311,7 @@ describe('when the project requires email confirmation', () => {
     await user.press(view.getByText('Create account'));
     await view.findByText(/check your email/i);
 
-    await user.type(view.getByPlaceholderText('Password'), 'correct-horse');
+    await user.type(view.getByLabelText('Password'), 'correct-horse');
     await user.press(view.getByText('Sign in'));
 
     expect(mockSignIn).toHaveBeenCalledTimes(1);
@@ -390,7 +390,7 @@ describe('the way back in when the password is gone', () => {
     const user = userEvent.setup();
     const view = await render(<SignInScreen />);
 
-    await user.type(view.getByPlaceholderText('Email'), 'owner@example.test');
+    await user.type(view.getByLabelText('Email'), 'owner@example.test');
     await user.press(view.getByText('Forgot your password?'));
 
     expect(mockResetPassword).toHaveBeenCalledWith('owner@example.test');
@@ -406,11 +406,11 @@ describe('the way back in when the password is gone', () => {
     const user = userEvent.setup();
     const view = await render(<SignInScreen />);
 
-    await user.type(view.getByPlaceholderText('Email'), 'owner@example.test');
+    await user.type(view.getByLabelText('Email'), 'owner@example.test');
     await user.press(view.getByText('Forgot your password?'));
 
     expect(mockResetPassword).toHaveBeenCalledTimes(1);
-    expect(view.getByPlaceholderText('Password').props.value).toBe('');
+    expect(view.getByLabelText('Password').props.value).toBe('');
   });
 
   it('never says whether the address has an account', async () => {
@@ -423,7 +423,7 @@ describe('the way back in when the password is gone', () => {
     const user = userEvent.setup();
     const view = await render(<SignInScreen />);
 
-    await user.type(view.getByPlaceholderText('Email'), 'stranger@example.test');
+    await user.type(view.getByLabelText('Email'), 'stranger@example.test');
     await user.press(view.getByText('Forgot your password?'));
 
     const notice = await view.findByText(/reset link is on its way/i);
