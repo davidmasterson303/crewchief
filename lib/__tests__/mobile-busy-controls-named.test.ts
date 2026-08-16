@@ -79,30 +79,44 @@ const offenders = screenFiles().flatMap((file) => {
 });
 
 describe('a busy control keeps its name', () => {
-  it('still watches something, and names where the guarantee now lives', () => {
-    /*
-      Guards the guard — but it had to move on 16 Aug, and the reason is the
-      good kind.
+  /*
+    ── This rule finished migrating on 16 Aug, and the guard had to follow ────
 
-      This used to require **more than one** hand-rolled busy `Pressable` to
-      exist, on the reasoning that a walk which silently stopped matching would
-      make the rule below trivially true. That was right while every screen
-      rolled its own control. Step 5 finished moving them onto `Button`, and the
-      count fell to one — so the anti-vacuous check failed while the app was
-      getting *better*.
+    It began as "every hand-rolled busy `Pressable` must carry an
+    `accessibilityLabel`", because a control named by its `<Text>` child goes
+    anonymous the moment that child is swapped for a spinner — at exactly the
+    point it has something to say.
 
-      Lowering the threshold would have been the wrong repair: it would leave
-      the guard pointed at a population that is on its way to zero. The
-      guarantee now lives in the primitive, so that is what this asserts —
-      `Button` shows a spinner and keeps an accessible name through it — plus
-      the stragglers the scan can still see.
-    */
+    Every one of those controls is now a `Button`. The rule did not weaken; it
+    moved into the primitive, where it is true by construction.
+
+    ⚠ The anti-vacuous check chased that migration down and got it wrong twice.
+    It first required **more than one** such control to exist; step 5 took the
+    count to one and it failed while the app improved. Repaired to **at least
+    one**; migrating `AccountScreen` took the count to zero and it failed again,
+    for the same good reason.
+
+    So the population is no longer the evidence. The end state is **zero**, and
+    the two things that keep this honest are stated directly: the primitive
+    carries the behaviour, and the detector still works when handed a control.
+    A count is a bad guard when the correct answer is none.
+  */
+  it('no screen hand-rolls a busy control any more', () => {
     const spinners = screenFiles().flatMap((file) =>
-      pressables(readFileSync(join(SCREENS, file), 'utf8')).filter(({ block }) =>
-        block.includes('<ActivityIndicator')
-      )
+      pressables(readFileSync(join(SCREENS, file), 'utf8'))
+        .filter(({ block }) => block.includes('<ActivityIndicator'))
+        .map(({ line }) => `${file}:${line}`)
     );
 
+    expect(spinners).toEqual([]);
+  });
+
+  it('keeps the behaviour in the primitive, which is where it went', () => {
+    /*
+      With the count at zero the scan alone proves nothing — an app with no
+      busy controls would pass it. This is the half that says the capability
+      still exists and still carries its name.
+    */
     const button = readFileSync(
       join(__dirname, '..', '..', 'apps', 'mobile', 'src', 'components', 'Button.tsx'),
       'utf8'
@@ -110,9 +124,28 @@ describe('a busy control keeps its name', () => {
 
     expect(button).toMatch(/<ActivityIndicator/);
     expect(button).toMatch(/accessibilityLabel=\{accessibilityLabel \?\? label\}/);
+    expect(button).toMatch(/accessibilityState=\{\{ disabled: inert, busy \}\}/);
+  });
 
-    // The walk itself still finds real controls; zero would mean it broke.
-    expect(spinners.length).toBeGreaterThanOrEqual(1);
+  it('can still detect one, so a new hand-rolled control would fail', () => {
+    /*
+      Guards the guard on a fixture rather than on live offenders — which is
+      the only way left, now that there are none. If the walk or the
+      `<ActivityIndicator` match silently stopped working, the rule above would
+      be trivially true forever.
+    */
+    const offender = `
+      <Pressable onPress={save}>
+        {busy ? <ActivityIndicator /> : <Text>Save</Text>}
+      </Pressable>
+    `;
+
+    const found = pressables(offender).filter(({ block }) =>
+      block.includes('<ActivityIndicator')
+    );
+
+    expect(found).toHaveLength(1);
+    expect(found[0].block).not.toMatch(/accessibilityLabel/);
   });
 
   it('every Pressable that can show a spinner carries an accessibilityLabel', () => {

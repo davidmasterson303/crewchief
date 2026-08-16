@@ -1,21 +1,13 @@
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Linking,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { API_BASE_URL } from '../config';
+import Button from '../components/Button';
+import Field from '../components/Field';
 
 import { deleteAccount, getSubscription } from '../api/account';
 import { ApiRequestError } from '../api/client';
-import { border, brand, radius, status, surface, text } from '../theme';
+import { border, brand, radius, space, status, surface, text } from '../theme';
 import {
   DELETION_CONFIRM_PHRASE,
   DELETION_INVENTORY,
@@ -152,13 +144,12 @@ export function AccountScreen({
             </View>
           )}
 
-          <Pressable
-            onPress={onSignOut}
-            disabled={deleting}
-            style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
-          >
-            <Text style={styles.actionText}>Sign out</Text>
-          </Pressable>
+          {/*
+            An exact variant match, not an approximation: this was transparent
+            with a `border.field` edge, pressing to `surface.raised` — which is
+            `Button`'s `outline` down to the token.
+          */}
+          <Button label="Sign out" variant="outline" onPress={onSignOut} disabled={deleting} />
 
           {/*
             ── Why these are in the binary rather than only on the website ────
@@ -219,43 +210,43 @@ export function AccountScreen({
               </Text>
             ))}
 
-            <Text style={styles.confirmLabel}>
-              Type {DELETION_CONFIRM_PHRASE} to confirm
-            </Text>
-            <TextInput
+            {/*
+              One label doing both jobs, and it takes the **longer** wording.
+
+              The visible text read "Type DELETE to confirm" while the spoken
+              name was "…to confirm account deletion". `Field` speaks the label
+              it shows, so one of the two had to win — and on the single
+              irreversible control in this product, the more explicit one does.
+              It is three words of redundancy inside a section already titled
+              "Delete account"; that is the safe direction to be redundant in.
+            */}
+            <Field
+              label={`Type ${DELETION_CONFIRM_PHRASE} to confirm account deletion`}
               value={confirmText}
               onChangeText={setConfirmText}
               placeholder={DELETION_CONFIRM_PHRASE}
-              placeholderTextColor={text.muted}
               autoCapitalize="characters"
               autoCorrect={false}
               editable={!deleting}
-              style={styles.input}
-              accessibilityLabel={`Type ${DELETION_CONFIRM_PHRASE} to confirm account deletion`}
             />
 
             {error && <Text style={styles.error}>{error}</Text>}
 
-            <Pressable
+            {/*
+              The `delete` variant, matched token for token — `status.danger`,
+              pressing to `status.dangerPressed`, disabling to `surface.disabled`.
+              The primitive also keeps the accessible name through the spinner,
+              which this screen was already doing by hand and for the same
+              reason: the `<Text>` naming it is what gets replaced.
+            */}
+            <Button
+              label="Delete my account"
+              variant="delete"
               onPress={() => void handleDelete()}
-              disabled={!confirmed || deleting}
-              accessibilityRole="button"
-              // Same reason as SignInScreen's submit: the `<Text>` that names
-              // this is replaced by a spinner while `deleting`.
-              accessibilityLabel="Delete my account"
-              accessibilityState={{ disabled: !confirmed || deleting, busy: deleting }}
-              style={({ pressed }) => [
-                styles.deleteButton,
-                (!confirmed || deleting) && styles.deleteButtonDisabled,
-                pressed && confirmed && !deleting && styles.deleteButtonPressed,
-              ]}
-            >
-              {deleting ? (
-                <ActivityIndicator color={text.primary} />
-              ) : (
-                <Text style={styles.deleteButtonText}>Delete my account</Text>
-              )}
-            </Pressable>
+              disabled={!confirmed}
+              busy={deleting}
+              style={styles.deleteAction}
+            />
           </View>
         </ScrollView>
       </View>
@@ -289,16 +280,6 @@ const styles = StyleSheet.create({
   },
   value: { color: text.primary, fontSize: 16 },
 
-  action: {
-    minHeight: 52,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: border.field,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionPressed: { backgroundColor: surface.raised },
-  actionText: { color: text.primary, fontSize: 16, fontWeight: '600' },
 
   legal: { gap: 4 },
   /*
@@ -343,31 +324,8 @@ const styles = StyleSheet.create({
   dangerBody: { color: text.secondary, fontSize: 14, lineHeight: 20 },
   inventoryItem: { color: text.muted, fontSize: 13, lineHeight: 19 },
 
-  confirmLabel: { color: text.secondary, fontSize: 13, marginTop: 6 },
-  input: {
-    minHeight: 48,
-    borderRadius: radius.button,
-    borderWidth: 1,
-    borderColor: border.fieldHover,
-    backgroundColor: status.scrim,
-    color: text.primary,
-    // 16px so iOS does not zoom the page on focus — the same rule R2 enforces
-    // on the web, and the same reason.
-    fontSize: 16,
-    paddingHorizontal: 14,
-    letterSpacing: 2,
-  },
   error: { color: status.dangerText, fontSize: 13 },
 
-  deleteButton: {
-    minHeight: 50,
-    borderRadius: radius.button,
-    backgroundColor: status.danger,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 4,
-  },
-  deleteButtonDisabled: { backgroundColor: surface.disabled },
-  deleteButtonPressed: { backgroundColor: status.dangerPressed },
-  deleteButtonText: { color: text.primary, fontSize: 16, fontWeight: '700' },
+  /** Keeps the 4pt lift the hand-rolled control had above the error line. */
+  deleteAction: { marginTop: space.xs },
 });
