@@ -430,15 +430,6 @@ const styles = StyleSheet.create({
   bulletRow: { flexDirection: 'row', gap: space.sm, paddingRight: space.xs },
   bulletMark: { ...type.body, color: text.muted },
 
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
-  chip: {
-    backgroundColor: surface.raised,
-    borderWidth: 1,
-    borderColor: border.panel,
-    borderRadius: radius.pill,
-    paddingHorizontal: space.sm,
-    paddingVertical: 2,
-  },
 
   empty: { flex: 1, justifyContent: 'center', gap: space.sm, paddingHorizontal: space.xs },
   emptyTitle: { ...type.title, fontSize: 20, lineHeight: 26, color: text.primary, letterSpacing: -0.3 },

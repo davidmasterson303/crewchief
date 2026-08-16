@@ -27,7 +27,7 @@ import Plinth from '../components/Plinth';
 import VehiclePlate from '../components/VehiclePlate';
 import ListRow from '../components/ListRow';
 import SectionHeader from '../components/SectionHeader';
-import { border, radius, space, status, surface, text, type } from '../theme';
+import { space, text, type } from '../theme';
 import { getHealthBandJudgement } from '@crewchief/core/health-band';
 
 /** The board's hero height for the photograph on this screen. */
@@ -616,14 +616,6 @@ const styles = StyleSheet.create({
   trim: { ...type.body, color: text.muted },
 
   /* The same real surface step the garage cards now use — not a 5% wash. */
-  card: {
-    backgroundColor: surface.card,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: border.panel,
-    padding: space.lg,
-    gap: space.sm,
-  },
 
   buildDial: { alignItems: 'center' },
   summary: { ...type.body, fontSize: 14, lineHeight: 20, color: text.secondary },
@@ -632,7 +624,6 @@ const styles = StyleSheet.create({
   rowLabel: { ...type.body, fontSize: 14, color: text.muted },
   rowValue: { ...type.body, fontSize: 14, color: text.primary, flexShrink: 1, textAlign: 'right' },
 
-  recall: { ...type.bodyStrong, color: status.attention },
 
   /*
     ⚠ **The colours in the two CTAs below are deliberately NOT tokenised.**
@@ -647,33 +638,8 @@ const styles = StyleSheet.create({
     close, and no source scan can catch it because this is dark text on light.
     Structure moves onto the system; these four colours do not.
   */
-  advisorCta: {
-    backgroundColor: surface.inverse,
-    borderRadius: radius.card,
-    paddingVertical: space.lg,
-    paddingHorizontal: space.lg,
-    gap: 3,
-  },
-  advisorCtaText: { color: text.onInverse, fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
-  advisorCtaHint: { color: text.onInverseMuted, fontSize: 13, lineHeight: 18 },
 
   /* Outlined rather than filled, so it reads as the second verb on the screen. */
-  scanCta: {
-    borderWidth: 1,
-    borderColor: border.field,
-    borderRadius: radius.card,
-    paddingVertical: space.lg,
-    paddingHorizontal: space.lg,
-    gap: 3,
-  },
-  scanCtaText: {
-    ...type.title,
-    fontSize: 16,
-    fontWeight: '700',
-    color: text.primary,
-    letterSpacing: -0.2,
-  },
-  scanCtaHint: { ...type.value, color: text.muted },
 
   centred: {
     flex: 1,

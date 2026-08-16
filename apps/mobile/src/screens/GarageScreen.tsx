@@ -17,7 +17,7 @@ import Chip from '../components/Chip';
 import GarageBay from '../components/GarageBay';
 import Logo from '../components/Logo';
 import { SkeletonCard } from '../components/Skeleton';
-import { border, radius, space, status, surface, text, type, TARGET_MIN } from '../theme';
+import { radius, space, status, surface, text, type, TARGET_MIN } from '../theme';
 import { AccountScreen } from './AccountScreen';
 import { PushPrimer } from '../notifications/PushPrimer';
 import {
@@ -746,30 +746,9 @@ const styles = StyleSheet.create({
     the designed step, and the border can stay subtle because the fill is now
     doing the work.
   */
-  card: {
-    backgroundColor: surface.card,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: border.panel,
-    overflow: 'hidden',
-  },
 
-  cardBody: { padding: space.lg, gap: space.sm },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: space.md,
-  },
-  cardTitleBlock: { flex: 1 },
-  name: { ...type.title, color: text.primary },
-  trim: { ...type.value, color: text.muted, marginTop: 2 },
 
-  noScore: { ...type.value, fontSize: 12, color: text.muted },
 
-  metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md },
-  meta: { ...type.value, color: text.muted },
-  recall: { ...type.value, color: status.attention, fontWeight: '600' },
 
   centred: {
     flex: 1,
