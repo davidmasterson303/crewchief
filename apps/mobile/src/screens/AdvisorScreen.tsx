@@ -13,6 +13,7 @@ import {
 
 import { askAdvisor, MAX_MESSAGE_LENGTH } from '../api/consultant';
 import { ApiRequestError } from '../api/client';
+import Button from '../components/Button';
 import ProvenanceRow from '../components/ProvenanceRow';
 import { Skeleton } from '../components/Skeleton';
 import { border, radius, space, status, surface, text, type } from '../theme';
@@ -274,15 +275,25 @@ export function AdvisorScreen({
           // question while this one is in flight. Only sending is gated.
           returnKeyType="default"
         />
-        <Pressable
-          style={[styles.send, !canSend && styles.sendDisabled]}
+        {/*
+          The inverse CTA, from the primitive.
+
+          ⚠ It also puts this on the 44pt floor. The hand-rolled version had
+          `paddingVertical: 13` and no `minHeight`, so its height depended on
+          the label's line box — which is how a control quietly stops meeting a
+          coarse-pointer target without anyone changing a number.
+
+          `small` rather than `large`: it sits beside the composer's input, and
+          the size names the type weight, never the height. Both clear 44.
+        */}
+        <Button
+          label="Ask"
+          variant="inverse"
+          size="small"
           onPress={() => void send()}
           disabled={!canSend}
-          accessibilityRole="button"
           accessibilityLabel="Send question to the advisor"
-        >
-          <Text style={styles.sendText}>Ask</Text>
-        </Pressable>
+        />
       </View>
 
       {overLength ? (
@@ -482,12 +493,4 @@ const styles = StyleSheet.create({
     token substitution here would re-open a defect that took two attempts to
     find, and a disabled control still has to say what it is.
   */
-  send: {
-    backgroundColor: surface.inverse,
-    borderRadius: radius.well,
-    paddingHorizontal: space.lg,
-    paddingVertical: 13,
-  },
-  sendDisabled: { backgroundColor: surface.inverseDisabled },
-  sendText: { color: text.onInverse, fontSize: 15, fontWeight: '600' },
 });

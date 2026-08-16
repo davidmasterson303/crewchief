@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 
 import Card from '../components/Card';
+import Button from '../components/Button';
 import { apiRequest, ApiRequestError } from '../api/client';
 import {
   evaluateSchedule,
@@ -309,13 +310,22 @@ export function ServiceMilestoneScreen({ vehicleId, onSignOut }: Props) {
           onSubmitEditing={() => void confirm()}
         />
 
-        <Pressable
-          style={styles.primaryCta}
-          accessibilityRole="button"
+        {/*
+          The inverse CTA, from the primitive.
+
+          ⚠ It also closes a double-submit. This was a bare `Pressable` with no
+          `disabled` — the label changed to "Saving…" and the control stayed
+          live, so a second tap fired `confirm()` again mid-write. `Button`'s
+          `busy` blocks the press and keeps the accessible name, which a label
+          swapped for "Saving…" does not: a screen reader loses the verb at the
+          moment it matters.
+        */}
+        <Button
+          label="That is right"
+          variant="inverse"
+          busy={saving}
           onPress={() => void confirm()}
-        >
-          <Text style={styles.primaryCtaText}>{saving ? 'Saving…' : 'That is right'}</Text>
-        </Pressable>
+        />
       </ScrollView>
     );
   }
@@ -473,14 +483,6 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
 
-  primaryCta: {
-    backgroundColor: surface.inverse,
-    borderRadius: radius.button,
-    minHeight: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryCtaText: { color: text.onInverse, fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
 
   /**
    * The card, on the ladder rather than beside it.

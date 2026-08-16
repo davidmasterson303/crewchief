@@ -380,24 +380,7 @@ const styles = StyleSheet.create({
   form: { padding: 28, gap: 14 },
   lockup: { alignItems: 'flex-start', marginBottom: 4 },
   subtitle: { color: text.muted, fontSize: 15, marginBottom: 14 },
-  input: {
-    backgroundColor: surface.raised,
-    borderWidth: 1,
-    borderColor: border.field,
-    borderRadius: radius.well,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    color: text.primary,
-    fontSize: 16,
-  },
   error: { color: status.dangerText, fontSize: 13 },
-  button: {
-    backgroundColor: surface.inverse,
-    borderRadius: radius.button,
-    paddingVertical: 15,
-    alignItems: 'center',
-    marginTop: 6,
-  },
   /*
     An explicit fill, not `opacity` — the same defect the advisor's "Ask"
     button carried, on the first screen anyone sees.
@@ -409,7 +392,6 @@ const styles = StyleSheet.create({
     colour literals and sees none here, and no test mounts this screen at all.
     A render test now does.
   */
-  buttonDisabled: { backgroundColor: surface.inverseDisabled },
   notice: { color: status.confirm, fontSize: 13, lineHeight: 18 },
   switchMode: { minHeight: 44, justifyContent: 'center', alignItems: 'center' },
   switchModeText: { color: text.secondary, fontSize: 14 },
@@ -428,7 +410,6 @@ const styles = StyleSheet.create({
     button and changes what the sentence appears to say.
   */
   consentLink: { color: text.primary, textDecorationLine: 'underline' },
-  buttonText: { color: text.onInverse, fontSize: 16, fontWeight: '600' },
 
   devCheck: { marginTop: 18, gap: 4 },
   /*

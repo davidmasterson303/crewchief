@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 
+import Button from '../components/Button';
 import Card from '../components/Card';
 import { apiRequest, ApiRequestError } from '../api/client';
 import { wishlistItemIdentifier, type WishlistItemType } from '@crewchief/core/wishlist-identifier';
@@ -341,9 +342,9 @@ export function WishlistScreen({ vehicleId, onSignOut }: Props) {
               <Text style={styles.composerCancelText}>Cancel</Text>
             </Pressable>
 
-            <Pressable
-              style={[styles.addCta, (!draft.trim() || saving) && styles.addCtaOff]}
-              accessibilityRole="button"
+            <Button
+              label="Add"
+              variant="inverse"
               /*
                 Named explicitly. The visible label shortened to "Add" when the
                 composer gained a Cancel beside it, and "Add" alone is a poor
@@ -352,11 +353,10 @@ export function WishlistScreen({ vehicleId, onSignOut }: Props) {
                 visible; the accessible name cannot rely on that.
               */
               accessibilityLabel="Add to wishlist"
-              accessibilityState={{ disabled: !draft.trim() || saving }}
+              disabled={!draft.trim()}
+              busy={saving}
               onPress={() => void add()}
-            >
-              <Text style={styles.addCtaText}>{saving ? 'Adding…' : 'Add'}</Text>
-            </Pressable>
+            />
           </View>
         </View>
       )}
@@ -483,14 +483,6 @@ const styles = StyleSheet.create({
   typeText: { color: text.secondary, fontSize: 14, fontWeight: '600' },
   typeTextOn: { color: text.onInverse },
 
-  addCta: {
-    flex: 1,
-    backgroundColor: surface.inverse,
-    borderRadius: radius.button,
-    minHeight: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   /*
     An explicit fill, **not `opacity`**, and that is a testability decision as
     much as a design one.
@@ -505,8 +497,6 @@ const styles = StyleSheet.create({
     A real colour is measured. #8f8f8f against the near-black label reads about
     6.2:1, and taking it darker turns the suite red, which is the whole point.
   */
-  addCtaOff: { backgroundColor: surface.inverseDisabled },
-  addCtaText: { color: text.onInverse, fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
 
   /**
    * The card, on the ladder rather than beside it.
