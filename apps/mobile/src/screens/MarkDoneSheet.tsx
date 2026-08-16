@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import Field from '../components/Field';
 import { border, brand, radius, status, surface, text } from '../theme';
 
 import {
@@ -99,7 +100,7 @@ export function MarkDoneSheet({
             {itemName}
           </Text>
 
-          <Field label="Who did the work">
+          <FieldGroup label="Who did the work">
             <View style={styles.chipRow}>
               <Choice
                 label="I did it"
@@ -112,23 +113,20 @@ export function MarkDoneSheet({
                 onPress={() => set({ isDIY: false })}
               />
             </View>
-          </Field>
+          </FieldGroup>
 
           {!draft.isDIY && (
-            <Field label="Shop" problem={problemFor('shopName')}>
-              <TextInput
-                style={[styles.input, problemFor('shopName') && styles.inputBad]}
-                value={draft.shopName}
-                onChangeText={(shopName) => set({ shopName })}
-                placeholder="Who did it"
-                placeholderTextColor={text.muted}
-                accessibilityLabel="Shop name"
-                autoCapitalize="words"
-              />
-            </Field>
+            <Field
+              label="Shop"
+              problem={problemFor('shopName')}
+              value={draft.shopName}
+              onChangeText={(shopName) => set({ shopName })}
+              placeholder="Who did it"
+              autoCapitalize="words"
+            />
           )}
 
-          <Field label="When" problem={problemFor('serviceDate')}>
+          <FieldGroup label="When" problem={problemFor('serviceDate')}>
             <View style={styles.chipRow}>
               <Choice
                 label="Today"
@@ -151,7 +149,7 @@ export function MarkDoneSheet({
               autoCapitalize="none"
               autoCorrect={false}
             />
-          </Field>
+          </FieldGroup>
 
           {/*
             Both costs are optional and the label says so, because the honest
@@ -160,30 +158,26 @@ export function MarkDoneSheet({
           */}
           <View style={styles.costRow}>
             <View style={styles.costCell}>
-              <Field label="Parts" hint="Optional" problem={problemFor('partsCost')}>
-                <TextInput
-                  style={[styles.input, problemFor('partsCost') && styles.inputBad]}
-                  value={draft.partsCost}
-                  onChangeText={(partsCost) => set({ partsCost })}
-                  placeholder="—"
-                  placeholderTextColor={text.muted}
-                  accessibilityLabel="Parts cost"
-                  keyboardType="decimal-pad"
-                />
-              </Field>
+              <Field
+                label="Parts"
+                hint="Optional"
+                problem={problemFor('partsCost')}
+                value={draft.partsCost}
+                onChangeText={(partsCost) => set({ partsCost })}
+                placeholder="—"
+                keyboardType="decimal-pad"
+              />
             </View>
             <View style={styles.costCell}>
-              <Field label="Labour" hint="Optional" problem={problemFor('laborCost')}>
-                <TextInput
-                  style={[styles.input, problemFor('laborCost') && styles.inputBad]}
-                  value={draft.laborCost}
-                  onChangeText={(laborCost) => set({ laborCost })}
-                  placeholder="—"
-                  placeholderTextColor={text.muted}
-                  accessibilityLabel="Labour cost"
-                  keyboardType="decimal-pad"
-                />
-              </Field>
+              <Field
+                label="Labour"
+                hint="Optional"
+                problem={problemFor('laborCost')}
+                value={draft.laborCost}
+                onChangeText={(laborCost) => set({ laborCost })}
+                placeholder="—"
+                keyboardType="decimal-pad"
+              />
             </View>
           </View>
 
@@ -213,7 +207,20 @@ export function MarkDoneSheet({
   );
 }
 
-function Field({
+/**
+ * A labelled **group** — a label, arbitrary content, and a problem line.
+ *
+ * ⚠ This was called `Field`, and that name is why the primitive went unused
+ * here: a local component wearing an import's name reads as adoption. It is the
+ * third instance of the pattern in this app, after the advisor's `EmptyState`
+ * and four private cards.
+ *
+ * It is genuinely not a `Field`. The primitive owns its own `TextInput`; this
+ * wraps whatever it is given — a row of choice chips, or chips *and* an input
+ * together. Where a group holds nothing but an input, the primitive is used
+ * directly and this does not appear.
+ */
+function FieldGroup({
   label,
   hint,
   problem,
