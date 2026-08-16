@@ -13,6 +13,7 @@ import {
 
 import Button from '../components/Button';
 import Card from '../components/Card';
+import EmptyState from '../components/EmptyState';
 import { apiRequest, ApiRequestError } from '../api/client';
 import { wishlistItemIdentifier, type WishlistItemType } from '@crewchief/core/wishlist-identifier';
 import { formatCurrency } from '@crewchief/core/formatting-utils';
@@ -362,13 +363,16 @@ export function WishlistScreen({ vehicleId, onSignOut }: Props) {
       )}
 
       {state.items.length === 0 ? (
-        <Card style={styles.cardGap}>
-          <Text style={styles.emptyTitle}>Nothing on the list yet</Text>
-          <Text style={styles.emptyBody}>
-            Add what this car needs as you think of it. The advisor uses this list when it
-            works out what a job would cost.
-          </Text>
-        </Card>
+        /*
+          No action, and deliberately: the "Add something" control sits directly
+          above this. A second control with the same job would be two ways to do
+          one thing on a screen with nothing on it — which reads as indecision
+          rather than helpfulness.
+        */
+        <EmptyState
+          headline="Nothing on the list yet"
+          body="Add what this car needs as you think of it. The advisor uses this list when it works out what a job would cost."
+        />
       ) : (
         state.items.map((item) => (
           <Card key={item.id} style={styles.cardGap}>
@@ -536,8 +540,6 @@ const styles = StyleSheet.create({
   removeCta: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 },
   removeText: { color: status.attention, fontSize: 14, fontWeight: '600' },
 
-  emptyTitle: { color: text.primary, fontSize: 16, fontWeight: '600' },
-  emptyBody: { color: text.secondary, fontSize: 14, lineHeight: 20 },
 
   errorTitle: { color: text.primary, fontSize: 17, fontWeight: '600' },
   errorBody: { color: text.muted, fontSize: 14, textAlign: 'center' },

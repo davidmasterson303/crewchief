@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 
 import Card from '../components/Card';
+import EmptyState from '../components/EmptyState';
 import { apiRequest, ApiRequestError } from '../api/client';
 import {
   describeRecord,
@@ -208,12 +209,16 @@ export function ServiceHistoryScreen({ vehicleId, onSignOut }: Props) {
       }
     >
       {state.records.length === 0 ? (
-        <Card style={styles.cardGap}>
-          <Text style={styles.emptyTitle}>Nothing recorded yet</Text>
-          <Text style={styles.emptyBody}>
-            Scan an invoice, or mark something done on the wishlist, and it will appear here.
-          </Text>
-        </Card>
+        /*
+          No action: this screen has no navigation callbacks — only a vehicle
+          id and a sign-out — so an "action" here could not go anywhere. The
+          body names both routes in instead, which is the honest version of a
+          next step on a screen that cannot offer one.
+        */
+        <EmptyState
+          headline="Nothing recorded yet"
+          body="Scan an invoice, or mark something done on the wishlist, and it will appear here."
+        />
       ) : (
         <>
           <View style={styles.summary}>
@@ -335,8 +340,6 @@ const styles = StyleSheet.create({
   */
   recollection: { color: status.attention },
 
-  emptyTitle: { color: text.primary, fontSize: 16, fontWeight: '600' },
-  emptyBody: { color: text.muted, fontSize: 14, lineHeight: 20 },
 
   errorTitle: { color: text.primary, fontSize: 17, fontWeight: '600' },
   errorBody: { color: text.muted, fontSize: 14, textAlign: 'center' },

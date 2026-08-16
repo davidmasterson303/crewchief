@@ -14,6 +14,7 @@ import { apiRequest, ApiRequestError } from '../api/client';
 import Button from '../components/Button';
 import AlertBanner from '../components/AlertBanner';
 import Chip from '../components/Chip';
+import EmptyState from '../components/EmptyState';
 import GarageBay from '../components/GarageBay';
 import Logo from '../components/Logo';
 import { SkeletonCard } from '../components/Skeleton';
@@ -600,35 +601,27 @@ export function GarageScreen({
         {header}
 
         {state.vehicles.length === 0 ? (
-          <View style={styles.centred}>
-            <Text style={styles.errorTitle}>No vehicles yet</Text>
-            {/*
-            This read "Add a car on the web and it will appear here." — the
-            mobile-first problem in one sentence. A new user's first screen sent
-            them to a different product to become a user at all, which an App
-            Store reviewer would have hit before anything else.
-          */}
-            <Text style={styles.errorBody}>
-              Add your first car and CrewChief gets to work on it.
-            </Text>
-            {/*
-            `primary` here and `secondary` on the error screen above, and the
-            difference is the point: this is the one thing a new account should
-            do, and it is the only filled button on the first screen they meet.
-          */}
-            <Button
-              label="Add a car"
-              /*
-              The header carries an "Add a car" control too. Two buttons with
-              the same spoken name on one screen is ambiguous to a screen reader
-              in a way it is not to the eye, which can use position — so this
-              one is named for where it is.
-            */
-              accessibilityLabel="Add your first car"
-              onPress={onAddVehicle}
-              style={styles.stateAction}
-            />
-          </View>
+          /*
+            The primitive, which `contrast.test.tsx` already calls "the first
+            thing a new user sees".
+
+            The copy is kept verbatim. It read "Add a car on the web and it will
+            appear here" until 8 Aug — the mobile-first problem in one sentence,
+            sending a new user to a different product to become a user at all,
+            which a reviewer would hit before anything else.
+
+            The action keeps its own spoken name because the header carries an
+            "Add a car" control too, and two controls with the same name on one
+            screen are ambiguous to a screen reader in a way they are not to the
+            eye, which has position to go on.
+          */
+          <EmptyState
+            headline="No vehicles yet"
+            body="Add your first car and CrewChief gets to work on it."
+            actionLabel="Add a car"
+            actionAccessibilityLabel="Add your first car"
+            onAction={onAddVehicle}
+          />
         ) : (
           <ScrollView
             horizontal

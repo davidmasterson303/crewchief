@@ -1,8 +1,10 @@
+import { Text } from 'react-native';
 import { render, userEvent } from '@testing-library/react-native';
 
 import AlertBanner from '../AlertBanner';
 import Button from '../Button';
 import Chip from '../Chip';
+import EmptyState from '../EmptyState';
 import Field from '../Field';
 import ListRow from '../ListRow';
 import ProvenanceRow from '../ProvenanceRow';
@@ -288,5 +290,81 @@ describe('Button — the inverse variant', () => {
 
     expect(spinners).toHaveLength(1);
     expect(spinners[0].color).toBe(text.onInverse);
+  });
+});
+
+describe('EmptyState', () => {
+  /*
+    Zero callers until 16 Aug, while four screens rolled their own — the garage,
+    the advisor, service history and the wishlist, at three different title
+    sizes.
+
+    ⚠ The advisor's was the reason the gap survived an audit: it was a local
+    function *named `EmptyState`*, shadowing the import that would have replaced
+    it. A private copy called `emptyBlock` is easy to spot; one wearing the
+    primitive's own name is invisible.
+  */
+  it('says what, says why, and offers the door', async () => {
+    const onAction = jest.fn();
+    const view = await render(
+      <EmptyState
+        headline="No vehicles yet"
+        body="Add your first car and CrewChief gets to work on it."
+        actionLabel="Add a car"
+        onAction={onAction}
+      />
+    );
+
+    view.getByText('No vehicles yet');
+    view.getByText('Add your first car and CrewChief gets to work on it.');
+    await userEvent.setup().press(view.getByLabelText('Add a car'));
+    expect(onAction).toHaveBeenCalled();
+  });
+
+  it('lets the action carry its own spoken name', async () => {
+    /*
+      The garage needs it: the header already has an "Add a car" control, and
+      two controls with the same spoken name on one screen are ambiguous to a
+      screen reader in a way they are not to the eye, which has position to go
+      on. The visible label stays short.
+    */
+    const view = await render(
+      <EmptyState
+        headline="No vehicles yet"
+        body="Add your first car."
+        actionLabel="Add a car"
+        actionAccessibilityLabel="Add your first car"
+        onAction={jest.fn()}
+      />
+    );
+
+    view.getByLabelText('Add your first car');
+    view.getByText('Add a car');
+  });
+
+  it('renders quiet extra content without turning it into controls', async () => {
+    /*
+      The advisor's three example questions. Its own note is the rule: they are
+      examples, not prompts, and making them buttons would turn a conversation
+      into a menu on the first screen a new user meets.
+    */
+    const view = await render(
+      <EmptyState headline="Ask about this car" body="It already knows the history.">
+        <Text>“What should I do at the next service?”</Text>
+      </EmptyState>
+    );
+
+    view.getByText('“What should I do at the next service?”');
+    expect(view.queryByRole('button')).toBeNull();
+  });
+
+  it('offers no door when there is nowhere to go', async () => {
+    // Service history has no navigation callbacks, so an action there could
+    // not lead anywhere. The body names the routes in instead.
+    const view = await render(
+      <EmptyState headline="Nothing recorded yet" body="Scan an invoice and it appears here." />
+    );
+
+    expect(view.queryByRole('button')).toBeNull();
   });
 });

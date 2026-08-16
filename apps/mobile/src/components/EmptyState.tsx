@@ -29,20 +29,46 @@ export default function EmptyState({
   headline,
   body,
   actionLabel,
+  actionAccessibilityLabel,
   onAction,
+  children,
 }: {
   headline: string;
   /** Why it is empty, in plain words. Not an apology. */
   body: string;
   actionLabel?: string;
+  /**
+   * Override the action's spoken name.
+   *
+   * The garage needs it and its own comment says why: the header already
+   * carries an "Add a car" control, and two controls with the same spoken name
+   * on one screen are ambiguous to a screen reader in a way they are not to the
+   * eye, which has position to go on.
+   */
+  actionAccessibilityLabel?: string;
   onAction?: () => void;
+  /**
+   * Extra quiet content under the body — the advisor's example questions.
+   *
+   * ⚠ Not a slot for controls. The advisor's own note is the rule: those
+   * examples are **not** prompts to tap, because making them buttons would turn
+   * a conversation into a menu on the first screen a new user meets. Anything
+   * pressable belongs in `action`, where the ladder can see it.
+   */
+  children?: React.ReactNode;
 }) {
   return (
     <View style={styles.wrap}>
       <Text style={styles.headline}>{headline}</Text>
       <Text style={styles.body}>{body}</Text>
+      {children}
       {actionLabel && onAction ? (
-        <Button label={actionLabel} onPress={onAction} style={styles.action} />
+        <Button
+          label={actionLabel}
+          accessibilityLabel={actionAccessibilityLabel}
+          onPress={onAction}
+          style={styles.action}
+        />
       ) : null}
     </View>
   );

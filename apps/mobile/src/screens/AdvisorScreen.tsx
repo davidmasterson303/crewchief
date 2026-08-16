@@ -14,6 +14,7 @@ import {
 import { askAdvisor, MAX_MESSAGE_LENGTH } from '../api/consultant';
 import { ApiRequestError } from '../api/client';
 import Button from '../components/Button';
+import EmptyState from '../components/EmptyState';
 import ProvenanceRow from '../components/ProvenanceRow';
 import { Skeleton } from '../components/Skeleton';
 import { border, radius, space, status, surface, text, type } from '../theme';
@@ -228,7 +229,7 @@ export function AdvisorScreen({
         keyExtractor={(turn) => turn.id}
         contentContainerStyle={styles.transcript}
         renderItem={({ item }) => <TurnView turn={item} />}
-        ListEmptyComponent={<EmptyState />}
+        ListEmptyComponent={<AdvisorEmptyState />}
         /*
           Content-size rather than a call after each setState: the answer's
           height is not known until it has laid out, and scrolling before that
@@ -396,22 +397,31 @@ function TurnView({ turn }: { turn: Turn }) {
 
 /**
  * The empty state names what the advisor can see, because the alternative is a
- * blank screen that invites "what do I even ask". These three are not canned
- * prompts to tap — they are examples, and making them buttons would turn a
- * conversation into a menu on the first screen a new user meets.
+ * blank screen that invites "what do I even ask".
+ *
+ * ⚠ The three examples are **not** canned prompts to tap. Making them buttons
+ * would turn a conversation into a menu on the first screen a new user meets,
+ * which is why they go through `EmptyState`'s `children` — a slot the primitive
+ * documents as taking quiet content and never controls.
+ *
+ * ── Why this used the primitive late ────────────────────────────────────────
+ *
+ * It was a local function *called `EmptyState`*, shadowing the import that
+ * would have replaced it. A private copy is easy to spot when it is named
+ * `emptyBlock`; one wearing the primitive's own name is invisible, and this is
+ * how the primitive reached 15 Aug with zero callers while four screens rolled
+ * their own.
  */
-function EmptyState() {
+function AdvisorEmptyState() {
   return (
-    <View style={styles.empty}>
-      <Text style={styles.emptyTitle}>Ask about this car</Text>
-      <Text style={styles.emptyBody}>
-        The advisor already knows its service history, open issues, recalls and mods. You do not
-        need to explain them.
-      </Text>
+    <EmptyState
+      headline="Ask about this car"
+      body="The advisor already knows its service history, open issues, recalls and mods. You do not need to explain them."
+    >
       <Text style={styles.emptyExample}>“Is the timing chain something I should worry about?”</Text>
       <Text style={styles.emptyExample}>“What should I do at the next service?”</Text>
       <Text style={styles.emptyExample}>“Is $1,400 fair for front control arms?”</Text>
-    </View>
+    </EmptyState>
   );
 }
 
@@ -442,9 +452,6 @@ const styles = StyleSheet.create({
   bulletMark: { ...type.body, color: text.muted },
 
 
-  empty: { flex: 1, justifyContent: 'center', gap: space.sm, paddingHorizontal: space.xs },
-  emptyTitle: { ...type.title, fontSize: 20, lineHeight: 26, color: text.primary, letterSpacing: -0.3 },
-  emptyBody: { ...type.body, fontSize: 14, lineHeight: 20, color: text.muted },
   emptyExample: { ...type.body, fontSize: 14, lineHeight: 20, color: text.muted },
 
   thinking: { gap: space.sm, paddingHorizontal: space.lg },

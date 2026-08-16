@@ -5,6 +5,21 @@ import { border, radius, space, surface } from '../theme';
 /**
  * A recess — the estimate block in the advisor, a read-only value group.
  *
+ * ── ⚠ This has no caller yet, and that is not an oversight ──────────────────
+ *
+ * Audited 16 Aug: `Well` is used by zero screens. The first read of that was
+ * "four screens hand-roll it" — **wrong**. The two `surface.well` sites in this
+ * app are the advisor's chat bubble, which is a bubble and not a recess, and
+ * the garage's dev-only token block, which never ships.
+ *
+ * The caller this was built for is **the advisor's estimate block**, and the
+ * mobile advisor does not render one yet. So the honest state is a primitive
+ * waiting on a feature, not a primitive being ignored.
+ *
+ * Do not adopt it to close the gap. A well pressed into service as a card, a
+ * bubble or a panel is worse than an unused file: it teaches the next reader
+ * that the distinction below does not mean anything.
+ *
  * ── A well is not a card ────────────────────────────────────────────────────
  *
  * A `Card` is raised and holds a thing. A well is *cut into* the surface it
