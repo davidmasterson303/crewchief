@@ -67,14 +67,18 @@ import {
  * its colours.
  *
  * An earlier attempt was written and deleted rather than left broken, and the
- * reason is worth carrying: **`fireEvent` does not work against this form and
- * fails silently.** `changeText` leaves state untouched, so `canSubmit` stays
- * false and `submit()` returns at its first line; the submit control resolves
- * to a host `View` with no `onPress`. Nothing throws — a suite built on it
- * passes while proving nothing.
+ * reason is worth carrying — in its corrected form, because the note that
+ * stood here until 15 Aug 2026 blamed the wrong thing. It said `fireEvent`
+ * "does not work against this form and fails silently". What actually fails is
+ * an **un-awaited** `fireEvent`: RNTL 14's `render`, `fireEvent` and
+ * `userEvent` are all async, and dropping the `await` leaves React's act scope
+ * open, which stops every later render in that file from committing. It cost
+ * `contrast.test.tsx` a week of measuring nothing in green — `jest.setup.js`
+ * carries the mechanism and now fails on it.
  *
- * `userEvent`, RNTL 14's async API for React 19's concurrent render, works
- * completely. **Use it for every interaction in this app's screen tests.**
+ * **Use `userEvent` for every interaction in this app's screen tests, and
+ * await it.** It is RNTL 14's async API for React 19's concurrent render and
+ * it models a real press rather than a synthetic prop call.
  *
  * ── The mods question is asked here, not buried in settings ─────────────────
  *

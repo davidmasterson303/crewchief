@@ -1,4 +1,4 @@
-import { fireEvent, render, userEvent } from '@testing-library/react-native';
+import { render, userEvent } from '@testing-library/react-native';
 
 import { GarageScreen } from '../GarageScreen';
 import { VehicleDetailScreen } from '../VehicleDetailScreen';
@@ -10,11 +10,6 @@ import { SignInScreen } from '../SignInScreen';
 import { AddVehicleScreen } from '../AddVehicleScreen';
 import { apiRequest, ApiRequestError } from '../../api/client';
 import { auditText, belowFloor, contrastRatio, SCREEN_BACKGROUND } from '../../test-support/contrast';
-import BayRoom from '../../components/BayRoom';
-import ClusterGauge from '../../components/ClusterGauge';
-import HealthDrivers from '../../components/HealthDrivers';
-import Plinth from '../../components/Plinth';
-import { bay, surface } from '../../theme';
 
 /**
  * The AA floor, measured on rendered screens.
@@ -33,6 +28,20 @@ import { bay, surface } from '../../theme';
  *
  * Both suites stay. The scan covers every style in the app including screens
  * nothing mounts; this covers fewer styles far more truthfully.
+ *
+ * ── Await every interaction ─────────────────────────────────────────────────
+ *
+ * This file carried a "do not add a test below this line" warning from 8 to 15
+ * August 2026, because everything after the add-a-car case rendered a null tree
+ * and audited nothing — in green, since `belowFloor(...) === []` passes on an
+ * empty audit. The cause was three un-awaited `fireEvent.changeText` calls:
+ * **`render`, `fireEvent` and `userEvent` are all async in RNTL 14**, and
+ * overlapping act scopes leave React unable to commit any later render for the
+ * rest of the file. `jest.setup.js` carries the mechanism and now fails the
+ * test that leaks the scope, and `belowFloor` refuses an empty audit.
+ *
+ * Use `userEvent` for every interaction, and await it. `fireEvent` works when
+ * awaited but nothing in this app needs it.
  */
 
 jest.mock('../../api/client', () => {
@@ -261,6 +270,25 @@ describe('the measurement itself', () => {
 
     await view.findByText('2015 BMW M235i');
     expect(auditText(view).length).toBeGreaterThan(4);
+  });
+
+  /*
+    ── The two ways this suite has gone vacuous, now closed ──────────────────
+
+    Both are the same shape: `expect(belowFloor(...)).toEqual([])` passes when
+    nothing was audited, so the assertion says most when it fails and nothing
+    at all when the input is empty. It has happened twice — §0.16's source
+    scanner on an empty scan, and this file measuring a null tree for a week.
+  */
+  it('refuses to report a clean bill on an audit of nothing', () => {
+    expect(() => belowFloor([])).toThrow(/nothing was audited/);
+    expect(belowFloor([], { allowEmpty: true })).toEqual([]);
+  });
+
+  it('refuses to audit a tree that never committed', () => {
+    // What an un-awaited `render`/`fireEvent`/`userEvent` leaves behind: React's
+    // act scope stays open, the root never commits, and `toJSON()` is null.
+    expect(() => auditText({ toJSON: () => null })).toThrow(/tree is null/);
   });
 });
 
@@ -540,6 +568,7 @@ describe('the service milestone screen', () => {
   it('reads at AA on the milestone, once the reading is confirmed', async () => {
     request.mockResolvedValue(CAR);
 
+    const user = userEvent.setup();
     const view = await render(
       <ServiceMilestoneScreen
         vehicleId="db143cdc-e68c-46f0-849e-69f7a1873f58"
@@ -547,7 +576,7 @@ describe('the service milestone screen', () => {
       />
     );
 
-    fireEvent.press(await view.findByText('That is right'));
+    await user.press(await view.findByText('That is right'));
 
     // The oil interval lands the car inside a milestone; brake fluid has no
     // recorded date, so it renders in the "timed by date" block rather than
@@ -583,6 +612,7 @@ describe('the service milestone screen', () => {
       },
     });
 
+    const user = userEvent.setup();
     const view = await render(
       <ServiceMilestoneScreen
         vehicleId="a1000000-0000-0000-0000-000000000001"
@@ -590,7 +620,7 @@ describe('the service milestone screen', () => {
       />
     );
 
-    fireEvent.press(await view.findByText('That is right'));
+    await user.press(await view.findByText('That is right'));
 
     await view.findByText('Timed by date, not mileage');
     expect(view.queryByText(/Brake fluid flush/)).not.toBeNull();
@@ -628,9 +658,10 @@ describe('the sign-in screen', () => {
  */
 describe('sign-up', () => {
   it('reads at AA in create-account mode', async () => {
+    const user = userEvent.setup();
     const view = await render(<SignInScreen />);
 
-    fireEvent.press(await view.findByText('New here? Create an account'));
+    await user.press(await view.findByText('New here? Create an account'));
 
     await view.findByText('Create your garage');
     expect(belowFloor(auditText(view))).toEqual([]);
@@ -650,41 +681,56 @@ describe('add a car', () => {
   });
 
   it('reads at AA with the form filled and both choices rendered', async () => {
+    const user = userEvent.setup();
     const view = await render(
       <AddVehicleScreen onAdded={jest.fn()} onSignOut={jest.fn()} />
     );
 
-    fireEvent.changeText(view.getByLabelText('Model year'), '2020');
-    fireEvent.changeText(view.getByLabelText('Make'), 'Subaru');
-    fireEvent.changeText(view.getByLabelText('Model'), 'WRX');
+    await user.type(view.getByLabelText('Model year'), '2020');
+    await user.type(view.getByLabelText('Make'), 'Subaru');
+    await user.type(view.getByLabelText('Model'), 'WRX');
+
+    /*
+      The submit is the whole reason to fill the form: it changes fill between
+      `submitOff` and `submit`, and the enabled one is what this case exists to
+      measure. Asserted rather than assumed — everything else on this screen
+      renders identically empty or full, so without this the case would measure
+      the disabled state again under a name that says otherwise.
+    */
+    expect(view.getByLabelText('Add to my garage').props.accessibilityState).toMatchObject({
+      disabled: false,
+    });
 
     // Both the selected and unselected chip, since they are different fills.
     await view.findByText('Not for me');
     expect(belowFloor(auditText(view))).toEqual([]);
-
   });
 });
 
-/*
-  ⚠ ⚠ **DO NOT ADD A TEST BELOW THIS LINE.** ⚠ ⚠
+/**
+ * The tail sentinel — what the "do not add a test below this line" warning
+ * became.
+ *
+ * From 8 to 15 August 2026 every `render` past the add-a-car case came back
+ * with a null tree, so anything added here audited nothing and passed. Four
+ * cases were written below and all four went green while proving nothing; the
+ * response at the time was a warning comment telling the next person not to
+ * try, and the four cases moved to `surface-contrast.test.tsx`.
+ *
+ * The cause is fixed — un-awaited `fireEvent` calls leaving React's act scope
+ * open, see `jest.setup.js` — and the warning is gone. This stands in its place
+ * and does the job the warning could not: it mounts the simplest screen in the
+ * app at the very foot of the file and insists that a render *here* still
+ * measures something. Keep it last. Add new cases above it.
+ */
+describe('the last render in this file still measures something', () => {
+  it('mounts and audits after every case above it', async () => {
+    const view = await render(<SignInScreen />);
 
-  Every `render` that happens after the test above returns a tree whose
-  `toJSON()` is **null**. Audits of it are empty, and because every assertion
-  in this file has the shape `expect(belowFloor(...)).toEqual([])`, an empty
-  audit **passes**. A test added here measures nothing and says so in green.
+    await view.findByText('Sign in');
 
-  Found on 15 Aug by adding four cases below and watching all four pass while
-  proving nothing — caught only by an anti-vacuous guard, which is the third
-  time in this repo that a guard rather than a test has been the thing that
-  noticed. Bisected with `-t` to this exact case: pair it with any later render
-  and that render comes back null; drop it and the same renders are fine.
-
-  **The mechanism is not yet understood.** Filling this form starts work that
-  outlives the assertions, and flushing with `await act(async () => {})` here
-  does *not* fix it — so it is not simply a pending state update. It wants a
-  real diagnosis rather than a guess.
-
-  Until then, new surfaces are audited in `surface-contrast.test.tsx`, which is
-  a separate file and therefore a separate module registry and renderer.
-*/
-
+    // Not a contrast assertion — `belowFloor` covers that on every case above.
+    // This asserts the *harness* still works this far down the file.
+    expect(auditText(view).length).toBeGreaterThan(3);
+  });
+});

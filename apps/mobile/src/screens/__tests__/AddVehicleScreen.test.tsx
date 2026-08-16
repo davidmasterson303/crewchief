@@ -13,29 +13,26 @@ import { apiRequest, ApiRequestError } from '../../api/client';
  * harness-shaped rather than like defects, and the screen's docblock recorded
  * the gap and the assertions to restore instead of shipping a weakened test.
  *
- * That diagnosis was half right. `fireEvent` genuinely does not work here, and
- * it fails *silently* — which is the part worth writing down, because a suite
- * built on it passes while proving nothing:
+ * ⚠ **That diagnosis was wrong, and the wrong half was expensive.** It said
+ * `fireEvent` "does not work here" and fails silently — that `changeText`
+ * leaves `props.value` unchanged and the press lands on nothing. Re-measured on
+ * 15 Aug 2026: an **awaited** `fireEvent.changeText` sets `value` and flips
+ * `accessibilityState.disabled` exactly as `userEvent.type` does.
  *
- *   - `fireEvent.changeText` leaves `props.value` unchanged. State never
- *     updates, so `canSubmit` stays false and `submit()` returns at its first
- *     line.
- *   - `getByLabelText('Add to my garage')` resolves to a host `View` whose
- *     `onPress` is `undefined`, so the press lands on nothing.
+ * The real fault was the missing `await`. In RNTL 14 `render`, `fireEvent` and
+ * `userEvent` are all async, and an un-awaited one leaves React's act scope
+ * open — after which **no later render in that file commits at all**, and
+ * `toJSON()` returns null. Believing the API was simply broken hid that for a
+ * week: `contrast.test.tsx` grew a "do not add a test below this line" warning
+ * around the un-awaited calls instead of an `await`. `jest.setup.js` carries
+ * the mechanism and now fails on it.
  *
- * Neither throws. A test doing all of the above and then asserting "no request
- * was sent for an invalid reading" **passes for entirely the wrong reason** —
- * it sent nothing because it typed nothing.
- *
- * The fix was not a workaround. RNTL 14's `userEvent` is the async API that
- * exists for React 19's concurrent render, and it works completely: typing
- * updates state, `accessibilityState.disabled` flips, the press reaches the
- * handler. `fireEvent` is the older synchronous API that concurrent mounting
- * broke.
- *
- * **Use `userEvent` in every screen test in this app.** `render` is already
- * awaited throughout (see `GarageScreen.test.tsx`); this is the same change one
- * layer down.
+ * **Use `userEvent` in every screen test in this app, and await it.** Not
+ * because `fireEvent` is broken, but because `userEvent` models a real press
+ * rather than a synthetic prop call — it respects `disabled`, `pointerEvents`
+ * and the press sequence, which is what these tests are meant to assert on.
+ * `render` is already awaited throughout (see `GarageScreen.test.tsx`); this is
+ * the same discipline one layer down.
  *
  * ── The guard against the failure above ─────────────────────────────────────
  *
