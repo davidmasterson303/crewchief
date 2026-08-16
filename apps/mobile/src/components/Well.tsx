@@ -16,6 +16,14 @@ import { border, radius, space, surface } from '../theme';
  * mobile advisor does not render one yet. So the honest state is a primitive
  * waiting on a feature, not a primitive being ignored.
  *
+ * ⚠ **Confirmed 16 Aug, and it is an API gap rather than screen work.**
+ * `POST /api/v1/consultant` returns `{ sessionId, response, contextKinds }` —
+ * `response` is prose, and no structured estimate reaches either client.
+ * Parsing dollar ranges back out of that prose is the obvious shortcut and the
+ * wrong one: a mis-parsed range shown as a priced line item is the overclaim
+ * the provenance work exists to prevent. Written up as gap 4 in
+ * `docs/step4-api-gaps.md`.
+ *
  * Do not adopt it to close the gap. A well pressed into service as a card, a
  * bubble or a panel is worse than an unused file: it teaches the next reader
  * that the distinction below does not mean anything.

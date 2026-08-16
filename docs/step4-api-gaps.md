@@ -199,6 +199,55 @@ columns. The empty state is a design question, not engineering time.
 
 ---
 
+## 4. ⚠ A fourth gap, found 16 Aug on the advisor — **not previously listed**
+
+§0.16 flagged three. There is a fourth, and it is the reason the `Well`
+primitive still has no caller.
+
+**What the board specifies.** Screen 04 is the advisor, and its own summary
+line is *"Answers are unboxed; **the estimate is a well**; provenance is a
+claim, never a badge."* The drawn screen carries a structured estimate:
+
+> Estimated, for this vehicle in your area:
+> Fluid flush — $110 – $160
+> Master cylinder, if needed — $380 – $520
+> Most likely total — $110 – $160
+
+**What the API returns.** `POST /api/v1/consultant` responds with exactly
+`{ sessionId, response, contextKinds }`. `response` is **prose**. There is no
+structured estimate on either client — web's `CostEstimateBreakdown` is fed by
+`QuoteDetailDialog` from the quote flow, not by the advisor.
+
+So the estimate well cannot be built. Parsing ranges back out of the model's
+prose is the obvious shortcut and it is the wrong one: this codebase's standing
+position is that it does not invent precision, and a mis-parsed dollar range
+shown as a priced line item is exactly the overclaim the provenance work exists
+to prevent.
+
+### The pieces already exist, which makes this smaller than it looks
+
+`packages/core/src/advice-range.ts` already holds `AdviceRange`,
+`widenToHonestSpread`, `formatRange` and `positionAgainstRange`, and
+`quote-check.ts` uses them for the front door. None of it is wired into the
+consultant's response.
+
+**Proposed shape:** the consultant route returns an optional
+`estimate?: { lines: Array<{ label: string; range: AdviceRange }>; likely: AdviceRange }`
+alongside `response`, populated when the model's answer priced something and
+omitted when it did not.
+
+⚠ **Optional is the load-bearing part.** Most advisor answers are not quotes,
+and a well that renders empty — or worse, at $0 — on every non-pricing answer
+would be a worse screen than no well at all. Absent must mean absent.
+
+**Estimate:** ~1 ed, most of it in getting the model to return the numbers
+separately from the prose rather than in the plumbing.
+
+**Until then `Well` correctly has no caller**, and its own header now says so.
+It is a primitive waiting on a feature, not one being ignored.
+
+---
+
 ## Order I would build them in
 
 1. **Nothing** — #1 is already served; the hero just needs drawing, and David
