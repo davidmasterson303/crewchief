@@ -36,6 +36,8 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { surface, radius } from '../../apps/mobile/src/theme';
+
 const MOBILE_SRC = join(__dirname, '..', '..', 'apps', 'mobile', 'src');
 const COMPONENTS = join(MOBILE_SRC, 'components');
 
@@ -83,6 +85,25 @@ describe('no local component wears a primitive s name', () => {
     // failure mode this repo has now been caught by four times.
     expect(primitives.length).toBeGreaterThan(10);
     expect(files.length).toBeGreaterThan(15);
+  });
+
+  it('is anchored to a tree that actually resolves', () => {
+    /*
+      ⚠ Required by `tests-test-real-code`, and it caught this suite the day it
+      was written: a rule that only reads strings can rot against a moved or
+      renamed tree and go on reporting a clean app.
+
+      The link is honest about being indirect. This rule is about **names**, and
+      there is no plain-TypeScript module that holds them — every primitive is a
+      `.tsx` that cannot be imported in a node environment. So it anchors to the
+      layer those primitives are built from, exactly as the sibling static
+      guards do. If `apps/mobile/src/theme` ever moved, this fails loudly rather
+      than scanning a path that no longer means anything.
+    */
+    expect(surface.card).toMatch(/^#[0-9A-F]{6}$/i);
+    expect(radius.card).toBe(14);
+    expect(primitives).toContain('Field');
+    expect(primitives).toContain('EmptyState');
   });
 
   it('has no shadow', () => {
