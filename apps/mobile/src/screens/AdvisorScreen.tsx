@@ -431,7 +431,6 @@ const styles = StyleSheet.create({
   bulletMark: { ...type.body, color: text.muted },
 
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
-  chipPrefix: { ...type.label, fontSize: 11, letterSpacing: 0, color: text.muted },
   chip: {
     backgroundColor: surface.raised,
     borderWidth: 1,
@@ -440,7 +439,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.sm,
     paddingVertical: 2,
   },
-  chipText: { ...type.label, fontSize: 11, letterSpacing: 0, color: text.muted },
 
   empty: { flex: 1, justifyContent: 'center', gap: space.sm, paddingHorizontal: space.xs },
   emptyTitle: { ...type.title, fontSize: 20, lineHeight: 26, color: text.primary, letterSpacing: -0.3 },

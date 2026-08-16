@@ -624,13 +624,6 @@ const styles = StyleSheet.create({
     padding: space.lg,
     gap: space.sm,
   },
-  cardLabel: {
-    ...type.label,
-    fontSize: 11,
-    color: text.muted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
 
   buildDial: { alignItems: 'center' },
   summary: { ...type.body, fontSize: 14, lineHeight: 20, color: text.secondary },
