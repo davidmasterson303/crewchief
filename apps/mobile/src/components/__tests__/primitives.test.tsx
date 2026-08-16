@@ -174,3 +174,36 @@ describe('ProvenanceRow', () => {
     expect(view.queryByText(/Based on/)).toBeNull();
   });
 });
+
+describe('pressed states', () => {
+  /*
+    ⚠ Only one of these three claims can be made here, and the missing two are
+    the interesting ones.
+
+    React Native's `Pressable` drives its pressed state through `usePressability`
+    and the responder system, not through a prop this runner can fire at: a
+    synthetic `pressIn` on the host node leaves `style` resolved for
+    `pressed: false`, so the tree only ever shows the resting state. Measured —
+    both a `props.style` read and a `fireEvent(row, 'pressIn')` returned the
+    resting value.
+
+    So "a pressed style must change something" lives in
+    `lib/__tests__/mobile-pressed-states.test.ts` as a source rule instead. That
+    is a weaker kind of check and it is the kind available: the defect it exists
+    for — `ListRow`'s `pressed: { opacity: 1 }`, a declaration that changes
+    nothing while looking like feedback — is visible in source and invisible
+    here.
+  */
+  it('leaves an untappable row alone', async () => {
+    // No handler, no button role, and nothing to acknowledge.
+    const view = await render(<ListRow label="Mileage" value="66,000 mi" />);
+
+    expect(view.queryByRole('button')).toBeNull();
+  });
+
+  it('gives a tappable one the role that says it can be pressed', async () => {
+    const view = await render(<ListRow label="Mileage" value="66,000 mi" onPress={jest.fn()} />);
+
+    expect(view.getByRole('button')).toBeTruthy();
+  });
+});

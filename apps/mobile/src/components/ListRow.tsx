@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { TABULAR, TARGET_MIN, border, space, text, type } from '../theme';
+import { TABULAR, TARGET_MIN, border, space, surface, text, type } from '../theme';
 
 /**
  * One row in a divider-separated list.
@@ -85,7 +85,21 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: border.panel,
   },
-  pressed: { opacity: 1 },
+  /**
+   * Real feedback, and it replaces a no-op.
+   *
+   * ⚠ This was `opacity: 1` — a style that changes nothing while looking like a
+   * pressed state had been implemented, which is worse than none: the branch is
+   * there, so nobody re-reads it. Almost certainly the residue of removing a
+   * group opacity when this app took alpha fades off its controls.
+   *
+   * `surface.raised` is `Button`'s own `ghostPressed`, and this is that case: a
+   * row with no resting fill, on a backdrop it does not choose. On a card it
+   * deepens; on the page it is the same step a ghost button uses there. Either
+   * way it is a fill swap rather than a fade, so the ink keeps full strength —
+   * the rule the 1.61:1 "Ask" label was written into this system to prevent.
+   */
+  pressed: { backgroundColor: surface.raised },
   labelBlock: { flex: 1, gap: 2 },
   label: { ...type.ui, color: text.muted },
   detail: { ...type.label, letterSpacing: 0, color: text.muted },

@@ -249,7 +249,14 @@ export default function VehiclePlate({
         <Pressable
           onPress={onAddPhoto}
           disabled={busy}
-          style={styles.action}
+          /*
+            A fill swap on press, matching `Button`'s `quiet` step — raised at
+            rest, well when pressed. A control sitting on an unknown photograph
+            has to acknowledge the tap with its own surface; fading it would
+            take the label with it, which is the rule this app removed group
+            opacity for.
+          */
+          style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
           hitSlop={space.sm}
           accessibilityRole="button"
           accessibilityState={{ busy, disabled: busy }}
@@ -312,5 +319,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: border.field,
   },
+  actionPressed: { backgroundColor: surface.well },
   actionLabel: { ...type.label, color: text.primary },
 });
