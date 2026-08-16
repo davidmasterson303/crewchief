@@ -79,11 +79,23 @@ const offenders = screenFiles().flatMap((file) => {
 });
 
 describe('a busy control keeps its name', () => {
-  it('found controls of this shape at all, so it cannot pass vacuously', () => {
+  it('still watches something, and names where the guarantee now lives', () => {
     /*
-      Guards the guard. If the walk or the `<ActivityIndicator` match silently
-      stopped working, the assertion below would be trivially true — the failure
-      mode this repo has re-learned enough times to have a suite named after it.
+      Guards the guard — but it had to move on 16 Aug, and the reason is the
+      good kind.
+
+      This used to require **more than one** hand-rolled busy `Pressable` to
+      exist, on the reasoning that a walk which silently stopped matching would
+      make the rule below trivially true. That was right while every screen
+      rolled its own control. Step 5 finished moving them onto `Button`, and the
+      count fell to one — so the anti-vacuous check failed while the app was
+      getting *better*.
+
+      Lowering the threshold would have been the wrong repair: it would leave
+      the guard pointed at a population that is on its way to zero. The
+      guarantee now lives in the primitive, so that is what this asserts —
+      `Button` shows a spinner and keeps an accessible name through it — plus
+      the stragglers the scan can still see.
     */
     const spinners = screenFiles().flatMap((file) =>
       pressables(readFileSync(join(SCREENS, file), 'utf8')).filter(({ block }) =>
@@ -91,7 +103,16 @@ describe('a busy control keeps its name', () => {
       )
     );
 
-    expect(spinners.length).toBeGreaterThan(1);
+    const button = readFileSync(
+      join(__dirname, '..', '..', 'apps', 'mobile', 'src', 'components', 'Button.tsx'),
+      'utf8'
+    );
+
+    expect(button).toMatch(/<ActivityIndicator/);
+    expect(button).toMatch(/accessibilityLabel=\{accessibilityLabel \?\? label\}/);
+
+    // The walk itself still finds real controls; zero would mean it broke.
+    expect(spinners.length).toBeGreaterThanOrEqual(1);
   });
 
   it('every Pressable that can show a spinner carries an accessibilityLabel', () => {

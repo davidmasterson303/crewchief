@@ -11,9 +11,11 @@ import {
   View,
 } from 'react-native';
 
+import Button from '../components/Button';
+import Field from '../components/Field';
 import { apiRequest, ApiRequestError } from '../api/client';
 import { validateMileageUpdate } from '@crewchief/core/mileage-tracking';
-import { status, surface, text } from '../theme';
+import { radius, status, surface, text } from '../theme';
 import {
   BASELINE_AGE_OPTIONS,
   type BaselineAge,
@@ -181,60 +183,62 @@ export function AddVehicleScreen({ onAdded, onSignOut }: Props) {
           Enough to look it up. Everything else can wait.
         </Text>
 
+        {/*
+          `Field`, and the visible labels are the upgrade.
+
+          This form asked for six values through placeholders alone, so every
+          label vanished the moment someone typed — on the one screen a new user
+          cannot skip. The accessible names are unchanged because the primitive
+          takes the label it speaks, and `hint` now carries "optional" into that
+          name rather than showing it only to people who can see it.
+
+          The two-column row wraps each field rather than styling it: `Field`'s
+          `style` reaches the input, and it is the **wrapper** that has to flex.
+        */}
         <View style={styles.row}>
-          <TextInput
-            style={[styles.input, styles.year]}
-            value={year}
-            onChangeText={setYear}
-            placeholder="Year"
-            placeholderTextColor={text.muted}
-            keyboardType="number-pad"
-            maxLength={4}
-            accessibilityLabel="Model year"
-            editable={!busy}
-          />
-          <TextInput
-            style={[styles.input, styles.grow]}
-            value={make}
-            onChangeText={setMake}
-            placeholder="Make"
-            placeholderTextColor={text.muted}
-            autoCapitalize="words"
-            accessibilityLabel="Make"
-            editable={!busy}
-          />
+          <View style={styles.year}>
+            <Field
+              label="Model year"
+              value={year}
+              onChangeText={setYear}
+              keyboardType="number-pad"
+              maxLength={4}
+              editable={!busy}
+            />
+          </View>
+          <View style={styles.grow}>
+            <Field
+              label="Make"
+              value={make}
+              onChangeText={setMake}
+              autoCapitalize="words"
+              editable={!busy}
+            />
+          </View>
         </View>
 
-        <TextInput
-          style={styles.input}
+        <Field
+          label="Model"
           value={model}
           onChangeText={setModel}
-          placeholder="Model"
-          placeholderTextColor={text.muted}
           autoCapitalize="words"
-          accessibilityLabel="Model"
           editable={!busy}
         />
 
-        <TextInput
-          style={styles.input}
+        <Field
+          label="Trim"
+          hint="optional"
           value={trim}
           onChangeText={setTrim}
-          placeholder="Trim (optional)"
-          placeholderTextColor={text.muted}
           autoCapitalize="words"
-          accessibilityLabel="Trim, optional"
           editable={!busy}
         />
 
-        <TextInput
-          style={styles.input}
+        <Field
+          label="Current mileage"
           value={mileage}
           onChangeText={setMileage}
-          placeholder="Current mileage"
-          placeholderTextColor={text.muted}
           keyboardType="number-pad"
-          accessibilityLabel="Current mileage"
           editable={!busy}
         />
 
@@ -278,14 +282,12 @@ export function AddVehicleScreen({ onAdded, onSignOut }: Props) {
             count from the work rather than guess from the odometer.
           </Text>
 
-          <TextInput
-            style={styles.input}
+          <Field
+            label="Mileage at last oil change"
+            hint="optional"
             value={serviceMileage}
             onChangeText={setServiceMileage}
-            placeholder="Mileage at the time (optional)"
-            placeholderTextColor={text.muted}
             keyboardType="number-pad"
-            accessibilityLabel="Mileage at last oil change, optional"
             editable={!busy}
           />
 
@@ -325,19 +327,17 @@ export function AddVehicleScreen({ onAdded, onSignOut }: Props) {
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        <Pressable
-          style={[styles.submit, !canSubmit && styles.submitOff]}
-          accessibilityRole="button"
-          accessibilityLabel="Add to my garage"
-          accessibilityState={{ disabled: !canSubmit }}
+        {/*
+          The inverse CTA from the primitive — the sixth and last private copy
+          of a treatment four tokens existed for and no component owned.
+        */}
+        <Button
+          label="Add to my garage"
+          variant="inverse"
           onPress={() => void submit()}
-        >
-          {busy ? (
-            <ActivityIndicator color={text.onInverse} />
-          ) : (
-            <Text style={styles.submitText}>Add to my garage</Text>
-          )}
-        </Pressable>
+          disabled={!canSubmit}
+          busy={busy}
+        />
 
         {/*
           Said plainly rather than left as a surprise. The dossier takes ~23s to
@@ -365,15 +365,6 @@ const styles = StyleSheet.create({
   grow: { flex: 1 },
   year: { width: 96 },
 
-  input: {
-    backgroundColor: surface.raised,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    // 16px, per RB0 rule 3's floor for any focusable input.
-    fontSize: 16,
-    color: text.primary,
-    minHeight: 48,
-  },
 
   modsBlock: { gap: 8, marginTop: 8 },
   modsQuestion: { color: text.primary, fontSize: 16, fontWeight: '600' },
@@ -382,7 +373,7 @@ const styles = StyleSheet.create({
   choice: {
     flex: 1,
     minHeight: 48,
-    borderRadius: 12,
+    borderRadius: radius.button,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: surface.raised,
@@ -392,7 +383,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
     paddingHorizontal: 14,
     justifyContent: 'center',
-    borderRadius: 12,
+    borderRadius: radius.button,
     backgroundColor: surface.raised,
   },
   ageText: { color: text.secondary, fontSize: 14, fontWeight: '600' },
@@ -403,18 +394,8 @@ const styles = StyleSheet.create({
 
   error: { color: status.dangerText, fontSize: 13, lineHeight: 18 },
 
-  submit: {
-    marginTop: 8,
-    backgroundColor: surface.inverse,
-    borderRadius: 12,
-    minHeight: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   /* An explicit fill, never `opacity` — the contrast audit cannot composite a
      parent alpha, so a faded control is an unmeasured one. See WishlistScreen. */
-  submitOff: { backgroundColor: surface.inverseDisabled },
-  submitText: { color: text.onInverse, fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
 
   footnote: { color: text.secondary, fontSize: 12, lineHeight: 18, marginTop: 4 },
 });

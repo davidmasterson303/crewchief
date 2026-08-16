@@ -38,17 +38,19 @@ const MOBILE_SRC = join(__dirname, '..', '..', 'apps', 'mobile', 'src');
 const ALLOWED = [join('src', 'theme')];
 
 /**
- * ── The ratchet, and its one entry ──────────────────────────────────────────
+ * ── The ratchet, now empty ──────────────────────────────────────────────────
  *
- * `AddVehicleScreen.tsx` carries four on-scale-by-luck radii and is **being
- * edited by another session right now** — the one diagnosing the null-tree
- * pollution in `contrast.test.tsx`. Two sessions share one working tree here,
- * so editing it concurrently is not a merge, it is a race.
+ * It held one entry for a day: `AddVehicleScreen.tsx`, deferred not because the
+ * fix was hard but because **another session was editing that file** — two
+ * sessions share one working tree here, so a concurrent edit is not a merge,
+ * it is a race. That session landed, the screen moved onto the primitives with
+ * step 5, and the entry came off.
  *
- * ⚠ **This list may only ever shrink.** A file left here after it is fixed
- * fails the suite too, so it cannot quietly become the place violations go.
+ * ⚠ **This list may only ever shrink**, and the test below enforces it: a file
+ * left here after it is fixed fails too, so it cannot quietly become the place
+ * violations go.
  */
-const PENDING = ['AddVehicleScreen.tsx'];
+const PENDING: string[] = [];
 
 function sourceFiles(dir: string, acc: { rel: string; code: string }[] = []) {
   for (const entry of readdirSync(dir)) {

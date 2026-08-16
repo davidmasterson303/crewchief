@@ -56,7 +56,20 @@ export default function Field({
 
       <TextInput
         {...input}
-        accessibilityLabel={label}
+        /*
+          The hint is part of the name, not decoration beside it.
+
+          ⚠ It was visible and **unspoken** until 16 Aug. A field labelled
+          "Mileage at last oil change" with "optional" sitting next to it told a
+          sighted reader it could be skipped and told a screen-reader user
+          nothing — so the one group most likely to abandon a long form got the
+          version with no way out. Both now hear "Mileage at last oil change,
+          optional".
+
+          A comma rather than a space: it is how the platform reads a pause, and
+          "Trim optional" is a different phrase from "Trim, optional".
+        */
+        accessibilityLabel={hint ? `${label}, ${hint}` : label}
         aria-invalid={invalid}
         placeholderTextColor={text.muted}
         /*
