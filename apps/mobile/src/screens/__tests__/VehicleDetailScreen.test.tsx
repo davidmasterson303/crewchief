@@ -235,3 +235,88 @@ describe('when it simply failed', () => {
     await waitFor(() => expect(request.mock.calls.length).toBeGreaterThan(before));
   });
 });
+
+describe('what this screen leads to stays reachable', () => {
+  /**
+   * Every string the screen rendered, in the order it rendered them.
+   *
+   * Order is the assertion here — nothing else can express "below the fold".
+   * A screen can contain a control and still have buried it, which is exactly
+   * what happened on 15 Aug and is why this exists.
+   */
+  const textInOrder = (view: { toJSON: () => unknown }): string[] => {
+    const out: string[] = [];
+
+    const walk = (node: unknown) => {
+      if (typeof node === 'string') {
+        out.push(node);
+        return;
+      }
+      if (!node || typeof node !== 'object') return;
+      const host = node as { children?: unknown[] };
+      for (const child of host.children ?? []) walk(child);
+    };
+
+    walk(view.toJSON());
+    return out;
+  };
+
+  it('puts the advisor and the wishlist above the second instruments', async () => {
+    /*
+      ⚠ The regression David found in the simulator, in one assertion.
+
+      Step 4 stacked the photo hero, a 184pt dial, the drivers, the score
+      history and the build dial above the destinations — so "Ask the advisor",
+      the verb this screen exists to lead to, and the wishlist with it, sat
+      below roughly two screens of instruments. His words were "I can't see add
+      wishlist any more" and "ask crewchief is buried too low", and both were
+      the same defect.
+
+      The board's own order is the fix and it was there all along: screen 02 is
+      the car and what to do about it; **screen 03 is "vehicle detail,
+      scrolled"** and is where "the two instruments web has and mobile does
+      not" live. Reference is what you scroll to.
+    */
+    respond();
+    const { view } = await mount();
+    await view.findByText(/2018 Honda Accord/);
+
+    const order = textInOrder(view);
+    /*
+      Case-insensitive: `SectionHeader` upper-cases its title, so a section is
+      "HEALTH" in the tree and "Health" in the source. Matching exactly found
+      the dial's readout and missed the heading.
+    */
+    const at = (needle: string) =>
+      order.findIndex((line) => line.toLowerCase().includes(needle.toLowerCase()));
+
+    expect(at('Health')).toBeGreaterThan(-1);
+    expect(at('Ask the advisor')).toBeGreaterThan(-1);
+    expect(at('Build')).toBeGreaterThan(-1);
+
+    // Health first, then what to do about it, then the reference instruments.
+    expect(at('Health')).toBeLessThan(at('Wishlist'));
+    expect(at('Wishlist')).toBeLessThan(at('Ask the advisor'));
+    expect(at('Ask the advisor')).toBeLessThan(at('Build'));
+    expect(at('Ask the advisor')).toBeLessThan(at('Details'));
+  });
+
+  it('shows one dial on this screen, and it is not the hero', async () => {
+    /*
+      The board: "Hero · 184pt … **Garage bay and nothing else** — one dial per
+      screen", and "Card · 104pt … deliberately still. **The plinth on vehicle
+      detail**." A second hero is a second screen claiming the one dial, and at
+      184 with a sweep it was most of what pushed the destinations down.
+
+      The card variant is still — no ignition sweep — so the reading is present
+      immediately rather than arriving.
+    */
+    respond();
+    const { view } = await mount();
+
+    expect(await view.findByText('61')).toBeTruthy();
+    // The hero draws six numbered majors; the card draws none.
+    expect(view.queryByText('20')).toBeNull();
+    expect(view.queryByText('80')).toBeNull();
+  });
+});

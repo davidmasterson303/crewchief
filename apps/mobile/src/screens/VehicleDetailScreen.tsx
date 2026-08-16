@@ -18,7 +18,7 @@ import { nextRungs, showsModifications } from '@crewchief/core/mod-progression';
 import AlertBanner from '../components/AlertBanner';
 import Button from '../components/Button';
 import Card from '../components/Card';
-import ClusterGauge from '../components/ClusterGauge';
+import ClusterGauge, { CARD_SIZE } from '../components/ClusterGauge';
 import HealthDrivers from '../components/HealthDrivers';
 import HealthHistory, { type HealthReading } from '../components/HealthHistory';
 import BuildGauge from '../components/BuildGauge';
@@ -441,25 +441,19 @@ export function VehicleDetailScreen({
         <Card>
           <SectionHeader title="Health" />
           {/*
-            The hero instrument — step 4.
+            ⚠ The **card** dial at 104, not the hero — corrected 15 Aug.
 
-            One dial per screen, and on vehicle detail this is it. `ClusterGauge`
-            carries the canonical `label` rather than the garage row's `short`,
-            because the module sets both deliberately and this screen has the
-            width; and it sweeps at ignition, which the garage row does not — a
-            column of three dials all sweeping at once reads as noise.
-          */}
-          {/*
-            The dial stands on a plinth rather than on the card.
+            The board is explicit and I read it wrong the first time: *"Hero ·
+            184pt … Garage bay and nothing else — one dial per screen"*, and
+            *"Card · 104pt … deliberately still. **The plinth on vehicle
+            detail**."* A second hero here is a second screen claiming the one
+            dial, and at 184 plus a sweep it pushed everything this screen
+            exists to lead to below the fold.
 
-            A 184pt instrument dropped straight onto a panel is a picture of an
-            instrument. The slab is what makes it an object — and it is the
-            other half of what was deferred out of step 3 with the bay, for the
-            same reason: both are shaped by the dial, so building them around a
-            placeholder meant building them twice.
+            The plinth is what makes it an object rather than a picture of one.
           */}
           <Plinth>
-            <ClusterGauge score={score} />
+            <ClusterGauge score={score} variant="card" size={CARD_SIZE} />
           </Plinth>
           {health?.summary ? <Text style={styles.summary}>{health.summary}</Text> : null}
 
@@ -474,20 +468,64 @@ export function VehicleDetailScreen({
             mileage against age.
           */}
           <HealthDrivers drivers={drivers} />
-
-          {/*
-            Score over time.
-
-            ⚠ **Renders nothing on this account today**, and that is correct:
-            there is one recorded reading for the real car and a chart needs
-            two. The sweep writes one per vehicle per run, so it fills in on its
-            own — which is why the plumbing is here rather than waiting for the
-            data to exist first.
-          */}
-          <HealthHistory history={history} />
         </Card>
       )}
 
+
+
+
+      {/*
+        ── Three destinations, as rows rather than as cards ───────────────────
+
+        These were three full-width bordered cards, each with a title and a
+        hint, stacked above the health summary — four boxes competing to be the
+        thing you press, on a screen whose actual job is to tell you about a
+        car. As rows they read as what they are: places to go.
+      */}
+      <Card>
+        <SectionHeader title="This car" />
+        <ListRow label="Service history" onPress={onOpenHistory} value="" />
+        <ListRow
+          label="Wishlist"
+          detail="What it needs, so the advisor can price it"
+          onPress={onOpenWishlist}
+          value=""
+        />
+        <ListRow
+          label="Scan an invoice"
+          detail="Photograph a bill and its lines are filed here"
+          onPress={onScanInvoice}
+          value=""
+        />
+      </Card>
+      {/*
+        ── The one filled primary ─────────────────────────────────────────────
+
+        The advisor is the verb this screen exists to lead to, and it is now the
+        only filled control on it. Everything above is either information or a
+        destination.
+
+        It keeps its place near the bottom rather than the top: the earlier
+        version put it first to answer guideline 4.2, but 4.2 is answered by the
+        app *having* the flow, not by where the button sits — and a primary
+        above the health summary asked the question before showing the reason
+        to ask it.
+      */}
+      <Button label="Ask the advisor" onPress={onAskAdvisor} style={styles.primaryAction} />
+
+      {/*
+        ── Below the fold, and that is the board's order ───────────────────────
+
+        Screen 02 is the car and what to do about it; **screen 03 is "vehicle
+        detail, scrolled"** and carries "the two instruments web has and mobile
+        does not: health over time, and the build dial with its redline".
+
+        ⚠ They were above the destinations until 15 Aug and it was wrong. Two
+        full-height instruments between the health summary and the advisor put
+        the verb this screen exists to lead to — and the wishlist with it —
+        below everything. The instruments are reference; you scroll to them.
+      */}
+      <HealthHistoryCard history={history} />
       {/*
         ── The build, and why it is a second card rather than a second dial ────
 
@@ -515,7 +553,6 @@ export function VehicleDetailScreen({
           {rungs.length > 0 && <ProgressionLadder next={rungs[0].role} />}
         </Card>
       )}
-
       <Card>
         <SectionHeader title="Details" />
         <Row
@@ -544,47 +581,30 @@ export function VehicleDetailScreen({
           value={vehicle.ownership_objective ? humanise(vehicle.ownership_objective) : null}
         />
       </Card>
-
-      {/*
-        ── Three destinations, as rows rather than as cards ───────────────────
-
-        These were three full-width bordered cards, each with a title and a
-        hint, stacked above the health summary — four boxes competing to be the
-        thing you press, on a screen whose actual job is to tell you about a
-        car. As rows they read as what they are: places to go.
-      */}
-      <Card>
-        <SectionHeader title="This car" />
-        <ListRow label="Service history" onPress={onOpenHistory} value="" />
-        <ListRow
-          label="Wishlist"
-          detail="What it needs, so the advisor can price it"
-          onPress={onOpenWishlist}
-          value=""
-        />
-        <ListRow
-          label="Scan an invoice"
-          detail="Photograph a bill and its lines are filed here"
-          onPress={onScanInvoice}
-          value=""
-        />
-      </Card>
-
-      {/*
-        ── The one filled primary ─────────────────────────────────────────────
-
-        The advisor is the verb this screen exists to lead to, and it is now the
-        only filled control on it. Everything above is either information or a
-        destination.
-
-        It keeps its place near the bottom rather than the top: the earlier
-        version put it first to answer guideline 4.2, but 4.2 is answered by the
-        app *having* the flow, not by where the button sits — and a primary
-        above the health summary asked the question before showing the reason
-        to ask it.
-      */}
-      <Button label="Ask the advisor" onPress={onAskAdvisor} style={styles.primaryAction} />
     </ScrollView>
+  );
+}
+
+/**
+ * Score over time, in its own card — and nothing at all when there is no chart.
+ *
+ * `HealthHistory` declines to draw from fewer than two readings, which is
+ * right: a one-point chart is a dot. But a `Card` wrapped round it would still
+ * render its heading, so the screen would carry a "Health over time" title with
+ * an empty panel under it — the shape that reads as a loading failure.
+ *
+ * ⚠ **That is the state this account is in today.** There is exactly one
+ * recorded reading for the real car, so this renders nothing until the sweep
+ * has run twice.
+ */
+function HealthHistoryCard({ history }: { history: HealthReading[] }) {
+  if (history.length < 2) return null;
+
+  return (
+    <Card>
+      <SectionHeader title="Health over time" />
+      <HealthHistory history={history} />
+    </Card>
   );
 }
 
