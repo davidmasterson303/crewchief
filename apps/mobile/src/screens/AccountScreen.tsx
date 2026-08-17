@@ -15,6 +15,7 @@ import {
   describeDeletion,
   isDeletionConfirmed,
 } from '@crewchief/core/account-deletion';
+import { interFace } from '../theme/fonts';
 
 /**
  * Account — sign out, and delete the account. App Store guideline 5.1.1(v).
@@ -266,7 +267,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: border.field,
   },
-  title: { color: text.primary, fontSize: 22, fontWeight: '700' },
+  title: { color: text.primary, fontSize: 22, fontFamily: interFace('700'), fontWeight: '700' },
   close: { color: brand.accent, fontSize: 16, minHeight: 44, lineHeight: 44 },
   disabledText: { color: text.disabled },
 
@@ -298,7 +299,7 @@ const styles = StyleSheet.create({
     padding: 18,
     gap: 10,
   },
-  dangerTitle: { color: status.dangerText, fontSize: 17, fontWeight: '700' },
+  dangerTitle: { color: status.dangerText, fontSize: 17, fontFamily: interFace('700'), fontWeight: '700' },
 
   /*
     E5's subscription warning. An amber panel rather than the surrounding red:
@@ -319,7 +320,7 @@ const styles = StyleSheet.create({
     padding: 14,
     gap: 6,
   },
-  noticeHeadline: { color: status.attention, fontSize: 14, fontWeight: '700', lineHeight: 20 },
+  noticeHeadline: { color: status.attention, fontSize: 14, fontFamily: interFace('700'), fontWeight: '700', lineHeight: 20 },
   noticeBody: { color: status.attention, fontSize: 13, lineHeight: 19 },
   dangerBody: { color: text.secondary, fontSize: 14, lineHeight: 20 },
   inventoryItem: { color: text.muted, fontSize: 13, lineHeight: 19 },

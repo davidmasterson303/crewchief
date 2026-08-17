@@ -15,6 +15,7 @@ import { getHealthBandJudgement, healthBandHex } from '@crewchief/core/health-ba
 
 import { DIAL_MIN, TABULAR, surface, text, type } from '../theme';
 import { useReducedMotion } from '../motion/reduced-motion';
+import { interFace } from '../theme/fonts';
 
 /**
  * The health score as an instrument cluster, on the phone.
@@ -347,7 +348,7 @@ export default function ClusterGauge({
                   y={at.y}
                   fill={text.muted}
                   fontSize={10}
-                  fontWeight="500"
+                  fontFamily={interFace('500')} fontWeight="500"
                   textAnchor="middle"
                   alignmentBaseline="central"
                 >
@@ -446,10 +447,10 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     textAlign: 'center',
-    fontWeight: '700',
+    fontFamily: interFace('700'), fontWeight: '700',
     ...TABULAR,
   },
-  verdict: { fontWeight: '600', letterSpacing: 0.2 },
+  verdict: { fontFamily: interFace('600'), fontWeight: '600', letterSpacing: 0.2 },
   row: { alignItems: 'flex-end' },
   /**
    * 30, off the type scale on purpose. The scale names roles for language —
@@ -457,6 +458,6 @@ const styles = StyleSheet.create({
    * instrument reading is none of those. It is the dial, at the size the dial
    * is not available.
    */
-  rowReading: { fontSize: 30, lineHeight: 34, fontWeight: '700', ...TABULAR },
+  rowReading: { fontSize: 30, lineHeight: 34, fontFamily: interFace('700'), fontWeight: '700', ...TABULAR },
   rowVerdict: { ...type.label },
 });

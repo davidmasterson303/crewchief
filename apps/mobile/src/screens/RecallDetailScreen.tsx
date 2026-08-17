@@ -19,6 +19,7 @@ import {
   type NormalisedRecall,
   type RecallSeverity,
 } from '@crewchief/core/recalls';
+import { interFace } from '../theme/fonts';
 
 /**
  * Phase 5.6 — where a recall notification lands.
@@ -293,7 +294,7 @@ const styles = StyleSheet.create({
   body: { padding: 20, gap: 16, paddingBottom: 40 },
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 10 },
 
-  name: { color: text.primary, fontSize: 24, fontWeight: '700', letterSpacing: -0.5 },
+  name: { color: text.primary, fontSize: 24, fontFamily: interFace('700'), fontWeight: '700', letterSpacing: -0.5 },
   count: { color: text.muted, fontSize: 14, marginTop: -10 },
 
   banner: { borderRadius: radius.card, padding: 16, gap: 6, borderWidth: 1 },
@@ -305,7 +306,7 @@ const styles = StyleSheet.create({
   */
   bannerSevere: { backgroundColor: status.criticalFill, borderColor: status.criticalBorder },
   bannerWarn: { backgroundColor: status.attentionFill, borderColor: status.attentionBorder },
-  bannerTitle: { color: text.primary, fontSize: 17, fontWeight: '700', letterSpacing: -0.2 },
+  bannerTitle: { color: text.primary, fontSize: 17, fontFamily: interFace('700'), fontWeight: '700', letterSpacing: -0.2 },
   bannerBody: { color: text.secondary, fontSize: 14, lineHeight: 20 },
 
   /**
@@ -325,7 +326,7 @@ const styles = StyleSheet.create({
   component: {
     color: status.attention,
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: interFace('700'), fontWeight: '700',
     letterSpacing: 0.6,
   },
   summary: { color: text.primary, fontSize: 15, lineHeight: 21 },
@@ -334,7 +335,7 @@ const styles = StyleSheet.create({
   sectionLabel: {
     color: text.muted,
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: interFace('600'), fontWeight: '600',
     letterSpacing: 0.4,
   },
   body14: { color: text.secondary, fontSize: 14, lineHeight: 20 },
@@ -350,11 +351,11 @@ const styles = StyleSheet.create({
     minHeight: 44,
     justifyContent: 'center',
   },
-  askCtaText: { color: text.primary, fontSize: 14, fontWeight: '600' },
+  askCtaText: { color: text.primary, fontSize: 14, fontFamily: interFace('600'), fontWeight: '600' },
 
   footnote: { color: text.muted, fontSize: 12, lineHeight: 18 },
 
-  errorTitle: { color: text.primary, fontSize: 17, fontWeight: '600' },
+  errorTitle: { color: text.primary, fontSize: 17, fontFamily: interFace('600'), fontWeight: '600' },
   errorBody: { color: text.muted, fontSize: 14, textAlign: 'center' },
   button: {
     marginTop: 6,

@@ -10,6 +10,7 @@ import {
 } from '@crewchief/core/garage-next-service';
 import { TABULAR, bay, radius, space, surface, text, type } from '../theme';
 import { useReducedMotion } from '../motion/reduced-motion';
+import { interFace } from '../theme/fonts';
 
 /**
  * One car, in one bay.
@@ -358,12 +359,12 @@ const styles = StyleSheet.create({
   bayNumber: {
     fontSize: 12,
     lineHeight: 16,
-    fontWeight: '700',
+    fontFamily: interFace('700'), fontWeight: '700',
     letterSpacing: 2.16,
     color: bay.light,
     ...TABULAR,
   },
-  position: { ...type.label, fontWeight: '500', letterSpacing: 0, color: text.muted, ...TABULAR },
+  position: { ...type.label, fontFamily: interFace('500'), fontWeight: '500', letterSpacing: 0, color: text.muted, ...TABULAR },
 
   shutter: { backgroundColor: surface.nav, borderRadius: radius.hero },
 

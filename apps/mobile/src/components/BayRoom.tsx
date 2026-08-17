@@ -2,6 +2,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Defs, Ellipse, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 import { TARGET_MIN, bay, border, radius, space, surface, text, type } from '../theme';
+import { interFace } from '../theme/fonts';
 
 /**
  * The lit room a car stands in.
@@ -174,7 +175,7 @@ const styles = StyleSheet.create({
    */
   wordmark: {
     fontSize: 28,
-    fontWeight: '800',
+    fontFamily: interFace('800'), fontWeight: '800',
     letterSpacing: 5.6,
     color: text.muted,
     paddingLeft: 5.6,

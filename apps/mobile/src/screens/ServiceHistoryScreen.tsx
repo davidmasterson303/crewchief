@@ -24,6 +24,7 @@ import {
 } from '@crewchief/core/service-record';
 import { formatCurrency } from '@crewchief/core/formatting-utils';
 import { border, radius, status, surface, text } from '../theme';
+import { interFace } from '../theme/fonts';
 
 /**
  * What has been done to this car, on the phone.
@@ -308,9 +309,9 @@ const styles = StyleSheet.create({
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 10 },
 
   summary: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
-  summaryCount: { color: text.secondary, fontSize: 15, fontWeight: '600' },
-  summaryCost: { color: text.primary, fontSize: 15, fontWeight: '700' },
-  summaryScope: { color: text.muted, fontSize: 13, fontWeight: '500' },
+  summaryCount: { color: text.secondary, fontSize: 15, fontFamily: interFace('600'), fontWeight: '600' },
+  summaryCost: { color: text.primary, fontSize: 15, fontFamily: interFace('700'), fontWeight: '700' },
+  summaryScope: { color: text.muted, fontSize: 13, fontFamily: interFace('500'), fontWeight: '500' },
 
   /**
    * The card, on the ladder rather than beside it.
@@ -327,8 +328,8 @@ const styles = StyleSheet.create({
    */
   cardGap: { gap: 6 },
   head: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
-  name: { color: text.primary, fontSize: 15, fontWeight: '600', flexShrink: 1 },
-  cost: { color: text.primary, fontSize: 15, fontWeight: '700' },
+  name: { color: text.primary, fontSize: 15, fontFamily: interFace('600'), fontWeight: '600', flexShrink: 1 },
+  cost: { color: text.primary, fontSize: 15, fontFamily: interFace('700'), fontWeight: '700' },
   meta: { color: text.muted, fontSize: 13, lineHeight: 19 },
 
   /*
@@ -339,7 +340,7 @@ const styles = StyleSheet.create({
   foot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   provenance: { color: text.muted, fontSize: 12, lineHeight: 17, flexShrink: 1 },
   removeCta: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },
-  removeText: { color: status.attention, fontSize: 13, fontWeight: '600' },
+  removeText: { color: status.attention, fontSize: 13, fontFamily: interFace('600'), fontWeight: '600' },
   /*
     A recollection is tinted rather than merely worded differently. The label
     already says "what you told us at sign-up"; the colour is what survives
@@ -348,7 +349,7 @@ const styles = StyleSheet.create({
   recollection: { color: status.attention },
 
 
-  errorTitle: { color: text.primary, fontSize: 17, fontWeight: '600' },
+  errorTitle: { color: text.primary, fontSize: 17, fontFamily: interFace('600'), fontWeight: '600' },
   errorBody: { color: text.muted, fontSize: 14, textAlign: 'center' },
   retry: {
     marginTop: 6,
@@ -359,5 +360,5 @@ const styles = StyleSheet.create({
     minHeight: 44,
     justifyContent: 'center',
   },
-  retryText: { color: text.secondary, fontSize: 14, fontWeight: '600' },
+  retryText: { color: text.secondary, fontSize: 14, fontFamily: interFace('600'), fontWeight: '600' },
 });

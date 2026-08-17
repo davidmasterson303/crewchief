@@ -10,6 +10,7 @@ import {
   type CompletionDraft,
   type CompletionProblem,
 } from '@crewchief/core/wishlist-completion';
+import { interFace } from '../theme/fonts';
 
 /**
  * Marking a wishlist item done, on the phone.
@@ -274,17 +275,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  barTitle: { color: text.primary, fontSize: 17, fontWeight: '700' },
+  barTitle: { color: text.primary, fontSize: 17, fontFamily: interFace('700'), fontWeight: '700' },
   barAction: { color: text.secondary, fontSize: 16, minWidth: 64 },
   barSpacer: { minWidth: 64 },
   dim: { color: text.muted },
 
   body: { paddingHorizontal: 20, paddingBottom: 32, gap: 20 },
-  item: { color: text.primary, fontSize: 20, fontWeight: '700', lineHeight: 26 },
+  item: { color: text.primary, fontSize: 20, fontFamily: interFace('700'), fontWeight: '700', lineHeight: 26 },
 
   field: { gap: 8 },
   labelRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
-  label: { color: text.secondary, fontSize: 14, fontWeight: '600' },
+  label: { color: text.secondary, fontSize: 14, fontFamily: interFace('600'), fontWeight: '600' },
   hint: { color: text.muted, fontSize: 12 },
   problem: { color: status.dangerText, fontSize: 13, lineHeight: 18 },
 
@@ -314,7 +315,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   choiceOn: { backgroundColor: brand.primary, borderColor: brand.primary },
-  choiceText: { color: text.secondary, fontSize: 15, fontWeight: '600' },
+  choiceText: { color: text.secondary, fontSize: 15, fontFamily: interFace('600'), fontWeight: '600' },
   // The v8 paired primary — #0E7490 with light ink measures 5.10:1. The pair
   // moves together; dark ink on this fill is 3.39:1 and fails.
   choiceTextOn: { color: text.onPrimary },
@@ -335,5 +336,5 @@ const styles = StyleSheet.create({
   // An explicit fill rather than `opacity`, so the contrast audit can see it —
   // a parent alpha never reaches the comparison.
   ctaOff: { backgroundColor: surface.disabled },
-  ctaText: { color: text.onPrimary, fontSize: 16, fontWeight: '700' },
+  ctaText: { color: text.onPrimary, fontSize: 16, fontFamily: interFace('700'), fontWeight: '700' },
 });

@@ -22,6 +22,7 @@ import { CONTEXT_KIND_LABELS, type ContextKind } from '@crewchief/core/consultan
 import type { ConsultantEstimate } from '@crewchief/core/consultant-estimate';
 import EstimateWell from '../components/EstimateWell';
 import { parseAnswer } from '@crewchief/core/answer-markup';
+import { interFace } from '../theme/fonts';
 
 /**
  * Phase 3.4 — ask the advisor about one car.
@@ -480,7 +481,7 @@ const styles = StyleSheet.create({
   advisorRow: { gap: space.sm },
   advisorText: { ...type.body, color: text.primary },
   /* Weight only. A brighter colour as well would make ordinary text read as dimmed. */
-  advisorBold: { fontWeight: '700' },
+  advisorBold: { fontFamily: interFace('700'), fontWeight: '700' },
   answer: { gap: 2 },
   answerGap: { height: space.sm },
   /* Hanging indent: the glyph sits outside the text column so wrapped lines align. */

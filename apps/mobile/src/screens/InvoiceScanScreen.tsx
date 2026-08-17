@@ -11,6 +11,7 @@ import {
 import Button from '../components/Button';
 import { ApiRequestError } from '../api/client';
 import { border, radius, surface, text, type } from '../theme';
+import { interFace } from '../theme/fonts';
 
 /**
  * Phase 3.3 — photograph an invoice and have its line items read.
@@ -374,7 +375,7 @@ export function InvoiceScanScreen({
 const styles = StyleSheet.create({
   body: { padding: 20, gap: 14, flexGrow: 1 },
   block: { gap: 12 },
-  title: { color: text.primary, fontSize: 22, fontWeight: '700', letterSpacing: -0.3 },
+  title: { color: text.primary, fontSize: 22, fontFamily: interFace('700'), fontWeight: '700', letterSpacing: -0.3 },
   /* `body_` because `body` is the container above. */
   body_: { color: text.muted, fontSize: 15, lineHeight: 22 },
 

@@ -19,6 +19,7 @@ import { resetPassword, signIn, signUp } from '../auth/session';
 import { hasDevCredentials, signInWithDevCredentials } from '../auth/dev-session';
 import { checkSharedCore } from '../core-check';
 import { border, build, radius, status, surface, text } from '../theme';
+import { interFace } from '../theme/fonts';
 
 /**
  * Sign in.
@@ -418,6 +419,6 @@ const styles = StyleSheet.create({
     the AA floor on `surface.page` that `78eba74` made a rule.
   */
   devCheckOk: { color: text.muted, fontSize: 12, textAlign: 'center' },
-  devCheckFail: { color: status.dangerText, fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  devCheckFail: { color: status.dangerText, fontSize: 13, fontFamily: interFace('700'), fontWeight: '700', textAlign: 'center' },
   devCheckDetail: { color: status.dangerText, fontSize: 11, textAlign: 'center' },
 });

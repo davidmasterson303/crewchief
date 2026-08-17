@@ -3,6 +3,7 @@ import { Modal, StyleSheet, Text, View } from 'react-native';
 import Button from '../components/Button';
 import { PUSH_PRIMER_COPY } from '@crewchief/core/push-priming';
 import { surface, text } from '../theme';
+import { interFace } from '../theme/fonts';
 
 /**
  * The screen that comes *before* iOS asks. Phase 5, C5.
@@ -96,7 +97,7 @@ export function PushPrimer({
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: surface.page, justifyContent: 'space-between' },
   body: { paddingHorizontal: 28, paddingTop: 96, gap: 18 },
-  title: { color: text.primary, fontSize: 26, fontWeight: '700', lineHeight: 32 },
+  title: { color: text.primary, fontSize: 26, fontFamily: interFace('700'), fontWeight: '700', lineHeight: 32 },
   paragraph: { color: text.secondary, fontSize: 16, lineHeight: 24 },
   detail: { color: text.muted, fontSize: 14, lineHeight: 21 },
 

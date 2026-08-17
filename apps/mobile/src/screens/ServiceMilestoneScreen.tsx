@@ -31,6 +31,7 @@ import { historyLookups, type ServiceHistoryRow } from '@crewchief/core/service-
 import { validateMileageUpdate } from '@crewchief/core/mileage-tracking';
 import { wishlistItemIdentifier } from '@crewchief/core/wishlist-identifier';
 import { border, radius, status, surface, text } from '../theme';
+import { interFace } from '../theme/fonts';
 
 /**
  * Phase 5.6 — where a service-due notification lands.
@@ -471,10 +472,10 @@ const styles = StyleSheet.create({
   body: { padding: 20, gap: 14, paddingBottom: 40 },
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 10 },
 
-  name: { color: text.primary, fontSize: 24, fontWeight: '700', letterSpacing: -0.5 },
+  name: { color: text.primary, fontSize: 24, fontFamily: interFace('700'), fontWeight: '700', letterSpacing: -0.5 },
   mileageLine: { color: text.muted, fontSize: 14, marginTop: -10 },
 
-  gateLead: { color: text.primary, fontSize: 18, fontWeight: '600' },
+  gateLead: { color: text.primary, fontSize: 18, fontFamily: interFace('600'), fontWeight: '600' },
   gateBody: { color: text.secondary, fontSize: 14, lineHeight: 20 },
   input: {
     backgroundColor: surface.raised,
@@ -500,7 +501,7 @@ const styles = StyleSheet.create({
    * `mobile-radius-scale.test.ts` on why that rule was scoped to radius.
    */
   cardGap: { gap: 10 },
-  cardTitle: { color: text.primary, fontSize: 17, fontWeight: '700', letterSpacing: -0.2 },
+  cardTitle: { color: text.primary, fontSize: 17, fontFamily: interFace('700'), fontWeight: '700', letterSpacing: -0.2 },
   reason: { color: text.secondary, fontSize: 14, lineHeight: 20 },
   basis: { color: text.muted, fontSize: 12 },
 
@@ -511,8 +512,8 @@ const styles = StyleSheet.create({
     borderTopColor: border.panel,
   },
   serviceHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  serviceName: { color: text.primary, fontSize: 15, fontWeight: '600', flexShrink: 1 },
-  overdue: { color: status.attention, fontSize: 12, fontWeight: '700' },
+  serviceName: { color: text.primary, fontSize: 15, fontFamily: interFace('600'), fontWeight: '600', flexShrink: 1 },
+  overdue: { color: status.attention, fontSize: 12, fontFamily: interFace('700'), fontWeight: '700' },
   body14: { color: text.secondary, fontSize: 14, lineHeight: 20 },
 
   addCta: {
@@ -525,13 +526,13 @@ const styles = StyleSheet.create({
   /* An explicit fill, never `opacity` — see WishlistScreen: the contrast audit
      cannot see a parent alpha, so a faded control is an unmeasured one. */
   addCtaDone: { backgroundColor: surface.raised },
-  addCtaText: { color: text.primary, fontSize: 14, fontWeight: '600' },
+  addCtaText: { color: text.primary, fontSize: 14, fontFamily: interFace('600'), fontWeight: '600' },
   addCtaDoneText: { color: text.secondary },
 
   unknownItem: { color: text.secondary, fontSize: 14, lineHeight: 20 },
   footnote: { color: text.muted, fontSize: 12, lineHeight: 18 },
 
-  errorTitle: { color: text.primary, fontSize: 17, fontWeight: '600' },
+  errorTitle: { color: text.primary, fontSize: 17, fontFamily: interFace('600'), fontWeight: '600' },
   errorBody: { color: text.muted, fontSize: 14, textAlign: 'center' },
   button: {
     marginTop: 6,

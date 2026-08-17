@@ -1,3 +1,5 @@
+import { EDITORIAL_FACE, interFace } from './fonts';
+
 /**
  * The mobile token layer — CrewChief v8, native.
  *
@@ -304,25 +306,49 @@ export const type = {
    * Not in the handoff's four-size list because it is a *role*, not a UI size:
    * "Newsreader for one serif role per screen". **One per screen, never two.**
    *
-   * ⚠ The serif face is not loaded in the native app yet — there is no font
-   * asset in `apps/mobile`, and adding one is a native change that costs an EAS
-   * build. Until then this is the system sans at editorial weight, which is
-   * also exactly what the sport register specifies ("tight heavy Inter"), so
-   * sport is already correct and standard is the one waiting on the font.
+   * ✅ **The serif is bundled as of 16 Aug** — `Newsreader_700Bold`, loaded by
+   * `useFonts` in `App.tsx`. This docblock previously said it was not, and that
+   * the change would cost an EAS build; the build is now the same one that
+   * carries the first TestFlight upload, so the two costs merged.
+   *
+   * Only the 700 cut ships, because this is a single-weight role by definition.
+   * A second cut would be a second editorial role arriving by the back door.
    */
-  editorial: { fontSize: 26, lineHeight: 32, fontWeight: '700' as const, letterSpacing: -0.5 },
+  editorial: {
+    fontFamily: EDITORIAL_FACE,
+    fontSize: 26,
+    lineHeight: 32,
+    fontWeight: '700' as const,
+    letterSpacing: -0.5,
+  },
   /** 18 — screen titles and hero copy. */
-  title: { fontSize: 18, lineHeight: 24, fontWeight: '700' as const },
+  title: { fontFamily: interFace('700'), fontSize: 18, lineHeight: 24, fontWeight: '700' as const },
   /** 16 — body. */
-  body: { fontSize: 16, lineHeight: 22, fontWeight: '400' as const },
-  bodyStrong: { fontSize: 16, lineHeight: 22, fontWeight: '600' as const },
+  body: { fontFamily: interFace('400'), fontSize: 16, lineHeight: 22, fontWeight: '400' as const },
+  bodyStrong: {
+    fontFamily: interFace('600'),
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: '600' as const,
+  },
   /** 14 — UI: buttons, rows, nav. */
-  ui: { fontSize: 14, lineHeight: 20, fontWeight: '500' as const },
-  uiStrong: { fontSize: 14, lineHeight: 20, fontWeight: '600' as const },
+  ui: { fontFamily: interFace('500'), fontSize: 14, lineHeight: 20, fontWeight: '500' as const },
+  uiStrong: {
+    fontFamily: interFace('600'),
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '600' as const,
+  },
   /** 13 — a value. Tabular wherever it is data. */
-  value: { fontSize: 13, lineHeight: 18, fontWeight: '400' as const },
+  value: { fontFamily: interFace('400'), fontSize: 13, lineHeight: 18, fontWeight: '400' as const },
   /** 12 — the word that names a value. The type floor. */
-  label: { fontSize: 12, lineHeight: 16, fontWeight: '600' as const, letterSpacing: 0.6 },
+  label: {
+    fontFamily: interFace('600'),
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '600' as const,
+    letterSpacing: 0.6,
+  },
 } as const;
 
 /**

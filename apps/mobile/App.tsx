@@ -4,8 +4,10 @@ import { StatusBar } from 'expo-status-bar';
 import type { Session } from '@supabase/supabase-js';
 
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useFonts } from 'expo-font';
 
 import { surface, text } from './src/theme';
+import { FONT_ASSETS } from './src/theme/font-assets';
 
 import { onSessionChange, signOut, startSessionAutoRefresh } from './src/auth/session';
 import { unregisterPush } from './src/notifications/register';
@@ -25,9 +27,35 @@ import { RootNavigator } from './src/navigation/RootNavigator';
  * garage.
  *
  * So `undefined` means "still asking" and renders nothing but a spinner.
+ *
+ * ── The type gate, which is the same argument one layer down ────────────────
+ *
+ * Fonts load asynchronously too, and a screen painted before they arrive draws
+ * in San Francisco and then **reflows** when Inter lands — every metric on the
+ * screen shifts at once, a frame or two after the user is already reading. That
+ * is worse than the wait it avoids, and worst on the dense screens.
+ *
+ * ⚠ The two gates are deliberately **not** merged into one condition. They fail
+ * differently: an unresolved session is a question with an answer coming, while
+ * a font that will not load is a permanent state — and treating that as "still
+ * loading" would hang the app on a blank screen forever. See `fontState`.
  */
 export default function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
+
+  const [fontsLoaded, fontError] = useFonts(FONT_ASSETS);
+
+  /*
+    ⚠ **A font that failed to load must not block the app.**
+
+    `useFonts` reports an error rather than retrying, and the honest response is
+    to carry on in the system face. An app that renders in San Francisco is a
+    cosmetic defect; an app that never renders is a broken one, and nobody can
+    report a typeface they cannot get past. This is the same reasoning
+    `reduced-motion.ts` uses for its unknown case — degrade toward the thing
+    that still works.
+  */
+  const fontsReady = fontsLoaded || fontError !== null;
 
   useEffect(() => {
     // Drives token refresh off foreground/background — see session.ts.
@@ -52,7 +80,7 @@ export default function App() {
     */
     <SafeAreaProvider>
       <View style={styles.root}>
-        {session === undefined ? (
+        {session === undefined || !fontsReady ? (
           <View style={styles.loading}>
             <ActivityIndicator color={text.muted} />
           </View>

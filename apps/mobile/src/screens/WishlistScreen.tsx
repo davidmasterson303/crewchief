@@ -21,6 +21,7 @@ import { formatCurrency } from '@crewchief/core/formatting-utils';
 import { completionPayload, type CompletionDraft } from '@crewchief/core/wishlist-completion';
 import { MarkDoneSheet } from './MarkDoneSheet';
 import { border, brand, radius, status, surface, text, type } from '../theme';
+import { interFace } from '../theme/fonts';
 
 /**
  * Phase 5.6 — the wishlist, on the phone.
@@ -441,11 +442,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  openComposerText: { color: text.secondary, fontSize: 15, fontWeight: '600' },
+  openComposerText: { color: text.secondary, fontSize: 15, fontFamily: interFace('600'), fontWeight: '600' },
 
   composer: { gap: 10 },
   typeBlock: { gap: 8 },
-  typeLabel: { color: text.muted, fontSize: 12, fontWeight: '600' },
+  typeLabel: { color: text.muted, fontSize: 12, fontFamily: interFace('600'), fontWeight: '600' },
   composerActions: { flexDirection: 'row', gap: 10 },
   composerCancel: {
     minHeight: 48,
@@ -456,7 +457,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  composerCancelText: { color: text.secondary, fontSize: 15, fontWeight: '600' },
+  composerCancelText: { color: text.secondary, fontSize: 15, fontFamily: interFace('600'), fontWeight: '600' },
   input: {
     backgroundColor: surface.raised,
     borderRadius: radius.button,
@@ -488,7 +489,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   typeChipOn: { backgroundColor: surface.inverse },
-  typeText: { color: text.secondary, fontSize: 14, fontWeight: '600' },
+  typeText: { color: text.secondary, fontSize: 14, fontFamily: interFace('600'), fontWeight: '600' },
   typeTextOn: { color: text.onInverse },
 
   /*
@@ -521,8 +522,8 @@ const styles = StyleSheet.create({
    */
   cardGap: { gap: 8 },
   itemHead: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
-  itemName: { color: text.primary, fontSize: 15, fontWeight: '600', flexShrink: 1 },
-  itemCost: { color: text.primary, fontSize: 15, fontWeight: '700' },
+  itemName: { color: text.primary, fontSize: 15, fontFamily: interFace('600'), fontWeight: '600', flexShrink: 1 },
+  itemCost: { color: text.primary, fontSize: 15, fontFamily: interFace('700'), fontWeight: '700' },
   itemBody: { color: text.secondary, fontSize: 14, lineHeight: 20 },
   itemFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   itemMeta: { color: text.muted, fontSize: 12 },
@@ -540,12 +541,12 @@ const styles = StyleSheet.create({
     borderColor: brand.primary,
     justifyContent: 'center',
   },
-  doneText: { color: brand.accent, fontSize: 14, fontWeight: '700' },
+  doneText: { color: brand.accent, fontSize: 14, fontFamily: interFace('700'), fontWeight: '700' },
   removeCta: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 },
-  removeText: { color: status.attention, fontSize: 14, fontWeight: '600' },
+  removeText: { color: status.attention, fontSize: 14, fontFamily: interFace('600'), fontWeight: '600' },
 
 
-  errorTitle: { color: text.primary, fontSize: 17, fontWeight: '600' },
+  errorTitle: { color: text.primary, fontSize: 17, fontFamily: interFace('600'), fontWeight: '600' },
   errorBody: { color: text.muted, fontSize: 14, textAlign: 'center' },
   button: {
     marginTop: 6,

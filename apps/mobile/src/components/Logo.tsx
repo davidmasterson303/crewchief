@@ -24,6 +24,7 @@ import { Text, View } from 'react-native';
 import Svg, { Circle, G, Path } from 'react-native-svg';
 
 import tokens from '../theme/tokens.json';
+import { interFace } from '../theme/fonts';
 
 export type LogoVariant = 'mark' | 'horizontal' | 'stacked';
 
@@ -107,7 +108,7 @@ export function Logo({
       <Text
         style={{
           fontSize: nameSize,
-          fontWeight: '700',
+          fontFamily: interFace('700'), fontWeight: '700',
           letterSpacing: nameSize * (horizontal ? -0.035 : -0.03),
           lineHeight: nameSize,
           color: nameColor,

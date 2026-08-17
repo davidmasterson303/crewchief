@@ -20,6 +20,7 @@ import {
   BASELINE_AGE_OPTIONS,
   type BaselineAge,
 } from '@crewchief/core/onboarding-baseline';
+import { interFace } from '../theme/fonts';
 
 /**
  * Add a car — the first thing a new user does, and until 8 Aug it did not exist
@@ -358,7 +359,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: surface.page },
   body: { padding: 24, gap: 12 },
 
-  title: { color: text.primary, fontSize: 26, fontWeight: '700', letterSpacing: -0.5 },
+  title: { color: text.primary, fontSize: 26, fontFamily: interFace('700'), fontWeight: '700', letterSpacing: -0.5 },
   subtitle: { color: text.secondary, fontSize: 14, marginBottom: 6 },
 
   row: { flexDirection: 'row', gap: 10 },
@@ -367,7 +368,7 @@ const styles = StyleSheet.create({
 
 
   modsBlock: { gap: 8, marginTop: 8 },
-  modsQuestion: { color: text.primary, fontSize: 16, fontWeight: '600' },
+  modsQuestion: { color: text.primary, fontSize: 16, fontFamily: interFace('600'), fontWeight: '600' },
   modsHint: { color: text.secondary, fontSize: 13, lineHeight: 18 },
 
   choice: {
@@ -386,10 +387,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.button,
     backgroundColor: surface.raised,
   },
-  ageText: { color: text.secondary, fontSize: 14, fontWeight: '600' },
+  ageText: { color: text.secondary, fontSize: 14, fontFamily: interFace('600'), fontWeight: '600' },
 
   choiceOn: { backgroundColor: surface.inverse },
-  choiceText: { color: text.secondary, fontSize: 15, fontWeight: '600' },
+  choiceText: { color: text.secondary, fontSize: 15, fontFamily: interFace('600'), fontWeight: '600' },
   choiceTextOn: { color: text.onInverse },
 
   error: { color: status.dangerText, fontSize: 13, lineHeight: 18 },

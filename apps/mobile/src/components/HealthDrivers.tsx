@@ -3,6 +3,7 @@ import { getHealthBandJudgement, healthBandHex } from '@crewchief/core/health-ba
 import type { HealthDriver } from '@crewchief/core/health-drivers';
 
 import { TABULAR, border, space, text, type } from '../theme';
+import { interFace } from '../theme/fonts';
 
 /**
  * What the health score is made of — the three drivers.
@@ -85,7 +86,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
   label: { ...type.uiStrong, color: text.primary },
   /** 20, tabular. A reading, not a heading — it must not reflow as it changes. */
-  reading: { fontSize: 20, lineHeight: 24, fontWeight: '700', ...TABULAR },
+  reading: { fontSize: 20, lineHeight: 24, fontFamily: interFace('700'), fontWeight: '700', ...TABULAR },
   unknown: { color: text.muted },
   detail: { ...type.value, color: text.muted },
 });
