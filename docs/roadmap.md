@@ -875,8 +875,13 @@ current.
    `{"status":"broken","reason":"NOT_CONFIGURED"}`, and the canary exits 3 —
    *"the deployment has no CONSULTANT_HEALTH_SECRET set"*.
    - **GitHub** → repository *Actions* secret, so the workflow can authenticate.
-   - **Netlify** → environment variable on the demo site, so the endpoint will
-     answer at all. It is in local `.env` and absent from the deployment.
+   - **Netlify** → environment variable on the **`crewchief-demo`** project —
+     the one deploying `demo-live`, *not* `effulgent-blancmange-6adfdf` which
+     deploys `main`. Two CrewChief sites exist and the split is deliberate
+     (`scripts/promote-demo.mjs` gates the public demo behind main; it is 70
+     commits and nine days back as of 17 Aug). The canary watches the demo on
+     purpose. Setting this on the main site leaves the canary red while looking
+     done.
 
    The two values must be identical. Setting only the Actions secret leaves the
    canary failing forever while looking configured.

@@ -48,10 +48,22 @@
 #
 #   1. **GitHub → repository Actions secret** `CONSULTANT_HEALTH_SECRET`, so
 #      this workflow can authenticate.
-#   2. **Netlify → environment variable** `CONSULTANT_HEALTH_SECRET` on the site
-#      serving the demo, so the deployed endpoint will answer at all. It is
-#      present in local `.env` and absent from the deployment, which is why the
-#      endpoint reports `NOT_CONFIGURED` rather than a health verdict.
+#   2. **Netlify → environment variable** `CONSULTANT_HEALTH_SECRET`, so the
+#      deployed endpoint will answer at all. It is present in local `.env` and
+#      absent from the deployment, which is why the endpoint reports
+#      `NOT_CONFIGURED` rather than a health verdict.
+#
+#      ⚠ **On the `crewchief-demo` project, not the main one.** There are two
+#      CrewChief sites in Netlify and the names invite the wrong guess:
+#
+#        crewchief-demo.netlify.app        <- deploys `demo-live`. THIS ONE.
+#        effulgent-blancmange-6adfdf...    <- deploys `main`, the app backend.
+#
+#      That split is deliberate, not drift: `scripts/promote-demo.mjs` promotes
+#      `main` to `demo-live` behind a gate, so the public demo is intentionally
+#      behind — 70 commits and nine days, as of 17 Aug. This canary targets the
+#      demo on purpose, because the demo is what a recruiter loads. Setting the
+#      variable on the main site would leave the canary red and look done.
 #
 # The two values must be identical.
 #
