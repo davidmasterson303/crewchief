@@ -516,9 +516,15 @@ describe('GarageBay', () => {
     photo_url: null,
   };
 
+  /*
+    Fixed, because "overdue since" and "due now" turn on exactly one day and a
+    test that reads the wall clock passes for 364 days a year.
+  */
+  const TODAY = '2026-08-16';
+
   it('names the bay and its position, so a swipe has somewhere to land', async () => {
     const view = await render(
-      <GarageBay vehicle={WRX} score={70} index={1} total={3} active={false} />
+      <GarageBay vehicle={WRX} today={TODAY} score={70} index={1} total={3} active={false} />
     );
 
     view.getByText('BAY 02');
@@ -532,7 +538,7 @@ describe('GarageBay', () => {
       duplication problem moved one screen along.
     */
     const view = await render(
-      <GarageBay vehicle={WRX} score={70} index={0} total={1} active={false} />
+      <GarageBay vehicle={WRX} today={TODAY} score={70} index={0} total={1} active={false} />
     );
 
     view.getByText('SUBARU');
@@ -548,7 +554,7 @@ describe('GarageBay', () => {
     jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(false);
 
     const view = await render(
-      <GarageBay vehicle={WRX} score={70} index={0} total={2} active={false} />
+      <GarageBay vehicle={WRX} today={TODAY} score={70} index={0} total={2} active={false} />
     );
 
     // The dial is drawn — it is the reading that waits, not the instrument.
@@ -562,7 +568,7 @@ describe('GarageBay', () => {
     jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(true);
 
     const view = await render(
-      <GarageBay vehicle={WRX} score={70} index={0} total={1} active />
+      <GarageBay vehicle={WRX} today={TODAY} score={70} index={0} total={1} active />
     );
     await act(async () => {});
 
@@ -573,7 +579,7 @@ describe('GarageBay', () => {
     // A dial at 0 asserts a reading. No score is not a zero — the same rule the
     // garage card has always followed.
     const view = await render(
-      <GarageBay vehicle={WRX} score={null} index={0} total={1} active={false} />
+      <GarageBay vehicle={WRX} today={TODAY} score={null} index={0} total={1} active={false} />
     );
 
     view.getByText('No score yet');
@@ -588,7 +594,7 @@ describe('GarageBay', () => {
     */
     const onOpen = jest.fn();
     const view = await render(
-      <GarageBay vehicle={WRX} score={70} index={0} total={1} active={false} onOpen={onOpen} />
+      <GarageBay vehicle={WRX} today={TODAY} score={70} index={0} total={1} active={false} onOpen={onOpen} />
     );
 
     await userEvent.setup().press(view.getByLabelText('2018 Subaru WRX, open details'));
@@ -719,5 +725,112 @@ describe('Plinth', () => {
     const rendered = JSON.stringify(view.toJSON());
     expect(rendered).toContain(plinth.catchLight);
     expect(rendered).not.toMatch(/shadowOffset|shadowRadius|elevation/);
+  });
+});
+
+describe('the bay’s next-service row', () => {
+  /*
+    Fixed, because "overdue since" and "due now" turn on exactly one day and a
+    test that reads the wall clock passes for 364 days a year.
+  */
+  const TODAY = '2026-08-16';
+
+  /** A car the sweep has never reached — every car in the product today. */
+  const WRX = {
+    id: 'v-2',
+    year: 2020,
+    make: 'Subaru',
+    model: 'WRX',
+    current_mileage: 41200,
+  };
+
+  const WRX_SWEPT = {
+    id: 'v-2',
+    year: 2020,
+    make: 'Subaru',
+    model: 'WRX',
+    current_mileage: 41200,
+    next_service_label: 'Engine oil and filter',
+    next_service_at_miles: 41620,
+    next_service_due_on: null,
+  };
+
+  it('reads as a countdown when the sweep has an answer', async () => {
+    const view = await render(
+      <GarageBay vehicle={WRX_SWEPT} today={TODAY} score={70} index={0} total={1} active={false} />
+    );
+
+    view.getByText('NEXT SERVICE');
+    view.getByText('Engine oil and filter · in 420 mi');
+    await view.unmount();
+  });
+
+  it('keeps the label when there is no answer, and says only that', async () => {
+    /*
+      ⚠ **The assertion the whole feature was blocked on**, and it belongs here
+      rather than in `garage-next-service.test.ts` because it is a property of
+      the rendered row, not of the function.
+
+      `docs/step4-api-gaps.md` §3 held this row for one sentence: "'No schedule
+      yet' is not the same as 'nothing due', and the card must not imply the
+      second." What keeps the empty state honest is not the wording — it is that
+      **the label does not leave**. The subject of the sentence is fixed before
+      the value is read, so "No schedule yet" can only be heard as an answer to
+      that question.
+
+      A row that disappeared instead would be the version that lies: a bay with
+      no next-service line, next to one that has it, reads as a car with nothing
+      coming up. That is why the first assertion is the label and not the value.
+    */
+    const view = await render(
+      <GarageBay
+        vehicle={{ id: 'v-3', year: 2015, make: 'BMW', model: 'M235i', current_mileage: 66000 }}
+        today={TODAY}
+        score={70}
+        index={0}
+        total={1}
+        active={false}
+      />
+    );
+
+    view.getByText('NEXT SERVICE');
+    view.getByText('No schedule yet');
+    expect(view.queryByText(/nothing due|up to date|all clear|none/i)).toBeNull();
+    await view.unmount();
+  });
+
+  it('is the state every car is in today, which is why it was designed first', async () => {
+    /*
+      Checked against the live database on 16 Aug: the migration adding these
+      columns is **not applied** — `select next_service_label` returns 42703 —
+      so no vehicle carries a swept value and every bay renders this branch.
+
+      It is also the state that has *no* live instance once the migration lands,
+      because all four vehicles have a knowledge-base schedule. An empty state
+      that is universal today and rare tomorrow cannot be found by opening the
+      app in either period, which is the argument for pinning it.
+    */
+    const view = await render(
+      <GarageBay vehicle={WRX} today={TODAY} score={70} index={0} total={1} active={false} />
+    );
+
+    view.getByText('No schedule yet');
+    await view.unmount();
+  });
+
+  it('names the reading rather than assuming a car has never been driven', async () => {
+    const view = await render(
+      <GarageBay
+        vehicle={{ ...WRX_SWEPT, current_mileage: null }}
+        today={TODAY}
+        score={70}
+        index={0}
+        total={1}
+        active={false}
+      />
+    );
+
+    view.getByText('Engine oil and filter · at 41,620 mi');
+    await view.unmount();
   });
 });

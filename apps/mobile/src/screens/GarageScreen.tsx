@@ -31,6 +31,7 @@ import { shouldShowPushPrimer } from '@crewchief/core/push-priming';
 import { uploadVehiclePhoto } from '../api/photos';
 import type { InvoiceFile } from '../api/documents';
 import { getHealthBandJudgement } from '@crewchief/core/health-band';
+import { localToday } from '@crewchief/core/garage-next-service';
 
 /**
  * Phase 3.2 — the garage, read only.
@@ -171,6 +172,13 @@ function VehicleBay({
   return (
     <GarageBay
       vehicle={vehicle}
+      /*
+        Read at render rather than held in state. The garage is not open across
+        midnight often, and a date frozen at mount would be quietly wrong for
+        anyone who left the app on overnight — which is exactly the reader who
+        would then see "overdue since" a day early.
+      */
+      today={localToday()}
       score={score}
       index={index}
       total={total}

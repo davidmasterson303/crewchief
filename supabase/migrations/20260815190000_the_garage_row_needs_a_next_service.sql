@@ -48,6 +48,24 @@
   than having to trust it. A row whose timestamp is days old means the sweep has
   not run, which is worth surfacing rather than hiding behind a confident label.
 
+  ## ⚠ Amended 16 Aug, before ever being applied
+
+  A fourth column, `next_service_due_on`, was added while building the row this
+  migration exists for. The original three could not express the most ordinary
+  time-driven case: brake fluid has no mileage interval, so `next_service_label`
+  would store "Brake fluid" and `next_service_at_miles` would be null, leaving
+  the card able to name the service but not to say **when**.
+
+  That is worse than saying nothing. "Brake fluid" under a heading reading "Next
+  service", with no timing after it, reads as *now* — the loudest claim the row
+  can make, arrived at by accident. `describeNextService` refuses to render it
+  and returns `unknown`, which would have made every time-driven car fall into
+  the empty state.
+
+  Amended in place rather than followed by a second migration because **this one
+  has never run** — verified against the live database, not inferred from this
+  folder: `select next_service_label` returns `42703, column does not exist`.
+
   ## ⚠ Sequencing — read before deploying
 
   **Nothing selects these columns yet, on purpose.** Adding them to
@@ -58,7 +76,7 @@
 
   ## Verification
 
-  Should return three rows:
+  Should return four rows:
 
       SELECT column_name, data_type, is_nullable
         FROM information_schema.columns
@@ -80,4 +98,25 @@ ALTER TABLE public.vehicles
   ADD COLUMN IF NOT EXISTS next_service_at_miles integer,
   /* When the sweep last wrote the two above. Lets a reader judge the staleness
      rather than trust it — see the note on freshness. */
+  /* The date it falls due, for a service the schedule times by calendar rather
+     than by odometer.
+
+     ⚠ **Exactly one of this and `next_service_at_miles` should be set.** The
+     schedule's own rule is "whichever comes first", and the sweep applies it —
+     by the time a row is written the choice is made. A row carrying both is the
+     sweep failing to decide, and the reader prefers mileage rather than trying
+     to reconcile them.
+
+     `date`, not `timestamptz`. This names a calendar day with no time in it,
+     and giving it a zone is how "due Sep 1" becomes "due Aug 31" for every
+     owner west of Greenwich. */
+  ADD COLUMN IF NOT EXISTS next_service_due_on date,
+  /* When the sweep last wrote the values above. Lets a reader judge the
+     staleness rather than trust it — see the note on freshness.
+
+     ⚠ Note that the countdown itself does **not** depend on this.
+     `next_service_at_miles` is an absolute odometer reading, so "in 420 mi" is
+     recomputed against live mileage on every read and corrects itself as the
+     car is driven. Had the column held a remainder, this timestamp would have
+     been load-bearing rather than informational. */
   ADD COLUMN IF NOT EXISTS next_service_updated_at timestamptz;

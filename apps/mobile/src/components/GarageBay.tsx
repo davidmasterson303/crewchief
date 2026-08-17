@@ -4,6 +4,10 @@ import { getHealthBandJudgement } from '@crewchief/core/health-band';
 
 import BayRoom, { BAY_ROOM_HEIGHT, BayLightPool } from './BayRoom';
 import ClusterGauge from './ClusterGauge';
+import {
+  UNKNOWN_TIMING,
+  describeNextService,
+} from '@crewchief/core/garage-next-service';
 import { TABULAR, bay, radius, space, surface, text, type } from '../theme';
 import { useReducedMotion } from '../motion/reduced-motion';
 
@@ -50,6 +54,18 @@ export interface BayVehicle {
   photo_url?: string | null;
   current_mileage?: number | null;
   vehicle_status?: string | null;
+  /**
+   * The three stored next-service columns, when the sweep has written them.
+   *
+   * ⚠ Optional at the type level and absent in the product today: the migration
+   * that adds these columns is written and **not applied**, verified against the
+   * live database rather than read off the folder. Until it lands and a sweep
+   * runs, every car takes the unknown branch — which is exactly why that branch
+   * had to be designed before the row shipped rather than discovered after.
+   */
+  next_service_label?: string | null;
+  next_service_at_miles?: number | null;
+  next_service_due_on?: string | null;
 }
 
 export default function GarageBay({
@@ -63,8 +79,18 @@ export default function GarageBay({
   onAddPhoto,
   uploading,
   footer,
+  today,
 }: {
   vehicle: BayVehicle;
+  /**
+   * Today, as `YYYY-MM-DD`.
+   *
+   * Injected rather than read from a clock in here, for the reason the rest of
+   * this codebase does it: a component with its own clock cannot be tested at
+   * the date that matters — and "overdue since" versus "due now" turns on
+   * exactly one day.
+   */
+  today: string;
   /** Health score, or null when the car has none. Null is not zero. */
   score?: number | null;
   /** Zero-based position, for the batten. */
@@ -147,6 +173,16 @@ export default function GarageBay({
   const name = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ');
   const band = typeof score === 'number' ? getHealthBandJudgement(score) : null;
 
+  const nextService = describeNextService(
+    {
+      label: vehicle.next_service_label ?? null,
+      atMiles: vehicle.next_service_at_miles ?? null,
+      dueOn: vehicle.next_service_due_on ?? null,
+    },
+    vehicle.current_mileage ?? null,
+    today
+  );
+
   return (
     <View style={styles.bay}>
       {/*
@@ -226,6 +262,42 @@ export default function GarageBay({
         </View>
       </Pressable>
 
+      {/*
+        The next-service row.
+
+        ⚠ **It renders in both states, and that is the design rather than an
+        oversight.** `docs/step4-api-gaps.md` §3 held this row for one sentence:
+        "'No schedule yet' is not the same as 'nothing due', and the card must
+        not imply the second." A row that disappears when the answer is unknown
+        is the version that breaks that rule — a bay with no next-service line,
+        sitting next to one that has it, reads as a car with nothing coming up.
+
+        Keeping the label fixed is what makes the empty state safe to say. The
+        subject of the sentence is settled before the value is read, so "No
+        schedule yet" can only be heard as an answer to *that* question.
+
+        It sits above the instrument for the same reason the advisor's estimate
+        sits below its provenance line: this is a fact about the car, and the
+        dial is a reading of it.
+      */}
+      <View style={styles.nextService}>
+        <Text style={styles.nextServiceLabel}>NEXT SERVICE</Text>
+        {nextService.kind === 'known' ? (
+          <Text style={styles.nextServiceValue} numberOfLines={1}>
+            {nextService.service} · {nextService.timing}
+          </Text>
+        ) : (
+          /*
+            Muted, and phrased to match the "No score yet" beneath it. Two
+            absences on one card that word themselves differently read as two
+            different kinds of problem.
+          */
+          <Text style={styles.nextServiceUnknown} numberOfLines={1}>
+            {UNKNOWN_TIMING}
+          </Text>
+        )}
+      </View>
+
       <View style={styles.instrument}>
         {band && typeof score === 'number' ? (
           <>
@@ -252,6 +324,27 @@ export default function GarageBay({
 }
 
 const styles = StyleSheet.create({
+  nextService: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: space.md,
+    paddingHorizontal: space.md,
+    paddingTop: space.sm,
+  },
+  /** 12/600 at 0.6 tracking — the label role, and the floor. Never smaller. */
+  nextServiceLabel: { ...type.label, color: text.muted },
+  /*
+    Right-aligned and allowed to take the slack, so the label column stays put
+    across a stack of bays. A value that started at a different x on every card
+    would make the list read as unaligned rather than as a set.
+  */
+  nextServiceValue: { ...type.ui, color: text.primary, flex: 1, textAlign: 'right' },
+  /*
+    The same size, one step quieter. Not italic and not a different face: this
+    is a real answer to the question, not an apology for one.
+  */
+  nextServiceUnknown: { ...type.ui, color: text.muted, flex: 1, textAlign: 'right' },
   bay: { gap: space.md, paddingHorizontal: space.lg },
   target: { gap: space.md },
 
