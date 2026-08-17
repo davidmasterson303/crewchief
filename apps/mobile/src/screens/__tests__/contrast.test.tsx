@@ -1,5 +1,12 @@
 import { render, userEvent } from '@testing-library/react-native';
 
+jest.mock('../../onboarding/first-run-storage', () => ({
+  everHadVehicle: jest.fn().mockResolvedValue(true),
+  recordEverHadVehicle: jest.fn().mockResolvedValue(undefined),
+}));
+
+import { everHadVehicle } from '../../onboarding/first-run-storage';
+
 import { GarageScreen } from '../GarageScreen';
 import { VehicleDetailScreen } from '../VehicleDetailScreen';
 import { InvoiceScanScreen } from '../InvoiceScanScreen';
@@ -135,7 +142,37 @@ describe('failure states, which are where sub-floor text hides', () => {
     expect(belowFloor(auditText(view))).toEqual([]);
   });
 
-  it('the garage empty state, which is the first thing a new user sees', async () => {
+  it('the opening explanation, which is the first thing a new user sees', async () => {
+    /*
+      ⚠ This case replaced "the garage empty state" on 17 Aug and the title
+      moved with it, because the claim in it moved: an install that has never
+      had a car now gets `FirstRun`, not `EmptyState`. Leaving the old name on
+      the old screen would have left the *most*-read surface in the app
+      unaudited under a title claiming it was covered.
+
+      It also carries the most new copy of anything added recently — three
+      promises and a caveat, at the quietest step of the ink ramp — which is
+      where a contrast floor is most likely to be crossed by accident.
+    */
+    (everHadVehicle as jest.Mock).mockResolvedValue(false);
+    request.mockResolvedValue({ vehicles: [] });
+
+    const view = await render(
+      <GarageScreen
+        accessToken="t"
+        email="owner@example.test"
+        onSignOut={jest.fn()}
+        onOpenVehicle={jest.fn()}
+        onAddVehicle={jest.fn()}
+      />
+    );
+
+    await view.findByText('Start with one car');
+    expect(belowFloor(auditText(view))).toEqual([]);
+  });
+
+  it('the empty garage a returning owner sees', async () => {
+    (everHadVehicle as jest.Mock).mockResolvedValue(true);
     request.mockResolvedValue({ vehicles: [] });
 
     const view = await render(

@@ -58,8 +58,21 @@ describe('GarageScreen — App Store 5.1.1(v)', () => {
       Split on the returns themselves. Everything before the first one is setup
       and is not a rendered path; every chunk after one is something a user can
       actually be looking at, and each has to carry the account affordance.
+
+      ⚠ The `(?!\))` is load-bearing and was added on 17 Aug after this test
+      failed on a change that did nothing wrong. `\breturn \(` also matches a
+      `useEffect` cleanup — `return () => { live = false; };` — so adding an
+      effect with teardown invented a "render path" consisting of the rest of
+      the setup block, which of course renders nothing at all.
+
+      That is a false positive, and a false positive on a compliance test is
+      worse than it sounds: the fix that suggests itself is to contort the
+      component until the regex is happy, which leaves the rule enforcing a
+      coding style instead of App Store 5.1.1(v). Excluding `return ()` is
+      narrow — a JSX return never opens with `)` — so every real path is still
+      caught.
     */
-    const paths = body.split(/\breturn \(/).slice(1);
+    const paths = body.split(/\breturn \((?!\))/).slice(1);
 
     // If this component is ever rewritten into a single return, this assertion
     // is what tells the next person to re-read the rule rather than assume the

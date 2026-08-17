@@ -15,6 +15,7 @@ import Button from '../components/Button';
 import AlertBanner from '../components/AlertBanner';
 import Chip from '../components/Chip';
 import EmptyState from '../components/EmptyState';
+import FirstRun from '../components/FirstRun';
 import GarageBay from '../components/GarageBay';
 import Logo from '../components/Logo';
 import { SkeletonCard } from '../components/Skeleton';
@@ -28,10 +29,13 @@ import {
   registerForPush,
 } from '../notifications/register';
 import { shouldShowPushPrimer } from '@crewchief/core/push-priming';
+import { shouldShowFirstRun } from '@crewchief/core/first-run';
+import { everHadVehicle, recordEverHadVehicle } from '../onboarding/first-run-storage';
 import { uploadVehiclePhoto } from '../api/photos';
 import type { InvoiceFile } from '../api/documents';
 import { getHealthBandJudgement } from '@crewchief/core/health-band';
 import { localToday } from '@crewchief/core/garage-next-service';
+import { interFace } from '../theme/fonts';
 
 /**
  * Phase 3.2 — the garage, read only.
@@ -294,6 +298,45 @@ export function GarageScreen({
     | { status: 'error'; message: string; unauthorized: boolean }
   >({ status: 'loading' });
   const [refreshing, setRefreshing] = useState(false);
+
+  /**
+   * Has this install ever had a car in it?
+   *
+   * `undefined` while the answer is still being read off storage, and the
+   * empty-garage branch renders **nothing** until it resolves. The alternative
+   * is a frame of the wrong opening screen — either the bare "No vehicles yet"
+   * flashing before the explanation, or the explanation flashing at somebody
+   * who has used this for a year. Same argument the session gate in `App.tsx`
+   * makes for `undefined`, one question along.
+   */
+  const [hadVehicle, setHadVehicle] = useState<boolean | undefined>(undefined);
+
+  useEffect(() => {
+    let live = true;
+
+    void everHadVehicle().then((ever) => {
+      if (live) setHadVehicle(ever);
+    });
+
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  /*
+    Written on a load that returns cars, not on the create.
+
+    The two differ for the case that matters: signing in on a second phone to
+    an account that already has cars never runs a create, and a flag written
+    only there would leave that install believing forever that this is
+    somebody's first run.
+  */
+  useEffect(() => {
+    if (state.status !== 'ok' || state.vehicles.length === 0) return;
+
+    setHadVehicle(true);
+    void recordEverHadVehicle();
+  }, [state]);
   const [primerOpen, setPrimerOpen] = useState(false);
 
   /*
@@ -614,26 +657,53 @@ export function GarageScreen({
 
         {state.vehicles.length === 0 ? (
           /*
-            The primitive, which `contrast.test.tsx` already calls "the first
-            thing a new user sees".
+            An empty garage has two readings, and they want different screens.
 
-            The copy is kept verbatim. It read "Add a car on the web and it will
-            appear here" until 8 Aug — the mobile-first problem in one sentence,
-            sending a new user to a different product to become a user at all,
-            which a reviewer would hit before anything else.
+            Somebody who has never had a car here needs to be told what this is
+            before being asked for one. Somebody who has used it and sold the
+            car needs no introduction — greeting them with "Start with one car"
+            would be the product forgetting them. `shouldShowFirstRun` decides,
+            and `@crewchief/core/first-run` carries the argument for why the
+            stored fact is "ever had a vehicle" rather than "seen onboarding".
 
-            The action keeps its own spoken name because the header carries an
-            "Add a car" control too, and two controls with the same name on one
-            screen are ambiguous to a screen reader in a way they are not to the
-            eye, which has position to go on.
+            ⚠ `undefined` renders nothing rather than guessing. The answer is
+            read off storage asynchronously, and either default would flash the
+            wrong opening screen for a frame — the bare empty state ahead of the
+            explanation, or the explanation at a year-old account.
           */
-          <EmptyState
-            headline="No vehicles yet"
-            body="Add your first car and CrewChief gets to work on it."
-            actionLabel="Add a car"
-            actionAccessibilityLabel="Add your first car"
-            onAction={onAddVehicle}
-          />
+          hadVehicle === undefined ? null : shouldShowFirstRun({
+            everHadVehicle: hadVehicle,
+            vehicleCount: state.vehicles.length,
+          }) ? (
+            /*
+              It replaces the body and not the screen. The header above carries
+              Account, and hiding that from a brand-new user who wants to sign
+              out — or delete the account they just made — is exactly the
+              failure this screen's own header comment warns about: "an
+              affordance placed in one branch of a screen that renders several".
+            */
+            <FirstRun onAddVehicle={onAddVehicle} />
+          ) : (
+            /*
+              The returning case, and the copy is kept verbatim. It read "Add a
+              car on the web and it will appear here" until 8 Aug — the
+              mobile-first problem in one sentence, sending a new user to a
+              different product to become a user at all, which a reviewer would
+              hit before anything else.
+
+              The action keeps its own spoken name because the header carries an
+              "Add a car" control too, and two controls with the same name on
+              one screen are ambiguous to a screen reader in a way they are not
+              to the eye, which has position to go on.
+            */
+            <EmptyState
+              headline="No vehicles yet"
+              body="Add your first car and CrewChief gets to work on it."
+              actionLabel="Add a car"
+              actionAccessibilityLabel="Add your first car"
+              onAction={onAddVehicle}
+            />
+          )
         ) : (
           <ScrollView
             horizontal
@@ -722,7 +792,7 @@ const styles = StyleSheet.create({
   headerAction: {
     color: text.secondary,
     ...type.value,
-    fontWeight: '600',
+    fontFamily: interFace('600'), fontWeight: '600',
     minHeight: TARGET_MIN,
     lineHeight: TARGET_MIN,
   },

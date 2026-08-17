@@ -1,5 +1,7 @@
 import { render, userEvent, waitFor } from '@testing-library/react-native';
 
+import { everHadVehicle, recordEverHadVehicle } from '../../onboarding/first-run-storage';
+
 import { GarageScreen } from '../GarageScreen';
 import { apiRequest, ApiRequestError } from '../../api/client';
 
@@ -40,6 +42,16 @@ import { apiRequest, ApiRequestError } from '../../api/client';
   assertion sees the screen it was written against. The primer's own behaviour
   is covered in `push-priming.test.ts`, where the rule lives.
 */
+/**
+ * Controlled per test, because it decides which of the two empty states
+ * renders. Defaults to a returning install — the majority case across this
+ * file, and the one every other test here predates.
+ */
+jest.mock('../../onboarding/first-run-storage', () => ({
+  everHadVehicle: jest.fn().mockResolvedValue(true),
+  recordEverHadVehicle: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock('../../notifications/register', () => ({
   currentPushPermission: jest.fn().mockResolvedValue('granted'),
   primerDismissedOn: jest.fn().mockResolvedValue(null),
@@ -166,13 +178,73 @@ describe('App Store 5.1.1(v) — account deletion stays reachable', () => {
   });
 
   it('offers Account to an account with no cars', async () => {
-    // The ordinary first-run state, and not a failure.
+    // An empty garage is the ordinary first-run state, and not a failure.
     request.mockResolvedValue({ vehicles: [] });
 
     const view = await renderGarage();
 
     expect(await view.findByLabelText('Account')).toBeTruthy();
-    expect(view.getByText('No vehicles yet')).toBeTruthy();
+  });
+
+  it('offers Account behind the opening explanation too', async () => {
+    /*
+      ⚠ The reason the first-run screen replaces the *body* and not the screen.
+
+      Somebody who has just signed up, cannot work out what this is, and wants
+      to sign out or delete the account they just made is the person most likely
+      to need Account and the one a full-screen takeover would hide it from —
+      the failure this screen's own header comment already warns about.
+    */
+    (everHadVehicle as jest.Mock).mockResolvedValue(false);
+    request.mockResolvedValue({ vehicles: [] });
+
+    const view = await renderGarage();
+
+    expect(await view.findByText('Start with one car')).toBeTruthy();
+    expect(view.getByLabelText('Account')).toBeTruthy();
+  });
+});
+
+describe('which empty garage you get', () => {
+  it('explains the product to an install that has never had a car', async () => {
+    (everHadVehicle as jest.Mock).mockResolvedValue(false);
+    request.mockResolvedValue({ vehicles: [] });
+
+    const view = await renderGarage();
+
+    expect(await view.findByText('Start with one car')).toBeTruthy();
+    expect(view.queryByText('No vehicles yet')).toBeNull();
+  });
+
+  it('says only that it is empty to someone who has had one before', async () => {
+    /*
+      A year-old account that sold its last car is not a new user. Greeting it
+      with "Start with one car" is the product forgetting them, which is why the
+      stored fact is "ever had a vehicle" rather than "seen onboarding" —
+      `@crewchief/core/first-run` carries the argument.
+    */
+    (everHadVehicle as jest.Mock).mockResolvedValue(true);
+    request.mockResolvedValue({ vehicles: [] });
+
+    const view = await renderGarage();
+
+    expect(await view.findByText('No vehicles yet')).toBeTruthy();
+    expect(view.queryByText('Start with one car')).toBeNull();
+  });
+
+  it('remembers a garage that had cars in it, so the explanation does not return', async () => {
+    /*
+      Recorded on a **load** that returns cars rather than on the create. The
+      two differ for the case that matters: signing in on a second phone to an
+      account that already has cars never runs a create, and a flag written only
+      there would leave that install believing forever that this is a first run.
+    */
+    (everHadVehicle as jest.Mock).mockResolvedValue(false);
+    request.mockResolvedValue({ vehicles: [M235I] });
+
+    await renderGarage();
+
+    await waitFor(() => expect(recordEverHadVehicle).toHaveBeenCalled());
   });
 });
 
