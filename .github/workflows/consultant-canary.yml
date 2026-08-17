@@ -1,0 +1,101 @@
+# The consultant canary — every 6 hours against the live demo.
+#
+# Why this exists rather than a promote-time check alone:
+# CREWCHIEF_ROUNDTRIP_GATE_DESIGN.md's central finding is that the §22 outage
+# arrived WITHOUT a deploy. The API key went stale while the code sat still.
+# A gate that only runs on promote is structurally incapable of catching it,
+# because nobody was promoting.
+#
+# Runs against the LIVE demo, not a candidate build. The demo is linked from
+# David's portfolio during an active job search, so the thing worth monitoring
+# is what a recruiter would actually load.
+#
+# Cost: four Gemini chat calls a day, ~1.3s each. That is the price of knowing.
+#
+# ── ⚠ Why this file sat unused for two weeks, and the rule that explains it ──
+#
+# It was written and committed to the `canary-workflow` branch, and never
+# reached `main`. **GitHub Actions only fires `schedule` triggers from the
+# default branch** — so this cron has never run once. `ai_usage_events` shows it
+# plainly: `surface = 'canary'` rows exist on 8 Aug and 15 Aug and nowhere else,
+# which is a hand-run and a promote, not a six-hourly cadence.
+#
+# A monitor that is not running is worse than no monitor, because the silence
+# reads as good news. That is the same failure mode §22 is about, one level up:
+# there, the outage arrived without a deploy; here, the thing meant to catch it
+# arrived without a merge.
+#
+# Landed on `main` on 17 Aug by copying **this file alone** off that branch. The
+# branch itself is 459 files behind and merging it would revert a fortnight of
+# work — everything else it needs (`scripts/consultant-canary.mjs`, the live
+# demo host) was already here.
+#
+# ── ⚠ This needs the secret in TWO places, and they must match ──────────────
+#
+# Verified by running the canary by hand against the live demo on 17 Aug:
+#
+#     [2026-08-17T13:06:10Z] UNABLE https://crewchief-demo.davidmasterson.co
+#         — the deployment has no CONSULTANT_HEALTH_SECRET set          exit 3
+#
+# and the endpoint itself agrees:
+#
+#     GET /api/health/consultant
+#     {"status":"broken","reason":"NOT_CONFIGURED",
+#      "detail":"CONSULTANT_HEALTH_SECRET is not set."}
+#
+# So there are two settings, not one, and adding only the first leaves the
+# canary red forever while looking configured:
+#
+#   1. **GitHub → repository Actions secret** `CONSULTANT_HEALTH_SECRET`, so
+#      this workflow can authenticate.
+#   2. **Netlify → environment variable** `CONSULTANT_HEALTH_SECRET` on the site
+#      serving the demo, so the deployed endpoint will answer at all. It is
+#      present in local `.env` and absent from the deployment, which is why the
+#      endpoint reports `NOT_CONFIGURED` rather than a health verdict.
+#
+# The two values must be identical.
+#
+# ⚠ Until both exist the script exits 3 — "the canary could not run" — and this
+# job fails rather than passing quietly. That is deliberate: a monitor that
+# cannot run must not be mistaken for a monitor reporting good news.
+name: Consultant canary
+
+on:
+  schedule:
+    # 00:00, 06:00, 12:00, 18:00 UTC.
+    - cron: '0 */6 * * *'
+  workflow_dispatch: # so it can be run by hand after a suspected outage
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Ask the live consultant a real question
+        id: canary
+        env:
+          CONSULTANT_HEALTH_SECRET: ${{ secrets.CONSULTANT_HEALTH_SECRET }}
+        # `continue-on-error` so the exit code can be inspected below rather
+        # than ending the job. The distinction between "ours" and "Google's"
+        # is the whole point and must survive into the alert.
+        continue-on-error: true
+        run: |
+          node scripts/consultant-canary.mjs https://crewchief-demo.davidmasterson.co
+          echo "exit=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Interpret the result
+        run: |
+          case "${{ steps.canary.outcome }}" in
+            success)
+              echo "Consultant is answering." ;;
+            *)
+              echo "::error::The consultant canary did not report good."
+              echo "Exit 1 = ours, fix it. Exit 2 = Gemini unavailable, note it."
+              echo "Exit 3 = the canary could not run; check CONSULTANT_HEALTH_SECRET."
+              exit 1 ;;
+          esac
