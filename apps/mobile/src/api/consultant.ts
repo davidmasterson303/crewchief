@@ -1,5 +1,7 @@
 import { apiRequest } from './client';
 import { isContextKind, type ContextKind } from '@crewchief/core/consultant-context-kinds';
+import type { AdviceRange } from '@crewchief/core/advice-range';
+import type { ConsultantEstimate, EstimateLine } from '@crewchief/core/consultant-estimate';
 
 /**
  * The advisor — Phase 3.4, and the flow carrying the App Store 4.2 argument.
@@ -50,6 +52,58 @@ export interface AdvisorAnswer {
   response: string;
   /** What the server loaded and put in front of the model. Rendered "Based on". */
   contextKinds: ContextKind[];
+  /**
+   * The priced lines behind the estimate well, when the answer priced anything.
+   *
+   * ⚠ **Optional, and it is the field's most important property.** Most advisor
+   * answers are not quotes. The server omits this rather than sending an empty
+   * one for exactly that reason — see the route's own note — and the screen must
+   * render nothing at all when it is absent. A well showing no lines, or a total
+   * of $0, on ordinary advice would be the product asserting a price it never
+   * inferred.
+   */
+  estimate?: ConsultantEstimate;
+}
+
+/**
+ * Narrow an estimate off the wire, or drop it whole.
+ *
+ * The same argument as `isContextKind` one field along, and stronger here. This
+ * is rendered as **prices, in the product's own voice, inside a styled well** —
+ * the strongest claim of precision anything in this app makes. A partially
+ * understood estimate is not a degraded estimate, it is a wrong one, so a
+ * malformed line takes only itself and a payload with no usable lines returns
+ * `undefined` rather than an empty shell.
+ *
+ * ⚠ It does **not** re-validate the numbers. `parseEstimate` on the server
+ * already widened every range to an honest spread and dropped verdict labels;
+ * repeating that here would put two copies of the same policy in two packages,
+ * and the copy that drifts is always the second one.
+ */
+function narrowEstimate(raw: unknown): ConsultantEstimate | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+
+  const source = raw as { lines?: unknown; likely?: unknown };
+  if (!Array.isArray(source.lines)) return undefined;
+
+  const lines = source.lines.filter(isEstimateLine);
+  if (lines.length === 0) return undefined;
+
+  const likely = isAdviceRange(source.likely) ? source.likely : undefined;
+
+  return { lines, ...(likely ? { likely } : {}) };
+}
+
+function isAdviceRange(value: unknown): value is AdviceRange {
+  if (typeof value !== 'object' || value === null) return false;
+  const range = value as { low?: unknown; high?: unknown };
+  return typeof range.low === 'number' && typeof range.high === 'number';
+}
+
+function isEstimateLine(value: unknown): value is EstimateLine {
+  if (typeof value !== 'object' || value === null) return false;
+  const line = value as { label?: unknown; range?: unknown };
+  return typeof line.label === 'string' && line.label !== '' && isAdviceRange(line.range);
 }
 
 /** Matches the route's own ceiling, so an over-long message fails before the flight. */
@@ -64,6 +118,7 @@ export async function askAdvisor({
     sessionId?: unknown;
     response?: unknown;
     contextKinds?: unknown;
+    estimate?: unknown;
   }>('/consultant', {
     method: 'POST',
     body: {
@@ -79,6 +134,8 @@ export async function askAdvisor({
     },
   });
 
+  const estimate = narrowEstimate(body.estimate);
+
   return {
     /*
       Falling back to the id we sent covers the impossible case without
@@ -91,5 +148,10 @@ export async function askAdvisor({
     contextKinds: Array.isArray(body.contextKinds)
       ? body.contextKinds.filter(isContextKind)
       : [],
+    // Spread rather than assigned, so an answer with no estimate has no
+    // `estimate` key at all. `undefined` and absent read the same in most code
+    // and differently in an `'estimate' in answer` check, and this is a field
+    // whose whole contract is that absent means absent.
+    ...(estimate ? { estimate } : {}),
   };
 }

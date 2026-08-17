@@ -171,6 +171,18 @@ export async function POST(request: NextRequest): Promise<Response> {
       */
       contextKinds: result.contextKinds ?? [],
       wishlistActions: result.wishlistActions ?? [],
+      /*
+        The priced lines behind the estimate well, and **omitted rather than
+        emptied** when the answer did not price anything.
+
+        Not `?? []` like the two above, and the difference is the whole design.
+        Those are lists that are legitimately empty — no chips, no suggestions.
+        An estimate is a claim about what a job costs, and there is no such
+        thing as an empty one: a well rendering no lines, or a total of $0, on
+        the ordinary advice turn would be the product asserting a price it
+        never inferred. Absent has to arrive as absent.
+      */
+      ...(result.estimate ? { estimate: result.estimate } : {}),
     } as ApiResponse);
   } catch (error) {
     logger.error('API:CONSULTANT', error as Error);

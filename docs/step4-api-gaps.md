@@ -3,7 +3,11 @@
 Design specced three things §0.16 records the endpoints as unable to feed.
 
 Written as proposals because the roadmap asks for the shape first. **Since
-then, one turned out not to be a gap at all (§1) and one has been built (§2).**
+then: §1 turned out not to be a gap at all, §2 and §4 are built, and §3 is the
+only one still open.** §4 was not in the original three — it was found on 16 Aug
+while looking at the advisor, which is the reason the title says three and the
+document has four.
+
 Each section says which it is at its heading; where the built shape differs from
 the proposed one, both are kept so the change of mind is readable.
 
@@ -199,7 +203,7 @@ columns. The empty state is a design question, not engineering time.
 
 ---
 
-## 4. ⚠ A fourth gap, found 16 Aug on the advisor — **not previously listed**
+## 4. The advisor's estimate — ✅ **built 16 Aug** (found the same day)
 
 §0.16 flagged three. There is a fourth, and it is the reason the `Well`
 primitive still has no caller.
@@ -231,24 +235,94 @@ to prevent.
 `quote-check.ts` uses them for the front door. None of it is wired into the
 consultant's response.
 
-**Proposed shape:** the consultant route returns an optional
+### ✅ What was built, and the one place it differs from the proposal
+
+**Proposed shape:** an optional
 `estimate?: { lines: Array<{ label: string; range: AdviceRange }>; likely: AdviceRange }`
-alongside `response`, populated when the model's answer priced something and
-omitted when it did not.
+alongside `response`.
 
-⚠ **Optional is the load-bearing part.** Most advisor answers are not quotes,
-and a well that renders empty — or worse, at $0 — on every non-pricing answer
-would be a worse screen than no well at all. Absent must mean absent.
+**Built shape:** the same, except **`likely` is optional too, and it is not a
+total.** That change is worth stating rather than burying.
 
-**Estimate:** ~1 ed, most of it in getting the model to return the numbers
-separately from the prose rather than in the plumbing.
+The board's own example prices two lines at $110–$160 and $380–$520 and then
+gives "Most likely total" as **$110–$160**. The second line is "Master
+cylinder, *if needed*", and the likely case is that it is not. Summing the lines
+would charge the owner for every contingency the advisor was careful to mark as
+one — turning a considered answer into a worst case and reporting it as the
+expected one. Only the model knows which lines are conditional, so only the
+model can say this, and when it does not say it the field is absent. The screen
+labels it **"Most likely"**, never "Total", so a reader who adds up the rows and
+gets a different number is seeing the feature rather than a bug.
 
-**Until then `Well` correctly has no caller**, and its own header now says so.
-It is a primitive waiting on a feature, not one being ignored.
+**How the numbers travel:** tags, on the pattern `consultant-commands.ts`
+already established — `[ESTIMATE: label|low|high]` per line and an optional
+`[ESTIMATE_TOTAL: low|high]`. `packages/core/src/consultant-estimate.ts` parses
+them and `app/actions.ts` strips them from the prose alongside the wishlist and
+status tags.
+
+**Three judgements inside it:**
+
+- **`widenToHonestSpread` is applied at the parse boundary**, not in the
+  renderer, so every reader of a `ConsultantEstimate` gets an honest spread
+  without having to ask. A range of $1,000–$1,010 claims 1% precision that no
+  estimate from a language model over an unseen job has.
+- **A line label is advice copy** and runs through `statesVerdict`. "Fluid
+  flush, they're overcharging" set in a styled panel next to a price is a
+  statement about a named local business — the exact exposure `cc-design-0003`
+  exists to prevent. The line is dropped, not the whole estimate.
+- **Parsed outside the `!isDemoVehicle` block.** Everything in that block
+  writes; this only reads the answer already given. A stranger trying the demo
+  car sees the same estimate an owner would, rather than the well becoming a
+  paid feature by accident.
+
+⚠ **Optional remained the load-bearing part.** Most advisor answers are not
+quotes. The route omits the field rather than sending `[]`, the mobile client
+narrows it to `undefined` rather than an empty shell, and the screen renders
+nothing at all — a well showing no lines, or a total of $0, on ordinary advice
+would be the product asserting a price it never inferred.
+
+**`Well` now has its caller**: `apps/mobile/src/components/EstimateWell.tsx`.
+Its header has been corrected — it said "no caller yet, and that is not an
+oversight", which stopped being true the moment this landed.
+
+⚠ **Still open, and it is a product call.** The board's copy reads "Estimated,
+for this vehicle **in your area**". This app has no location — the consultant
+prompt receives no postcode and no region — so the phrase is dropped rather
+than defaulted, the same rule `describeQuote` already follows. Adding it back
+means collecting a location, which is a product decision and not a small one.
+
+⚠ **And one thing no test can settle:** whether the model actually emits these
+tags well. The parser, the widening and the well are all verified; the quality
+of the numbers is a prompt question that needs real answers looked at. The
+plumbing was the smaller half, as predicted — the estimate of ~1 ed was right
+about where the work was.
 
 ---
 
-## Order I would build them in
+## Where this stands, 16 Aug
+
+**#3 is the only one left**, and its blocker is not engineering time. The
+migration adding `next_service_label` and `next_service_at_miles` is written and
+**unapplied**, deliberately: nothing selects those columns yet, and the coverage
+question in §3 has to be answered before the row is worth drawing. A car with no
+`vehicle_knowledge_base` entry has no next service, and *"No schedule yet"* is
+not the same as *"nothing due"* — the card must not imply the second. That empty
+state is a design question.
+
+Two things carried over that are David's rather than mine:
+
+- **The M235i's photo** needs re-uploading through the web app, which downscales
+  it on the way in. Thirty seconds, and it is what unblocks the 196pt hero
+  reading as a photo instead of a fallback (§1).
+- **Whether `health_score` should become a function of the three drivers** (§2).
+  Defensible for one release that it is not; awkward forever.
+
+The original order — build #3, then #2, then nothing for #1 — is left below for
+the record, since #2 was in fact built first and the reasoning for that ordering
+turned out not to survive David choosing "compute".
+
+<details>
+<summary>The order as first proposed, 15 Aug</summary>
 
 1. **Nothing** — #1 is already served; the hero just needs drawing, and David
    needs to re-upload one photo.
@@ -256,3 +330,5 @@ It is a primitive waiting on a feature, not one being ignored.
 3. **#2**, last, because the "compute or generate" decision changes what gets
    built and the follow-on question about `health_score` deserves a real answer
    rather than a default.
+
+</details>

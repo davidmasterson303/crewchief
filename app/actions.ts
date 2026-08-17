@@ -29,6 +29,7 @@ import {
   storagePathFromStoredUrl,
 } from '@crewchief/core/storage-paths';
 import { parseWishlistCommands, parsePerformanceCommands, parseStatusCommands, parseInvoiceFlag } from '@crewchief/core/consultant-commands';
+import { parseEstimate } from '@crewchief/core/consultant-estimate';
 import { validateData, vehicleIdSchema, serviceItemSchema, maintenanceLineItemSchema, quoteRequestSchema } from '@crewchief/core/validation';
 import { withRetry } from '@crewchief/core/retry';
 import type { Vehicle, ServiceItem, MaintenanceLineItem, KnowledgeBase, ApiResponse, ConsultantContext } from '@crewchief/core/types';
@@ -1089,6 +1090,24 @@ export async function sendConsultantMessage(params: {
     const wishlistActions = wishlistParse.commands;
     response = wishlistParse.cleaned;
 
+    /*
+      The priced lines behind the advisor's estimate well.
+
+      Parsed here with the other tags, and deliberately **outside** the
+      `!isDemoVehicle` block below. Everything in that block writes to the
+      database; this only reads the answer the model already gave, and a
+      stranger trying the demo car should see the same estimate a signed-in
+      owner would. Putting it inside would make the well a paid feature by
+      accident.
+
+      `estimate` is `undefined` on almost every turn, because almost every
+      answer is not a quote. See `consultant-estimate.ts` — absent must mean
+      absent, or the well renders empty on ordinary advice.
+    */
+    const estimateParse = parseEstimate(response);
+    const estimate = estimateParse.estimate;
+    response = estimateParse.cleaned;
+
     let performanceUpdated = false;
     let invoiceProcessed = false;
     let invoiceItemsProcessed = 0;
@@ -1184,7 +1203,7 @@ export async function sendConsultantMessage(params: {
       const updatedHistory = [
         ...messageHistory,
         userMessage,
-        { role: 'assistant', content: response, timestamp: new Date().toISOString(), wishlistActions: wishlistActions.length > 0 ? wishlistActions : undefined },
+        { role: 'assistant', content: response, timestamp: new Date().toISOString(), wishlistActions: wishlistActions.length > 0 ? wishlistActions : undefined, ...(estimate ? { estimate } : {}) },
       ];
 
       await client
@@ -1203,7 +1222,7 @@ export async function sendConsultantMessage(params: {
       derived in ConsultantChat.tsx from the values it posted — which stopped
       being the model's context the moment that context moved server-side.
     */
-    return { success: true, response, contextKinds, wishlistActions, performanceUpdated, invoiceProcessed, invoiceItemsProcessed, issueUpdates, modUpdates };
+    return { success: true, response, contextKinds, wishlistActions, estimate, performanceUpdated, invoiceProcessed, invoiceItemsProcessed, issueUpdates, modUpdates };
   } catch (error) {
     console.error('Consultant message error:', error);
     return { success: false, error: 'Failed to get response from consultant' };

@@ -19,6 +19,8 @@ import ProvenanceRow from '../components/ProvenanceRow';
 import { Skeleton } from '../components/Skeleton';
 import { border, radius, space, status, surface, text, type } from '../theme';
 import { CONTEXT_KIND_LABELS, type ContextKind } from '@crewchief/core/consultant-context-kinds';
+import type { ConsultantEstimate } from '@crewchief/core/consultant-estimate';
+import EstimateWell from '../components/EstimateWell';
 import { parseAnswer } from '@crewchief/core/answer-markup';
 
 /**
@@ -83,7 +85,18 @@ import { parseAnswer } from '@crewchief/core/answer-markup';
 
 type Turn =
   | { id: string; role: 'you'; text: string }
-  | { id: string; role: 'advisor'; text: string; kinds: ContextKind[] };
+  | {
+      id: string;
+      role: 'advisor';
+      text: string;
+      kinds: ContextKind[];
+      /**
+       * Present only when the answer priced something, which is rarely.
+       * Optional here for the same reason it is optional on the wire — a well
+       * that renders on ordinary advice would show a price nobody inferred.
+       */
+      estimate?: ConsultantEstimate;
+    };
 
 /**
  * Ids for the list, not identity. `Date.now()` alone collides when a question
@@ -157,6 +170,7 @@ export function AdvisorScreen({
           role: 'advisor',
           text: answer.response,
           kinds: answer.contextKinds,
+          ...(answer.estimate ? { estimate: answer.estimate } : {}),
         },
       ]);
       // Only now, because the question is only safely somewhere else once the
@@ -402,6 +416,17 @@ function TurnView({ turn }: { turn: Turn }) {
         12 and the primitive has no size prop.
       */}
       <ProvenanceRow kinds={turn.kinds.map((kind) => CONTEXT_KIND_LABELS[kind])} />
+      {/*
+        Below the provenance line, not above it.
+
+        The order is an argument about what the numbers are. Provenance
+        qualifies the whole answer — what the advisor could see when it said
+        this — and the prices are part of what was said, so they sit inside the
+        scope that sentence sets rather than after it. Put the well first and
+        the "Based on" line reads as a footnote to the estimate alone, which
+        narrows a claim that was never that narrow.
+      */}
+      {turn.estimate ? <EstimateWell estimate={turn.estimate} /> : null}
     </View>
   );
 }

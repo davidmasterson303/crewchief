@@ -5,28 +5,26 @@ import { border, radius, space, surface } from '../theme';
 /**
  * A recess — the estimate block in the advisor, a read-only value group.
  *
- * ── ⚠ This has no caller yet, and that is not an oversight ──────────────────
+ * ── ⚠ One caller, and only one is correct ──────────────────────────────────
  *
- * Audited 16 Aug: `Well` is used by zero screens. The first read of that was
- * "four screens hand-roll it" — **wrong**. The two `surface.well` sites in this
- * app are the advisor's chat bubble, which is a bubble and not a recess, and
- * the garage's dev-only token block, which never ships.
+ * `EstimateWell` — the priced lines under an advisor answer, which is the
+ * caller this was built for and the only one it has.
  *
- * The caller this was built for is **the advisor's estimate block**, and the
- * mobile advisor does not render one yet. So the honest state is a primitive
- * waiting on a feature, not a primitive being ignored.
+ * It sat unused from 14 to 16 Aug and the header said why: the numbers did not
+ * exist. `POST /api/v1/consultant` returned prose and nothing else, written up
+ * as gap 4 in `docs/step4-api-gaps.md`. That gap is closed — the route now
+ * returns a structured `estimate` parsed from tags the model emits — so this is
+ * a primitive that waited for its feature and got it.
  *
- * ⚠ **Confirmed 16 Aug, and it is an API gap rather than screen work.**
- * `POST /api/v1/consultant` returns `{ sessionId, response, contextKinds }` —
- * `response` is prose, and no structured estimate reaches either client.
- * Parsing dollar ranges back out of that prose is the obvious shortcut and the
- * wrong one: a mis-parsed range shown as a priced line item is the overclaim
- * the provenance work exists to prevent. Written up as gap 4 in
- * `docs/step4-api-gaps.md`.
+ * ⚠ **The warning that came with it still stands.** Do not adopt this to make
+ * something look grouped. A well pressed into service as a card, a bubble or a
+ * panel is worse than an unused file: it teaches the next reader that the
+ * distinction below does not mean anything.
  *
- * Do not adopt it to close the gap. A well pressed into service as a card, a
- * bubble or a panel is worse than an unused file: it teaches the next reader
- * that the distinction below does not mean anything.
+ * For the record, since it was got wrong once: the first audit read this as
+ * "four screens hand-roll it" and that was **wrong**. The two `surface.well`
+ * sites in this app are the advisor's chat bubble, which is a bubble and not a
+ * recess, and the garage's dev-only token block, which never ships.
  *
  * ── A well is not a card ────────────────────────────────────────────────────
  *
