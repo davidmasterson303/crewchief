@@ -11,6 +11,7 @@ import {
 
 import Card from '../components/Card';
 import { apiRequest, ApiRequestError } from '../api/client';
+import { Skeleton, SkeletonCard } from '../components/Skeleton';
 import { radius, status, surface, text } from '../theme';
 import {
   hasRemedy,
@@ -144,10 +145,16 @@ export function RecallDetailScreen({ vehicleId, title, onAskAdvisor, onSignOut }
   }, [load]);
 
   if (state.kind === 'loading') {
+    /*
+      A banner-height block then recall cards. The banner is the first thing
+      this screen says when it has something to say, so leaving its space
+      unclaimed is what makes the arrival jump.
+    */
     return (
-      <View style={styles.centre}>
-        <ActivityIndicator color={text.secondary} />
-      </View>
+      <ScrollView contentContainerStyle={styles.body}>
+        <Skeleton height={72} />
+        <SkeletonCard lines={3} />
+      </ScrollView>
     );
   }
 

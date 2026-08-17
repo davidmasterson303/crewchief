@@ -15,6 +15,7 @@ import Button from '../components/Button';
 import Card from '../components/Card';
 import EmptyState from '../components/EmptyState';
 import { apiRequest, ApiRequestError } from '../api/client';
+import { Skeleton, SkeletonCard } from '../components/Skeleton';
 import { wishlistItemIdentifier, type WishlistItemType } from '@crewchief/core/wishlist-identifier';
 import { formatCurrency } from '@crewchief/core/formatting-utils';
 import { completionPayload, type CompletionDraft } from '@crewchief/core/wishlist-completion';
@@ -240,10 +241,13 @@ export function WishlistScreen({ vehicleId, onSignOut }: Props) {
   );
 
   if (state.kind === 'loading') {
+    // Three cards, because that is what a wishlist resolves into.
     return (
-      <View style={styles.centre}>
-        <ActivityIndicator color={text.secondary} />
-      </View>
+      <ScrollView contentContainerStyle={styles.body}>
+        <SkeletonCard lines={2} />
+        <SkeletonCard lines={2} />
+        <SkeletonCard lines={2} />
+      </ScrollView>
     );
   }
 

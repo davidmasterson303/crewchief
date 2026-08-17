@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 
 import { apiRequest, ApiRequestError } from '../api/client';
+import { Skeleton, SkeletonCard } from '../components/Skeleton';
 import { uploadVehiclePhoto } from '../api/photos';
 import type { InvoiceFile } from '../api/documents';
 import type { HealthDriver } from '@crewchief/core/health-drivers';
@@ -294,10 +295,20 @@ export function VehicleDetailScreen({
   }, [pickPhoto, vehicleId, load]);
 
   if (state.status === 'loading') {
+    /*
+      Shaped like the dossier that is coming, not a centred dot.
+
+      This is the densest screen in the app and the one a recall notification
+      opens, so it is the most likely to be met cold. A hero block then two
+      cards mirrors what resolves — the photo, the health card, the
+      destinations — which is what stops the fill-in reading as a jump.
+    */
     return (
-      <View style={styles.centred}>
-        <ActivityIndicator color={text.muted} />
-      </View>
+      <ScrollView contentContainerStyle={styles.body}>
+        <Skeleton height={196} />
+        <SkeletonCard lines={3} />
+        <SkeletonCard lines={2} />
+      </ScrollView>
     );
   }
 

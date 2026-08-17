@@ -13,6 +13,7 @@ import {
 import Card from '../components/Card';
 import Button from '../components/Button';
 import { apiRequest, ApiRequestError } from '../api/client';
+import { Skeleton, SkeletonCard } from '../components/Skeleton';
 import {
   evaluateSchedule,
   milestoneReason,
@@ -266,10 +267,11 @@ export function ServiceMilestoneScreen({ vehicleId, onSignOut }: Props) {
   );
 
   if (state.kind === 'loading') {
+    // One card: this screen resolves into a single milestone or a mileage gate.
     return (
-      <View style={styles.centre}>
-        <ActivityIndicator color={text.secondary} />
-      </View>
+      <ScrollView contentContainerStyle={styles.body}>
+        <SkeletonCard lines={3} />
+      </ScrollView>
     );
   }
 

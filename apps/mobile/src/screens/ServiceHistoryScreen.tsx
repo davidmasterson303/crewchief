@@ -13,6 +13,7 @@ import {
 import Card from '../components/Card';
 import EmptyState from '../components/EmptyState';
 import { apiRequest, ApiRequestError } from '../api/client';
+import { Skeleton, SkeletonCard } from '../components/Skeleton';
 import {
   describeRecord,
   describeRemoval,
@@ -175,10 +176,16 @@ export function ServiceHistoryScreen({ vehicleId, onSignOut }: Props) {
   );
 
   if (state.kind === 'loading') {
+    /*
+      A summary line then records — the shape this screen actually resolves
+      into, rather than three identical cards.
+    */
     return (
-      <View style={styles.centre}>
-        <ActivityIndicator color={text.muted} />
-      </View>
+      <ScrollView contentContainerStyle={styles.body}>
+        <Skeleton width="45%" height={18} />
+        <SkeletonCard lines={2} />
+        <SkeletonCard lines={2} />
+      </ScrollView>
     );
   }
 

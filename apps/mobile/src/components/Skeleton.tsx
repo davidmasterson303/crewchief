@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { radius, space, surface } from '../theme';
+import { useReducedMotion } from '../motion/reduced-motion';
 
 /**
  * Loading placeholders. This app had none at all.
@@ -24,11 +25,28 @@ import { radius, space, surface } from '../theme';
  * `useNativeDriver` because opacity qualifies, and a placeholder that stutters
  * while the JS thread parses the response it is waiting for is worse than no
  * placeholder.
+ *
+ * ── ⚠ Reduced motion, added 16 Aug ──────────────────────────────────────────
+ *
+ * This was the **one animation in the app with no guard** — an unconditional
+ * infinite loop, on the screens a reviewer opens first, while the dials, the
+ * bay door and the build needle all checked the preference correctly. Found by
+ * an external design audit, not by anything here.
+ *
+ * It holds at the bright end rather than the dim one. A static placeholder at
+ * 0.4 reads as a disabled control; at 0.9 it reads as content that has not
+ * arrived, which is what it is.
  */
 export function Skeleton({ width, height = 14, style }: { width?: number | `${number}%`; height?: number; style?: ViewStyle }) {
+  const reduced = useReducedMotion();
   const pulse = useRef(new Animated.Value(0.4)).current;
 
   useEffect(() => {
+    if (reduced) {
+      pulse.setValue(0.9);
+      return;
+    }
+
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, { toValue: 0.9, duration: 700, useNativeDriver: true }),
@@ -37,7 +55,7 @@ export function Skeleton({ width, height = 14, style }: { width?: number | `${nu
     );
     loop.start();
     return () => loop.stop();
-  }, [pulse]);
+  }, [pulse, reduced]);
 
   return (
     <Animated.View

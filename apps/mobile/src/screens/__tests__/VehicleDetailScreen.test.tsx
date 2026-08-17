@@ -320,3 +320,24 @@ describe('what this screen leads to stays reachable', () => {
     expect(view.queryByText('80')).toBeNull();
   });
 });
+
+describe('the first load stands in for the dossier', () => {
+  it('shows a shaped placeholder rather than a dot in an empty field', async () => {
+    /*
+      This is the densest screen in the app and the one a recall notification
+      opens, so it is the most likely to be met cold. It showed a centred
+      `ActivityIndicator` until 16 Aug, while the primitive built for exactly
+      this had sat unused since 14 Aug.
+
+      `SkeletonCard` announces itself once for the group — eight identical
+      "loading" bars read aloud is worse than silence — so the accessible name
+      is what proves it rendered.
+    */
+    request.mockImplementation(() => new Promise(() => {}));
+
+    const { view } = await mount();
+
+    expect(view.getAllByLabelText('Loading').length).toBeGreaterThan(0);
+    expect(view.queryByText(/2018 Honda Accord/)).toBeNull();
+  });
+});
