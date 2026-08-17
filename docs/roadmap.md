@@ -697,6 +697,28 @@ Add to `app/globals.css` and to the DS spec, then reference by name in review.
 ## RP4 — pre-launch (~half a day) — extends item 15
 
 ### A viewport matrix in CI, beside the LCP/CLS budgets
+> **PARTIAL — the browser-free half shipped 17 Aug as
+> `lib/__tests__/viewport-floors.test.ts`**, registered in
+> `STATIC_ANALYSIS_SUITES` as the change line asks.
+>
+> **Landed:** no rendered text under 12px (arbitrary sizes in both `px` and
+> `rem`; `app/dev/` exempt and named, for the one 9px illustration caption), and
+> no focusable field under 16px — checked three ways, because R2's fix has three
+> separate ways to come undone: the pointer-scoped rule being deleted, a call
+> site out-specifying it with a utility (**how the bug shipped the first time**),
+> and someone reaching for `maximum-scale=1` / `user-scalable=no`. The third is
+> the one worth having: it *works*, so the change looks like a fix, and nothing
+> on the resulting page says it has failed WCAG 1.4.4.
+>
+> ⚠ **One finding, and it was the guard being wrong rather than the app.** The
+> first scan failed `components/ui/input.tsx` for `file:text-sm` — which styles a
+> file control's `::file-selector-button`, not the field's own text, and cannot
+> cause the zoom. Pinned as its own case, because a guard that cries wolf on an
+> invisible rule gets made to pass rather than read.
+>
+> **Still open:** no horizontal overflow and no interactive target under 44px.
+> Both need real layout and ride with item 15's Lighthouse CI owner, as written.
+
 - 320 · 375 · 768 · 1440, asserting: **no horizontal overflow** (`scrollWidth <= clientWidth` on `body`), **no interactive target under 44px**, **no rendered text under 12px**, **no focusable input under 16px at ≤640**. Static analysis covers the last two cheaply — the same pattern as `image-weight-budget.test.ts`, and it registers in `STATIC_ANALYSIS_SUITES` the same way. The first two need a real browser, so they ride with item 15's Lighthouse CI owner.
 - Then this audit cannot happen twice.
 

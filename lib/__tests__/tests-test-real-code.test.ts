@@ -62,6 +62,20 @@ const STATIC_ANALYSIS_SUITES = [
   // scoped `FOR ALL`, which is right on every other table in this schema and
   // here hands any signed-in user the paid tier.
   'entitlement-not-user-writable.test.ts',
+  // Reads app/ and components/ off disk, plus globals.css, for RP4's two
+  // browser-free assertions: nothing renders under 12px, and no field is small
+  // enough for iOS Safari to zoom the page on focus. There is nothing to
+  // import — the subject is a Tailwind class in JSX and a CSS media query, and
+  // jsdom resolves neither Tailwind's generated utilities nor a
+  // `pointer: coarse` media query, so the rendered check the guard would prefer
+  // is not available under any runner here.
+  //
+  // The failure it pins is SILENT and invisible on a desktop: the page zooms on
+  // focus and never restores the scale, and the user is horizontally scrolled
+  // for the rest of the session. It also pins the *forbidden fix*, which is
+  // worse than the bug because it works — `user-scalable=no` stops the zoom and
+  // fails WCAG 1.4.4 with nothing on the page to say so.
+  'viewport-floors.test.ts',
   // Reads apps/mobile/app.json and both package.json files to prove the iOS
   // privacy manifest still describes the app that ships. There is nothing to
   // import — the subject is a block of configuration, and the failure it pins
