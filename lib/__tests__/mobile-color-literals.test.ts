@@ -32,6 +32,22 @@ import { surface, text, brand } from '../../apps/mobile/src/theme';
 const MOBILE_SRC = join(__dirname, '..', '..', 'apps', 'mobile', 'src');
 
 /**
+ * ⚠ The app root, which sat outside this scan until 16 August.
+ *
+ * `App.tsx` and `index.ts` live *beside* `src/`, not in it — so for the whole
+ * token migration they were unscanned, and `App.tsx` still carried `#080808`:
+ * the flat neutral black v8 replaced, on the **first screen of a cold start**.
+ * The very first thing anyone saw was the one colour this rule exists to
+ * remove.
+ *
+ * Found by an external design audit rather than by this suite, which is the
+ * argument for the entry: a scan's scope is part of the rule, and a rule that
+ * stops one directory short of the entry point is not enforcing what it claims.
+ */
+const MOBILE_ROOT = join(__dirname, '..', '..', 'apps', 'mobile');
+const ROOT_FILES = ['App.tsx', 'index.ts'];
+
+/**
  * The two files allowed to name a colour.
  *
  * `theme/` is the token layer itself — the whole point is that the values live
@@ -61,9 +77,22 @@ function stripComments(code: string): string {
 const COLOUR = /#[0-9a-fA-F]{3,8}\b|\brgba?\s*\(\s*\d/;
 
 describe('the mobile app names no colour outside the token layer', () => {
-  const files = sourceFiles(MOBILE_SRC)
+  const rootFiles = ROOT_FILES.map((name) => ({
+    rel: join('apps', 'mobile', name),
+    code: readFileSync(join(MOBILE_ROOT, name), 'utf8'),
+  }));
+
+  const files = [...sourceFiles(MOBILE_SRC), ...rootFiles]
     .filter((f) => !ALLOWED.some((a) => f.rel.includes(a)))
     .map((f) => ({ ...f, code: stripComments(f.code) }));
+
+  it('scans the app root as well as src, which it did not until 16 Aug', () => {
+    // The entry point is where a cold start renders from. A scan that skips it
+    // is not enforcing the rule it states.
+    for (const name of ROOT_FILES) {
+      expect(files.some((f) => f.rel.endsWith(name))).toBe(true);
+    }
+  });
 
   it('has sources to scan', () => {
     // A broken walk would make the assertion below pass vacuously — the exact

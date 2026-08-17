@@ -454,17 +454,21 @@ export function GarageScreen({
           placed in one branch of a screen that renders several. The header
           renders in every state this screen has, which is why both live in it.
         */}
-        <Pressable
-          onPress={onAddVehicle}
-          hitSlop={12}
-          accessibilityRole="button"
-          accessibilityLabel="Add a car"
-        >
+        {/*
+          ⚠ No `hitSlop`. These two sat in a `space.lg` row each carrying
+          `hitSlop={12}`, so their targets overlapped by **8pt** — 12 + 12 into
+          a 16pt gap — and a tap in the overlap went to whichever painted last.
+
+          The floor names this exception itself: hitSlop is not a substitute in
+          a wrapped row. Both already clear 44 vertically through `minHeight`
+          and `lineHeight`, and both clear it horizontally on their own text, so
+          the slop was buying nothing and paying for it with a collision.
+        */}
+        <Pressable onPress={onAddVehicle} accessibilityRole="button" accessibilityLabel="Add a car">
           <Text style={styles.headerAction}>Add car</Text>
         </Pressable>
         <Pressable
           onPress={() => setAccountOpen(true)}
-          hitSlop={12}
           accessibilityRole="button"
           accessibilityLabel="Account"
         >
@@ -703,7 +707,9 @@ const styles = StyleSheet.create({
   /*
     Brighter than `signOut`, because these two are not equals: adding a car is
     the thing this screen exists to lead to, and Account is somewhere you go
-    occasionally. Both clear the 44px target through `minHeight` plus `hitSlop`.
+    occasionally. Both clear the 44pt target through `minHeight` and
+    `lineHeight` alone — see the note at the call site for why `hitSlop` was
+    removed rather than reduced.
   */
   headerAction: {
     color: text.secondary,

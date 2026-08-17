@@ -5,6 +5,8 @@ import type { Session } from '@supabase/supabase-js';
 
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { surface, text } from './src/theme';
+
 import { onSessionChange, signOut, startSessionAutoRefresh } from './src/auth/session';
 import { unregisterPush } from './src/notifications/register';
 import { supabase } from './src/auth/supabase';
@@ -52,7 +54,7 @@ export default function App() {
       <View style={styles.root}>
         {session === undefined ? (
           <View style={styles.loading}>
-            <ActivityIndicator color="rgba(255,255,255,0.5)" />
+            <ActivityIndicator color={text.muted} />
           </View>
         ) : session ? (
           /*
@@ -93,6 +95,16 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#080808' },
+  /*
+    ⚠ This was `#080808` until 16 Aug — the flat neutral black v8 replaced, on
+    the **first screen of a cold start**. So the very first thing anyone saw was
+    the one colour the whole token migration existed to remove, and no guard
+    caught it because `mobile-color-literals` scanned `src/` and this file sits
+    beside it.
+
+    Found by Cowork's design audit, not by any check this repo owns. The scope
+    hole is closed with it.
+  */
+  root: { flex: 1, backgroundColor: surface.page },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 });

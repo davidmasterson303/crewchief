@@ -269,6 +269,17 @@ export function AdvisorScreen({
           value={draft}
           onChangeText={setDraft}
           placeholder="Ask about this car…"
+          /*
+            ⚠ Named, because a placeholder is not a label — and this was the one
+            unlabelled input left in the app, on the screen the product's whole
+            argument rests on. VoiceOver reads a placeholder as the field's
+            *value* while it is empty and drops it entirely once someone types,
+            so a returning screen-reader user found an unnamed box containing
+            their own half-written question. `Field` states this rule; this
+            input cannot be a `Field` — a chat composer takes no visible label —
+            so it carries the name directly.
+          */
+          accessibilityLabel="Ask about this car"
           placeholderTextColor={text.muted}
           multiline
           // Not `editable={!busy}`: a disabled input drops the keyboard and
