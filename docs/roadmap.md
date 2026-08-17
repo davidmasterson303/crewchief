@@ -579,7 +579,34 @@ Add to `app/globals.css` and to the DS spec, then reference by name in review.
 
 ## RP2 — after (~4 days; these need design, not a prefix)
 
+> ⚠ **Reconciled 17 Aug — this document disagreed with itself.** The status
+> section already said *"RP0, RP1 and RP2 are all closed — R4, R8, R11 and R12
+> landed this afternoon"* (§ 2 Aug status, line ~108), while every item body
+> below still read as outstanding, three of them as CRITICAL or HIGH. R13 and
+> R14 had their own verdicts; the other four had none.
+>
+> Nothing was re-planned. The code was checked and the verdicts written where
+> the reader actually looks, with line-number evidence per item.
+>
+> Worth naming as a failure mode rather than a tidy-up: a summary line 500 lines
+> from the item it summarises is not where anyone reads a status. Somebody
+> scanning for the next CRITICAL finds R4, and spends a day rebuilding a
+> consultant layout that already carries its own `R4.` comment explaining the
+> fix. **A stale board is not neutral — it buys work that is already done and
+> hides what is genuinely left.**
+
 ### R4. The consultant is a fixed 520px box inside a scrolling page — CRITICAL
+> **DONE.** `ConsultantChat.tsx:694` is
+> `h-full md:h-[calc(100dvh-320px)] md:min-h-[520px] md:max-h-[760px]`, and the
+> shell it sits in is `DashboardLayout`'s `mobileLayout="app-shell"` (`:32`,
+> `:217`) — the viewport is the frame below `md`, so the thread is the only
+> thing that scrolls. The composer is `shrink-0` with
+> `pb-[max(1rem,env(safe-area-inset-bottom))]` (`:1087`). The sidebar becomes a
+> drawer rather than taking 256px of a 375px viewport.
+>
+> The in-file comment records the measurement that mattered: **the composer
+> began 860px down a 692px viewport.**
+
 > Critical by impact, but scheduled here because it is a layout rebuild, not an edit.
 
 - **Problem:** `ConsultantChat.tsx:609` is `h-[calc(100vh-320px)] min-h-[520px] max-h-[760px]`. On a 667px phone the calc yields 347px, so `min-h` wins and the panel is 520px — inside a page whose demo banner, nav, tab strip, vehicle title and meta row have already eaten ~400px. **The composer sits below the fold: you scroll the page to type and the thread to read.** Two scroll contexts stacked on the flagship feature. `100vh` also measures the URL-bar-collapsed viewport, so the panel exceeds the visible area on first paint.
@@ -595,6 +622,10 @@ Add to `app/globals.css` and to the DS spec, then reference by name in review.
 - **Effort:** ~half a day.
 
 ### R8. A five-column cost table in 231px, inside `overflow-hidden` — HIGH
+> **DONE.** `CostBreakdownTable.tsx:81` — below `md` it is a card per line item,
+> the table above it. Its own header (`:47`) makes the point the change line
+> implies: the two are genuinely different layouts of the same data, not one
+> layout with a prefix.
 - **Problem:** `CostBreakdownTable.tsx:55–63` — Item · Parts · Labor Hrs · Labor Cost · Total, `text-[11px]` headers, every cell carrying a low *and* a high figure. The wrapper is `overflow-hidden`, so the usual escape hatch (let it scroll sideways) is actively closed. This is the artefact the consultant produces to justify an estimate — it *is* the answer — and on a phone it is a stack of clipped numerals.
 - **Change:** a card per line item below `md`, the table above it. Same data, same order, no horizontal scroll:
   ```
@@ -607,11 +638,18 @@ Add to `app/globals.css` and to the DS spec, then reference by name in review.
 - **Effort:** ~3 hours.
 
 ### R11. A 36px page title over a four-up meta row — MEDIUM
+> **DONE.** `DashboardLayout.tsx:441` is `text-2xl sm:text-4xl lg:text-5xl`, and
+> the meta row below it is a grid before it is a wrapped flex — both exactly as
+> the change line specifies, both annotated `R11` at the call site.
 - **Problem:** `DashboardLayout.tsx:296` is `text-4xl lg:text-5xl`, so a phone gets 36px for "2018 Honda Accord" in 279px — three lines before the trim appears. `:303` puts Mileage / Avg monthly / Status / Reliability in `flex flex-wrap gap-8`, which wraps to a ragged 2 + 2 with 32px gutters.
 - **Change:** `h1` → `text-2xl sm:text-4xl lg:text-5xl`; meta row → `grid grid-cols-2 gap-x-6 gap-y-5 sm:flex sm:flex-wrap sm:gap-8`.
 - **Effort:** ~1 hour.
 
 ### R12. The breadcrumb — and with it the way back — is hidden below 640px — MEDIUM
+> **DONE.** The full breadcrumb is still `hidden sm:flex` (`DashboardLayout.tsx:285`)
+> — correctly, because the phone got its **own** compact one rather than a
+> squeezed copy of the desktop control (`:127`, `:257`). The way back exists at
+> every width, which was the actual complaint.
 - **Problem:** `DashboardLayout.tsx:236` is `hidden sm:flex`. Garage › vehicle › page plus the scrolled health-score pill all vanish on a phone; what remains is a logo that happens to be a link. The comment above it records that four separate routes back to the garage were consolidated into this one control — which is then `display:none` on the viewport where a back affordance matters most.
 - **Change:** below `sm`, one row — `‹ Garage · Accord · 61` (chevron-left + parent + short name + score pill, `min-h-[44px]`). Full breadcrumb returns at `sm`.
 - **Effort:** ~1 hour.
