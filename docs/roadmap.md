@@ -176,6 +176,25 @@ this file** — read those first if you are picking this up cold.
 - **Effort:** ~1 day.
 
 ### 5. Preload any surviving LCP photo (F4 residue)
+> **CLOSED 17 Aug — superseded, with the residue re-scoped rather than dropped.**
+> The body below was already a complete account; what it lacked was a verdict,
+> and an item nobody can act on reads as work outstanding. That is the same
+> failure just corrected in RP2, one section up.
+>
+> **Verified before closing:** `fetchpriority` ships on the hero's request
+> (`VehicleIdentity.tsx:296`, spelled lowercase and cast — React 18.2 has no
+> camelCase prop and warns), the same treatment is on `GarageDoor.tsx:253`, and
+> the blur-up fill is `vehicleBlurData` from `@crewchief/core/vehicle-blur`.
+>
+> **The residue, stated as its own thing:** a real `<link rel=preload>` for the
+> dashboard hero is blocked on the dashboard server-rendering its vehicle, which
+> is a change of a different size and is not this item. It belongs with a
+> Lighthouse number that says it is worth having — i.e. behind item 15's still-open
+> LCP half. Reopening this without that measurement would be optimising a
+> figure nobody has taken.
+>
+> Original note follows.
+
 > **OPEN — and largely moot, but not closed honestly.** `/` and the auth screens no longer
 > carry a photograph at all, so the item is satisfied there by removal. The dashboard hero
 > still does, and a static `<link rel=preload>` **cannot** name it: the URL comes from a
