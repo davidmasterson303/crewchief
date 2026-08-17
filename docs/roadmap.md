@@ -842,11 +842,26 @@ current.
 
 ## ⚠ David's list — one migration is time-sensitive
 
-1. **Apply `20260802200000_split_ai_usage_by_traffic_class.sql`.** Pure
-   additions, no `DROP`, so the SQL Editor will not stall. **Every metering row
-   written before it runs is blended permanently** — no later migration can
-   reconstruct which traffic was demo, real, or the canary. This is the one item
-   that gets worse by waiting.
+1. ~~**Apply `20260802200000_split_ai_usage_by_traffic_class.sql`.**~~
+   ✅ **APPLIED — verified against the live database 17 Aug, not read off the
+   folder.** `ai_usage_events.surface` exists and is discriminating: over the
+   most recent 219 rows, `account` 193, `canary` 19, `demo` 6, `anonymous` 1,
+   recording continuously from 2 Aug 21:09Z. Nothing was blended.
+
+   ⚠ **This entry spent a fortnight telling David to go and do something that
+   was already done, under a ⚠ heading calling it the one item that gets worse
+   by waiting.** That is the second dead instruction on this four-item list —
+   item 2 was struck for the same reason. A list that keeps urgent-looking
+   completed work is not merely untidy: it spends the reader's attention on the
+   items that do *not* matter, which is exactly how the one that does gets
+   missed.
+
+   ⚠ **A real one, found while checking this:** `surface = 'canary'` rows appear
+   on 8 and 15 Aug and nowhere else. The six-hourly canary workflow had never
+   fired, because it sat on the `canary-workflow` branch and **Actions only runs
+   `schedule` from the default branch**. Landed on `main` on 17 Aug (`55213ff`).
+   It still needs `CONSULTANT_HEALTH_SECRET` in **two** places — GitHub Actions
+   *and* Netlify — see 5 below.
 2. ~~**`brew install cocoapods`** — unblocks the simulator and the rest of Phase 3.~~
    ⛔ **DEAD — do not run this.** It was never possible: macOS ships Ruby 2.6, CocoaPods needs
    ≥ 3.0, and there is no Homebrew on this machine. **Routed around by EAS cloud builds on
@@ -855,6 +870,16 @@ current.
 3. **A dashboard read for erratum T2**, blocking 5.2:
    `select tablename, policyname, cmd, roles, qual from pg_policies order by tablename;`
 4. **Review the KB queue** — `cd ~/Developer/advisor-kb && node dist/cli.js queue`.
+5. ⚠ **Set `CONSULTANT_HEALTH_SECRET` in two places, or the canary stays red.**
+   Verified by running it by hand on 17 Aug: the deployed endpoint answers
+   `{"status":"broken","reason":"NOT_CONFIGURED"}`, and the canary exits 3 —
+   *"the deployment has no CONSULTANT_HEALTH_SECRET set"*.
+   - **GitHub** → repository *Actions* secret, so the workflow can authenticate.
+   - **Netlify** → environment variable on the demo site, so the endpoint will
+     answer at all. It is in local `.env` and absent from the deployment.
+
+   The two values must be identical. Setting only the Actions secret leaves the
+   canary failing forever while looking configured.
 
 *The `ai_usage_events` migration is **already applied** — recording since
 2 Aug 21:09Z, and schema-verified in the ~19:38 handoff below. It was still
