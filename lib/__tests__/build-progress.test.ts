@@ -23,7 +23,7 @@ import {
   effortOf,
   needleFor,
 } from '@crewchief/core/build-progress';
-import { TRACK, VIEW_H, VIEW_W, angleFor } from '@crewchief/core/cluster-geometry';
+import { CX, CY, R, TRACK, VIEW_H, VIEW_W, angleFor, pointAt } from '@crewchief/core/cluster-geometry';
 
 /** The WRX's five parts — Easy, Moderate ×3, Hard. 1 + 9 + 6 = 16. */
 const WRX = [
@@ -151,6 +151,23 @@ describe('one instrument, two readings', () => {
     expect(TRACK).toBe('M 50.5 149.5 A 70 70 0 1 1 149.5 149.5');
   });
 
+  it('shares the radius the arc is actually drawn at', () => {
+    /*
+      ⚠ Added 17 Aug, closing a hole in the check above it.
+
+      That assertion matches the **template text** `A ${R} ${R}` — so it passes
+      whatever `R` happens to be. Change the web dial to `const R = 68` and the
+      source still contains that exact string, `TRACK` still equals the value
+      core resolved, and both assertions stay green while the two dials draw
+      different arcs at the same endpoints.
+
+      A guard whose subject is an unexpanded template is checking punctuation.
+    */
+    expect(gauge).toContain(`const R = ${R}`);
+    expect(gauge).toContain(`const CX = ${CX}`);
+    expect(gauge).toContain(`const CY = ${CY}`);
+  });
+
   it('shares the viewBox', () => {
     expect(gauge).toContain(`const VIEW_W = ${VIEW_W}`);
     expect(gauge).toContain(`const VIEW_H = ${VIEW_H}`);
@@ -160,6 +177,38 @@ describe('one instrument, two readings', () => {
     expect(gauge).toContain('2.7 * score - 135');
     expect(angleFor(0)).toBe(-135);
     expect(angleFor(100)).toBe(135);
+  });
+
+  it('puts its own endpoints exactly where the arc path says they are', () => {
+    /*
+      The strongest of these, because it is the only one that is not string
+      matching — and because the two files express this geometry in genuinely
+      different forms:
+
+          web    x = CX + r·sin(θ),        y = CY − r·cos(θ)
+          core   x = CX + r·cos(θ − 90°),  y = CY + r·sin(θ − 90°)
+
+      Those are equal for every θ, and nothing said so. `pointAt` is the one
+      piece of the dial a refactor can silently break — swap a sine for a cosine
+      and every tick, the needle and the numerals move together, which reads as
+      a design choice rather than a bug.
+
+      Tying it to `TRACK`'s literal endpoints is what makes it self-checking:
+      the arc string and the point function are independent statements of the
+      same shape, so if either drifts they stop agreeing.
+    */
+    const start = pointAt(0, R);
+    const end = pointAt(100, R);
+
+    expect(start.x).toBeCloseTo(50.5, 1);
+    expect(start.y).toBeCloseTo(149.5, 1);
+    expect(end.x).toBeCloseTo(149.5, 1);
+    expect(end.y).toBeCloseTo(149.5, 1);
+
+    // And those are the numbers actually written into the arc, not numbers that
+    // merely resemble them.
+    expect(TRACK).toContain(`M ${start.x.toFixed(1)} ${start.y.toFixed(1)}`);
+    expect(TRACK).toContain(`${end.x.toFixed(1)} ${end.y.toFixed(1)}`);
   });
 });
 

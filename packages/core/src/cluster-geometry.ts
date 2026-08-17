@@ -14,11 +14,23 @@
  * has paid for that shape repeatedly, most recently with `VehicleDataSchema`
  * defined twice and drifting the moment one was edited.
  *
- * So the numbers live here and `cluster-geometry.test.ts` pins `ClusterGauge`'s
- * own literals to them. The shipped health dial is deliberately **not**
- * refactored to import these: it works, it is covered, and rewriting a live
+ * So the numbers live here, and the shipped health dial is deliberately **not**
+ * refactored to import them: it works, it is covered, and rewriting a live
  * component to prove a point about duplication is how a working thing breaks.
- * The test catches drift without touching it.
+ * A guard catches drift without touching it.
+ *
+ * ⚠ **That guard is `describe('one instrument, two readings')` in
+ * `lib/__tests__/build-progress.test.ts`.** This docblock used to cite a
+ * `cluster-geometry.test.ts`, which has never existed — so anyone checking the
+ * claim found nothing and could reasonably conclude the duplication was
+ * unguarded and "fix" it, which is the one thing the paragraph above asks them
+ * not to do. A pointer to a file that is not there is worse than no pointer.
+ *
+ * Three holes in that guard were closed on 17 Aug, and the first is the
+ * instructive one: it asserted the *template text* `A ${R} ${R}`, which passes
+ * whatever `R` is. `R`, `CX` and `CY` are now pinned by value, and `pointAt` is
+ * pinned against `TRACK`'s own endpoints — the two files state this geometry in
+ * different but equivalent forms, and nothing previously said they had to agree.
  */
 
 export const VIEW_W = 200;
