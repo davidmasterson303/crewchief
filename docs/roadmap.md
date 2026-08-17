@@ -785,6 +785,25 @@ Add to `app/globals.css` and to the DS spec, then reference by name in review.
 
 Nine deliberate pieces of responsive work are already in the codebase. The recommendation above is to **generalise** them, not replace them.
 
+> **All nine verified present 17 Aug**, and **three are now guarded** by
+> `lib/__tests__/inclusive-affordances.test.ts`.
+>
+> The filter was not importance — it was visibility. A regression in those three
+> is invisible to whoever causes it: nobody develops in Windows High Contrast or
+> with a coarse pointer, so a rename that unhooks the forced-colors block leaves
+> a clean diff, a page that looks right, and a dial showing **a full ring at
+> every score**. The other six regress in front of you the moment you resize a
+> window, and a test is the wrong tool for those.
+>
+> The sharpest of the three checks that the CSS still names classes
+> `ClusterGauge.tsx` actually renders — a stylesheet hooked to nothing reviews
+> perfectly and applies to nothing, the same shape as a font face named but
+> never loaded.
+>
+> ⚠ Writing it caught the guard passing on a **comment**: the first
+> `.tap-target-44` in `globals.css` is 600 lines above the rule, inside the
+> prose describing it. Anchored to the declaration.
+
 | What | Why it is right | Where |
 |---|---|---|
 | Consultant sidebar → drawer | Reclaims 256px of a 375px viewport; overlay + handle, static at `md` | `ConsultantChat:621` |

@@ -76,6 +76,19 @@ const STATIC_ANALYSIS_SUITES = [
   // worse than the bug because it works — `user-scalable=no` stops the zoom and
   // fails WCAG 1.4.4 with nothing on the page to say so.
   'viewport-floors.test.ts',
+  // Reads globals.css and components/ClusterGauge.tsx off disk to pin the three
+  // accessibility affordances whose regression is invisible to whoever causes
+  // it: the gauge's forced-colors restatement, the focus and coarse-pointer
+  // paths on hover-revealed controls, and the 44px hit area. There is nothing
+  // to import — the subject is a media query and the classnames a component
+  // renders, and jsdom resolves neither `forced-colors: active` nor Tailwind's
+  // generated utilities.
+  //
+  // The failure it pins is SILENT in the strongest sense: nobody develops in
+  // Windows High Contrast or with a coarse pointer, so a rename that unhooks
+  // the block leaves a clean diff, a correct-looking page, and a dial that
+  // shows a full ring at every score.
+  'inclusive-affordances.test.ts',
   // Reads apps/mobile/app.json and both package.json files to prove the iOS
   // privacy manifest still describes the app that ships. There is nothing to
   // import — the subject is a block of configuration, and the failure it pins
