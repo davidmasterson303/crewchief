@@ -115,13 +115,27 @@ Prefer the loud failure. The expensive bugs in this codebase have no error:
 ## 8. There are two Netlify projects, and the names invite the wrong guess
 
 ```
-effulgent-blancmange-6adfdf   deploys main        the app backend + candidate
-crewchief-demo                deploys demo-live   the public, recruiter-facing demo
+effulgent-blancmange-6adfdf   deploys main        the promote gate's CANDIDATE
+crewchief-demo                deploys demo-live   crewchief-demo.davidmasterson.co
+                                                  AND crewchief.davidmasterson.co
 ```
 
 This is a **promote gate**, not drift: `scripts/promote-demo.mjs` is the only
-way `demo-live` moves, so the demo is deliberately behind. Run the dry run
-first; it verifies the exact build that is about to become the demo.
+way `demo-live` moves, so what is public is deliberately behind `main`. Run the
+dry run first; it verifies the exact build that is about to become public.
+
+⚠ **`crewchief.davidmasterson.co` is gated too** — it is the App Store listing's
+privacy-policy URL and the origin the mobile app talks to (`app.json` →
+`extra.apiBaseUrl`). Before that, anything pushed to `main` was instantly live
+at a URL App Review reads.
+
+Two things follow, and both are workflow rules rather than trivia:
+
+- **A promote publishes the API shipped apps depend on.** It is not a cosmetic
+  act; do not run it to show someone a new screen.
+- **A mobile build needing a new `/api/v1/*` route must be promoted first**, or
+  it ships calling an endpoint that is not there — a 404 on a path that exists
+  perfectly well on `main`, which is the most confusing shape a bug can take.
 
 ⚠ After promoting, `/api/version` reports the **merge commit** on `demo-live`,
 never the `main` commit named in the message. Checking for the latter and

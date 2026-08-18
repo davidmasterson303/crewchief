@@ -8,22 +8,33 @@ import Constants from 'expo-constants';
  * Mac's LAN address works until the address changes, which on a home network
  * is whenever the router feels like it — so the default is a deployment.
  *
- * The site serving `main`, not the public demo. That is where the v1 routes
- * are; the demo deliberately lags behind it (promotion is a separate step,
- * `cc-product-0004`) and may not carry a route this app depends on.
+ * ⚠ **This is a gated hostname, and that inverts a rule this file used to
+ * state.** It said the app must point at the site serving `main`, because the
+ * demo lagged and might not carry a route the app depends on. That was right
+ * while this value was a throwaway CI host. It is wrong now that the same URL
+ * is the App Store listing's privacy-policy address and the origin every
+ * installed copy of the app talks to: a store app must not have its backend
+ * change on every push to `main`.
+ *
+ * So `crewchief.davidmasterson.co` is served by the project building
+ * **`demo-live`**, which only moves through `scripts/promote-demo.mjs`.
+ *
+ * **The consequence, and it is a workflow rule rather than a caveat: a mobile
+ * build that needs a new `/api/v1/*` route must have that route promoted
+ * first.** Ship the app against an unpromoted endpoint and it calls something
+ * that is not there yet — a 404 on a path that exists perfectly well on `main`,
+ * which is the most confusing shape a bug can take.
  *
  * ⚠ **This became a real hostname on 17 Aug** — `crewchief.davidmasterson.co`,
  * on its own Let's Encrypt certificate, replacing
- * `effulgent-blancmange-6adfdf.netlify.app`. The old host still answers 200 and
- * does **not** redirect, so nothing broke in the swap; it was changed because
- * the App Store listing and every in-app legal link are built from this value,
- * and a generated preview name is not what should appear in either.
+ * `effulgent-blancmange-6adfdf.netlify.app`, because the App Store listing and
+ * every in-app legal link are built from this value and a generated preview
+ * name is not what belongs in either.
  *
- * ⚠ It is the same site, so the change inherits a consequence worth stating:
- * that host was a throwaway CI target nobody visited, and it is now a
- * user-facing surface. Anything decided on the premise "nobody visits it" —
- * build suppression, deploy noise, what is safe to push to `main` — needs
- * re-reading against that.
+ * That swap also promoted a throwaway CI target into a user-facing surface, and
+ * everything decided on the premise "nobody visits it" — build suppression,
+ * deploy noise, what is safe to push to `main` — had to be re-read against it.
+ * Gating the hostname is the answer to the largest of those.
  *
  * Overridable via `app.json` → `expo.extra.apiBaseUrl` so pointing at a LAN
  * address for a session is a config change and not a code change.

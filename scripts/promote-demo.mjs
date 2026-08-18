@@ -1,5 +1,20 @@
 /**
- * Promote the current `main` to the public demo.
+ * Promote the current `main` to the public demo — and to the app's backend.
+ *
+ * ⚠ **Read this first if you have not run it since 17 Aug.** `demo-live` no
+ * longer serves only the portfolio demo. `crewchief.davidmasterson.co` — the
+ * App Store listing's privacy-policy URL, and the origin every installed copy
+ * of the mobile app talks to — is served by the same project.
+ *
+ * So a promote is no longer a cosmetic act. Same gate, higher stakes: it
+ * publishes the API that shipped apps depend on. Two things follow.
+ *
+ *   1. Do not run it casually to show someone a new screen.
+ *   2. A mobile build needing a new `/api/v1/*` route must be promoted
+ *      **before** that build ships, or it calls an endpoint that is not there.
+ *
+ * That gating was the point rather than a side effect: before it, anything
+ * pushed to `main` was instantly live at a URL App Review reads.
  *
  * ── The problem this solves ─────────────────────────────────────────────────
  *
@@ -293,7 +308,10 @@ try {
 const mergeCommit = sh('git rev-parse demo-live').slice(0, 8);
 
 console.log(`
-Netlify is building the demo now. When it finishes:
+⚠ This promote also moves https://crewchief.davidmasterson.co — the App Store
+listing URL and the mobile app's API origin — not only the portfolio demo.
+
+Netlify is building both now. When it finishes:
 
   node scripts/verify-demo.mjs
 
