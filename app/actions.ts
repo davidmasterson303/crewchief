@@ -16,6 +16,7 @@ import { researchVehicleDossier } from '@/lib/vehicle-research';
 import { showsModifications } from '@crewchief/core/mod-progression';
 import { logger } from '@crewchief/core/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { platformClientIp } from '@crewchief/core/client-ip';
 import { recomputePerformanceStats } from '@/lib/performance-stats';
 import { recordAiUsageInBackground } from '@/lib/ai-usage';
 import { downloadStoredFile } from '@/lib/storage-objects';
@@ -5671,6 +5672,32 @@ export async function updateModificationStatusWithTier(
   }
 }
 
+/** A synthetic id for a quote that was generated but deliberately not stored. */
+const DEMO_QUOTE_ID = 'demo-quote';
+
+/**
+ * The caller's address, for the demo quote bucket.
+ *
+ * Server actions have no `NextRequest`, so the headers come from `next/headers`
+ * rather than a parameter. Imported lazily because this module is large and
+ * almost every other export in it has no business touching request headers.
+ *
+ * ⚠ `null` means the platform did not supply an address, and the bucket is then
+ * **skipped rather than shared**. One bucket called "unknown" would let a single
+ * visitor exhaust everybody's allowance, which is worse than not limiting —
+ * the daily demo budget still bounds the spend either way. Same reasoning the
+ * front door writes down for its own null case.
+ */
+async function demoClientIp(): Promise<string | null> {
+  try {
+    const { headers } = await import('next/headers');
+    const bag = await headers();
+    return platformClientIp((name) => bag.get(name));
+  } catch {
+    return null;
+  }
+}
+
 export async function generateQuoteRequestV2(
   vehicleId: string,
   selectedItemIds: string[],
@@ -5697,9 +5724,50 @@ export async function generateQuoteRequestV2(
   });
 
   try {
-    const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
+    /*
+      ⚠ `read`, not `write`, and the quote is not persisted for a demo car.
+
+      A quote is the most convincing thing this product does — it turns a
+      wishlist into priced work with an email a shop can answer — and until
+      17 Aug the public demo refused it outright with "Demo vehicles are
+      read-only". Someone evaluating CrewChief saw the setup and not the payoff.
+
+      The block was right about the database and wrong about the feature.
+      Generating costs nothing but an AI call; **storing** is what would let an
+      anonymous visitor write rows against a shared car. So this takes the same
+      shape `sendConsultantMessage` already uses for demo chat: compute the
+      answer, return it, skip every write.
+    */
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'read' });
     if (!access.ok) {
       return { success: false, error: access.error };
+    }
+
+    /*
+      Demo traffic is anonymous and each quote is two model calls, so it is
+      capped twice over: a per-visitor bucket on the `ai` tier for bursts, and
+      the shared daily demo allowance for the day as a whole.
+
+      ⚠ Both degrade rather than break — the message says what happened and when
+      it returns, because the person hitting this is evaluating the product and
+      a stack trace is a worse answer than "come back tomorrow".
+    */
+    if (access.isDemo) {
+      const ip = await demoClientIp();
+      if (ip) {
+        const limit = await checkRateLimit(`demoquote:${ip}`, 'ai');
+        if (!limit.allowed) {
+          return {
+            success: false,
+            error: `That is a lot of quotes at once. Try again in ${limit.retryAfterSeconds} seconds.`,
+          };
+        }
+      }
+
+      const demo = await checkDemoBudget();
+      if (!demo.allowed) {
+        return { success: false, error: demoBudgetMessage(demo) };
+      }
     }
 
     if (!selectedItemIds || selectedItemIds.length === 0) {
@@ -5790,6 +5858,28 @@ export async function generateQuoteRequestV2(
       description: item.description,
       category: item.category
     }));
+
+    /*
+      ⚠ The one write in this function, and the reason a demo may run the rest
+      of it. `quote_requests` rows belong to a real owner's car; an anonymous
+      visitor generating one against a shared demo vehicle would be writing into
+      somebody else's garage.
+
+      The caller gets a synthetic id instead. Nothing reads it back — the dialog
+      renders the breakdown and the email draft it was handed — so the demo
+      shows the whole feature and leaves nothing behind.
+    */
+    if (access.isDemo) {
+      console.log('[QUOTE_V2] Demo vehicle — returning the quote without storing it');
+      return {
+        success: true,
+        data: {
+          quoteRequestId: DEMO_QUOTE_ID,
+          emailDraft: emailResult.data,
+          costBreakdown: costResult.data,
+        },
+      };
+    }
 
     console.log('[QUOTE_V2] Saving quote to database');
     const { data: quoteRequest, error: insertError } = await client
