@@ -89,6 +89,16 @@ const STATIC_ANALYSIS_SUITES = [
   // the block leaves a clean diff, a correct-looking page, and a dial that
   // shows a full ring at every score.
   'inclusive-affordances.test.ts',
+  // Reads app/actions.ts and lib/api-auth.ts off disk to prove the demo quote
+  // path generates without persisting. The property is an ORDERING one — the
+  // demo early-return must precede the `quote_requests` insert — and calling
+  // the function would need Supabase, Gemini and a request context while still
+  // only proving the branch it happened to take.
+  //
+  // The failure it pins is silent: both lines can be present and correct while
+  // the insert runs first, which is an anonymous write against a shared demo
+  // vehicle that still returns a plausible quote. No error, no symptom.
+  'demo-quote-generation.test.ts',
   // Reads apps/mobile/app.json and both package.json files to prove the iOS
   // privacy manifest still describes the app that ships. There is nothing to
   // import — the subject is a block of configuration, and the failure it pins

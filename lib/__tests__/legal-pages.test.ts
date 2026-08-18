@@ -119,7 +119,7 @@ describe('the two documents cannot contradict the app', () => {
   });
 });
 
-describe('what is still unfinished is visibly unfinished', () => {
+describe('what is still unfinished is visibly unfinished — now on a public page', () => {
   it('has not shipped a plausible-looking fake operator or contact', () => {
     /*
       CrewChief has no legal entity (Q2, open). The placeholders are bracketed
@@ -130,6 +130,34 @@ describe('what is still unfinished is visibly unfinished', () => {
 
       This test goes red when they are filled in. That is the intent — it is the
       prompt to delete it and link the pages publicly.
+
+      ── ⚠ 17 Aug: THE PREMISE ABOVE HAS FLIPPED ─────────────────────────────
+
+      `lib/legal.ts` says these "must be replaced before either page is linked
+      publicly". **They are now linked publicly.** Two things happened on the
+      same day:
+
+        - The mobile Account screen builds its Terms and Privacy links from
+          `API_BASE_URL`, which is now `https://crewchief.davidmasterson.co` —
+          a real hostname on its own certificate, not a generated preview name.
+        - That same URL goes in the App Store listing's privacy-policy field,
+          which App Review reads.
+
+      So `[OPERATOR NAME — see Q2, entity not yet formed]` currently renders as
+      **literal body text on a public page**, and Q2 has stopped being only a
+      revenue question. Found by Cowork while wiring the domain; verified by
+      fetching the live page.
+
+      This assertion is deliberately **not** inverted yet, because filling it in
+      is David's call and turning the suite red would block unrelated work on a
+      decision that is not an engineering one. It is a countdown now rather than
+      a steady state, and it must be resolved before submission rather than
+      before launch.
+
+      ⚠ The Apple enrolment may already have answered it: the membership is
+      **Individual, not Organization**, so the App Store seller name is David's
+      personal legal name. An operator field naming that is consistent with what
+      Apple will display, and needs no entity to exist first.
     */
     const legal = read('lib/legal.ts');
     expect(legal).toContain('[OPERATOR NAME');

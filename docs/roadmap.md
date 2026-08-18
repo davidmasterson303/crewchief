@@ -1,5 +1,15 @@
 # CrewChief roadmap — image pipeline, backdrop, cockpit direction, and responsive web
 
+> ⚠ **This file is a plan of record, not a rulebook.** The working rules — the
+> ones that have cost time, about verifying against the artefact rather than the
+> board, what proves a commit, and which failures here are silent — now live in
+> **`CLAUDE.md`** at the repo root, which is loaded every session.
+>
+> They were previously spread across three separate "Gotchas this session added"
+> sections in this file, 400 lines apart, in a document long enough that its own
+> status section and its item bodies disagreed for a fortnight without anyone
+> noticing. That is the argument for moving them.
+
 > ## ⚠ READ THIS FIRST — state as of 13 Aug 2026, 05:00
 >
 > **Everything below this block was written on 2 August.** Its design and responsive content is
