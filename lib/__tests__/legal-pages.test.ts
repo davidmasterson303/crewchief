@@ -23,6 +23,8 @@ import { join } from 'node:path';
 
 import { SUBSCRIPTION_CANCEL_PATH } from '@crewchief/core/account-deletion';
 
+import { CONTACT_EMAIL, LAST_UPDATED, OPERATOR } from '@/lib/legal';
+
 const root = join(__dirname, '..', '..');
 const read = (p: string) => readFileSync(join(root, p), 'utf8');
 
@@ -119,48 +121,76 @@ describe('the two documents cannot contradict the app', () => {
   });
 });
 
-describe('what is still unfinished is visibly unfinished — now on a public page', () => {
-  it('has not shipped a plausible-looking fake operator or contact', () => {
+describe('who operates the service, and who to write to about it', () => {
+  /*
+    ── ⚠ Read this before "fixing" either assertion ────────────────────────────
+
+    These two constants are at different stages on purpose, and the asymmetry is
+    the whole content of this block.
+
+    `OPERATOR` was a bracketed placeholder until 18 Aug. It is now David's legal
+    name, because the Apple membership submitted 16 Aug is **Individual, not
+    Organization** — so the App Store seller name is his personal name whatever
+    the entity question (Q2) eventually decides. The placeholder outlived its
+    premise: `lib/legal.ts` said it must be replaced "before either page is
+    linked publicly", and the pages went public on 17 Aug when
+    `crewchief.davidmasterson.co` became both the mobile client's API origin and
+    the App Store listing's privacy-policy URL.
+
+    `CONTACT_EMAIL` is still bracketed, and still renders as literal body text on
+    that public page. It is not an oversight — David is standing up a dedicated
+    address rather than publishing a personal one, and there is nothing true to
+    write until it exists. **The assertion below goes red the moment it is
+    filled in. That is the intent**: it is the prompt to bump `LAST_UPDATED` and
+    promote to `web-live`, not a regression.
+
+    ⚠ A green run here does not mean the public page is fixed. Nothing deploys
+    from `main`; `crewchief.davidmasterson.co` serves `web-live`.
+  */
+
+  it('names a real operator rather than a bracketed placeholder', () => {
+    expect(OPERATOR).toBe('David Masterson');
+
+    // Anti-vacuous: this must still be able to catch a placeholder coming back.
+    expect(OPERATOR).not.toMatch(/[[\]]|TBD|not yet|to be decided/i);
+    expect(OPERATOR.trim().length).toBeGreaterThan(0);
+  });
+
+  it('has not shipped a plausible-looking fake contact address', () => {
     /*
-      CrewChief has no legal entity (Q2, open). The placeholders are bracketed
-      and self-describing on purpose: a policy naming an entity that does not
-      exist is worse than one that admits it is incomplete, and the failure mode
-      to guard against is a well-meaning edit replacing them with something that
-      *reads* finished.
-
-      This test goes red when they are filled in. That is the intent — it is the
-      prompt to delete it and link the pages publicly.
-
-      ── ⚠ 17 Aug: THE PREMISE ABOVE HAS FLIPPED ─────────────────────────────
-
-      `lib/legal.ts` says these "must be replaced before either page is linked
-      publicly". **They are now linked publicly.** Two things happened on the
-      same day:
-
-        - The mobile Account screen builds its Terms and Privacy links from
-          `API_BASE_URL`, which is now `https://crewchief.davidmasterson.co` —
-          a real hostname on its own certificate, not a generated preview name.
-        - That same URL goes in the App Store listing's privacy-policy field,
-          which App Review reads.
-
-      So `[OPERATOR NAME — see Q2, entity not yet formed]` currently renders as
-      **literal body text on a public page**, and Q2 has stopped being only a
-      revenue question. Found by Cowork while wiring the domain; verified by
-      fetching the live page.
-
-      This assertion is deliberately **not** inverted yet, because filling it in
-      is David's call and turning the suite red would block unrelated work on a
-      decision that is not an engineering one. It is a countdown now rather than
-      a steady state, and it must be resolved before submission rather than
-      before launch.
-
-      ⚠ The Apple enrolment may already have answered it: the membership is
-      **Individual, not Organization**, so the App Store seller name is David's
-      personal legal name. An operator field naming that is consistent with what
-      Apple will display, and needs no entity to exist first.
+      The failure mode guarded against is a well-meaning edit substituting
+      something that *reads* finished — `support@crewchief.com`, an address
+      nobody monitors, or one on a hostname with no MX. A bracketed placeholder
+      is worse-looking and better: it cannot silently fail to reach anyone.
     */
-    const legal = read('lib/legal.ts');
-    expect(legal).toContain('[OPERATOR NAME');
-    expect(legal).toContain('[CONTACT EMAIL');
+    expect(CONTACT_EMAIL).toContain('[CONTACT EMAIL');
+    expect(CONTACT_EMAIL).not.toContain('@');
+  });
+
+  it('interpolates both constants rather than restating them in the pages', () => {
+    /*
+      Asserting the sources were found at all. Without this, both guards above
+      keep passing while a page renders a hardcoded literal beside them — the
+      constant would be correct and the published document wrong, which is the
+      exact defect `lib/legal.ts` centralises these to prevent.
+    */
+    for (const [name, source] of [['privacy', privacy], ['terms', terms]] as const) {
+      expect(`${name}: ${source.includes('{OPERATOR}')}`).toBe(`${name}: true`);
+      expect(`${name}: ${source.includes('{CONTACT_EMAIL}')}`).toBe(`${name}: true`);
+    }
+  });
+
+  it('carries a last-updated date no earlier than the operator being named', () => {
+    /*
+      `LAST_UPDATED` is the date the *content* changed, and naming the operator
+      of the service is the most substantive line in either document. Leaving it
+      at 14 August published a policy whose stated last-changed date preceded
+      the change it was describing.
+    */
+    expect(LAST_UPDATED).toBe('18 August 2026');
+    expect(new Date(LAST_UPDATED).getTime()).not.toBeNaN();
+    expect(new Date(LAST_UPDATED).getTime()).toBeGreaterThanOrEqual(
+      new Date('14 August 2026').getTime(),
+    );
   });
 });

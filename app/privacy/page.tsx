@@ -37,10 +37,17 @@ export const metadata: Metadata = {
  *   `lib/account-data.ts`, storage first so no object is orphaned by the
  *   cascade that would otherwise remove its only reference.
  *
- * ── What must be settled before this is published ───────────────────────────
+ * ── What is still unsettled — the page is already published ─────────────────
  *
- * `OPERATOR` and `CONTACT_EMAIL` in `lib/legal.ts`. Both are visibly
- * unfinished on purpose — see that file.
+ * This heading used to read "before this is published", and that framing
+ * expired on 17 Aug: the page went live on `crewchief.davidmasterson.co`, which
+ * is the privacy-policy URL in the App Store listing. It is not a draft waiting
+ * for a launch date; it is what App Review reads.
+ *
+ * `OPERATOR` was filled in on 18 Aug — Apple's Individual membership settled it
+ * without needing an entity. **`CONTACT_EMAIL` is still bracketed and still
+ * renders as literal body text below**, pending a dedicated address. See
+ * `lib/legal.ts`.
  */
 export default function PrivacyPolicyPage() {
   return (

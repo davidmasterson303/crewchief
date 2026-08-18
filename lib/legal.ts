@@ -1,13 +1,28 @@
 /**
  * The two facts these documents cannot be written without, and one date.
  *
- * ⚠ **`OPERATOR` and `CONTACT_EMAIL` are placeholders and must be replaced
- * before either page is linked publicly.** They are deliberately obvious rather
- * than plausible: a privacy policy naming an entity that does not exist is
- * worse than one that admits it is unfinished, and CrewChief has no entity yet
- * (`cc-business-0001`, and roadmap Q2 — still open).
+ * ── `OPERATOR` — settled 18 Aug, and Apple settled it ───────────────────────
  *
- * They live here rather than in the pages because a privacy policy and terms
+ * This was a placeholder until 18 Aug because CrewChief has no legal entity
+ * (`cc-business-0001`, roadmap Q2 — still open) and a policy naming an entity
+ * that does not exist is worse than one admitting it is unfinished.
+ *
+ * **The entity question did not need answering.** The Apple Developer
+ * membership submitted 16 Aug is **Individual, not Organization**, so the App
+ * Store seller name is David's personal legal name whatever Q2 decides later.
+ * Naming him here is consistent with what Apple displays anyway, needs no
+ * entity to exist first, and cannot be made wrong by forming one — an entity
+ * would change who operates the service, which is a substance change that
+ * bumps `LAST_UPDATED` on its own terms.
+ *
+ * ⚠ **`CONTACT_EMAIL` is still a placeholder, and it is still rendering on a
+ * public page.** David is standing up a dedicated address rather than
+ * publishing a personal one; until it exists there is nothing true to put here.
+ * It stays deliberately bracketed and self-describing for the original reason:
+ * the failure mode is a well-meaning edit replacing it with something that
+ * *reads* finished. `legal-pages.test.ts` holds it to that.
+ *
+ * These live here rather than in the pages because a privacy policy and terms
  * of service that disagree about who is operating the service is a defect that
  * reads as boilerplate, which is the one thing these documents cannot afford to
  * look like.
@@ -17,14 +32,20 @@
  * whose date moves for a CSS edit teaches people the date means nothing.
  */
 
-/** ⚠ REPLACE — the legal or trading name the service is operated under. */
-export const OPERATOR = '[OPERATOR NAME — see Q2, entity not yet formed]';
+/** The legal name the service is operated under — confirmed by David, 18 Aug. */
+export const OPERATOR = 'David Masterson';
 
 /** ⚠ REPLACE — a monitored address. Required by the App Store listing too. */
 export const CONTACT_EMAIL = '[CONTACT EMAIL — not yet chosen]';
 
-/** The date the substance of these documents last changed. */
-export const LAST_UPDATED = '14 August 2026';
+/**
+ * The date the substance of these documents last changed.
+ *
+ * ⚠ **Bump this again when `CONTACT_EMAIL` is filled in.** Naming the contact
+ * for a legal document is a second substance change, not a follow-up to this
+ * one, and it will ship on its own day.
+ */
+export const LAST_UPDATED = '18 August 2026';
 
 /**
  * Where Apple sends someone to stop a subscription.
