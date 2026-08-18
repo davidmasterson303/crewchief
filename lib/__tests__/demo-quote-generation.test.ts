@@ -32,6 +32,36 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+/**
+ * ── ⚠ Why the quote, and not the other four ─────────────────────────────────
+ *
+ * Audited 17 Aug after this change, because "the demo refuses it" is a bad
+ * reason to leave a feature hidden and a good reason to check the siblings.
+ * Five actions authorize `write` and then call a model:
+ *
+ *   generateVehicleHealthSummary   demo cars already carry one — the dial on
+ *                                  the demo page is reading it. Regenerating
+ *                                  would spend money to redraw what is shown.
+ *   parseInvoiceLineItems          the impressive one, and the one that must
+ *                                  stay shut: it reads a document that has to
+ *                                  be uploaded first, so opening it opens an
+ *                                  anonymous write to storage. See below.
+ *   generateModificationDetails    persists to `modification_tracking`; the
+ *                                  output *is* the row.
+ *   generateBackfillMod            same, and only reachable from that flow.
+ *   ensureAggressiveModMinimum     same again.
+ *
+ * The quote was the only one where the write is **incidental**. Its product is
+ * a breakdown and an email draft handed to the caller; the row is a
+ * convenience for an owner who wants it later, and a demo visitor has no
+ * "later". The other four either produce a row as their output or would need a
+ * second, genuinely dangerous permission to run at all.
+ *
+ * That is the test to apply to the next one somebody asks about: **does the
+ * caller get the value without the row?** If not, unblocking it is not showing
+ * the feature, it is letting a stranger write into a shared car.
+ */
+
 const ACTIONS = readFileSync(join(__dirname, '..', '..', 'app', 'actions.ts'), 'utf8');
 
 /** The body of `generateQuoteRequestV2`, to the next top-level export. */
@@ -99,6 +129,32 @@ describe('and may never store one', () => {
     expect(upTo).not.toMatch(/\.upsert\(/);
     expect(upTo).not.toMatch(/\.update\(/);
     expect(upTo).not.toMatch(/\.delete\(/);
+  });
+});
+
+describe('the sibling that must stay shut', () => {
+  it('keeps anonymous uploads blocked, so invoice scan cannot be opened by halves', () => {
+    /*
+      ⚠ `parseInvoiceLineItems` is the most demo-worthy feature in the product —
+      photograph a receipt, get line items — and it is the one this change must
+      not be read as precedent for.
+
+      Reading an invoice requires an invoice, so the flow starts at
+      `upload-document`. Opening that for demo traffic is an **anonymous write
+      to storage** on a public page: unbounded bytes, arbitrary content, from
+      anyone. The quote path has no such door — it computes from rows that are
+      already there.
+
+      Pinned because the reasoning is easy to lose: someone who reads only "the
+      demo can generate quotes now" has every reason to think invoice scan
+      should follow.
+    */
+    const upload = readFileSync(
+      join(__dirname, '..', '..', 'app', 'api', 'v1', 'upload-document', 'route.ts'),
+      'utf8'
+    );
+
+    expect(upload).toContain("intent: 'write'");
   });
 });
 
