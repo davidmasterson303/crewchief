@@ -156,6 +156,16 @@ const PORTABLE: string[] = [
  * is visible rather than rediscovered mid-move.
  */
 const NOT_PORTABLE: Record<string, string> = {
+  /*
+    The same split this file keeps recording, and the cleanest instance of it.
+    The *decision* — what an Apple notification does to an entitlement — is in
+    `packages/core/src/apple-subscription.ts` and is portable and pure. What
+    stays here is `node:crypto`'s `X509Certificate`, which React Native does not
+    have and should not: verifying Apple's signature is a server's job by
+    definition. A client that verified its own receipts would be asserting its
+    own entitlement, which is the one thing this whole track exists to prevent.
+  */
+  'lib/apple-jws.ts': 'node:crypto X509Certificate — server-only by design',
   'lib/supabase.ts': 'constructs Supabase clients',
   'lib/api-auth.ts': 'Supabase, and reads next/headers',
   'lib/account-data.ts': 'reaches Supabase through lib/supabase',
