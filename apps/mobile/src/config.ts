@@ -17,7 +17,14 @@ import Constants from 'expo-constants';
  * change on every push to `main`.
  *
  * So `crewchief.davidmasterson.co` is served by the project building
- * **`demo-live`**, which only moves through `scripts/promote-demo.mjs`.
+ * **`web-live`**, which only moves when someone merges `main` into it.
+ *
+ * ⚠ **`web-live`, not `demo-live`** — an earlier version of this note said
+ * `demo-live` and was wrong for a day. They are two gates on the same
+ * repository and they exist for different reasons: `demo-live` paces the
+ * recruiter-facing demo, `web-live` paces the app's backend and the App Store
+ * hostname. Collapsing them would mean promoting the demo to show someone a new
+ * screen also moved the API under every installed app.
  *
  * **The consequence, and it is a workflow rule rather than a caveat: a mobile
  * build that needs a new `/api/v1/*` route must have that route promoted

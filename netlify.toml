@@ -4,6 +4,23 @@ publish = ".next"
 
 # Skip the web build when a commit touched only the Expo client.
 #
+# ⚠ KEPT DELIBERATELY, and narrower than a doc elsewhere claims. Checked
+# 17 Aug against the question "why did the Aug 7 ignore rule never take effect":
+#
+#   The Aug 7 rule — which also excluded `*.md` and `docs` — was NEVER MERGED.
+#   The rule below is older (from `e7c906f`, the Expo scaffold) and excludes
+#   `apps` alone. It is not an exit-code trap and not a bad pathspec: it does
+#   exactly what its comment says, and doc-only commits build *correctly* under
+#   it. Verified by running the command against real commits.
+#
+# That is Learning 1 of the cost write-up, stated plainly: a written fix is not a
+# shipped fix. The expected-result table was read as an outcome for ten days.
+#
+# Kept rather than deleted now that `web-live` gates the site, because this file
+# is shared by more than one project and a release-branch merge carrying only
+# mobile changes should still skip. It is defence in depth, no longer the
+# primary control — the gate is.
+#
 # Netlify cancels the build when this command exits 0. `git diff --quiet`
 # exits 0 when there is no difference, so this reads: "nothing changed outside
 # apps/ — don't rebuild the web app."

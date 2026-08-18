@@ -115,19 +115,30 @@ Prefer the loud failure. The expensive bugs in this codebase have no error:
 ## 8. There are two Netlify projects, and the names invite the wrong guess
 
 ```
-effulgent-blancmange-6adfdf   deploys main        the promote gate's CANDIDATE
-crewchief-demo                deploys demo-live   crewchief-demo.davidmasterson.co
-                                                  AND crewchief.davidmasterson.co
+effulgent-blancmange-6adfdf   deploys web-live    crewchief.davidmasterson.co
+                                                  App Store URL + the app's API
+crewchief-demo-live           deploys demo-live   crewchief-demo.davidmasterson.co
+glowing-hotteok-d2e57e        deploys main        davidmasterson.co (personal)
 ```
+
+**Nothing deploys from `main`.** Pushing to `main` costs nothing and publishes
+nothing; both CrewChief hostnames move only when someone merges into their
+release branch. That is a **gate, not a filter**, and it was chosen over an
+ignore rule for a reason worth keeping: a filter fails silently toward stale
+deploys, an ignore rule needs an inverted exit code to be right, and one
+`netlify.toml` is shared across sites. The gate is a dropdown with no silent
+failure mode. `demo-live` had been running the pattern correctly all along —
+9 builds against 111 from the same commit stream.
 
 This is a **promote gate**, not drift: `scripts/promote-demo.mjs` is the only
 way `demo-live` moves, so what is public is deliberately behind `main`. Run the
 dry run first; it verifies the exact build that is about to become public.
 
-⚠ **`crewchief.davidmasterson.co` is gated too** — it is the App Store listing's
-privacy-policy URL and the origin the mobile app talks to (`app.json` →
-`extra.apiBaseUrl`). Before that, anything pushed to `main` was instantly live
-at a URL App Review reads.
+⚠ **`crewchief.davidmasterson.co` is gated behind `web-live`** — it is the App
+Store listing's privacy-policy URL and the origin the mobile app talks to
+(`app.json` → `extra.apiBaseUrl`). Before that, anything pushed to `main` was
+instantly live at a URL App Review reads, and every push cost a build: 111
+builds in 17 days, 99% of a $34 bill.
 
 Two things follow, and both are workflow rules rather than trivia:
 
