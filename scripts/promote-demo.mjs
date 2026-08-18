@@ -136,12 +136,43 @@ try {
   const res = await fetch(`${CANDIDATE}/api/version`, { cache: 'no-store' });
   const { commit } = await res.json();
 
-  if (commit === head) {
-    ok(`serving ${commit.slice(0, 8)} — matches HEAD`);
-  } else if (commit === 'unknown') {
+  /*
+    ⚠ The candidate serves `web-live`, so it reports **web-live's HEAD** — a
+    `--no-ff` merge commit — and never `main`'s HEAD. Comparing to `head`
+    directly was right only while a site auto-deployed `main`, and it is the
+    same confusion this file already warns about for the demo's own version
+    check. I reintroduced it on the candidate side when the candidate moved.
+
+    Two conditions together mean "the code about to become the demo is live and
+    was verified":
+
+      1. the candidate is serving web-live's current HEAD — not a stale build
+      2. web-live actually contains main's HEAD — not an older promote
+
+    Checking only (1) would pass on a web-live that is a week behind; only (2)
+    would pass while the deploy was still building.
+  */
+  const webLive = sh('git rev-parse web-live');
+  const webLiveHasHead = (() => {
+    try {
+      execSync(`git merge-base --is-ancestor ${head} web-live`, { stdio: 'pipe' });
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+
+  if (commit === 'unknown') {
     bad('reports "unknown" — set COMMIT_REF in the Netlify build env');
+  } else if (commit !== webLive) {
+    bad(`serving ${String(commit).slice(0, 8)}, expected web-live ${webLive.slice(0, 8)} — deploy still building, or it failed`);
+  } else if (!webLiveHasHead) {
+    bad(
+      `web-live (${webLive.slice(0, 8)}) does not contain main ${head.slice(0, 8)} — ` +
+        'run scripts/promote-web.mjs first, or the demo ships code nothing verified'
+    );
   } else {
-    bad(`serving ${String(commit).slice(0, 8)}, expected ${head.slice(0, 8)} — deploy still building, or it failed`);
+    ok(`serving web-live ${commit.slice(0, 8)}, which contains ${head.slice(0, 8)}`);
   }
 } catch (e) {
   bad(`/api/version unreachable (${e.message}) — deploy this route before promoting`);
