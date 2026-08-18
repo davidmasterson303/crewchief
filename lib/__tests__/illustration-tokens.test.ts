@@ -145,10 +145,53 @@ describe('the tint prop stays a prop', () => {
     }
   });
 
-  it('applies the tint at low opacity rather than as a solid fill', () => {
+  it('carries the vehicle hue as light, never as fill', () => {
+    /*
+      ⚠ Tightened 17 Aug, and the old assertion is why this comment is long.
+
+      It used to pin the tint as `fill={tint} opacity={…}` at ≤0.3 — a fill,
+      merely a faint one. Design's capture review rejected that shape outright:
+      **"Light, never fill — the hue may not carry a health value."**
+
+      The distinction is not stylistic. A filled body is a *coloured object*,
+      and a coloured object on a surface that also carries a health ramp invites
+      the colour to be read as a reading. A rim leaves the body graphite and
+      puts the hue where a light source would.
+
+      So the rule is now the stronger one: the hue reaches the body as a
+      **stroke** and `fill={tint}` may not appear at all. The previous test
+      would have passed on any faint fill forever, because it was written to
+      describe the implementation rather than the rule.
+    */
     const frame = readFileSync(join(DIR, 'VehicleIllustration.tsx'), 'utf8');
-    const opacity = /tint \? <path d=\{bodyPath\} fill=\{tint\} opacity=\{([\d.]+)\}/.exec(frame);
+    const rendered = code(frame);
+
+    expect(rendered).not.toMatch(/fill=\{tint\}/);
+
+    const rim = /stroke=\{tint\}/.exec(rendered);
+    expect(rim).not.toBeNull();
+
+    // Still restrained. Light on an edge, not a second outline.
+    const opacity = /stroke=\{tint\}[\s\S]{0,220}?opacity=\{([\d.]+)\}/.exec(rendered);
     expect(opacity).not.toBeNull();
-    expect(Number(opacity![1])).toBeLessThanOrEqual(0.3);
+    expect(Number(opacity![1])).toBeLessThanOrEqual(0.6);
+  });
+
+  it('sits the vehicle on the floor rather than floating it', () => {
+    /*
+      Design's capture review again: *"the native bay already reflects its
+      instruments in the floor plane; a car drawing with no shadow and no
+      reflection is the one object in that room that is not in the room."*
+
+      A contact ellipse on the ground line, not a directional cast shadow — the
+      bay is lit from above and slightly forward, and a directional shadow would
+      have to agree with `BayRoom`'s gradient at every size and would disagree
+      the moment either moved.
+    */
+    const frame = readFileSync(join(DIR, 'VehicleIllustration.tsx'), 'utf8');
+    const rendered = code(frame);
+
+    expect(rendered).toMatch(/<ellipse/);
+    expect(rendered).toMatch(/cy=\{GROUND_Y\}/);
   });
 });
