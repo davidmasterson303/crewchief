@@ -5,6 +5,12 @@ import type { InvoiceFile } from '../api/documents';
 /**
  * The one place that will import `expo-image-picker`.
  *
+ * ⚠ **Two callers now, and that is why this is `pick-image` rather than
+ * `pick-invoice-image`.** Invoices came first; vehicle photographs arrived on
+ * 15 Aug. Adding a second module that imported the picker would have broken the
+ * invariant this file exists to hold — see below — so the seam widened instead
+ * of multiplying.
+ *
  * ── Why it is a seam and not just an import ─────────────────────────────────
  *
  * `expo-image-picker` is a **native** module. The development client currently
@@ -64,6 +70,26 @@ export type InvoiceImageSource = 'camera' | 'library';
 const QUALITY = 0.7;
 
 /**
+ * The wording each caller needs when permission is refused.
+ *
+ * Split out because "CrewChief needs the camera to photograph an invoice" is
+ * wrong when someone is adding a picture of their car, and a generic sentence
+ * covering both would tell nobody what they were doing.
+ */
+const PROMPTS = {
+  invoice: {
+    camera: 'CrewChief needs the camera to photograph an invoice.',
+    library: 'CrewChief needs access to your photos to attach an invoice.',
+  },
+  vehicle: {
+    camera: 'CrewChief needs the camera to photograph your car.',
+    library: 'CrewChief needs access to your photos to add a picture of your car.',
+  },
+} as const;
+
+export type ImagePurpose = keyof typeof PROMPTS;
+
+/**
  * Resolves to the chosen image, or `null` if the picker was dismissed.
  *
  * Throws `ImagePickerUnavailable` only when the source genuinely cannot be
@@ -72,7 +98,52 @@ const QUALITY = 0.7;
  * idle silently for `null` and shows an error for a throw.
  */
 export async function pickInvoiceImage(
-  source: InvoiceImageSource = 'camera'
+  source: InvoiceImageSource = 'camera',
+): Promise<InvoiceFile | null> {
+  return pickImage(source, 'invoice', QUALITY);
+}
+
+/**
+ * A photograph of the car itself.
+ *
+ * ── Why the quality is lower than the invoice's ─────────────────────────────
+ *
+ * ⚠ **A vehicle photo has a hard server-side ceiling that an invoice does not.**
+ * `MAX_STORED_PHOTO_BYTES` is 1.5 MB, and it exists because this account still
+ * holds a 3000×4000 / 2.3 MB original that has never decoded on a device — the
+ * plate's timeout exists solely to escape it. `MAX_FILE_SIZE` for a document is
+ * 10 MB, so an invoice has room this does not.
+ *
+ * On web the browser downscales before upload. **The phone cannot**: there is
+ * no canvas, and `expo-image-manipulator` — the module that would cap a
+ * dimension properly — is not in this build and adding it is a native change
+ * costing one of the month's cloud builds.
+ *
+ * So the lever available today is the encoder's quality, and 0.45 is it. A
+ * 12-megapixel capture lands under the ceiling at that setting in the ordinary
+ * case, and the ceiling is not raised to meet it: raising it would reintroduce
+ * exactly the undecodable-original bug for the next car.
+ *
+ * ⚠ **This is a probability, not a guarantee**, and the flow is built to say so
+ * — the server returns its refusal reason and the screen shows it, rather than
+ * failing generically. A guaranteed dimension cap needs that native module.
+ */
+export async function pickVehiclePhoto(
+  source: InvoiceImageSource = 'library',
+): Promise<InvoiceFile | null> {
+  return pickImage(source, 'vehicle', VEHICLE_QUALITY, 'vehicle');
+}
+
+/**
+ * Reduce a vehicle capture further than an invoice. See `pickVehiclePhoto`.
+ */
+const VEHICLE_QUALITY = 0.45;
+
+async function pickImage(
+  source: InvoiceImageSource,
+  purpose: ImagePurpose,
+  quality: number,
+  namePrefix = 'invoice',
 ): Promise<InvoiceFile | null> {
   if (source === 'camera') {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
@@ -86,8 +157,8 @@ export async function pickInvoiceImage(
       */
       throw new ImagePickerUnavailable(
         permission.canAskAgain
-          ? 'CrewChief needs the camera to photograph an invoice.'
-          : 'Camera access is off for CrewChief. You can turn it on in Settings, or choose a photo from your library instead.'
+          ? PROMPTS[purpose].camera
+          : 'Camera access is off for CrewChief. You can turn it on in Settings, or choose a photo from your library instead.',
       );
     }
   } else {
@@ -95,8 +166,8 @@ export async function pickInvoiceImage(
     if (!permission.granted) {
       throw new ImagePickerUnavailable(
         permission.canAskAgain
-          ? 'CrewChief needs access to your photos to attach an invoice.'
-          : 'Photo access is off for CrewChief. You can turn it on in Settings.'
+          ? PROMPTS[purpose].library
+          : 'Photo access is off for CrewChief. You can turn it on in Settings.',
       );
     }
   }
@@ -104,7 +175,7 @@ export async function pickInvoiceImage(
   const options: ImagePicker.ImagePickerOptions = {
     // Array form: `MediaTypeOptions` is deprecated in this version.
     mediaTypes: ['images'],
-    quality: QUALITY,
+    quality,
     /*
       ── This line is the fix for the 5 Aug end-to-end failure ────────────────
 
@@ -161,7 +232,7 @@ export async function pickInvoiceImage(
       one — an untyped blob is the upload that fails after the model has
       already been paid for.
     */
-    name: asset.fileName ?? `invoice-${Date.now()}.jpg`,
+    name: asset.fileName ?? `${namePrefix}-${Date.now()}.jpg`,
     type: asset.mimeType ?? 'image/jpeg',
     // Optional on purpose: absent means "unknown", and `uploadInvoice` lets an
     // unknown size through rather than refusing on absence.

@@ -77,8 +77,54 @@ nav {
     /* The build dial's redline — v8 §4c. Deliberately hotter and more
        orange-shifted than --critical-red (#F87171): a redline that matched the
        alert red would be read as an alert. Do not harmonise them. */
+    /*
+      A disabled control's own fill and ink — v8 §8a.
+
+      Explicit values rather than a group `opacity`, and that is the entire
+      point: an alpha on the wrapper multiplies with any alpha inside it, which
+      is how ModificationsTab's badges reached an effective 0.30. These two are
+      pre-composited, so there is nothing left to multiply and the contrast
+      guard can read them.
+
+      ⚠ Measured, because the design system's own comment is wrong here. It
+      claims "4.6:1 on surface-2, 4.9:1 on surface-3". Actual, against this
+      repo's surfaces:
+
+        on --surface-disabled #1B1917 : 3.31:1   <- the pairing this produces
+        on --surface-2        #1F1C19 : 3.20:1
+        on --surface-3        #272320 : 2.94:1
+
+      None of those is 4.6. That is **not a defect**: WCAG 2.1 SC 1.4.3 exempts
+      inactive components — "a disabled control in HTML is not required to meet
+      contrast requirements" — so a disabled label is allowed to sit here. The
+      reason to prefer these tokens over `opacity-50` is measurability, not
+      compliance. The numbers are corrected so nobody later reads 4.6 and
+      believes a disabled control clears the body floor.
+    */
+    --text-disabled: #6E6B67;
+    --surface-disabled: #1B1917;
+
     --build-redline: #FF4436;
     --build-redline-track: rgb(255 68 54 / 0.22);
+
+    /*
+     * The build ramp — v8 §6's prerequisite.
+     *
+     * These four values shipped inside `BuildGauge.tsx` as a bare ternary of
+     * hex literals. Naming them here is not tidying: **v8's register sets
+     * `--register-accent: var(--build-far)`, and `--build-far` did not exist**,
+     * so the sport register's accent would have resolved to nothing. Same shape
+     * as `--bay-heat` in §3 — the spec assumed a token the repo never had.
+     *
+     * Cool steel for stock, warming to the amber this app already uses for
+     * recall attention. Nothing here is a failure state, so nothing is red —
+     * the redline above is a separate axis and deliberately not part of this
+     * ramp.
+     */
+    --build-stock: #7d8794;           /* under 12 — untouched */
+    --build-mild: #9fc8d8;            /* 12–39  — bolt-ons */
+    --build-warm: #e0c168;            /* 40–69  — committed */
+    --build-far: #f0a35e;             /* 70+    — far side of sensible */
 
     /* ── design-system vocabulary, aliased onto the app's tokens (v7 C0) ──
      *
@@ -92,6 +138,14 @@ nav {
      * `hsl(var(--surface-3))`. Mixing the two up produces no colour at all.
      */
     --brand-accent: hsl(var(--accent));
+    /*
+     * The logo's other two colours (Sweep handoff, Aug 2026). The brief calls
+     * them existing tokens; they weren't — same shape as `--build-far` above,
+     * a spec assuming a name the repo never had. Cyan-700 is also the mark's
+     * colour on any light ground: cyan-400 on white measures 1.9:1.
+     */
+    --brand-accent-button: #0E7490;
+    --brand-accent-ink: #F2FBFD;
     --text-primary: hsl(var(--foreground));
     --text-muted: hsl(var(--muted-foreground));
     --border-default: hsl(var(--border));
@@ -220,6 +274,122 @@ nav {
     --scroll-reveal-distance: 28px;
     --duration-count-up: 900ms;
     --duration-shimmer: 1600ms;
+
+    /*
+     * ── Register defaults — v8 §6 ─────────────────────────────────────────
+     *
+     * The default register, stated rather than implied. These exist so the
+     * sport block below has something to override and so `.panel-cut` has a
+     * defined chamfer: `calc(100% - var(--register-chamfer))` against an
+     * UNDEFINED custom property is invalid at computed-value time, which
+     * silently drops the whole `clip-path`. A `0px` default makes the polygon
+     * a plain rectangle on purpose instead of by accident.
+     *
+     * `--register-accent` resolves to `--info` here, which is a full hex — not
+     * one of this file's bare HSL triplets — so `color: var(--register-accent)`
+     * is valid without an `hsl()` wrapper. Do not "harmonise" `--info` into a
+     * triplet without fixing this.
+     */
+    /*
+     * The bay knobs live HERE, not on `.service-bay` / `.cockpit-belt`.
+     *
+     * They were originally set on those elements, which reads naturally and is
+     * wrong: **a custom property set directly on an element beats one
+     * inherited from an ancestor.** The sport register sets these on <html>,
+     * so with the element-level definitions in place all four of its biggest
+     * perceptual changes — heat, LED, vignette, belt — resolved to the local
+     * value and did nothing.
+     *
+     * Caught by measuring the deployed page, not by the guard, because the
+     * guard's `:root` slice was itself broken. Both are fixed together.
+     */
+    --bay-heat: 0;
+    --bay-led: 1;
+    --bay-vignette: 0.35;
+    --belt-led: 1;
+
+    --register-accent: var(--info);
+    --register-rule: var(--border-subtle);
+    --register-chamfer: 0px;
+    --register-grain: transparent;
+    /*
+     * `--register-glow` (0.22 / 0.4) is deliberately NOT here. Its only reader
+     * is the cluster's ignition sweep in `tokens/cluster.css`, which is not
+     * ported yet — so shipping it now would add a token nothing reads, which
+     * is the precise defect `register-tokens.test.ts` exists to catch. It
+     * lands with the cluster work, not before.
+     */
+    /* Note this is NOT 0: the default register tightens numerals slightly too,
+       and the registers differ by amount. At 14px it is 0.14px — deliberate,
+       and the reason `.num` reads the token rather than hardcoding zero. */
+    --register-tracking: -0.01em;
+  }
+
+  /*
+   * ── The sport register — v8 §6 ──────────────────────────────────────────
+   *
+   * A second voice for the same product: same information, harder delivery.
+   * Set `data-register="sport"` on <html> and the surfaces below re-tune. It
+   * is a token swap, not a second stylesheet — nothing here restates a rule
+   * that `:root` already owns.
+   *
+   * Equal specificity to `:root` (both 0,1,0), so this wins on SOURCE ORDER
+   * alone. It must stay after the `:root` block and inside this layer. Moving
+   * it above, or out to an unlayered rule, silently changes which one applies.
+   *
+   * ── Three departures from `tokens/register.css`, all forced by wiring ────
+   *
+   * The export overrides `--radius-sm/md/lg/xl`. In this repo that would have
+   * squared off `rounded-xl` and left everything else at 14px, because:
+   *
+   *   - `--radius-md` and `--radius-lg` **do not exist here and are read by
+   *     nothing**. Tailwind derives `rounded-lg/md/sm` from `--radius`, which
+   *     the export never mentions. Overriding `--radius` is what actually
+   *     collapses the corners, so that is what this does.
+   *
+   *   - `--radius-sm` exists but is NOT Tailwind's `rounded-sm`. It is the
+   *     8px control radius, read directly by `.field`. Both are set, because
+   *     they are genuinely two different things.
+   *
+   *   - `--radius-full` is not overridden at all. `rounded-full` is 94 sites,
+   *     nearly all of them pills, avatars and dots where a 3px radius reads as
+   *     a rendering fault rather than a decision. The register sharpens
+   *     panels; it does not turn every badge into a chiclet.
+   *
+   * The type voice swaps `.display-serif` to the sans stack rather than to
+   * `var(--font-sans)`, which this repo does not define — Tailwind only
+   * extends `display`, so `sans` falls through to its default stack. Naming
+   * the stack keeps the swap honest instead of resolving to nothing.
+   */
+  [data-register='sport'] {
+    /* Hotter bay, harder light. See §3 for what each of these drives. */
+    --bay-heat: 1;
+    --bay-led: 1.5;
+    --bay-vignette: 0.62;
+    --belt-led: 1.7;
+
+    /* Milled, not rounded. `--radius` is the one that moves the product. */
+    --radius: 3px;
+    --radius-xl: 3px;
+    --radius-sm: 2px;
+
+    --register-chamfer: 16px;
+    --register-accent: var(--build-far);
+    --register-grain: rgb(255 255 255 / 0.03);
+    --register-tracking: -0.03em;
+  }
+
+  /*
+   * The type voice. The editorial serif is the default register's whole
+   * personality, so the sport register cannot merely tighten it — it changes
+   * instrument.
+   */
+  [data-register='sport'] .display-serif {
+    font-family:
+      ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+      'Helvetica Neue', Arial, sans-serif;
+    font-weight: 650;
+    letter-spacing: var(--register-tracking, -0.02em);
   }
 }
 
@@ -487,9 +657,21 @@ nav {
    * Geometry: wall to 64%, floor below it. That horizon is shared by three
    * layers, so if it moves it moves in all of them. */
   .service-bay {
-    --bay-led: 1;
-    --bay-vignette: 0.35;
+    /*
+      The second light source, off by default — v8 §3.
 
+      A performance bay is not this room brighter; it is this room with a work
+      light in it, throwing warm bounce off the floor against the cold ceiling
+      wash. Two-tone lighting is what separates a lit workshop from a dark web
+      page, and the eye reads it before it reads anything on the screen.
+
+      **At `--bay-heat: 0` this layer paints nothing**, so it stays a visual
+      no-op until the sport register turns it on.
+
+      `--bay-led`, `--bay-vignette` and `--bay-heat` were DECLARED here and now
+      live at `:root`. Declaring them on this element put them out of reach of
+      the register that exists to change them — see the note beside them.
+    */
     background-color: #0b0a09;
     background-image:
       /* corner falloff */
@@ -498,6 +680,8 @@ nav {
       radial-gradient(ellipse 92% 52% at 50% 13%, rgb(34 211 238 / calc(0.09 * var(--bay-led))), transparent 62%),
       /* the floor catching it */
       radial-gradient(ellipse 52% 9% at 50% 69%, rgb(34 211 238 / calc(0.06 * var(--bay-led))), transparent 72%),
+      /* the work light's warm bounce off the floor — only ever visible in sport */
+      radial-gradient(ellipse 78% 30% at 50% 99%, rgb(255 92 60 / calc(0.13 * var(--bay-heat))), transparent 72%),
       linear-gradient(180deg, rgb(255 255 255 / 0.028), rgb(255 255 255 / 0.007) 45%, transparent),
       /* wall/floor seam */
       linear-gradient(rgb(255 255 255 / 0.045), rgb(255 255 255 / 0.045)),
@@ -505,9 +689,16 @@ nav {
       repeating-linear-gradient(90deg, transparent 0 139px, rgb(255 255 255 / 0.02) 139px 140px),
       /* the room */
       linear-gradient(180deg, #0b0a09 0%, #131110 52%, #191713 64%, #15130f 100%);
-    background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, repeat-x, no-repeat;
-    background-size: 100% 100%, 100% 100%, 100% 100%, 100% 36%, 100% 1px, 100% 64%, 100% 100%;
-    background-position: 0 0, 0 0, 0 0, 0 100%, 0 64%, 0 0, 0 0;
+    /*
+      Four lists, one order. Inserting the heat layer at position 4 shifts every
+      later entry, and getting that wrong is not cosmetic: `repeat-x` landing on
+      the wrong layer is how the beltline's brushed grain once climbed out of
+      its 11% band and textured the whole page. Counted rather than eyeballed —
+      8 layers, 8 entries in each list.
+    */
+    background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, repeat-x, no-repeat;
+    background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 36%, 100% 1px, 100% 64%, 100% 100%;
+    background-position: 0 0, 0 0, 0 0, 0 0, 0 100%, 0 64%, 0 0, 0 0;
   }
 
   /* The cockpit beltline — concept 1c, and the dashboard's half of the rhyme.
@@ -533,8 +724,9 @@ nav {
    * part of the page's ground, not a fixed overlay, and pinning it would make
    * it swim against the content on the way down. */
   .cockpit-belt {
+    /* `--belt-y` stays here — it is this element's geometry and no register
+       touches it. `--belt-led` moved to `:root`, because sport does. */
     --belt-y: 58%;
-    --belt-led: 1;
 
     background-color: #0a0a0b;
     background-image:
@@ -1226,9 +1418,121 @@ nav {
   }
 
   /* Tabular figures wherever digits line up in columns. */
+  /*
+   * A panel with a corner taken off — v8 §6.
+   *
+   * The chamfer is `0px` in the default register, so this is an ordinary card
+   * until the register changes. `--radius-lg` in the export is `--radius`
+   * here; see the sport block for why that substitution is the whole point
+   * rather than a rename.
+   */
+  .panel-cut {
+    position: relative;
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06);
+    background-image:
+      linear-gradient(180deg, rgb(255 255 255 / 0.04), transparent 30px),
+      repeating-linear-gradient(120deg, var(--register-grain) 0 1px, transparent 1px 4px);
+    clip-path: polygon(
+      0 0,
+      calc(100% - var(--register-chamfer)) 0,
+      100% var(--register-chamfer),
+      100% 100%,
+      0 100%
+    );
+  }
+
+  /* The cut edge wants a light on it, or it reads as a corner that fell off.
+     Scoped to sport because in the default register there is no bevel to
+     light — a 1px diagonal over a square corner is just a scratch. */
+  [data-register='sport'] .panel-cut::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: calc(var(--register-chamfer) * 1.42);
+    height: 1px;
+    background: rgb(255 255 255 / 0.16);
+    transform-origin: top right;
+    transform: rotate(45deg);
+    pointer-events: none;
+  }
+
+  /*
+   * The way back — v8 §6.
+   *
+   * REQUIRED, not optional. Answering "not interested" in onboarding hides the
+   * whole modifications surface, and that answer is given in the first sixty
+   * seconds before anyone knows what it turns off. An irreversible preference
+   * is a trap, and it is what lets the onboarding question stay a single
+   * yes/no rather than having to be got right first time.
+   *
+   * Quiet by construction — ghost, never filled — because it is not what
+   * anyone came here to do. It still owes the 44px floor: this is a real
+   * control, not a footnote.
+   *
+   * Three substitutions from the export, all forced by tokens this repo does
+   * not define:
+   *
+   *   - `--touch-target-min` → the 44px literal, matching `button.tsx`, which
+   *     hardcodes the same floor for the same reason (RB0 rule 3).
+   *   - `--radius-md` → `--radius-sm`, which IS this repo's control radius.
+   *     `--radius-md` does not exist here; see the register block above.
+   *   - `--font-sans` → `inherit`. There is nothing to switch to — the body is
+   *     already the sans stack, and only `.display-serif` departs from it.
+   */
+  .register-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 44px;
+    padding: 0 10px;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: var(--text-body-sm);
+    font-weight: 600;
+    cursor: pointer;
+    transition: color var(--duration-fast) var(--ease-standard);
+  }
+
+  .register-switch:hover {
+    color: var(--text-primary);
+  }
+
+  .register-switch:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--focus-ring-soft);
+  }
+
+  /* Mid-flight. `cursor-not-allowed` also marks it inactive for the contrast
+     guard, which is what exempts the dimmed label from the body floor. */
+  .register-switch:disabled {
+    cursor: not-allowed;
+    color: var(--text-disabled);
+  }
+
+  .register-rule {
+    background: var(--register-rule);
+    height: 1px;
+    border: none;
+  }
+
+  .register-mark {
+    color: var(--register-accent);
+  }
+
   .num {
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1;
+    /* Tightens with the register — v8 §6. Both registers set this; they differ
+       by amount (-0.01em default, -0.03em sport). The `0` fallback only
+       applies if the token is removed entirely. */
+    letter-spacing: var(--register-tracking, 0);
   }
 
   /*

@@ -51,7 +51,13 @@ export function BuildGauge({
     warming through to the amber this app already uses for recall attention.
   */
   const colour =
-    needle >= 70 ? '#f0a35e' : needle >= 40 ? '#e0c168' : needle >= 12 ? '#9fc8d8' : '#7d8794';
+    needle >= 70
+      ? 'var(--build-far)'
+      : needle >= 40
+        ? 'var(--build-warm)'
+        : needle >= 12
+          ? 'var(--build-mild)'
+          : 'var(--build-stock)';
 
   /*
     The needle joins the redline once it enters it — v8 §4c.

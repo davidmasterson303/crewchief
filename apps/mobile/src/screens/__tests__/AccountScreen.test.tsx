@@ -1,7 +1,7 @@
-import { render, userEvent } from '@testing-library/react-native';
+import { render, userEvent, waitFor } from '@testing-library/react-native';
 
 import { AccountScreen } from '../AccountScreen';
-import { deleteAccount } from '../../api/account';
+import { deleteAccount, getSubscription } from '../../api/account';
 import { ApiRequestError } from '../../api/client';
 import { DELETION_CONFIRM_PHRASE } from '@crewchief/core/account-deletion';
 
@@ -27,9 +27,13 @@ import { DELETION_CONFIRM_PHRASE } from '@crewchief/core/account-deletion';
  * moved. The same reason `contrast.test.tsx` imports its floor.
  */
 
-jest.mock('../../api/account', () => ({ deleteAccount: jest.fn() }));
+jest.mock('../../api/account', () => ({
+  deleteAccount: jest.fn(),
+  getSubscription: jest.fn(),
+}));
 
 const mockDelete = deleteAccount as jest.MockedFunction<typeof deleteAccount>;
+const mockSubscription = getSubscription as jest.MockedFunction<typeof getSubscription>;
 
 /**
  * Built from the constant, exactly as the screen builds it.
@@ -60,6 +64,9 @@ function mount(overrides: Partial<Parameters<typeof AccountScreen>[0]> = {}) {
 beforeEach(() => {
   mockDelete.mockReset();
   mockDelete.mockResolvedValue({ deleted: { vehicles: 2, storageObjects: 5 } } as never);
+  mockSubscription.mockReset();
+  // The default is the ordinary account: nothing bought, nothing to warn about.
+  mockSubscription.mockResolvedValue({ live: false, certain: true });
 });
 
 describe('the confirmation gate', () => {
@@ -283,5 +290,77 @@ describe('closing the screen', () => {
 
     expect(props.onSignOut).toHaveBeenCalledTimes(1);
     expect(mockDelete).not.toHaveBeenCalled();
+  });
+});
+
+describe('the subscription warning — Guideline 3.1.2 / E5', () => {
+  /*
+    Deleting an account while an Apple-billed subscription keeps charging is a
+    documented rejection reason, and the failure is not paperwork: the account
+    that could manage the subscription is gone, the charge continues, and there
+    is no obvious way left to stop it.
+
+    This is the surface Apple reviews, which is why the rule lives in
+    `@crewchief/core/account-deletion` and both clients read it — two
+    implementations let the reviewed one drift weaker without anything saying so.
+  */
+
+  it('says nothing to someone with no subscription', async () => {
+    const { view } = mount();
+    const resolved = await view;
+
+    await waitFor(() => expect(mockSubscription).toHaveBeenCalled());
+    expect(resolved.queryByText(/does not cancel/i)).toBeNull();
+  });
+
+  it('warns a subscriber that deletion does not cancel the billing', async () => {
+    mockSubscription.mockResolvedValue({ live: true, certain: true });
+
+    const { view } = mount();
+    const resolved = await view;
+
+    expect(await resolved.findByText(/does not cancel your subscription/i)).toBeTruthy();
+    // Naming the place matters — "manage your subscription" is not a location.
+    expect(await resolved.findByText(/Subscriptions/)).toBeTruthy();
+  });
+
+  it('still lets a subscriber delete — the warning is not a gate', async () => {
+    /*
+      The design decision worth pinning. Refusing deletion until the
+      subscription is cancelled trades one guideline violation for a worse one:
+      5.1.1(v) requires deletion to be completed from inside the app, and
+      gating it on an action taken in a *different* app is exactly the
+      obstruction it exists to prevent.
+    */
+    mockSubscription.mockResolvedValue({ live: true, certain: true });
+
+    const user = userEvent.setup();
+    const { view } = mount();
+    const resolved = await view;
+
+    await resolved.findByText(/does not cancel your subscription/i);
+    await user.type(resolved.getByLabelText(CONFIRM_FIELD), DELETION_CONFIRM_PHRASE);
+    await user.press(resolved.getByLabelText('Delete my account'));
+
+    expect(mockDelete).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not block deletion when the subscription read fails', async () => {
+    /*
+      The screen's job is deletion. A secondary read that fails must not take
+      the required flow down with it — so `getSubscription` resolves to "no
+      subscription" on a network error rather than throwing, and the server
+      already fails the *other* way and warns when it cannot read.
+    */
+    mockSubscription.mockResolvedValue({ live: false, certain: false });
+
+    const user = userEvent.setup();
+    const { view } = mount();
+    const resolved = await view;
+
+    await user.type(resolved.getByLabelText(CONFIRM_FIELD), DELETION_CONFIRM_PHRASE);
+    await user.press(resolved.getByLabelText('Delete my account'));
+
+    expect(mockDelete).toHaveBeenCalledTimes(1);
   });
 });

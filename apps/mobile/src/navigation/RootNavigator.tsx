@@ -8,17 +8,20 @@ import {
   initialNotificationUrl,
   subscribeToNotificationTaps,
 } from '../notifications/push';
-import { registerForPush } from '../notifications/register';
+import { currentPushPermission, registerForPush } from '../notifications/register';
+import { shouldRegisterSilently } from '@crewchief/core/push-priming';
 
 import { AdvisorScreen } from '../screens/AdvisorScreen';
 import { InvoiceScanScreen } from '../screens/InvoiceScanScreen';
 import { RecallDetailScreen } from '../screens/RecallDetailScreen';
 import { WishlistScreen } from '../screens/WishlistScreen';
+import { ServiceHistoryScreen } from '../screens/ServiceHistoryScreen';
 import { ServiceMilestoneScreen } from '../screens/ServiceMilestoneScreen';
-import { pickInvoiceImage } from '../media/pick-invoice-image';
+import { pickInvoiceImage, pickVehiclePhoto } from '../media/pick-image';
 import { GarageScreen } from '../screens/GarageScreen';
 import { AddVehicleScreen } from '../screens/AddVehicleScreen';
 import { VehicleDetailScreen } from '../screens/VehicleDetailScreen';
+import { surface, text } from '../theme';
 
 /**
  * The signed-in stack. Phase 3 task 3.5, pulled forward.
@@ -122,6 +125,7 @@ export type RootStackParamList = {
     "people may want to add items to wishlist on the go."
   */
   Wishlist: { vehicleId: string; title?: string };
+  ServiceHistory: { vehicleId: string; title?: string };
   /*
     5.6. Where a service-due notification lands. It opened the vehicle screen
     until 7 Aug, on the reasoning that "your oil change is due" needs no
@@ -187,6 +191,7 @@ const linking: LinkingOptions<RootStackParamList> = {
       InvoiceScan: 'vehicle/:vehicleId/scan',
       RecallDetail: 'vehicle/:vehicleId/recalls',
       Wishlist: 'vehicle/:vehicleId/wishlist',
+      ServiceHistory: 'vehicle/:vehicleId/history',
       ServiceMilestone: 'vehicle/:vehicleId/service',
     },
   },
@@ -226,10 +231,10 @@ const linking: LinkingOptions<RootStackParamList> = {
 const UNTITLED = 'Vehicle';
 
 const screenOptions = {
-  headerStyle: { backgroundColor: '#080808' },
-  headerTintColor: '#ffffff',
-  headerTitleStyle: { color: '#ffffff' },
-  contentStyle: { backgroundColor: '#080808' },
+  headerStyle: { backgroundColor: surface.page },
+  headerTintColor: text.primary,
+  headerTitleStyle: { color: text.primary },
+  contentStyle: { backgroundColor: surface.page },
 } as const;
 
 export function RootNavigator({
@@ -252,15 +257,27 @@ export function RootNavigator({
     configureNotificationHandler();
 
     /*
-      Registration asks for permission itself and then files the device's push
-      token against this account — the half that was missing until the
-      `device_push_tokens` table existed. Permission alone was never enough:
-      the server had nowhere to send.
+      ── C5: the system prompt is no longer raised from here ──────────────────
 
-      Fire-and-forget on purpose. Push is an enhancement, and a signed-in
-      person with a working garage must not wait on it or see it fail.
+      This used to call `registerForPush()`, which asks iOS for permission as
+      its first act. iOS shows that dialog **exactly once** and a "no" can only
+      be undone in Settings — so the one irreversible ask was being spent on
+      entry to the signed-in stack, before the person had seen what the product
+      does. The most likely answer to a dialog you did not expect is no.
+
+      Now: a device that **already** has permission still registers silently,
+      because its token must be filed against the account and there is nothing
+      to explain. Everyone else is offered `PushPrimer` first — see
+      `GarageScreen`, which is where the vehicle count that gates it lives.
+
+      `shouldRegisterSilently` and `shouldShowPushPrimer` are complementary by
+      construction and there is a test asserting they can never both be true.
     */
-    void registerForPush();
+    void (async () => {
+      if (shouldRegisterSilently(await currentPushPermission())) {
+        void registerForPush();
+      }
+    })();
   }, []);
 
   return (
@@ -276,6 +293,18 @@ export function RootNavigator({
                 navigation.navigate('VehicleDetail', { vehicleId, title })
               }
               onAddVehicle={() => navigation.navigate('AddVehicle')}
+              /*
+                The same seam as the invoice picker. `pick-image.ts` is the only
+                module that imports `expo-image-picker`, so the screen takes the
+                picker rather than reaching for a native module it would then be
+                unable to mount without.
+
+                Library rather than camera by default: a car photograph is
+                almost always one already taken, and the simulator has no camera
+                at all — a camera-first default could never be exercised on the
+                machine this is developed on.
+              */
+              pickPhoto={() => pickVehiclePhoto('library')}
             />
           )}
         </Stack.Screen>
@@ -338,6 +367,14 @@ export function RootNavigator({
                   title: route.params.title,
                 })
               }
+              onOpenHistory={() =>
+                navigation.navigate('ServiceHistory', {
+                  vehicleId: route.params.vehicleId,
+                  title: route.params.title,
+                })
+              }
+              // The same seam as the garage's. See `pick-image.ts`.
+              pickPhoto={() => pickVehiclePhoto('library')}
             />
           )}
         </Stack.Screen>
@@ -369,10 +406,7 @@ export function RootNavigator({
           )}
         </Stack.Screen>
 
-        <Stack.Screen
-          name="RecallDetail"
-          options={{ title: 'Recalls' }}
-        >
+        <Stack.Screen name="RecallDetail" options={{ title: 'Recalls' }}>
           {({ route, navigation }) => (
             <RecallDetailScreen
               vehicleId={route.params.vehicleId}
@@ -389,33 +423,30 @@ export function RootNavigator({
           )}
         </Stack.Screen>
 
-        <Stack.Screen
-          name="Wishlist"
-          options={{ title: 'Wishlist' }}
-        >
+        <Stack.Screen name="Wishlist" options={{ title: 'Wishlist' }}>
           {({ route }) => (
             <WishlistScreen vehicleId={route.params.vehicleId} onSignOut={onSignOut} />
           )}
         </Stack.Screen>
 
-        <Stack.Screen
-          name="ServiceMilestone"
-          options={{ title: 'Service due' }}
-        >
+        <Stack.Screen name="ServiceHistory" options={{ title: 'Service history' }}>
+          {({ route }) => (
+            <ServiceHistoryScreen vehicleId={route.params.vehicleId} onSignOut={onSignOut} />
+          )}
+        </Stack.Screen>
+
+        <Stack.Screen name="ServiceMilestone" options={{ title: 'Service due' }}>
           {({ route }) => (
             <ServiceMilestoneScreen vehicleId={route.params.vehicleId} onSignOut={onSignOut} />
           )}
         </Stack.Screen>
 
-        <Stack.Screen
-          name="InvoiceScan"
-          options={{ title: 'Scan an invoice' }}
-        >
+        <Stack.Screen name="InvoiceScan" options={{ title: 'Scan an invoice' }}>
           {({ route }) => (
             <InvoiceScanScreen
               vehicleId={route.params.vehicleId}
               /*
-                The seam. `pick-invoice-image.ts` is the only module that will
+                The seam. `pick-image.ts` is the only module that will
                 import expo-image-picker, so this screen stays free of native
                 imports and one file changes when the build lands.
               */

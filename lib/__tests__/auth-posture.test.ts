@@ -190,6 +190,14 @@ const ROUTE_POSTURE: Record<string, 'vehicle-scoped' | 'session' | 'public' | 's
   'app/api/v1/upload-document/route.ts': 'vehicle-scoped',
   'app/api/v1/consultant/upload-document/route.ts': 'vehicle-scoped',
   /*
+    The vehicle photograph (15 Aug). Same shape as the invoice upload above and
+    for the same reason: it authorizes through lib/api-auth for the **status
+    code** — `apps/mobile/src/api/client.ts` keys sign-out off 401 — and then
+    delegates to `uploadVehiclePhoto`, which authorizes again on its own account
+    because a server action is an independently reachable POST.
+  */
+  'app/api/v1/upload-photo/route.ts': 'vehicle-scoped',
+  /*
     The three advisor routes (task 3.0.1). Each authorizes through lib/api-auth
     for the status code and then delegates to an action that authorizes again
     on its own account — see app/api/v1/consultant/route.ts for why that is two

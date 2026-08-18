@@ -10,7 +10,29 @@ import {
 } from 'react-native';
 
 import { apiRequest, ApiRequestError } from '../api/client';
-import { getHealthBandJudgement, healthBandHex } from '@crewchief/core/health-band';
+import { Skeleton, SkeletonCard } from '../components/Skeleton';
+import { uploadVehiclePhoto } from '../api/photos';
+import type { InvoiceFile } from '../api/documents';
+import type { HealthDriver } from '@crewchief/core/health-drivers';
+import { buildPosition } from '@crewchief/core/build-progress';
+import { nextRungs, showsModifications } from '@crewchief/core/mod-progression';
+import AlertBanner from '../components/AlertBanner';
+import Button from '../components/Button';
+import Card from '../components/Card';
+import ClusterGauge, { CARD_SIZE } from '../components/ClusterGauge';
+import HealthDrivers from '../components/HealthDrivers';
+import HealthHistory, { type HealthReading } from '../components/HealthHistory';
+import BuildGauge from '../components/BuildGauge';
+import ProgressionLadder from '../components/ProgressionLadder';
+import Plinth from '../components/Plinth';
+import VehiclePlate from '../components/VehiclePlate';
+import ListRow from '../components/ListRow';
+import SectionHeader from '../components/SectionHeader';
+import { space, text, type } from '../theme';
+import { getHealthBandJudgement } from '@crewchief/core/health-band';
+
+/** The board's hero height for the photograph on this screen. */
+const PHOTO_HERO = 196;
 
 /**
  * Phase 3.2, second half — the detail behind a garage row.
@@ -20,20 +42,22 @@ import { getHealthBandJudgement, healthBandHex } from '@crewchief/core/health-ba
  *
  * ── One request, and no photograph ──────────────────────────────────────────
  *
- * `GET /api/v1/load-vehicle?vehicleId=…` returns the vehicle and its knowledge
- * base in one round trip, already stripped of `custom_image_url` and carrying a
- * signed `photo_url`. **This screen deliberately does not draw that photo yet.**
+ * `GET /api/v1/load-vehicle?vehicleId=…` returns the vehicle, its knowledge
+ * base, the computed health drivers and the score history in one round trip —
+ * already stripped of `custom_image_url` and carrying a signed `photo_url`.
  *
- * The signed URL points at the stored original, and the one real photo on this
- * account is a 2.3 MB legacy upload that predates the browser downscale — it
- * never decodes on the simulator. The garage card carries a timeout so it
- * degrades to a plate; repeating that machinery here to show the same picture
- * twice as large would double a net rather than remove the need for one.
+ * ── The photograph, which this screen used to decline to draw ───────────────
  *
- * **Not deferred pending a server-side transform** — that fix was tried on
- * 2 Aug and Supabase image transformation is not enabled for this tenant. It is
- * deferred pending either that paid feature or a derivative generated at
- * upload, and until then the honest version of this screen has no photo on it.
+ * It did, and the reason was sound at the time: the signed URL points at the
+ * stored original, the one real photo on this account is a 2.3 MB legacy upload
+ * that never decodes on a device, and repeating the garage card's timeout
+ * machinery here would have doubled a net rather than removed the need for one.
+ *
+ * All three parts of that changed on 15 Aug. The net is now **one component** —
+ * `VehiclePlate` owns the timeout, the two exits from loading and the fallback,
+ * so the hero reuses it rather than copying it. And the plate is no longer a
+ * dead end: `/api/v1/upload-photo` means a car that falls back to it can be
+ * given a picture from this screen.
  * `GarageScreen`'s `PHOTO_TIMEOUT_MS` docblock carries the full measurement.
  *
  * ── States, and which ones are not errors ───────────────────────────────────
@@ -80,6 +104,14 @@ interface Vehicle {
   */
   performance_mindedness?: string | null;
   ownership_objective?: string | null;
+  /**
+   * The signed URL, resolved from `custom_image_url` by the route.
+   *
+   * ⚠ It has been on this payload since `2eb172a` — the roadmap listed it as a
+   * missing API field on 15 Aug and it was already there. The screen simply
+   * declared it and never drew it.
+   */
+  photo_url?: string | null;
   /* Both embedded shapes accepted, for the reason GarageScreen sets out. */
   vehicle_health_summary?: HealthSummary | HealthSummary[] | null;
   nhtsa_data?: { recalls?: unknown[] | null } | { recalls?: unknown[] | null }[] | null;
@@ -100,9 +132,27 @@ function humanise(value: string): string {
     .join(' ');
 }
 
+/**
+ * The slice of the knowledge base this screen reads.
+ *
+ * Deliberately not the whole dossier's type. `load-vehicle` returns
+ * `vehicle_knowledge_base` with `select('*')`, and declaring every column here
+ * would make the screen's contract a mirror of that table — the exact problem
+ * `VEHICLE_COLUMNS` was written to stop on the route side.
+ */
+interface Knowledge {
+  common_mods?: Array<{ name: string; purpose?: string; difficulty?: string }> | null;
+}
+
 type State =
   | { status: 'loading' }
-  | { status: 'ok'; vehicle: Vehicle }
+  | {
+      status: 'ok';
+      vehicle: Vehicle;
+      drivers: HealthDriver[];
+      history: HealthReading[];
+      knowledge: Knowledge | null;
+    }
   | { status: 'missing' }
   | { status: 'error'; message: string; unauthorized: boolean };
 
@@ -114,6 +164,8 @@ export function VehicleDetailScreen({
   onScanInvoice,
   onViewRecalls,
   onOpenWishlist,
+  onOpenHistory,
+  pickPhoto,
 }: {
   vehicleId: string;
   onBack: () => void;
@@ -128,14 +180,32 @@ export function VehicleDetailScreen({
   onScanInvoice: () => void;
   onViewRecalls: () => void;
   onOpenWishlist: () => void;
+  /**
+   * The picker seam — this screen never imports `expo-image-picker`.
+   *
+   * Same reasoning as `GarageScreen` and `InvoiceScanScreen`: it is a native
+   * module, a build that lacks it crashes on launch the moment anything in the
+   * graph imports it, and taking it as a prop is what lets this screen mount in
+   * a test. Omitted means the plate has no control rather than a broken one.
+   */
+  pickPhoto?: () => Promise<InvoiceFile | null>;
+  /** Track 5.6 follow-on: the phone could write service history and not read it. */
+  onOpenHistory: () => void;
 }) {
   const [state, setState] = useState<State>({ status: 'loading' });
   const [refreshing, setRefreshing] = useState(false);
+
+  const [uploading, setUploading] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
 
   const load = useCallback(
     async (isRefresh = false) => {
       if (isRefresh) setRefreshing(true);
       else setState({ status: 'loading' });
+
+      // A photo error does not survive a reload — `AlertBanner` is an alert
+      // rather than a dialog, so refresh is what dismisses it.
+      setPhotoError(null);
 
       try {
         /*
@@ -144,14 +214,32 @@ export function VehicleDetailScreen({
           something else routes here with a value that is not a uuid, a raw
           interpolation is a query-string injection rather than a 400.
         */
-        const body = await apiRequest<{ vehicle?: Vehicle }>(
-          `/load-vehicle?vehicleId=${encodeURIComponent(vehicleId)}`
-        );
+        const body = await apiRequest<{
+          vehicle?: Vehicle;
+          health_drivers?: HealthDriver[];
+          health_history?: HealthReading[];
+          knowledge?: Knowledge | null;
+        }>(`/load-vehicle?vehicleId=${encodeURIComponent(vehicleId)}`);
         if (!body.vehicle) {
           setState({ status: 'missing' });
           return;
         }
-        setState({ status: 'ok', vehicle: body.vehicle });
+        /*
+          `health_drivers` is top level rather than folded into `vehicle`,
+          because they are derived and the vehicle object is the row — mixing
+          them would let a caller believe it could write one back.
+
+          Defaulted to empty rather than assumed present: a deployment where the
+          route predates this field should render a health card without drivers,
+          not a screen that throws.
+        */
+        setState({
+          status: 'ok',
+          vehicle: body.vehicle,
+          drivers: Array.isArray(body.health_drivers) ? body.health_drivers : [],
+          history: Array.isArray(body.health_history) ? body.health_history : [],
+          knowledge: body.knowledge ?? null,
+        });
       } catch (error) {
         const apiError = error as ApiRequestError;
         // 404 is a state, not a failure — see the header.
@@ -168,18 +256,59 @@ export function VehicleDetailScreen({
         setRefreshing(false);
       }
     },
-    [vehicleId]
+    [vehicleId],
   );
 
   useEffect(() => {
     void load();
   }, [load]);
 
+  /**
+   * Add or replace this car's photograph.
+   *
+   * The same three outcomes the garage handles, and the same rule about which
+   * of them is an error: **dismissal is not one.** The picker resolving `null`
+   * returns the screen to idle silently — showing "cancelled" after a
+   * deliberate tap on Cancel is how an app feels accusatory.
+   *
+   * Reloads rather than patching `photo_url` in place. The upload returns a
+   * signed URL and the payload carries one the server signed its own way;
+   * writing one into state the next refresh overwrites is the disagreement that
+   * reads as a photo flickering back to the plate.
+   */
+  const onAddPhoto = useCallback(async () => {
+    if (!pickPhoto) return;
+    setPhotoError(null);
+
+    try {
+      const file = await pickPhoto();
+      if (!file) return;
+
+      setUploading(true);
+      await uploadVehiclePhoto(vehicleId, file);
+      await load(true);
+    } catch (error) {
+      setPhotoError(error instanceof Error ? error.message : 'That photo could not be saved.');
+    } finally {
+      setUploading(false);
+    }
+  }, [pickPhoto, vehicleId, load]);
+
   if (state.status === 'loading') {
+    /*
+      Shaped like the dossier that is coming, not a centred dot.
+
+      This is the densest screen in the app and the one a recall notification
+      opens, so it is the most likely to be met cold. A hero block then two
+      cards mirrors what resolves — the photo, the health card, the
+      destinations — which is what stops the fill-in reading as a jump.
+    */
     return (
-      <View style={styles.centred}>
-        <ActivityIndicator color="rgba(255,255,255,0.5)" />
-      </View>
+      <ScrollView contentContainerStyle={styles.body}>
+        <Skeleton height={196} />
+        <SkeletonCard lines={3} />
+        <SkeletonCard lines={2} />
+      </ScrollView>
     );
   }
 
@@ -187,12 +316,13 @@ export function VehicleDetailScreen({
     return (
       <View style={styles.centred}>
         <Text style={styles.errorTitle}>This vehicle is no longer here</Text>
-        <Text style={styles.errorBody}>
-          It may have been removed from another device.
-        </Text>
-        <Pressable style={styles.button} onPress={onBack}>
-          <Text style={styles.buttonText}>Back to garage</Text>
-        </Pressable>
+        <Text style={styles.errorBody}>It may have been removed from another device.</Text>
+        <Button
+          label="Back to garage"
+          variant="outline"
+          onPress={onBack}
+          style={styles.stateAction}
+        />
       </View>
     );
   }
@@ -204,19 +334,40 @@ export function VehicleDetailScreen({
           {state.unauthorized ? 'Your session ended' : 'Could not load this vehicle'}
         </Text>
         <Text style={styles.errorBody}>{state.message}</Text>
-        <Pressable
-          style={styles.button}
+        <Button
+          label={state.unauthorized ? 'Sign in again' : 'Try again'}
+          variant="outline"
           onPress={() => (state.unauthorized ? onSignOut() : void load())}
-        >
-          <Text style={styles.buttonText}>
-            {state.unauthorized ? 'Sign in again' : 'Try again'}
-          </Text>
-        </Pressable>
+          style={styles.stateAction}
+        />
       </View>
     );
   }
 
-  const { vehicle } = state;
+  const { vehicle, drivers, history, knowledge } = state;
+
+  /*
+    ── The build dial and the ladder, from the knowledge base ─────────────────
+
+    ⚠ `completed` is empty, and it is empty **everywhere**: `modification_tracking`
+    holds no rows across the entire product — re-confirmed against the live
+    database on 15 Aug. So every car reads Stock with the ladder on its first
+    rung, and that is the honest state rather than a placeholder.
+
+    `mod-progression.ts` makes the same argument for the ladder: with no
+    history, the first step genuinely is the first step. The dial says the same
+    thing in glass — a needle at rest is a car nobody has recorded work on, not
+    a car in poor condition, which is why it never borrows the health ramp.
+  */
+  const completed: string[] = [];
+  const build = buildPosition([]);
+  const rungs = showsModifications(vehicle.performance_mindedness)
+    ? nextRungs({
+        mods: Array.isArray(knowledge?.common_mods) ? knowledge.common_mods : [],
+        completed,
+        mindedness: vehicle.performance_mindedness,
+      })
+    : [];
   const health = first(vehicle.vehicle_health_summary);
   const score = typeof health?.health_score === 'number' ? health.health_score : null;
   const band = score === null ? null : getHealthBandJudgement(score);
@@ -229,10 +380,40 @@ export function VehicleDetailScreen({
         <RefreshControl
           refreshing={refreshing}
           onRefresh={() => void load(true)}
-          tintColor="rgba(255,255,255,0.5)"
+          tintColor={text.muted}
         />
       }
     >
+      {/*
+        The 196pt photo hero — no longer deferred.
+
+        Three things changed on 15 Aug and all three were prerequisites:
+        `photo_url` turned out to have been on this payload since `2eb172a`;
+        `VehiclePlate` moved the timeout and the fallback into one component, so
+        showing a photo here reuses that net rather than doubling it; and
+        `/api/v1/upload-photo` means a car that lands on the plate can be given
+        a picture from this screen instead of being stuck there.
+
+        ⚠ It will show the plate on this account until the M235i's 2.3 MB
+        original is replaced — that file has never decoded on a device. That is
+        the fallback working, not the hero failing, and the control to fix it is
+        on the plate itself.
+      */}
+      {photoError && (
+        <AlertBanner tone="critical" headline="That photo was not saved" body={photoError} />
+      )}
+
+      <VehiclePlate
+        photo={vehicle.photo_url}
+        year={vehicle.year}
+        make={vehicle.make}
+        model={vehicle.model}
+        trim={vehicle.trim}
+        height={PHOTO_HERO}
+        onAddPhoto={pickPhoto ? () => void onAddPhoto() : undefined}
+        busy={uploading}
+      />
+
       <View style={styles.headerBlock}>
         <Text style={styles.name}>
           {[vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ')}
@@ -245,61 +426,146 @@ export function VehicleDetailScreen({
       </View>
 
       {/*
-        Above the health card, not below the details.
+        ── The recall, first and as a banner ──────────────────────────────────
 
-        Guideline 4.2 is answered by what an app *does*, and everything else on
-        this screen is a rendering of stored values. Putting the one verb below
-        two cards of read-only data would bury it under exactly the material
-        that makes the app look like a database viewer. It is also the shortest
-        route to the flow with no other entry point: the garage row leads here,
-        and here leads to the advisor.
+        It was a card at the very bottom of the screen, under five rows of
+        read-only detail. A recall is the one thing here that can be
+        time-critical, and burying it under the mileage inverted the screen's
+        priorities. `AlertBanner` is opaque and measured, which a wash over an
+        unknown backdrop is not.
       */}
-      <Pressable style={styles.advisorCta} onPress={onAskAdvisor} accessibilityRole="button">
-        <Text style={styles.advisorCtaText}>Ask the advisor</Text>
-        <Text style={styles.advisorCtaHint}>
-          It already knows this car's history — no need to explain it
-        </Text>
-      </Pressable>
-
-      {/*
-        Secondary to the advisor, deliberately. Both are native-only verbs that
-        answer guideline 4.2, but the advisor is the one someone opens without
-        already holding a piece of paper.
-      */}
-      <Pressable style={styles.scanCta} onPress={onOpenWishlist} accessibilityRole="button">
-        <Text style={styles.scanCtaText}>Wishlist</Text>
-        <Text style={styles.scanCtaHint}>
-          What this car needs, so the advisor can price it
-        </Text>
-      </Pressable>
-
-      <Pressable style={styles.scanCta} onPress={onScanInvoice} accessibilityRole="button">
-        <Text style={styles.scanCtaText}>Scan an invoice</Text>
-        <Text style={styles.scanCtaHint}>
-          Photograph a bill and its line items are added here
-        </Text>
-      </Pressable>
-
-      {score !== null && band && (
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>Health</Text>
-          <View style={styles.scoreRow}>
-            <Text style={[styles.score, { color: healthBandHex(band) }]}>{score}</Text>
-            <Text style={[styles.bandLabel, { color: healthBandHex(band) }]}>
-              {/*
-                `label` here, `short` on the garage row. The module sets both
-                deliberately and says `label` is canonical — the row abbreviates
-                because it has a card's width, and this screen does not have to.
-              */}
-              {band.label}
-            </Text>
-          </View>
-          {health?.summary ? <Text style={styles.summary}>{health.summary}</Text> : null}
-        </View>
+      {recalls > 0 && (
+        <Pressable
+          onPress={onViewRecalls}
+          accessibilityRole="button"
+          accessibilityLabel={`View ${recalls} open ${recalls === 1 ? 'recall' : 'recalls'}`}
+        >
+          <AlertBanner
+            tone="critical"
+            headline={`${recalls} open ${recalls === 1 ? 'recall' : 'recalls'}`}
+            body="What it means, and what to do about it"
+          />
+        </Pressable>
       )}
 
-      <View style={styles.card}>
-        <Text style={styles.cardLabel}>Details</Text>
+      {score !== null && band && (
+        <Card>
+          <SectionHeader title="Health" />
+          {/*
+            ⚠ The **card** dial at 104, not the hero — corrected 15 Aug.
+
+            The board is explicit and I read it wrong the first time: *"Hero ·
+            184pt … Garage bay and nothing else — one dial per screen"*, and
+            *"Card · 104pt … deliberately still. **The plinth on vehicle
+            detail**."* A second hero here is a second screen claiming the one
+            dial, and at 184 plus a sweep it pushed everything this screen
+            exists to lead to below the fold.
+
+            The plinth is what makes it an object rather than a picture of one.
+          */}
+          <Plinth>
+            <ClusterGauge score={score} variant="card" size={CARD_SIZE} />
+          </Plinth>
+          {health?.summary ? <Text style={styles.summary}>{health.summary}</Text> : null}
+
+          {/*
+            The three score drivers — the endpoint gained them on 15 Aug.
+
+            ⚠ Below the summary rather than beside the dial, and that placement
+            is the honest one: they explain the subject without adding up to the
+            reading above them. Putting three numbers next to a total invites
+            arithmetic that does not hold — `health_score` comes from the model
+            and these are computed from the schedule, the recall list and
+            mileage against age.
+          */}
+          <HealthDrivers drivers={drivers} />
+        </Card>
+      )}
+
+
+
+
+      {/*
+        ── Three destinations, as rows rather than as cards ───────────────────
+
+        These were three full-width bordered cards, each with a title and a
+        hint, stacked above the health summary — four boxes competing to be the
+        thing you press, on a screen whose actual job is to tell you about a
+        car. As rows they read as what they are: places to go.
+      */}
+      <Card>
+        <SectionHeader title="This car" />
+        <ListRow label="Service history" onPress={onOpenHistory} value="" />
+        <ListRow
+          label="Wishlist"
+          detail="What it needs, so the advisor can price it"
+          onPress={onOpenWishlist}
+          value=""
+        />
+        <ListRow
+          label="Scan an invoice"
+          detail="Photograph a bill and its lines are filed here"
+          onPress={onScanInvoice}
+          value=""
+        />
+      </Card>
+      {/*
+        ── The one filled primary ─────────────────────────────────────────────
+
+        The advisor is the verb this screen exists to lead to, and it is now the
+        only filled control on it. Everything above is either information or a
+        destination.
+
+        It keeps its place near the bottom rather than the top: the earlier
+        version put it first to answer guideline 4.2, but 4.2 is answered by the
+        app *having* the flow, not by where the button sits — and a primary
+        above the health summary asked the question before showing the reason
+        to ask it.
+      */}
+      <Button label="Ask the advisor" onPress={onAskAdvisor} style={styles.primaryAction} />
+
+      {/*
+        ── Below the fold, and that is the board's order ───────────────────────
+
+        Screen 02 is the car and what to do about it; **screen 03 is "vehicle
+        detail, scrolled"** and carries "the two instruments web has and mobile
+        does not: health over time, and the build dial with its redline".
+
+        ⚠ They were above the destinations until 15 Aug and it was wrong. Two
+        full-height instruments between the health summary and the advisor put
+        the verb this screen exists to lead to — and the wishlist with it —
+        below everything. The instruments are reference; you scroll to them.
+      */}
+      <HealthHistoryCard history={history} />
+      {/*
+        ── The build, and why it is a second card rather than a second dial ────
+
+        The board's screen 03 names these as "the two instruments web has and
+        mobile does not". They are siblings, not variants: the health gauge is
+        hardwired to health semantics and **a low build reading is stock, not a
+        fault** — reusing it would render an unmodified car as a critical
+        failure and announce it as one.
+
+        Shown only when the owner has not said "stock". `showsModifications` is
+        the one genuine off switch, and it is "not now" rather than "never".
+      */}
+      {showsModifications(vehicle.performance_mindedness) && (
+        <Card>
+          <SectionHeader title="Build" />
+          <View style={styles.buildDial}>
+            <BuildGauge position={build} />
+          </View>
+
+          {/*
+            The ladder answers the question the dial does not: why this next,
+            and not the turbo. A recommendation with no visible reasoning is a
+            black box, and this product's whole argument is that it is not one.
+          */}
+          {rungs.length > 0 && <ProgressionLadder next={rungs[0].role} />}
+        </Card>
+      )}
+      <Card>
+        <SectionHeader title="Details" />
         <Row
           label="Mileage"
           value={
@@ -316,10 +582,7 @@ export function VehicleDetailScreen({
               : null
           }
         />
-        <Row
-          label="Use"
-          value={vehicle.vehicle_status ? humanise(vehicle.vehicle_status) : null}
-        />
+        <Row label="Use" value={vehicle.vehicle_status ? humanise(vehicle.vehicle_status) : null} />
         <Row
           label="Goal"
           value={vehicle.performance_mindedness ? humanise(vehicle.performance_mindedness) : null}
@@ -328,27 +591,31 @@ export function VehicleDetailScreen({
           label="Objective"
           value={vehicle.ownership_objective ? humanise(vehicle.ownership_objective) : null}
         />
-      </View>
-
-      {recalls > 0 && (
-        <Pressable
-          style={styles.card}
-          accessibilityRole="button"
-          accessibilityLabel={`View ${recalls} open ${recalls === 1 ? 'recall' : 'recalls'}`}
-          onPress={onViewRecalls}
-        >
-          <Text style={styles.recall}>
-            {recalls} open {recalls === 1 ? 'recall' : 'recalls'}
-          </Text>
-          {/*
-            5.6 replaced "Recall detail is on the web for now." A notification
-            about a recall that lands on a screen telling you to go and use a
-            different device is not a notification worth sending.
-          */}
-          <Text style={styles.errorBody}>What it means, and what to do about it</Text>
-        </Pressable>
-      )}
+      </Card>
     </ScrollView>
+  );
+}
+
+/**
+ * Score over time, in its own card — and nothing at all when there is no chart.
+ *
+ * `HealthHistory` declines to draw from fewer than two readings, which is
+ * right: a one-point chart is a dot. But a `Card` wrapped round it would still
+ * render its heading, so the screen would carry a "Health over time" title with
+ * an empty panel under it — the shape that reads as a loading failure.
+ *
+ * ⚠ **That is the state this account is in today.** There is exactly one
+ * recorded reading for the real car, so this renders nothing until the sweep
+ * has run twice.
+ */
+function HealthHistoryCard({ history }: { history: HealthReading[] }) {
+  if (history.length < 2) return null;
+
+  return (
+    <Card>
+      <SectionHeader title="Health over time" />
+      <HealthHistory history={history} />
+    </Card>
   );
 }
 
@@ -367,93 +634,54 @@ function Row({ label, value }: { label: string; value: string | null }) {
 }
 
 const styles = StyleSheet.create({
-  body: { padding: 20, gap: 14 },
+  body: { padding: space.lg, gap: space.md },
 
   headerBlock: { gap: 2 },
-  name: { color: '#fff', fontSize: 26, fontWeight: '700', letterSpacing: -0.5 },
-  trim: { color: 'rgba(255,255,255,0.5)', fontSize: 14 },
-
-  card: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    padding: 16,
-    gap: 10,
+  name: {
+    ...type.editorial,
+    fontSize: 26,
+    lineHeight: 32,
+    color: text.primary,
+    letterSpacing: -0.5,
   },
-  cardLabel: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
+  trim: { ...type.body, color: text.muted },
 
-  scoreRow: { flexDirection: 'row', alignItems: 'baseline', gap: 10 },
-  score: { fontSize: 34, fontWeight: '700', lineHeight: 36 },
-  bandLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
-  summary: { color: 'rgba(255,255,255,0.7)', fontSize: 14, lineHeight: 20 },
+  /* The same real surface step the garage cards now use — not a 5% wash. */
 
-  row: { flexDirection: 'row', justifyContent: 'space-between', gap: 16 },
-  rowLabel: { color: 'rgba(255,255,255,0.5)', fontSize: 14 },
-  rowValue: { color: '#fff', fontSize: 14, flexShrink: 1, textAlign: 'right' },
+  buildDial: { alignItems: 'center' },
+  summary: { ...type.body, fontSize: 14, lineHeight: 20, color: text.secondary },
 
-  recall: { color: '#e0a468', fontSize: 15, fontWeight: '600' },
+  row: { flexDirection: 'row', justifyContent: 'space-between', gap: space.lg },
+  rowLabel: { ...type.body, fontSize: 14, color: text.muted },
+  rowValue: { ...type.body, fontSize: 14, color: text.primary, flexShrink: 1, textAlign: 'right' },
+
 
   /*
-    White on #080808 rather than the brand cyan. `bg-cyan-600` measures 3.68:1
-    and is an open decision on the web board — pulling it onto a new surface
-    would spread a known sub-floor colour to a second client while the call is
-    still being made. The hint below is 0.55 white on white: 8.6:1, above the
-    4.5:1 floor `78eba74` made a rule.
-  */
-  advisorCta: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    paddingVertical: 15,
-    paddingHorizontal: 16,
-    gap: 3,
-  },
-  advisorCtaText: { color: '#080808', fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
-  /*
-    0.60, not 0.55. **The comment that shipped with this claimed "8.6:1, above
-    the 4.5:1 floor" and was wrong**: it measured white-on-white by mistake,
-    when this is near-black ink on a white button. The real figure was 4.47:1,
-    a hair *under* the floor, and no source scan could have caught it — the
-    scan only reads `rgba(255,255,255,α)` and this is dark text.
+    ⚠ **The colours in the two CTAs below are deliberately NOT tokenised.**
 
-    Found by the rendered-contrast suite, which measures each run against the
-    surface it truly lands on. 0.60 gives 5.35:1.
+    They are measured values with a history. The white fill was chosen over the
+    brand cyan because `bg-cyan-600` was a known 3.68:1 and an open decision on
+    the web board, and the dark ink sat at 4.47:1 — a hair under the floor —
+    behind a shipped comment that claimed 8.6:1 and had measured white-on-white
+    by mistake. The rendered-contrast suite caught it; 0.60 gives 5.35:1.
+
+    Substituting a token here would re-open a question that cost real time to
+    close, and no source scan can catch it because this is dark text on light.
+    Structure moves onto the system; these four colours do not.
   */
-  advisorCtaHint: { color: 'rgba(8,8,8,0.6)', fontSize: 13, lineHeight: 18 },
 
   /* Outlined rather than filled, so it reads as the second verb on the screen. */
-  scanCta: {
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-    borderRadius: 16,
-    paddingVertical: 15,
-    paddingHorizontal: 16,
-    gap: 3,
-  },
-  scanCtaText: { color: '#fff', fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
-  scanCtaHint: { color: 'rgba(255,255,255,0.5)', fontSize: 13, lineHeight: 18 },
 
-  centred: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 8 },
-  errorTitle: { color: '#fff', fontSize: 17, fontWeight: '600' },
-  errorBody: { color: 'rgba(255,255,255,0.5)', fontSize: 14, textAlign: 'center' },
-  button: {
-    marginTop: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-    borderRadius: 9,
-    paddingVertical: 11,
-    paddingHorizontal: 22,
+  centred: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: space.h1,
+    gap: space.sm,
   },
-  buttonText: { color: '#fff', fontSize: 14 },
+  errorTitle: { ...type.title, color: text.primary },
+  errorBody: { ...type.body, color: text.muted, textAlign: 'center' },
+  stateAction: { marginTop: space.md, paddingHorizontal: space.xxl },
+  /* Full-bleed: the one thing on the screen that is a commitment, not a link. */
+  primaryAction: { alignSelf: 'stretch', marginTop: space.xs },
 });

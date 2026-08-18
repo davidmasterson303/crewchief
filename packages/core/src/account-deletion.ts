@@ -87,3 +87,59 @@ export const DELETION_INVENTORY: readonly string[] = [
   'Every consultant conversation',
   'Your profile and sign-in',
 ];
+
+/**
+ * What a subscriber has to be told before deleting, and why it is a warning
+ * rather than a block.
+ *
+ * Phase 6, E5. **Deleting an account while an Apple-billed subscription keeps
+ * charging is a documented App Store rejection reason**, and it is a real
+ * failure rather than a paperwork one: the account that could manage the
+ * subscription is gone, so the charge continues and the person has no obvious
+ * way to stop it.
+ *
+ * ── Why we cannot just cancel it ────────────────────────────────────────────
+ *
+ * We do not hold the billing relationship. Apple does. There is no server-side
+ * call that cancels an App Store subscription on a user's behalf — only the
+ * account holder can, through the App Store. Any copy implying otherwise would
+ * be a promise the product cannot keep, which is worse than the silence it
+ * replaces.
+ *
+ * ── Why it must not block deletion ──────────────────────────────────────────
+ *
+ * The tempting fix is to refuse deletion until the subscription is cancelled.
+ * **That trades one guideline violation for a worse one.** 5.1.1(v) requires
+ * that deletion be initiated and completed from inside the app; gating it on an
+ * action that happens in a *different* app is exactly the obstruction the
+ * guideline exists to prevent, and it is the more likely rejection of the two.
+ *
+ * So: say it plainly, say it before the confirmation, and let them proceed.
+ */
+export const SUBSCRIPTION_CANCEL_PATH = 'Settings → your name → Subscriptions';
+
+export interface SubscriptionNotice {
+  /** One line stating the problem. */
+  headline: string;
+  /** What to do about it, naming where. */
+  action: string;
+}
+
+/**
+ * The notice to show above the confirmation, or `null` when there is nothing
+ * to warn about.
+ *
+ * `null` for a lapsed or absent subscription is not a detail — warning someone
+ * about a subscription they do not have would send them to cancel something
+ * that is not there, and they would reasonably conclude the deletion had not
+ * worked. `hasLiveEntitlement` is the only thing that should decide this, so it
+ * is passed in rather than re-derived here.
+ */
+export function subscriptionNotice(hasLiveSubscription: boolean): SubscriptionNotice | null {
+  if (!hasLiveSubscription) return null;
+
+  return {
+    headline: 'Deleting your account does not cancel your subscription.',
+    action: `Your subscription is billed by Apple, and only you can stop it — in ${SUBSCRIPTION_CANCEL_PATH}. Cancel it first, or you will keep being charged after this account is gone.`,
+  };
+}

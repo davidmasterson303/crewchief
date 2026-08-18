@@ -11,9 +11,17 @@ import {
   View,
 } from 'react-native';
 
+import Button from '../components/Button';
+import Card from '../components/Card';
+import EmptyState from '../components/EmptyState';
 import { apiRequest, ApiRequestError } from '../api/client';
+import { Skeleton, SkeletonCard } from '../components/Skeleton';
 import { wishlistItemIdentifier, type WishlistItemType } from '@crewchief/core/wishlist-identifier';
 import { formatCurrency } from '@crewchief/core/formatting-utils';
+import { completionPayload, type CompletionDraft } from '@crewchief/core/wishlist-completion';
+import { MarkDoneSheet } from './MarkDoneSheet';
+import { border, brand, radius, status, surface, text, type } from '../theme';
+import { interFace } from '../theme/fonts';
 
 /**
  * Phase 5.6 — the wishlist, on the phone.
@@ -88,6 +96,15 @@ export function WishlistScreen({ vehicleId, onSignOut }: Props) {
   const [draft, setDraft] = useState('');
   const [draftType, setDraftType] = useState<WishlistItemType>('maintenance');
   const [saving, setSaving] = useState(false);
+  /*
+    The composer is closed by default. It used to sit permanently above the
+    list, which made this a data-entry form with a list underneath rather than
+    "your list" with a way to add to it — and it pushed the first real item
+    below the fold on a phone.
+  */
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [doneItem, setDoneItem] = useState<WishlistItem | null>(null);
+  const [completing, setCompleting] = useState(false);
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -192,11 +209,46 @@ export function WishlistScreen({ vehicleId, onSignOut }: Props) {
     [load, onSignOut]
   );
 
+  const complete = useCallback(
+    async (draft: CompletionDraft) => {
+      const item = doneItem;
+      if (!item || completing) return;
+
+      setCompleting(true);
+      try {
+        await apiRequest('/wishlist/complete', {
+          method: 'POST',
+          body: completionPayload(item.id, draft),
+        });
+        setDoneItem(null);
+        await load(true);
+      } catch (error) {
+        const apiError = error as ApiRequestError;
+        if (apiError.status === 401) {
+          onSignOut();
+          return;
+        }
+        /*
+          The sheet stays open on failure. Closing it would discard what the
+          person typed and leave them unsure whether the history row was
+          written — and this is the one action here with no undo.
+        */
+        Alert.alert('Could not mark that done', apiError.message ?? 'Try again in a moment.');
+      } finally {
+        setCompleting(false);
+      }
+    },
+    [doneItem, completing, load, onSignOut]
+  );
+
   if (state.kind === 'loading') {
+    // Three cards, because that is what a wishlist resolves into.
     return (
-      <View style={styles.centre}>
-        <ActivityIndicator color="rgba(255,255,255,0.6)" />
-      </View>
+      <ScrollView contentContainerStyle={styles.body}>
+        <SkeletonCard lines={2} />
+        <SkeletonCard lines={2} />
+        <SkeletonCard lines={2} />
+      </ScrollView>
     );
   }
 
@@ -220,60 +272,115 @@ export function WishlistScreen({ vehicleId, onSignOut }: Props) {
         <RefreshControl
           refreshing={refreshing}
           onRefresh={() => void load(true)}
-          tintColor="rgba(255,255,255,0.5)"
+          tintColor={text.muted}
         />
       }
     >
-      <View style={styles.composer}>
-        <TextInput
-          style={styles.input}
-          value={draft}
-          onChangeText={setDraft}
-          placeholder="Something this car needs"
-          placeholderTextColor="rgba(255,255,255,0.4)"
-          accessibilityLabel="What to add to the wishlist"
-          returnKeyType="done"
-          onSubmitEditing={() => void add()}
-        />
-
-        <View style={styles.typeRow}>
-          {TYPES.map((type) => (
-            <Pressable
-              key={type.value}
-              accessibilityRole="button"
-              accessibilityState={{ selected: draftType === type.value }}
-              accessibilityLabel={`Add as ${type.label}`}
-              style={[styles.typeChip, draftType === type.value && styles.typeChipOn]}
-              onPress={() => setDraftType(type.value)}
-            >
-              <Text style={[styles.typeText, draftType === type.value && styles.typeTextOn]}>
-                {type.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-
+      {!composerOpen ? (
         <Pressable
-          style={[styles.addCta, (!draft.trim() || saving) && styles.addCtaOff]}
           accessibilityRole="button"
-          accessibilityState={{ disabled: !draft.trim() || saving }}
-          onPress={() => void add()}
+          accessibilityLabel="Add something to the wishlist"
+          style={styles.openComposer}
+          onPress={() => setComposerOpen(true)}
         >
-          <Text style={styles.addCtaText}>{saving ? 'Adding…' : 'Add to wishlist'}</Text>
+          <Text style={styles.openComposerText}>Add something</Text>
         </Pressable>
-      </View>
+      ) : (
+        <View style={styles.composer}>
+          <TextInput
+            style={styles.input}
+            value={draft}
+            onChangeText={setDraft}
+            placeholder="Something this car needs"
+            placeholderTextColor={text.muted}
+            accessibilityLabel="What to add to the wishlist"
+            returnKeyType="done"
+            autoFocus
+            onSubmitEditing={() => void add()}
+          />
+
+          {/*
+            ── The type is a refinement, not a toll gate ──────────────────────
+
+            These were three equal chips with `maintenance` preselected, shown
+            before the text field had anything in it. That made a taxonomy
+            decision the *first* thing the screen asked for, and the answer
+            barely surfaced afterwards — nothing groups or filters by it, so the
+            user classified an item for no visible return.
+
+            Now they appear only once there is something to classify, and the
+            label says what they are for. The default still stands on its own:
+            most things a car needs are maintenance, and an unchanged default is
+            a correct answer rather than an unanswered question.
+          */}
+          {draft.trim().length > 0 && (
+            <View style={styles.typeBlock}>
+              <Text style={styles.typeLabel}>File it as</Text>
+              <View style={styles.typeRow}>
+                {TYPES.map((type) => (
+                  <Pressable
+                    key={type.value}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: draftType === type.value }}
+                    accessibilityLabel={`File as ${type.label}`}
+                    style={[styles.typeChip, draftType === type.value && styles.typeChipOn]}
+                    onPress={() => setDraftType(type.value)}
+                  >
+                    <Text style={[styles.typeText, draftType === type.value && styles.typeTextOn]}>
+                      {type.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          )}
+
+          <View style={styles.composerActions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Cancel adding"
+              style={styles.composerCancel}
+              onPress={() => {
+                setComposerOpen(false);
+                setDraft('');
+              }}
+            >
+              <Text style={styles.composerCancelText}>Cancel</Text>
+            </Pressable>
+
+            <Button
+              label="Add"
+              variant="inverse"
+              /*
+                Named explicitly. The visible label shortened to "Add" when the
+                composer gained a Cancel beside it, and "Add" alone is a poor
+                accessible name — a screen reader user hears it with no object.
+                The visible text can be terse because the surrounding form is
+                visible; the accessible name cannot rely on that.
+              */
+              accessibilityLabel="Add to wishlist"
+              disabled={!draft.trim()}
+              busy={saving}
+              onPress={() => void add()}
+            />
+          </View>
+        </View>
+      )}
 
       {state.items.length === 0 ? (
-        <View style={styles.card}>
-          <Text style={styles.emptyTitle}>Nothing on the list yet</Text>
-          <Text style={styles.emptyBody}>
-            Add what this car needs as you think of it. The advisor uses this list when it
-            works out what a job would cost.
-          </Text>
-        </View>
+        /*
+          No action, and deliberately: the "Add something" control sits directly
+          above this. A second control with the same job would be two ways to do
+          one thing on a screen with nothing on it — which reads as indecision
+          rather than helpfulness.
+        */
+        <EmptyState
+          headline="Nothing on the list yet"
+          body="Add what this car needs as you think of it. The advisor uses this list when it works out what a job would cost."
+        />
       ) : (
         state.items.map((item) => (
-          <View key={item.id} style={styles.card}>
+          <Card key={item.id} style={styles.cardGap}>
             <View style={styles.itemHead}>
               <Text style={styles.itemName}>{item.item_name}</Text>
               {estimate(item) && <Text style={styles.itemCost}>{estimate(item)}</Text>}
@@ -283,18 +390,37 @@ export function WishlistScreen({ vehicleId, onSignOut }: Props) {
 
             <View style={styles.itemFoot}>
               <Text style={styles.itemMeta}>{item.category ?? item.item_type ?? 'Item'}</Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Remove ${item.item_name} from the wishlist`}
-                style={styles.removeCta}
-                onPress={() => remove(item)}
-              >
-                <Text style={styles.removeText}>Remove</Text>
-              </Pressable>
+              <View style={styles.itemActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Mark ${item.item_name} done`}
+                  style={styles.doneCta}
+                  onPress={() => setDoneItem(item)}
+                >
+                  <Text style={styles.doneText}>Done</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove ${item.item_name} from the wishlist`}
+                  style={styles.removeCta}
+                  onPress={() => remove(item)}
+                >
+                  <Text style={styles.removeText}>Remove</Text>
+                </Pressable>
+              </View>
             </View>
-          </View>
+          </Card>
         ))
       )}
+
+      <MarkDoneSheet
+        visible={doneItem !== null}
+        itemName={doneItem?.item_name ?? ''}
+        today={new Date().toISOString().slice(0, 10)}
+        saving={completing}
+        onCancel={() => setDoneItem(null)}
+        onConfirm={(draft) => void complete(draft)}
+      />
     </ScrollView>
   );
 }
@@ -303,10 +429,38 @@ const styles = StyleSheet.create({
   body: { padding: 20, gap: 14, paddingBottom: 40 },
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 10 },
 
+  /*
+    The closed state. A single control that says what it does, so the screen
+    opens as a list rather than as a form — the first item is now above the
+    fold on a phone, which it was not.
+  */
+  openComposer: {
+    minHeight: 48,
+    borderRadius: radius.button,
+    borderWidth: 1,
+    borderColor: border.field,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  openComposerText: { color: text.secondary, fontSize: 15, fontFamily: interFace('600'), fontWeight: '600' },
+
   composer: { gap: 10 },
+  typeBlock: { gap: 8 },
+  typeLabel: { color: text.muted, fontSize: 12, fontFamily: interFace('600'), fontWeight: '600' },
+  composerActions: { flexDirection: 'row', gap: 10 },
+  composerCancel: {
+    minHeight: 48,
+    paddingHorizontal: 18,
+    borderRadius: radius.button,
+    borderWidth: 1,
+    borderColor: border.field,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  composerCancelText: { color: text.secondary, fontSize: 15, fontFamily: interFace('600'), fontWeight: '600' },
   input: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 12,
+    backgroundColor: surface.raised,
+    borderRadius: radius.button,
     paddingHorizontal: 14,
     /*
       16px, not 14. iOS Safari's zoom rule does not apply to a native
@@ -315,15 +469,15 @@ const styles = StyleSheet.create({
       field here would be the one place in the product that disagrees.
     */
     fontSize: 16,
-    color: '#fff',
+    color: text.primary,
     minHeight: 48,
   },
 
   typeRow: { flexDirection: 'row', gap: 8 },
   typeChip: {
     paddingHorizontal: 14,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: radius.button,
+    backgroundColor: surface.raised,
     /*
       Grown for real rather than given a 44px `::after`-style hit area. These
       wrap in a row with an 8px gap, and R9 recorded what happens when a padded
@@ -334,17 +488,10 @@ const styles = StyleSheet.create({
     minHeight: 44,
     justifyContent: 'center',
   },
-  typeChipOn: { backgroundColor: '#fff' },
-  typeText: { color: 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: '600' },
-  typeTextOn: { color: '#080808' },
+  typeChipOn: { backgroundColor: surface.inverse },
+  typeText: { color: text.secondary, fontSize: 14, fontFamily: interFace('600'), fontWeight: '600' },
+  typeTextOn: { color: text.onInverse },
 
-  addCta: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    minHeight: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   /*
     An explicit fill, **not `opacity`**, and that is a testability decision as
     much as a design one.
@@ -359,31 +506,55 @@ const styles = StyleSheet.create({
     A real colour is measured. #8f8f8f against the near-black label reads about
     6.2:1, and taking it darker turns the suite red, which is the whole point.
   */
-  addCtaOff: { backgroundColor: '#8f8f8f' },
-  addCtaText: { color: '#080808', fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
 
-  card: { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 14, padding: 16, gap: 8 },
+  /**
+   * The card, on the ladder rather than beside it.
+   *
+   * ⚠ This was a **private copy** — `surface.raised` with no border, where the
+   * `Card` primitive is `surface.card` with `border.panel`. `raised` is the
+   * ladder's step for bars, tab strips and chips; a card painted on it sits one
+   * step off from every other card in the app, which is precisely the "twelve
+   * slightly different containers" the primitive set was built to end.
+   *
+   * The gap is kept as it was. Padding and gaps across this app want a pass
+   * with a designer's eye rather than a find-and-replace — see the note in
+   * `mobile-radius-scale.test.ts` on why that rule was scoped to radius.
+   */
+  cardGap: { gap: 8 },
   itemHead: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
-  itemName: { color: '#fff', fontSize: 15, fontWeight: '600', flexShrink: 1 },
-  itemCost: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  itemBody: { color: 'rgba(255,255,255,0.7)', fontSize: 14, lineHeight: 20 },
+  itemName: { color: text.primary, fontSize: 15, fontFamily: interFace('600'), fontWeight: '600', flexShrink: 1 },
+  itemCost: { color: text.primary, fontSize: 15, fontFamily: interFace('700'), fontWeight: '700' },
+  itemBody: { color: text.secondary, fontSize: 14, lineHeight: 20 },
   itemFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  itemMeta: { color: 'rgba(255,255,255,0.5)', fontSize: 12 },
-  removeCta: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },
-  removeText: { color: '#e0a468', fontSize: 14, fontWeight: '600' },
+  itemMeta: { color: text.muted, fontSize: 12 },
+  itemActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  /*
+    Done is the primary action on a row and Remove is not, so they do not look
+    alike. Remove deletes; Done writes the job into the car's service history
+    and is the reason to keep a list at all.
+  */
+  doneCta: {
+    minHeight: 44,
+    paddingHorizontal: 14,
+    borderRadius: radius.button,
+    borderWidth: 1,
+    borderColor: brand.primary,
+    justifyContent: 'center',
+  },
+  doneText: { color: brand.accent, fontSize: 14, fontFamily: interFace('700'), fontWeight: '700' },
+  removeCta: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 },
+  removeText: { color: status.attention, fontSize: 14, fontFamily: interFace('600'), fontWeight: '600' },
 
-  emptyTitle: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  emptyBody: { color: 'rgba(255,255,255,0.7)', fontSize: 14, lineHeight: 20 },
 
-  errorTitle: { color: '#fff', fontSize: 17, fontWeight: '600' },
-  errorBody: { color: 'rgba(255,255,255,0.5)', fontSize: 14, textAlign: 'center' },
+  errorTitle: { color: text.primary, fontSize: 17, fontFamily: interFace('600'), fontWeight: '600' },
+  errorBody: { color: text.muted, fontSize: 14, textAlign: 'center' },
   button: {
     marginTop: 6,
     paddingHorizontal: 18,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: radius.button,
+    backgroundColor: surface.raised,
     minHeight: 44,
     justifyContent: 'center',
   },
-  buttonText: { color: '#fff', fontSize: 14 },
+  buttonText: { color: text.primary, fontSize: 14 },
 });

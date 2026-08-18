@@ -15,12 +15,15 @@
 
 import {
   SERVICE_COOLDOWN_DAYS,
+  SWEEP_GENERATE_CAP,
   SWEEP_SEND_CAP,
   applySendCap,
   daysBetween,
   headlineService,
   recallsToRaise,
   shouldRaiseService,
+  vehiclesToGenerate,
+  type GenerationCandidate,
 } from '@crewchief/core/notification-sweep';
 import { normaliseRecall } from '@crewchief/core/recalls';
 import {
@@ -312,5 +315,136 @@ describe('headlineService', () => {
 
     expect(isWorthNotifying(milestone)).toBe(true);
     expect(headlineService(milestone!)).toBe('Engine oil and filter');
+  });
+});
+
+/**
+ * C4 — which cars get a schedule generated at 3am, and which are left alone.
+ *
+ * This is the only decision in the sweep that spends **money** rather than
+ * attention, so the tests are weighted differently from the ones above. There,
+ * the cost of a wrong answer is a notification somebody did not want. Here it
+ * is a Pro-model call, repeated nightly, for as long as nobody notices.
+ *
+ * Every filter below is a brake on that. The mutation note on each says what
+ * removing it would cost, because a filter whose absence is survivable does not
+ * need to exist and a filter whose absence is not should be hard to delete by
+ * accident.
+ */
+describe('vehiclesToGenerate', () => {
+  function candidate(overrides: Partial<GenerationCandidate> = {}): GenerationCandidate {
+    return {
+      vehicleId: 'v1',
+      userId: 'u1',
+      researchStatus: 'pending',
+      hasPushToken: true,
+      mileage: 61_000,
+      ...overrides,
+    };
+  }
+
+  it('generates for a pending car whose owner has a device and an odometer reading', () => {
+    const plan = vehiclesToGenerate([candidate()]);
+
+    expect(plan.send).toHaveLength(1);
+    expect(plan.capped).toBe(false);
+  });
+
+  it('never regenerates a car whose research already failed', () => {
+    /*
+      The most expensive mutation in this file. `failed` means the model has
+      already run three times and been paid for three times; selecting it here
+      would retry every one of those, every night, forever — and the user
+      already has a retry button owned by a request that waits for it.
+
+      Flip the filter to include 'failed' and this goes red.
+    */
+    expect(vehiclesToGenerate([candidate({ researchStatus: 'failed' })]).send).toHaveLength(0);
+  });
+
+  it('never regenerates a completed car that simply has no schedule', () => {
+    /*
+      The same runaway wearing a different status. A `completed` row with an
+      empty schedule is research that succeeded and produced nothing; asking
+      again tonight asks again every night.
+    */
+    expect(vehiclesToGenerate([candidate({ researchStatus: 'completed' })]).send).toHaveLength(0);
+  });
+
+  it('never regenerates a car the model has said it cannot help with', () => {
+    expect(vehiclesToGenerate([candidate({ researchStatus: 'unsupported' })]).send).toHaveLength(0);
+  });
+
+  it('skips a vehicle with no knowledge-base row at all', () => {
+    /*
+      The subtle one, and the reason `null` is not treated as "as good as
+      pending". Generation reports failure by UPDATEing `research_status` to
+      'failed' — which does nothing when there is no row to update. So a
+      vehicle in this state could fail nightly and never record that it had:
+      a paid call with no brake on it.
+    */
+    expect(vehiclesToGenerate([candidate({ researchStatus: null })]).send).toHaveLength(0);
+  });
+
+  it('does not spend a model call for an account with no registered device', () => {
+    expect(vehiclesToGenerate([candidate({ hasPushToken: false })]).send).toHaveLength(0);
+  });
+
+  it('does not generate for a car with no odometer reading', () => {
+    /*
+      `collectService` already refuses a car at zero miles, so generating for
+      one could not produce a notification even if it worked perfectly.
+    */
+    expect(vehiclesToGenerate([candidate({ mileage: 0 })]).send).toHaveLength(0);
+    expect(vehiclesToGenerate([candidate({ mileage: null })]).send).toHaveLength(0);
+  });
+
+  it('spends the budget and leaves the rest for tomorrow, rather than refusing the run', () => {
+    /*
+      The degradation this cap is supposed to produce. Eleven eligible cars on
+      a cap of ten is not an incident — it is a backlog, and the right answer
+      is ten tonight and one tomorrow. A cap that threw, or that skipped the
+      whole run, would turn a good night into an outage.
+    */
+    const many = Array.from({ length: SWEEP_GENERATE_CAP + 1 }, (_, i) =>
+      candidate({ vehicleId: `v${i}` })
+    );
+
+    const plan = vehiclesToGenerate(many);
+
+    expect(plan.send).toHaveLength(SWEEP_GENERATE_CAP);
+    expect(plan.considered).toBe(SWEEP_GENERATE_CAP + 1);
+    expect(plan.capped).toBe(true);
+  });
+
+  it('costs strictly less per night than the send cap allows', () => {
+    /*
+      Not a tautology — it is the assertion that these two numbers never get
+      collapsed into one. A send costs attention and 200 of them is a circuit
+      breaker; a generation costs money and 200 of those is a bill nobody
+      authorised. Someone reaching for "why are there two caps?" should find
+      this line.
+    */
+    expect(SWEEP_GENERATE_CAP).toBeLessThan(SWEEP_SEND_CAP);
+  });
+
+  it('filters before capping, so ineligible cars cannot consume the budget', () => {
+    /*
+      Order matters and the wrong order is invisible in the happy path. If the
+      cap were applied first, ten failed rows ahead of one pending car would
+      spend the whole budget on nothing and starve the one car that needed it.
+
+      The fixture puts the ineligible ones first for exactly that reason.
+    */
+    const blockers = Array.from({ length: SWEEP_GENERATE_CAP }, (_, i) =>
+      candidate({ vehicleId: `bad${i}`, researchStatus: 'failed' })
+    );
+    const real = candidate({ vehicleId: 'good' });
+
+    const plan = vehiclesToGenerate([...blockers, real]);
+
+    expect(plan.send).toHaveLength(1);
+    expect(plan.send[0].vehicleId).toBe('good');
+    expect(plan.capped).toBe(false);
   });
 });

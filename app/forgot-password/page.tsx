@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Car, Loader as Loader2, ArrowLeft, CircleCheck as CheckCircle2 } from 'lucide-react';
+import { Loader as Loader2, ArrowLeft, CircleCheck as CheckCircle2 } from 'lucide-react';
+import Logo from '@/components/brand/Logo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -69,9 +70,8 @@ export default function ForgotPasswordPage() {
     >
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2.5 group mb-6">
-            <Car className="h-7 w-7 text-white" />
-            <span className="text-xl font-semibold text-white tracking-tight">CrewChief</span>
+          <Link href="/" className="inline-flex group mb-6">
+            <Logo variant="stacked" size={60} />
           </Link>
           <h1 className="text-2xl font-bold text-white mb-2">Reset your password</h1>
           <p className="text-white/50 text-sm">Enter your email and we'll send a reset link</p>

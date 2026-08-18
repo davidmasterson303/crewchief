@@ -1,5 +1,77 @@
 # CrewChief roadmap — image pipeline, backdrop, cockpit direction, and responsive web
 
+> ## ⚠ READ THIS FIRST — state as of 13 Aug 2026, 05:00
+>
+> **Everything below this block was written on 2 August.** Its design and responsive content is
+> still the tree's record and still worth reading. Its *sequencing* is not, and it names work that
+> has been dropped.
+>
+> **This file is authoritative on the tree. It is not authoritative on the plan.** The plan of
+> record is **§0 of `~/Documents/Claude/Projects/davidmasterson.co/CREWCHIEF_ROADMAP_2026-08-02.md`
+> (Rev. G)**. Start at its **§0.15 — the critical path**, which is seven ordered lines with an
+> owner on each. Where the two files disagree about what to build next, §0 wins.
+>
+> ### Current state — re-derive before depending on any of it
+>
+> | | |
+> |---|---|
+> | `main` | **`fc96184`**, pushed. 14 commits on 12 Aug, all deployed |
+> | Web tests | **2300**, green | 
+> | Mobile tests | **174**, green |
+> | Typechecks | Three, all clean |
+> | Migrations | All applied **except `20260813020000`** (TRUNCATE revokes) — Cowork's |
+> | `demo-live` | **~27 commits behind `main`** — the public demo serves pre-v8 design |
+>
+> ### ⛔ Do not act on these — they are dead instructions below
+>
+> | It says | Reality |
+> |---|---|
+> | Build **5.2 Stripe checkout** | Dropped 8 Aug. Revenue is Apple IAP only |
+> | **`brew install cocoapods`** | Never possible here. Routed around by EAS cloud builds |
+> | Next.js upgrade is a **pre-submission gate** | It gates the web app, which is not what gets submitted. Track F |
+> | "Phase 3 stays at ~16 remaining" | Phase 3 completed 5 Aug |
+> | Erratum T2 blocks 5.2 | 5.2 is gone; the question returns at E7/E8 |
+>
+> ### The one thing blocking the most
+>
+> **`CRON_SECRET` is unset in production.** Confirmed 12 Aug by probing the deployed endpoint —
+> an unauthenticated `POST /api/internal/notify-sweep` returns `503 {"error":"Not configured"}`,
+> which that route emits **only** when the variable is absent. So the scheduler has fired daily
+> since 8 Aug and nothing has ever been sent. It is David's to set; do not work around it.
+>
+> ### Rules that arrived with 12 August's work — read before touching these areas
+>
+> - **`lib/vehicle-research.ts` authorizes nothing, by design.** It spends a Pro-model call for
+>   whatever vehicle it is handed. Two callers only, each authorizing differently;
+>   `vehicle-research-callers.test.ts` keeps that list closed. **Never export it from a
+>   `'use server'` file** — every export there is a public POST endpoint.
+> - **The sweep must never generate under `?dryRun=1`.** A dry run that spends money is a trap
+>   sprung by whoever is being careful.
+> - **A dry run reports `recallsPlanned`, not `recallsSent`.** The latter only increments in the
+>   delivery loop `dryRun` skips.
+> - **`account_entitlements` must never become user-writable.** A scoped `FOR ALL` policy is
+>   correct on every other table in this schema and is a free subscription on that one.
+> - **`resolveTier` is deleted.** Use `resolveEntitledTier` from `@crewchief/core/entitlement`.
+> - **A new table in `public` does not inherit the 1 Aug TRUNCATE revoke.** Carry its own
+>   `REVOKE TRUNCATE … FROM authenticated`; `truncate-revoked.test.ts` fails the build otherwise.
+> - **`/load-maintenance-data` returns two things that look like history.** `lineItems` is
+>   `invoice_line_items` — description and price, **no service date**. The service record is
+>   `maintenanceLineItems`. Reading the wrong one was a live bug until 12 Aug.
+> - **When you fix something, grep for the comments that described it.** Four docblocks were found
+>   asserting things that had stopped being true, three of them written by whoever had just made
+>   them false.
+>
+> ### What landed 12 Aug, all pushed
+>
+> **C4** the sweep's regeneration gap · **E7** `account_entitlements` · **E5** deletion under an
+> Apple subscription · **E4** the privacy manifest · **C5** the notification permission primer ·
+> the mobile **wishlist "Done"** plus its chips and composer · the **service history screen** and
+> record removal · the `ServiceMilestoneScreen` table fix · TRUNCATE revokes · two false docblocks.
+>
+> ⚠ **All of it is verified at the decision layer and unexercised at the surface.** Nothing built
+> on 12 Aug has been rendered on a device — `apps/mobile/ios` has never been generated here. See
+> §0.17 of the plan of record for exactly what each item is and is not proven by.
+
 Source: `Live-Site Audit.dc.html` (2 Aug 2026), grounded in repo `davidmasterson303/crewchief@main` (aa1d73f) and the live demo. Finding refs (F1–F8) and concept refs (1a–1c, 2a–2c) point into that report. Advisor KB was offline for the audit; reconcile against it when reconnected, and stage a `kb_propose` for the decisions below.
 
 ---
@@ -104,6 +176,25 @@ this file** — read those first if you are picking this up cold.
 - **Effort:** ~1 day.
 
 ### 5. Preload any surviving LCP photo (F4 residue)
+> **CLOSED 17 Aug — superseded, with the residue re-scoped rather than dropped.**
+> The body below was already a complete account; what it lacked was a verdict,
+> and an item nobody can act on reads as work outstanding. That is the same
+> failure just corrected in RP2, one section up.
+>
+> **Verified before closing:** `fetchpriority` ships on the hero's request
+> (`VehicleIdentity.tsx:296`, spelled lowercase and cast — React 18.2 has no
+> camelCase prop and warns), the same treatment is on `GarageDoor.tsx:253`, and
+> the blur-up fill is `vehicleBlurData` from `@crewchief/core/vehicle-blur`.
+>
+> **The residue, stated as its own thing:** a real `<link rel=preload>` for the
+> dashboard hero is blocked on the dashboard server-rendering its vehicle, which
+> is a change of a different size and is not this item. It belongs with a
+> Lighthouse number that says it is worth having — i.e. behind item 15's still-open
+> LCP half. Reopening this without that measurement would be optimising a
+> figure nobody has taken.
+>
+> Original note follows.
+
 > **OPEN — and largely moot, but not closed honestly.** `/` and the auth screens no longer
 > carry a photograph at all, so the item is satisfied there by removal. The dashboard hero
 > still does, and a static `<link rel=preload>` **cannot** name it: the URL comes from a
@@ -507,7 +598,34 @@ Add to `app/globals.css` and to the DS spec, then reference by name in review.
 
 ## RP2 — after (~4 days; these need design, not a prefix)
 
+> ⚠ **Reconciled 17 Aug — this document disagreed with itself.** The status
+> section already said *"RP0, RP1 and RP2 are all closed — R4, R8, R11 and R12
+> landed this afternoon"* (§ 2 Aug status, line ~108), while every item body
+> below still read as outstanding, three of them as CRITICAL or HIGH. R13 and
+> R14 had their own verdicts; the other four had none.
+>
+> Nothing was re-planned. The code was checked and the verdicts written where
+> the reader actually looks, with line-number evidence per item.
+>
+> Worth naming as a failure mode rather than a tidy-up: a summary line 500 lines
+> from the item it summarises is not where anyone reads a status. Somebody
+> scanning for the next CRITICAL finds R4, and spends a day rebuilding a
+> consultant layout that already carries its own `R4.` comment explaining the
+> fix. **A stale board is not neutral — it buys work that is already done and
+> hides what is genuinely left.**
+
 ### R4. The consultant is a fixed 520px box inside a scrolling page — CRITICAL
+> **DONE.** `ConsultantChat.tsx:694` is
+> `h-full md:h-[calc(100dvh-320px)] md:min-h-[520px] md:max-h-[760px]`, and the
+> shell it sits in is `DashboardLayout`'s `mobileLayout="app-shell"` (`:32`,
+> `:217`) — the viewport is the frame below `md`, so the thread is the only
+> thing that scrolls. The composer is `shrink-0` with
+> `pb-[max(1rem,env(safe-area-inset-bottom))]` (`:1087`). The sidebar becomes a
+> drawer rather than taking 256px of a 375px viewport.
+>
+> The in-file comment records the measurement that mattered: **the composer
+> began 860px down a 692px viewport.**
+
 > Critical by impact, but scheduled here because it is a layout rebuild, not an edit.
 
 - **Problem:** `ConsultantChat.tsx:609` is `h-[calc(100vh-320px)] min-h-[520px] max-h-[760px]`. On a 667px phone the calc yields 347px, so `min-h` wins and the panel is 520px — inside a page whose demo banner, nav, tab strip, vehicle title and meta row have already eaten ~400px. **The composer sits below the fold: you scroll the page to type and the thread to read.** Two scroll contexts stacked on the flagship feature. `100vh` also measures the URL-bar-collapsed viewport, so the panel exceeds the visible area on first paint.
@@ -523,6 +641,10 @@ Add to `app/globals.css` and to the DS spec, then reference by name in review.
 - **Effort:** ~half a day.
 
 ### R8. A five-column cost table in 231px, inside `overflow-hidden` — HIGH
+> **DONE.** `CostBreakdownTable.tsx:81` — below `md` it is a card per line item,
+> the table above it. Its own header (`:47`) makes the point the change line
+> implies: the two are genuinely different layouts of the same data, not one
+> layout with a prefix.
 - **Problem:** `CostBreakdownTable.tsx:55–63` — Item · Parts · Labor Hrs · Labor Cost · Total, `text-[11px]` headers, every cell carrying a low *and* a high figure. The wrapper is `overflow-hidden`, so the usual escape hatch (let it scroll sideways) is actively closed. This is the artefact the consultant produces to justify an estimate — it *is* the answer — and on a phone it is a stack of clipped numerals.
 - **Change:** a card per line item below `md`, the table above it. Same data, same order, no horizontal scroll:
   ```
@@ -535,11 +657,18 @@ Add to `app/globals.css` and to the DS spec, then reference by name in review.
 - **Effort:** ~3 hours.
 
 ### R11. A 36px page title over a four-up meta row — MEDIUM
+> **DONE.** `DashboardLayout.tsx:441` is `text-2xl sm:text-4xl lg:text-5xl`, and
+> the meta row below it is a grid before it is a wrapped flex — both exactly as
+> the change line specifies, both annotated `R11` at the call site.
 - **Problem:** `DashboardLayout.tsx:296` is `text-4xl lg:text-5xl`, so a phone gets 36px for "2018 Honda Accord" in 279px — three lines before the trim appears. `:303` puts Mileage / Avg monthly / Status / Reliability in `flex flex-wrap gap-8`, which wraps to a ragged 2 + 2 with 32px gutters.
 - **Change:** `h1` → `text-2xl sm:text-4xl lg:text-5xl`; meta row → `grid grid-cols-2 gap-x-6 gap-y-5 sm:flex sm:flex-wrap sm:gap-8`.
 - **Effort:** ~1 hour.
 
 ### R12. The breadcrumb — and with it the way back — is hidden below 640px — MEDIUM
+> **DONE.** The full breadcrumb is still `hidden sm:flex` (`DashboardLayout.tsx:285`)
+> — correctly, because the phone got its **own** compact one rather than a
+> squeezed copy of the desktop control (`:127`, `:257`). The way back exists at
+> every width, which was the actual complaint.
 - **Problem:** `DashboardLayout.tsx:236` is `hidden sm:flex`. Garage › vehicle › page plus the scrolled health-score pill all vanish on a phone; what remains is a logo that happens to be a link. The comment above it records that four separate routes back to the garage were consolidated into this one control — which is then `display:none` on the viewport where a back affordance matters most.
 - **Change:** below `sm`, one row — `‹ Garage · Accord · 61` (chevron-left + parent + short name + score pill, `min-h-[44px]`). Full breadcrumb returns at `sm`.
 - **Effort:** ~1 hour.
@@ -569,6 +698,9 @@ Add to `app/globals.css` and to the DS spec, then reference by name in review.
 > **David's call, and it is a scope decision rather than a fix:** delete
 > `MaintenanceHistory.tsx` and `UpcomingMaintenance.tsx`, or wire them up if
 > they were meant to be reached. R13 and R14 only become real after that.
+>
+> **Taken for `UpcomingMaintenance.tsx` — deleted, see R14.** This file is the
+> one left, and the decision is still open on it.
 - **Problem:** `MaintenanceHistory.tsx:347–376` keeps one line and pays for it — date `hidden sm:flex`, part number `hidden sm:inline`, description `truncate`, beside a category badge and a right-aligned cost. A maintenance record with its date hidden has the second-most-important fact removed, on the screen whose whole job is "what was done, when, for how much."
 - **Change:** two lines below `sm`, one line above —
   ```
@@ -578,14 +710,24 @@ Add to `app/globals.css` and to the DS spec, then reference by name in review.
 - **Effort:** ~2 hours.
 
 ### R14. A 260px carousel that fits neither phone nor desktop — MEDIUM
-> **INVALID AS WRITTEN — `components/UpcomingMaintenance.tsx` is not rendered
-> anywhere either.** Same evidence as R13, and the claim that it "is the only
-> horizontally-scrolling region in the app" is the tell: the only live
-> `overflow-x-auto` in `app/` or `components/` outside it are the dashboard's
-> tab strip, which carries `edge-fade-x` deliberately, and `EmailDraftDisplay`.
-> There is no carousel on any screen a user can reach.
+> **CLOSED BY DELETION — `components/UpcomingMaintenance.tsx` is gone.** The
+> item was invalid as written: the component was not rendered anywhere either.
+> Same evidence as R13, and the claim that it "is the only horizontally-
+> scrolling region in the app" was the tell — the only live `overflow-x-auto` in
+> `app/` or `components/` outside it are the dashboard's tab strip, which carries
+> `edge-fade-x` deliberately, and `EmailDraftDisplay`. There was no carousel on
+> any screen a user could reach.
 >
-> Fix written and reverted, for the reason under R13. Same decision needed.
+> A fix was written and reverted first, for the reason under R13. The decision
+> that entry asked for has now been taken in the delete direction: the component
+> and `LogServiceModal.tsx`, its only child and the sole reason that file
+> existed, are both removed. `packages/core/src/service-due.ts` already replaces
+> the approach — it reads the vehicle's own schedule rather than the hardcoded
+> `COMMON_INTERVALS` table this component carried, which is the argument for
+> deleting rather than wiring up.
+>
+> **`MaintenanceHistory.tsx` is still there**, so R13 is still open on the same
+> terms.
 - **Problem:** `UpcomingMaintenance.tsx:136`, `:415` — fixed `w-[260px]` cards in a snap scroller. At 375px that leaves a 19px sliver of the next card: too little to read as "more," too much to read as an edge. At 1440px the same strip scrolls through four items while 600px of row sits empty. It is the only horizontally-scrolling region in the app and it scrolls at *every* width.
 - **Change:** below `sm` → `w-[78vw] max-w-[300px] snap-start` (a legible next-card peek); `md`+ → `grid grid-cols-2 xl:grid-cols-3`, no scroller.
 - **Effort:** ~1 hour.
@@ -612,6 +754,28 @@ Add to `app/globals.css` and to the DS spec, then reference by name in review.
 ## RP4 — pre-launch (~half a day) — extends item 15
 
 ### A viewport matrix in CI, beside the LCP/CLS budgets
+> **PARTIAL — the browser-free half shipped 17 Aug as
+> `lib/__tests__/viewport-floors.test.ts`**, registered in
+> `STATIC_ANALYSIS_SUITES` as the change line asks.
+>
+> **Landed:** no rendered text under 12px (arbitrary sizes in both `px` and
+> `rem`; `app/dev/` exempt and named, for the one 9px illustration caption), and
+> no focusable field under 16px — checked three ways, because R2's fix has three
+> separate ways to come undone: the pointer-scoped rule being deleted, a call
+> site out-specifying it with a utility (**how the bug shipped the first time**),
+> and someone reaching for `maximum-scale=1` / `user-scalable=no`. The third is
+> the one worth having: it *works*, so the change looks like a fix, and nothing
+> on the resulting page says it has failed WCAG 1.4.4.
+>
+> ⚠ **One finding, and it was the guard being wrong rather than the app.** The
+> first scan failed `components/ui/input.tsx` for `file:text-sm` — which styles a
+> file control's `::file-selector-button`, not the field's own text, and cannot
+> cause the zoom. Pinned as its own case, because a guard that cries wolf on an
+> invisible rule gets made to pass rather than read.
+>
+> **Still open:** no horizontal overflow and no interactive target under 44px.
+> Both need real layout and ride with item 15's Lighthouse CI owner, as written.
+
 - 320 · 375 · 768 · 1440, asserting: **no horizontal overflow** (`scrollWidth <= clientWidth` on `body`), **no interactive target under 44px**, **no rendered text under 12px**, **no focusable input under 16px at ≤640**. Static analysis covers the last two cheaply — the same pattern as `image-weight-budget.test.ts`, and it registers in `STATIC_ANALYSIS_SUITES` the same way. The first two need a real browser, so they ride with item 15's Lighthouse CI owner.
 - Then this audit cannot happen twice.
 
@@ -620,6 +784,25 @@ Add to `app/globals.css` and to the DS spec, then reference by name in review.
 ## Already right — do not regress these
 
 Nine deliberate pieces of responsive work are already in the codebase. The recommendation above is to **generalise** them, not replace them.
+
+> **All nine verified present 17 Aug**, and **three are now guarded** by
+> `lib/__tests__/inclusive-affordances.test.ts`.
+>
+> The filter was not importance — it was visibility. A regression in those three
+> is invisible to whoever causes it: nobody develops in Windows High Contrast or
+> with a coarse pointer, so a rename that unhooks the forced-colors block leaves
+> a clean diff, a page that looks right, and a dial showing **a full ring at
+> every score**. The other six regress in front of you the moment you resize a
+> window, and a test is the wrong tool for those.
+>
+> The sharpest of the three checks that the CSS still names classes
+> `ClusterGauge.tsx` actually renders — a stylesheet hooked to nothing reviews
+> perfectly and applies to nothing, the same shape as a font face named but
+> never loaded.
+>
+> ⚠ Writing it caught the guard passing on a **comment**: the first
+> `.tap-target-44` in `globals.css` is 600 lines above the rule, inside the
+> prose describing it. Anchored to the declaration.
 
 | What | Why it is right | Where |
 |---|---|---|
@@ -678,15 +861,49 @@ current.
 
 ## ⚠ David's list — one migration is time-sensitive
 
-1. **Apply `20260802200000_split_ai_usage_by_traffic_class.sql`.** Pure
-   additions, no `DROP`, so the SQL Editor will not stall. **Every metering row
-   written before it runs is blended permanently** — no later migration can
-   reconstruct which traffic was demo, real, or the canary. This is the one item
-   that gets worse by waiting.
-2. **`brew install cocoapods`** — unblocks the simulator and the rest of Phase 3.
+1. ~~**Apply `20260802200000_split_ai_usage_by_traffic_class.sql`.**~~
+   ✅ **APPLIED — verified against the live database 17 Aug, not read off the
+   folder.** `ai_usage_events.surface` exists and is discriminating: over the
+   most recent 219 rows, `account` 193, `canary` 19, `demo` 6, `anonymous` 1,
+   recording continuously from 2 Aug 21:09Z. Nothing was blended.
+
+   ⚠ **This entry spent a fortnight telling David to go and do something that
+   was already done, under a ⚠ heading calling it the one item that gets worse
+   by waiting.** That is the second dead instruction on this four-item list —
+   item 2 was struck for the same reason. A list that keeps urgent-looking
+   completed work is not merely untidy: it spends the reader's attention on the
+   items that do *not* matter, which is exactly how the one that does gets
+   missed.
+
+   ⚠ **A real one, found while checking this:** `surface = 'canary'` rows appear
+   on 8 and 15 Aug and nowhere else. The six-hourly canary workflow had never
+   fired, because it sat on the `canary-workflow` branch and **Actions only runs
+   `schedule` from the default branch**. Landed on `main` on 17 Aug (`55213ff`).
+   It still needs `CONSULTANT_HEALTH_SECRET` in **two** places — GitHub Actions
+   *and* Netlify — see 5 below.
+2. ~~**`brew install cocoapods`** — unblocks the simulator and the rest of Phase 3.~~
+   ⛔ **DEAD — do not run this.** It was never possible: macOS ships Ruby 2.6, CocoaPods needs
+   ≥ 3.0, and there is no Homebrew on this machine. **Routed around by EAS cloud builds on
+   4 Aug**, and Phase 3 completed 5 Aug. This instruction has sent David to a terminal for a
+   command that cannot succeed more than once.
 3. **A dashboard read for erratum T2**, blocking 5.2:
    `select tablename, policyname, cmd, roles, qual from pg_policies order by tablename;`
 4. **Review the KB queue** — `cd ~/Developer/advisor-kb && node dist/cli.js queue`.
+5. ⚠ **Set `CONSULTANT_HEALTH_SECRET` in two places, or the canary stays red.**
+   Verified by running it by hand on 17 Aug: the deployed endpoint answers
+   `{"status":"broken","reason":"NOT_CONFIGURED"}`, and the canary exits 3 —
+   *"the deployment has no CONSULTANT_HEALTH_SECRET set"*.
+   - **GitHub** → repository *Actions* secret, so the workflow can authenticate.
+   - **Netlify** → environment variable on the **`crewchief-demo`** project —
+     the one deploying `demo-live`, *not* `effulgent-blancmange-6adfdf` which
+     deploys `main`. Two CrewChief sites exist and the split is deliberate
+     (`scripts/promote-demo.mjs` gates the public demo behind main; it is 70
+     commits and nine days back as of 17 Aug). The canary watches the demo on
+     purpose. Setting this on the main site leaves the canary red while looking
+     done.
+
+   The two values must be identical. Setting only the Actions secret leaves the
+   canary failing forever while looking configured.
 
 *The `ai_usage_events` migration is **already applied** — recording since
 2 Aug 21:09Z, and schema-verified in the ~19:38 handoff below. It was still
@@ -850,23 +1067,34 @@ hard way, all recorded in its own comments:
 
 ## Still open, in priority order
 
-1. **Erratum T2** — blocks 5.2. The anon RLS audit run this session found no
-   non-demo rows reachable across 25 tables, and `vehicle-documents` is private.
-   **That evidence does not touch the actual question**, which is what an
-   *authenticated* caller whose subscription lapsed can reach. Do not let anyone
-   close T2 on the anon result.
-2. **Phase 3 stays at ~16 remaining.** Built is not proven, and the simulator has
-   never run. **The blocker was never `xcode-select`** — that diagnosis was
-   wrong twice. `apps/mobile/ios` has never been generated (gitignored at
-   `apps/mobile/.gitignore:40`, no DerivedData, nothing installed on the booted
-   device) and CocoaPods is not installed. Do not run the simulator tool's
-   suggested `sudo xcode-select -s`; it is already the current selection.
-3. **2.98b is undecided, not dropped.** Recommendation is to drop it; three
-   costed options are in the roadmap's §3.3.
+> ⚠ **Reconciled 11 Aug — items 1 and 2 have both moved.** The rest hold. Current
+> state is §0.4 of the plan of record.
+
+1. **Erratum T2** — ~~blocks 5.2~~ **5.2 is dropped, so T2 blocks nothing today.**
+   **Re-scoped, not closed:** the same question — what an *authenticated* caller
+   whose subscription lapsed can reach — returns under Apple IAP at Track E's
+   E7/E8. Ask it there. The anon RLS audit run in this session found no non-demo
+   rows reachable across 25 tables and `vehicle-documents` is private, but
+   **that evidence does not touch the actual question**, and it must not be used
+   to close T2 whenever it does come back.
+2. ~~**Phase 3 stays at ~16 remaining.** Built is not proven, and the simulator has
+   never run.~~ ✅ **Phase 3 completed 5 Aug and is proven end to end.**
+   The two diagnoses recorded here are still worth keeping, because both were
+   wrong in instructive ways: **the blocker was never `xcode-select`** (that
+   diagnosis was wrong twice — do not run the simulator tool's suggested `sudo
+   xcode-select -s`, it is already the current selection), **and it was not
+   CocoaPods either.** CocoaPods was never installable on this machine — Ruby
+   2.6 against a ≥ 3.0 requirement, no Homebrew — so the real answer was to stop
+   trying to build locally at all. **EAS cloud builds routed around the whole
+   question on 4 Aug**, and Phase 3 closed the day after.
+3. **2.98b is undecided, not dropped.** ✅ **Decided 8 Aug — dropped, option A.**
+   The spec described a comparison the code cannot make: there is no stored
+   quoted figure anywhere in the schema.
 4. **`LOW → MINIMAL`** on the non-prose paths, once the round-trip gate can
-   speak to quality.
-5. **5.1's remaining half** — the upgrade-prompt UI, still deliberately unbuilt
-   while D2 and D3 are open.
+   speak to quality. *(Still open.)*
+5. **5.1's remaining half** — the upgrade-prompt UI. *(Still open, now tracked as
+   Track E's E6. No longer blocked on pricing: revenue goes through Apple IAP,
+   so the price is Apple's product record rather than a hard-coded figure.)*
 
 ---
 ---
@@ -1047,9 +1275,11 @@ at once, and `tsc` is perfectly happy about it. Always go through
    changed — `bg-cyan-600` is at 36 sites, so it is the brand colour on every
    primary button, and that is a design decision rather than something to slip
    into an accessibility pass.
-3. **The two dead components.** Delete `MaintenanceHistory.tsx` and
-   `UpcomingMaintenance.tsx`, or wire them up. R13 and R14 only become real
-   after that.
+3. **The dead components — one down.** `UpcomingMaintenance.tsx` is deleted,
+   and `LogServiceModal.tsx` with it: nothing else rendered the modal, and its
+   only insert named a column that has never existed under a `source` the CHECK
+   forbids. R14 is closed. `MaintenanceHistory.tsx` is the remaining one —
+   delete it or wire it up, and R13 only becomes real after that.
 4. **D2 (price) after two weeks of meter data**, per Addendum A. The first rows
    already show thinking at 5–8× the visible answer *at `LOW`*, which argues for
    re-testing `MINIMAL` on the non-prose paths once there is a fortnight to read.
@@ -1077,16 +1307,23 @@ Everything below is unblocked code unless marked. The blocked items are in
    has never been rendered — see the Phase 3.3 section below for exactly how far
    it *is* verified, and for the `xcode-select` false alarm not to repeat. **Do
    not press the final delete**: one real account, no throwaway.
-2. **5.2 — Stripe checkout (3 ed).** The next code item on the money track, and
+2. ~~**5.2 — Stripe checkout (3 ed).** The next code item on the money track, and
    the largest remaining. Blocked from *shipping* by 5.0 but not from being
-   built; D2 should be settled first so the price is not hard-coded twice.
+   built; D2 should be settled first so the price is not hard-coded twice.~~
+   ⛔ **DROPPED 8 Aug — do not build this.** The product pivoted to mobile-first,
+   sold through the App Store. The web app is a free companion that takes no
+   money, so there is no checkout to build. **Apple IAP is the only revenue
+   mechanism now.** The server-side entitlement gating survives as Track E's E7.
 3. **2.95d — window the consultant context (1.25 ed).** Size it against the
    meter rather than the guess, per Addendum A. Gate the consultant round trip
    before and after: a worse-grounded answer is still a well-formed answer.
 4. **The R10 tail** — data and labels to 13px on mobile. Needs a judgement per
    site, which is why only the 12px floor landed.
-5. **Next.js upgrade (3.5–6 ed).** Still a pre-submission gate. Taking money
-   does not make 13.5.11 more acceptable and does not move it earlier either.
+5. **Next.js upgrade (3.5–6 ed).** ~~Still a pre-submission gate.~~ **Re-scoped
+   8 Aug: it gates the *web* app, and the web app is no longer what gets
+   submitted.** Real work, still worth doing, but off the critical path — Track
+   F. Taking money does not make 13.5.11 more acceptable and does not move it
+   earlier either.
 6. **The R9 lint rule** in `_adherence.oxlintrc.json`. It is in the DS repo, so
    the 44px floor is still a review comment rather than a check — the one guard
    from this session's work that did not get automated.

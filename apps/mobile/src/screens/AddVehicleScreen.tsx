@@ -11,12 +11,16 @@ import {
   View,
 } from 'react-native';
 
+import Button from '../components/Button';
+import Field from '../components/Field';
 import { apiRequest, ApiRequestError } from '../api/client';
 import { validateMileageUpdate } from '@crewchief/core/mileage-tracking';
+import { radius, status, surface, text } from '../theme';
 import {
   BASELINE_AGE_OPTIONS,
   type BaselineAge,
 } from '@crewchief/core/onboarding-baseline';
+import { interFace } from '../theme/fonts';
 
 /**
  * Add a car — the first thing a new user does, and until 8 Aug it did not exist
@@ -66,14 +70,18 @@ import {
  * its colours.
  *
  * An earlier attempt was written and deleted rather than left broken, and the
- * reason is worth carrying: **`fireEvent` does not work against this form and
- * fails silently.** `changeText` leaves state untouched, so `canSubmit` stays
- * false and `submit()` returns at its first line; the submit control resolves
- * to a host `View` with no `onPress`. Nothing throws — a suite built on it
- * passes while proving nothing.
+ * reason is worth carrying — in its corrected form, because the note that
+ * stood here until 15 Aug 2026 blamed the wrong thing. It said `fireEvent`
+ * "does not work against this form and fails silently". What actually fails is
+ * an **un-awaited** `fireEvent`: RNTL 14's `render`, `fireEvent` and
+ * `userEvent` are all async, and dropping the `await` leaves React's act scope
+ * open, which stops every later render in that file from committing. It cost
+ * `contrast.test.tsx` a week of measuring nothing in green — `jest.setup.js`
+ * carries the mechanism and now fails on it.
  *
- * `userEvent`, RNTL 14's async API for React 19's concurrent render, works
- * completely. **Use it for every interaction in this app's screen tests.**
+ * **Use `userEvent` for every interaction in this app's screen tests, and
+ * await it.** It is RNTL 14's async API for React 19's concurrent render and
+ * it models a real press rather than a synthetic prop call.
  *
  * ── The mods question is asked here, not buried in settings ─────────────────
  *
@@ -176,60 +184,62 @@ export function AddVehicleScreen({ onAdded, onSignOut }: Props) {
           Enough to look it up. Everything else can wait.
         </Text>
 
+        {/*
+          `Field`, and the visible labels are the upgrade.
+
+          This form asked for six values through placeholders alone, so every
+          label vanished the moment someone typed — on the one screen a new user
+          cannot skip. The accessible names are unchanged because the primitive
+          takes the label it speaks, and `hint` now carries "optional" into that
+          name rather than showing it only to people who can see it.
+
+          The two-column row wraps each field rather than styling it: `Field`'s
+          `style` reaches the input, and it is the **wrapper** that has to flex.
+        */}
         <View style={styles.row}>
-          <TextInput
-            style={[styles.input, styles.year]}
-            value={year}
-            onChangeText={setYear}
-            placeholder="Year"
-            placeholderTextColor="rgba(255,255,255,0.35)"
-            keyboardType="number-pad"
-            maxLength={4}
-            accessibilityLabel="Model year"
-            editable={!busy}
-          />
-          <TextInput
-            style={[styles.input, styles.grow]}
-            value={make}
-            onChangeText={setMake}
-            placeholder="Make"
-            placeholderTextColor="rgba(255,255,255,0.35)"
-            autoCapitalize="words"
-            accessibilityLabel="Make"
-            editable={!busy}
-          />
+          <View style={styles.year}>
+            <Field
+              label="Model year"
+              value={year}
+              onChangeText={setYear}
+              keyboardType="number-pad"
+              maxLength={4}
+              editable={!busy}
+            />
+          </View>
+          <View style={styles.grow}>
+            <Field
+              label="Make"
+              value={make}
+              onChangeText={setMake}
+              autoCapitalize="words"
+              editable={!busy}
+            />
+          </View>
         </View>
 
-        <TextInput
-          style={styles.input}
+        <Field
+          label="Model"
           value={model}
           onChangeText={setModel}
-          placeholder="Model"
-          placeholderTextColor="rgba(255,255,255,0.35)"
           autoCapitalize="words"
-          accessibilityLabel="Model"
           editable={!busy}
         />
 
-        <TextInput
-          style={styles.input}
+        <Field
+          label="Trim"
+          hint="optional"
           value={trim}
           onChangeText={setTrim}
-          placeholder="Trim (optional)"
-          placeholderTextColor="rgba(255,255,255,0.35)"
           autoCapitalize="words"
-          accessibilityLabel="Trim, optional"
           editable={!busy}
         />
 
-        <TextInput
-          style={styles.input}
+        <Field
+          label="Current mileage"
           value={mileage}
           onChangeText={setMileage}
-          placeholder="Current mileage"
-          placeholderTextColor="rgba(255,255,255,0.35)"
           keyboardType="number-pad"
-          accessibilityLabel="Current mileage"
           editable={!busy}
         />
 
@@ -273,14 +283,12 @@ export function AddVehicleScreen({ onAdded, onSignOut }: Props) {
             count from the work rather than guess from the odometer.
           </Text>
 
-          <TextInput
-            style={styles.input}
+          <Field
+            label="Mileage at last oil change"
+            hint="optional"
             value={serviceMileage}
             onChangeText={setServiceMileage}
-            placeholder="Mileage at the time (optional)"
-            placeholderTextColor="rgba(255,255,255,0.35)"
             keyboardType="number-pad"
-            accessibilityLabel="Mileage at last oil change, optional"
             editable={!busy}
           />
 
@@ -320,19 +328,17 @@ export function AddVehicleScreen({ onAdded, onSignOut }: Props) {
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        <Pressable
-          style={[styles.submit, !canSubmit && styles.submitOff]}
-          accessibilityRole="button"
-          accessibilityLabel="Add to my garage"
-          accessibilityState={{ disabled: !canSubmit }}
+        {/*
+          The inverse CTA from the primitive — the sixth and last private copy
+          of a treatment four tokens existed for and no component owned.
+        */}
+        <Button
+          label="Add to my garage"
+          variant="inverse"
           onPress={() => void submit()}
-        >
-          {busy ? (
-            <ActivityIndicator color="#080808" />
-          ) : (
-            <Text style={styles.submitText}>Add to my garage</Text>
-          )}
-        </Pressable>
+          disabled={!canSubmit}
+          busy={busy}
+        />
 
         {/*
           Said plainly rather than left as a surprise. The dossier takes ~23s to
@@ -350,66 +356,47 @@ export function AddVehicleScreen({ onAdded, onSignOut }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#080808' },
+  container: { flex: 1, backgroundColor: surface.page },
   body: { padding: 24, gap: 12 },
 
-  title: { color: '#fff', fontSize: 26, fontWeight: '700', letterSpacing: -0.5 },
-  subtitle: { color: 'rgba(255,255,255,0.7)', fontSize: 14, marginBottom: 6 },
+  title: { color: text.primary, fontSize: 26, fontFamily: interFace('700'), fontWeight: '700', letterSpacing: -0.5 },
+  subtitle: { color: text.secondary, fontSize: 14, marginBottom: 6 },
 
   row: { flexDirection: 'row', gap: 10 },
   grow: { flex: 1 },
   year: { width: 96 },
 
-  input: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    // 16px, per RB0 rule 3's floor for any focusable input.
-    fontSize: 16,
-    color: '#fff',
-    minHeight: 48,
-  },
 
   modsBlock: { gap: 8, marginTop: 8 },
-  modsQuestion: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  modsHint: { color: 'rgba(255,255,255,0.7)', fontSize: 13, lineHeight: 18 },
+  modsQuestion: { color: text.primary, fontSize: 16, fontFamily: interFace('600'), fontWeight: '600' },
+  modsHint: { color: text.secondary, fontSize: 13, lineHeight: 18 },
 
   choice: {
     flex: 1,
     minHeight: 48,
-    borderRadius: 12,
+    borderRadius: radius.button,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: surface.raised,
   },
   ageGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   age: {
     minHeight: 44,
     paddingHorizontal: 14,
     justifyContent: 'center',
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: radius.button,
+    backgroundColor: surface.raised,
   },
-  ageText: { color: 'rgba(255,255,255,0.75)', fontSize: 14, fontWeight: '600' },
+  ageText: { color: text.secondary, fontSize: 14, fontFamily: interFace('600'), fontWeight: '600' },
 
-  choiceOn: { backgroundColor: '#fff' },
-  choiceText: { color: 'rgba(255,255,255,0.75)', fontSize: 15, fontWeight: '600' },
-  choiceTextOn: { color: '#080808' },
+  choiceOn: { backgroundColor: surface.inverse },
+  choiceText: { color: text.secondary, fontSize: 15, fontFamily: interFace('600'), fontWeight: '600' },
+  choiceTextOn: { color: text.onInverse },
 
-  error: { color: '#f87171', fontSize: 13, lineHeight: 18 },
+  error: { color: status.dangerText, fontSize: 13, lineHeight: 18 },
 
-  submit: {
-    marginTop: 8,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    minHeight: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   /* An explicit fill, never `opacity` — the contrast audit cannot composite a
      parent alpha, so a faded control is an unmeasured one. See WishlistScreen. */
-  submitOff: { backgroundColor: '#b8b8b8' },
-  submitText: { color: '#080808', fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
 
-  footnote: { color: 'rgba(255,255,255,0.6)', fontSize: 12, lineHeight: 18, marginTop: 4 },
+  footnote: { color: text.secondary, fontSize: 12, lineHeight: 18, marginTop: 4 },
 });

@@ -1,9 +1,88 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import CollapsibleSection from './CollapsibleSection';
-import VehicleInsights from './VehicleInsights';
-import { WishlistSection } from './WishlistSection';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useWishlistData } from '@/hooks/useWishlistData';
+
+/*
+  ── Both of these load when the fold opens, not before ──────────────────────
+
+  `CollapsibleSection` already refuses to *render* a closed section's children,
+  and its docblock makes the case for that: these subtrees mount dialogs and
+  fire queries, and a fold nobody opened should not pay for them. What it could
+  not do is stop the code being *downloaded* — a static import puts the whole
+  tree in the route's first load whether or not anything renders it.
+
+  Both of these sections are `defaultOpen={false}`, and both were pulling their
+  entire dialog stacks into the initial bundle:
+
+    WishlistSection  -> QuoteRequestDialogV2 -> QuoteGenerationProgress
+                     -> framer-motion, an animation library the dashboard
+                        otherwise has no use for at all
+                     plus MarkCompleteDialog, AddWishlistItemDialog,
+                        QuoteDetailDialog
+    VehicleInsights  -> IssueFixDialog, MaintenanceHistoryDialog and three
+                        tab panels (Issues, Maintenance, Modifications)
+
+  So the dashboard was shipping — and hydrating — a quote-request flow and a
+  628-line dossier in order to render two collapsed headers with a one-line
+  summary on each. Two `next build` runs over the same tree, this file being
+  the only difference:
+
+                          route chunk    First Load JS
+    static imports          30.4 kB         341 kB
+    dynamic                 13.9 kB         261 kB
+
+  80 kB less to download, parse and hydrate on every dashboard load, for
+  content most visitors never unfold.
+
+  That JavaScript is the reported symptom: switching tabs on the deployed
+  dashboard was slow, in the sense of the whole client boot having to finish
+  before the strip responded. This is aimed squarely at the cause. It is NOT
+  the fix that was tried first — the tab strip was briefly turned into native
+  anchors, which traded ~2.7s of client boot per switch for a full page load
+  and was reverted to `Link` + `prefetch`. Shrinking the boot is the version of
+  that idea which does not cost a navigation.
+
+  What made the first attempt wrong is worth keeping: the diagnosis behind it
+  came from a reproduction taken in a BACKGROUND browser tab, where
+  `document.visibilityState` is `hidden` and prefetch is deprioritised. The
+  original root cause was never actually established, so this is an attack on a
+  measured cost, not a confirmed culprit — it should be verified against the
+  deployed site rather than assumed to have closed the ticket.
+
+  `ssr: false` is honest rather than merely convenient: with `defaultOpen`
+  false these never render on the server anyway, so there is no server output
+  to lose, and it keeps them out of the server bundle too.
+
+  Both are used *only* here, so nothing else on any other route changes.
+
+  The trade is a fetch on first open. It is one chunk against a warm connection
+  and it happens while the section is already expanding, where a brief skeleton
+  is expected — as against a cost every visitor paid on every load for content
+  most of them never unfolded.
+*/
+const VehicleInsights = dynamic(() => import('./VehicleInsights'), {
+  ssr: false,
+  loading: () => <FoldSkeleton />,
+});
+
+const WishlistSection = dynamic(
+  () => import('./WishlistSection').then((m) => m.WishlistSection),
+  { ssr: false, loading: () => <FoldSkeleton /> }
+);
+
+/** Placeholder for a fold whose contents are still arriving. */
+function FoldSkeleton() {
+  return (
+    <div className="space-y-3 py-2">
+      <Skeleton className="h-5 w-40" />
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-4 w-[70%]" />
+    </div>
+  );
+}
 
 interface DashboardContentProps {
   vehicle: any;

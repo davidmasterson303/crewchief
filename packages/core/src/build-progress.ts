@@ -132,3 +132,63 @@ export function buildSummary(position: BuildPosition, remaining: number): string
     ? `${position.label}. ${remaining} more ${remaining === 1 ? 'step' : 'steps'} on this car's list.`
     : `${position.label}. You have outrun this car's known list — the dial keeps going.`;
 }
+
+/**
+ * ── The paint, as a judgement rather than as colours ────────────────────────
+ *
+ * `BuildGauge` has always chosen its ramp by branching on `needle` — 70, 40 and
+ * 12 — and those three numbers lived in the component next to the CSS variables
+ * they select. That was fine while one client drew this dial. It stops being
+ * fine now that the phone draws it too: React Native has no `var(--build-far)`,
+ * so the mobile gauge has to make the same choice from its own token layer, and
+ * a second copy of `needle >= 70` is a second copy.
+ *
+ * The split is the one `health-band.ts` already argues. **Which region of the
+ * continuum a reading falls in is product judgement and lives here.** What that
+ * region looks like on a given platform is presentation and stays with the
+ * platform — a CSS variable on web, a hex from `theme/` on the phone.
+ *
+ * ⚠ These are *needle* thresholds, not the point floors `ZONES` uses. They are
+ * genuinely different scales and neither is derivable from the other: `ZONES`
+ * bands accumulated effort, this bands the rendered position. Aligning them
+ * would be a product decision about what the dial's colours mean, not a
+ * tidy-up.
+ */
+export type BuildRamp = 'stock' | 'mild' | 'warm' | 'far';
+
+/**
+ * Where the redline starts, on the same 0–100 scale as the needle.
+ *
+ * One constant drives the painted band and the needle's colour, so the two
+ * cannot drift — a redline drawn at 82 with a needle that turns at 85 would show
+ * a pointer sitting in the red while still reading as normal, which is worse
+ * than having no redline. Now one constant across both clients, for the same
+ * reason at a larger scale.
+ *
+ * **This is not a fault threshold.** A redline means *near the limit of the
+ * engine*. `needleFor` clamps at 99 and a complete pass of the WRX's entire
+ * known catalogue lands near 63: visible from first launch, very nearly
+ * unreachable.
+ */
+export const REDLINE_FROM = 82;
+
+/**
+ * The ramp region for a needle position.
+ *
+ * Warm as the build climbs, rather than the health palette's red-to-green.
+ * **Nothing here is a failure state, so nothing is red** — cool steel for stock,
+ * warming through to amber. A low reading is *stock*, not a fault, and colouring
+ * it from the health ramp would announce an unmodified car to a screen reader as
+ * critical.
+ */
+export function buildRampFor(needle: number): BuildRamp {
+  if (needle >= 70) return 'far';
+  if (needle >= 40) return 'warm';
+  if (needle >= 12) return 'mild';
+  return 'stock';
+}
+
+/** Whether the needle has entered the redline — and so takes the redline colour. */
+export function isRedlined(needle: number): boolean {
+  return needle >= REDLINE_FROM;
+}

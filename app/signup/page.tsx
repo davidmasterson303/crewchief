@@ -4,7 +4,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { useRouter } from 'next/navigation';
-import { Car, Eye, EyeOff, Loader as Loader2, CircleCheck as CheckCircle2, Mail } from 'lucide-react';
+import { Eye, EyeOff, Loader as Loader2, CircleCheck as CheckCircle2, Mail } from 'lucide-react';
+import Logo from '@/components/brand/Logo';
 import { Button } from '@/components/ui/button';
 import { createBrowserSupabaseClient } from '@/lib/supabase';
 
@@ -199,9 +200,8 @@ export default function SignupPage() {
     >
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2.5 group mb-6">
-            <Car className="h-7 w-7 text-white" />
-            <span className="text-xl font-semibold text-white tracking-tight">CrewChief</span>
+          <Link href="/" className="inline-flex group mb-6">
+            <Logo variant="stacked" size={60} />
           </Link>
           <h1 className="text-2xl font-bold text-white mb-2">Create your account</h1>
           <p className="text-white/50 text-sm">Add a vehicle and get its full dossier &mdash; plus an AI consultant that knows your car.</p>

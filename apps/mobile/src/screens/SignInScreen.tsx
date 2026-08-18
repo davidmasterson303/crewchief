@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   StyleSheet,
@@ -10,9 +11,15 @@ import {
   View,
 } from 'react-native';
 
-import { signIn, signUp } from '../auth/session';
+import { API_BASE_URL } from '../config';
+import Button from '../components/Button';
+import Field from '../components/Field';
+import Logo from '../components/Logo';
+import { resetPassword, signIn, signUp } from '../auth/session';
 import { hasDevCredentials, signInWithDevCredentials } from '../auth/dev-session';
 import { checkSharedCore } from '../core-check';
+import { border, build, radius, status, surface, text } from '../theme';
+import { interFace } from '../theme/fonts';
 
 /**
  * Sign in.
@@ -76,43 +83,77 @@ export function SignInScreen() {
     }
   }
 
+  /*
+    Deliberately gated on the email field rather than on `canSubmit`: a reset
+    needs an address and nothing else, and requiring a password to recover a
+    forgotten password is the loop this control exists to break.
+  */
+  async function handleReset() {
+    if (busy) return;
+
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+
+    const result = await resetPassword(email);
+    setBusy(false);
+
+    if (!result.ok) {
+      setError(result.error ?? 'Could not send the reset email.');
+      return;
+    }
+
+    /*
+      "Sent", never "found" — Supabase answers identically for an address with
+      no account, and so does this.
+    */
+    setNotice('If that address has an account, a reset link is on its way.');
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={styles.form}>
-        <Text style={styles.title}>CrewChief</Text>
+        {/* The stacked lockup, per the Sweep handoff: this screen had no mark. */}
+        <View style={styles.lockup}>
+          <Logo variant="stacked" size={60} />
+        </View>
         <Text style={styles.subtitle}>
           {isNew ? 'Create your garage' : 'Sign in to your garage'}
         </Text>
 
-        <TextInput
-          style={styles.input}
+        {/*
+          `Field`, not two hand-rolled inputs.
+
+          The primitive already holds what this screen was doing by hand — the
+          16px floor that is not overridable, because under it iOS zooms on
+          focus and does not zoom back — and it adds what this screen could
+          not: a **visible** label.
+
+          That is the upgrade rather than a side effect. The note that stood
+          here was right that a placeholder is not a label: VoiceOver reads it
+          as the field's *value* while empty, and once someone types it is gone
+          entirely. Working around that with `accessibilityLabel` fixed the
+          screen reader and left the sighted case — a form whose labels vanish
+          as you fill it in. The primitive labels it for everyone.
+        */}
+        <Field
+          label="Email"
           value={email}
           onChangeText={setEmail}
-          placeholder="Email"
-          placeholderTextColor="rgba(255,255,255,0.3)"
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="email-address"
           textContentType="username"
-          /*
-            A placeholder is not a label. VoiceOver reads it as the field's
-            *value* when the field is empty, and once someone types their
-            address it is gone entirely — so a screen-reader user re-reading the
-            form finds two unlabelled boxes containing an email and some dots.
-          */
-          accessibilityLabel="Email"
           editable={!busy}
         />
 
-        <TextInput
-          style={styles.input}
+        <Field
+          label="Password"
           value={password}
           onChangeText={setPassword}
-          placeholder="Password"
-          placeholderTextColor="rgba(255,255,255,0.3)"
           secureTextEntry
           autoCapitalize="none"
           /*
@@ -122,7 +163,6 @@ export function SignInScreen() {
             saved, which is why this was here before sign-up existed.
           */
           textContentType={isNew ? 'newPassword' : 'password'}
-          accessibilityLabel="Password"
           editable={!busy}
           onSubmitEditing={handleSubmit}
         />
@@ -130,26 +170,74 @@ export function SignInScreen() {
         {error ? <Text style={styles.error}>{error}</Text> : null}
         {notice ? <Text style={styles.notice}>{notice}</Text> : null}
 
-        <Pressable
-          style={[styles.button, !canSubmit && styles.buttonDisabled]}
+        {/*
+          The inverse CTA, from the primitive rather than a sixth private copy.
+
+          `Button` carries the whole treatment: the white fill for a control
+          that has to outrank everything, the disabled fill that stays light so
+          an unavailable control does not read as a different one appearing,
+          and the rule this screen already understood — the accessible name
+          survives the spinner, because a control named by its `<Text>` child
+          goes anonymous at exactly the moment it has something to say.
+        */}
+        <Button
+          label={isNew ? 'Create account' : 'Sign in'}
+          variant="inverse"
           onPress={handleSubmit}
           disabled={!canSubmit}
-          accessibilityRole="button"
-          /*
-            Named explicitly rather than by its `<Text>` child, because the
-            child is swapped for a spinner while `busy` — so the control loses
-            its accessible name at exactly the moment someone most needs to know
-            what it is doing. `accessibilityState.busy` is what says "working".
-          */
-          accessibilityLabel={isNew ? 'Create account' : 'Sign in'}
-          accessibilityState={{ disabled: !canSubmit, busy }}
-        >
-          {busy ? (
-            <ActivityIndicator color="#080808" />
-          ) : (
-            <Text style={styles.buttonText}>{isNew ? 'Create account' : 'Sign in'}</Text>
-          )}
-        </Pressable>
+          busy={busy}
+        />
+
+        {/*
+          Shown while creating an account, which is the moment consent is
+          actually given. Apple's 3.1.2 wants these reachable in the binary;
+          putting them at the point of agreement rather than only in the
+          account screen is what makes the sentence true rather than merely
+          compliant.
+        */}
+        {isNew ? (
+          <View style={styles.consent}>
+            <Text style={styles.consentText}>
+              By creating an account you agree to the{' '}
+              <Text
+                style={styles.consentLink}
+                accessibilityRole="link"
+                accessibilityLabel="Terms of Use, opens in your browser"
+                onPress={() => void Linking.openURL(`${API_BASE_URL}/terms`)}
+              >
+                Terms of Use
+              </Text>{' '}
+              and{' '}
+              <Text
+                style={styles.consentLink}
+                accessibilityRole="link"
+                accessibilityLabel="Privacy Policy, opens in your browser"
+                onPress={() => void Linking.openURL(`${API_BASE_URL}/privacy`)}
+              >
+                Privacy Policy
+              </Text>
+              .
+            </Text>
+          </View>
+        ) : null}
+
+        {/*
+          Sign-in only. On the create-account form there is no password to have
+          forgotten, and offering to reset one for an address that may not have
+          an account yet is a question the screen cannot answer without becoming
+          an account-existence oracle — see `resetPassword`.
+        */}
+        {!isNew ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Email me a reset link"
+            onPress={handleReset}
+            disabled={busy}
+            style={styles.switchMode}
+          >
+            <Text style={styles.switchModeText}>Forgot your password?</Text>
+          </Pressable>
+        ) : null}
 
         <Pressable
           accessibilityRole="button"
@@ -289,28 +377,11 @@ function DevCoreCheck() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#080808', justifyContent: 'center' },
+  container: { flex: 1, backgroundColor: surface.page, justifyContent: 'center' },
   form: { padding: 28, gap: 14 },
-  title: { color: '#fff', fontSize: 30, fontWeight: '700', letterSpacing: -0.5 },
-  subtitle: { color: 'rgba(255,255,255,0.5)', fontSize: 15, marginBottom: 14 },
-  input: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    color: '#fff',
-    fontSize: 16,
-  },
-  error: { color: '#f87171', fontSize: 13 },
-  button: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    paddingVertical: 15,
-    alignItems: 'center',
-    marginTop: 6,
-  },
+  lockup: { alignItems: 'flex-start', marginBottom: 4 },
+  subtitle: { color: text.muted, fontSize: 15, marginBottom: 14 },
+  error: { color: status.dangerText, fontSize: 13 },
   /*
     An explicit fill, not `opacity` — the same defect the advisor's "Ask"
     button carried, on the first screen anyone sees.
@@ -322,19 +393,32 @@ const styles = StyleSheet.create({
     colour literals and sees none here, and no test mounts this screen at all.
     A render test now does.
   */
-  buttonDisabled: { backgroundColor: '#b8b8b8' },
-  notice: { color: '#7dd3a0', fontSize: 13, lineHeight: 18 },
+  notice: { color: status.confirm, fontSize: 13, lineHeight: 18 },
   switchMode: { minHeight: 44, justifyContent: 'center', alignItems: 'center' },
-  switchModeText: { color: 'rgba(255,255,255,0.7)', fontSize: 14 },
-  buttonText: { color: '#080808', fontSize: 16, fontWeight: '600' },
+  switchModeText: { color: text.secondary, fontSize: 14 },
+
+  consent: { paddingTop: 4 },
+  consentText: {
+    color: text.secondary,
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: 'center',
+  },
+  /*
+    Brighter than the sentence around it so the two tappable spans read as
+    controls. They are nested `<Text>` rather than separate Pressables so the
+    line wraps as one sentence — a link that breaks onto its own row reads as a
+    button and changes what the sentence appears to say.
+  */
+  consentLink: { color: text.primary, textDecorationLine: 'underline' },
 
   devCheck: { marginTop: 18, gap: 4 },
   /*
     Quiet when it passes — it is a diagnostic sitting under a product screen and
     should not compete with the sign-in button. #4ade80 and #f87171 both clear
-    the AA floor on #080808 that `78eba74` made a rule.
+    the AA floor on `surface.page` that `78eba74` made a rule.
   */
-  devCheckOk: { color: 'rgba(255,255,255,0.5)', fontSize: 12, textAlign: 'center' },
-  devCheckFail: { color: '#f87171', fontSize: 13, fontWeight: '700', textAlign: 'center' },
-  devCheckDetail: { color: '#f87171', fontSize: 11, textAlign: 'center' },
+  devCheckOk: { color: text.muted, fontSize: 12, textAlign: 'center' },
+  devCheckFail: { color: status.dangerText, fontSize: 13, fontFamily: interFace('700'), fontWeight: '700', textAlign: 'center' },
+  devCheckDetail: { color: status.dangerText, fontSize: 11, textAlign: 'center' },
 });

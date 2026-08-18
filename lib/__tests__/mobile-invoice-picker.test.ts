@@ -59,7 +59,7 @@ jest.mock(
 const {
   pickInvoiceImage,
   ImagePickerUnavailable,
-} = require('../../apps/mobile/src/media/pick-invoice-image');
+} = require('../../apps/mobile/src/media/pick-image');
 const { ALLOWED_DOCUMENT_TYPES } = require('@crewchief/core/validation');
 /* eslint-enable @typescript-eslint/no-var-requires */
 

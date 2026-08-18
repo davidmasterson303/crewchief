@@ -1,4 +1,11 @@
-import { fireEvent, render } from '@testing-library/react-native';
+import { render, userEvent } from '@testing-library/react-native';
+
+jest.mock('../../onboarding/first-run-storage', () => ({
+  everHadVehicle: jest.fn().mockResolvedValue(true),
+  recordEverHadVehicle: jest.fn().mockResolvedValue(undefined),
+}));
+
+import { everHadVehicle } from '../../onboarding/first-run-storage';
 
 import { GarageScreen } from '../GarageScreen';
 import { VehicleDetailScreen } from '../VehicleDetailScreen';
@@ -28,6 +35,20 @@ import { auditText, belowFloor, contrastRatio, SCREEN_BACKGROUND } from '../../t
  *
  * Both suites stay. The scan covers every style in the app including screens
  * nothing mounts; this covers fewer styles far more truthfully.
+ *
+ * ── Await every interaction ─────────────────────────────────────────────────
+ *
+ * This file carried a "do not add a test below this line" warning from 8 to 15
+ * August 2026, because everything after the add-a-car case rendered a null tree
+ * and audited nothing — in green, since `belowFloor(...) === []` passes on an
+ * empty audit. The cause was three un-awaited `fireEvent.changeText` calls:
+ * **`render`, `fireEvent` and `userEvent` are all async in RNTL 14**, and
+ * overlapping act scopes leave React unable to commit any later render for the
+ * rest of the file. `jest.setup.js` carries the mechanism and now fails the
+ * test that leaks the scope, and `belowFloor` refuses an empty audit.
+ *
+ * Use `userEvent` for every interaction, and await it. `fireEvent` works when
+ * awaited but nothing in this app needs it.
  */
 
 jest.mock('../../api/client', () => {
@@ -93,6 +114,7 @@ describe('the health score colour — never checked by the source scan', () => {
         onScanInvoice={jest.fn()}
         onViewRecalls={jest.fn()}
         onOpenWishlist={jest.fn()}
+      onOpenHistory={jest.fn()}
       />
     );
 
@@ -120,7 +142,37 @@ describe('failure states, which are where sub-floor text hides', () => {
     expect(belowFloor(auditText(view))).toEqual([]);
   });
 
-  it('the garage empty state, which is the first thing a new user sees', async () => {
+  it('the opening explanation, which is the first thing a new user sees', async () => {
+    /*
+      ⚠ This case replaced "the garage empty state" on 17 Aug and the title
+      moved with it, because the claim in it moved: an install that has never
+      had a car now gets `FirstRun`, not `EmptyState`. Leaving the old name on
+      the old screen would have left the *most*-read surface in the app
+      unaudited under a title claiming it was covered.
+
+      It also carries the most new copy of anything added recently — three
+      promises and a caveat, at the quietest step of the ink ramp — which is
+      where a contrast floor is most likely to be crossed by accident.
+    */
+    (everHadVehicle as jest.Mock).mockResolvedValue(false);
+    request.mockResolvedValue({ vehicles: [] });
+
+    const view = await render(
+      <GarageScreen
+        accessToken="t"
+        email="owner@example.test"
+        onSignOut={jest.fn()}
+        onOpenVehicle={jest.fn()}
+        onAddVehicle={jest.fn()}
+      />
+    );
+
+    await view.findByText('Start with one car');
+    expect(belowFloor(auditText(view))).toEqual([]);
+  });
+
+  it('the empty garage a returning owner sees', async () => {
+    (everHadVehicle as jest.Mock).mockResolvedValue(true);
     request.mockResolvedValue({ vehicles: [] });
 
     const view = await render(
@@ -149,6 +201,7 @@ describe('failure states, which are where sub-floor text hides', () => {
         onScanInvoice={jest.fn()}
         onViewRecalls={jest.fn()}
         onOpenWishlist={jest.fn()}
+      onOpenHistory={jest.fn()}
       />
     );
 
@@ -185,6 +238,7 @@ describe('the advisor CTA, which is dark text on white', () => {
         onScanInvoice={jest.fn()}
         onViewRecalls={jest.fn()}
         onOpenWishlist={jest.fn()}
+      onOpenHistory={jest.fn()}
       />
     );
 
@@ -207,10 +261,24 @@ describe('the advisor CTA, which is dark text on white', () => {
 
 describe('the measurement itself', () => {
   it('agrees with the floor the web guard uses', () => {
-    // `text-contrast-floor.test.ts` sets FLOOR = 50, meaning /50 white. These
-    // two numbers have to keep meaning the same thing.
+    /*
+      `text-contrast-floor.test.ts` sets FLOOR = 50, meaning /50 white. These
+      two numbers have to keep meaning the same thing.
+
+      ⚠ **The lower probe was 45% and had to move.** On the old `#080808`
+      backdrop 45% measured just under 4.5 and made a fine "one step below the
+      floor" sample. On `surface.page` — the warm graphite, which is lighter —
+      it composites to 4.53 and passes, so the assertion was failing for the
+      right reason: the sample was no longer below anything.
+
+      It now probes the two values the token layer actually defines, which is
+      what this test should always have asserted: `text.muted` at 50% is the
+      quietest a string may be, and `text.nonText` at 40% is a hairline token
+      that must never carry a word. Those are the numbers a future change would
+      break, and an arbitrary 45% is not.
+    */
     expect(contrastRatio('rgba(255,255,255,0.5)', SCREEN_BACKGROUND)).toBeGreaterThanOrEqual(4.5);
-    expect(contrastRatio('rgba(255,255,255,0.45)', SCREEN_BACKGROUND)).toBeLessThan(4.5);
+    expect(contrastRatio('rgba(255,255,255,0.4)', SCREEN_BACKGROUND)).toBeLessThan(4.5);
   });
 
   it('composites alpha rather than ignoring it', () => {
@@ -239,6 +307,25 @@ describe('the measurement itself', () => {
 
     await view.findByText('2015 BMW M235i');
     expect(auditText(view).length).toBeGreaterThan(4);
+  });
+
+  /*
+    ── The two ways this suite has gone vacuous, now closed ──────────────────
+
+    Both are the same shape: `expect(belowFloor(...)).toEqual([])` passes when
+    nothing was audited, so the assertion says most when it fails and nothing
+    at all when the input is empty. It has happened twice — §0.16's source
+    scanner on an empty scan, and this file measuring a null tree for a week.
+  */
+  it('refuses to report a clean bill on an audit of nothing', () => {
+    expect(() => belowFloor([])).toThrow(/nothing was audited/);
+    expect(belowFloor([], { allowEmpty: true })).toEqual([]);
+  });
+
+  it('refuses to audit a tree that never committed', () => {
+    // What an un-awaited `render`/`fireEvent`/`userEvent` leaves behind: React's
+    // act scope stays open, the root never commits, and `toJSON()` is null.
+    expect(() => auditText({ toJSON: () => null })).toThrow(/tree is null/);
   });
 });
 
@@ -418,16 +505,44 @@ describe('the wishlist', () => {
   });
 
   it('reads at AA with the add button disabled', async () => {
-    // The composer is empty on load, so the CTA renders in its disabled fill.
-    // This assertion only means something because that state is an explicit
-    // colour rather than an opacity — see the warning above.
+    /*
+      The composer is behind a control now, so it has to be opened before the
+      disabled CTA exists to audit. Worth keeping rather than deleting: this
+      assertion only means anything because the disabled state is an explicit
+      fill rather than an `opacity` — a parent alpha never reaches `auditText`'s
+      comparison, so an opacity-greyed button would pass while being unreadable.
+    */
     request.mockResolvedValue({ wishlistItems: [] });
 
+    const user = userEvent.setup();
     const view = await render(
       <WishlistScreen vehicleId="db143cdc-e68c-46f0-849e-69f7a1873f58" onSignOut={jest.fn()} />
     );
 
-    await view.findByText('Add to wishlist');
+    await user.press(await view.findByLabelText('Add something to the wishlist'));
+
+    await view.findByLabelText('Add to wishlist');
+    expect(belowFloor(auditText(view))).toEqual([]);
+  });
+
+  it('reads at AA on the mark-done sheet, which writes permanent history', async () => {
+    /*
+      New surface, and the one on this screen where a misread label has a
+      lasting consequence: it writes a `maintenance_line_items` row and deletes
+      the wishlist entry, with no undo.
+    */
+    request.mockResolvedValue({
+      wishlistItems: [{ id: 'w1', item_name: 'Front brake pads', item_type: 'maintenance' }],
+    });
+
+    const user = userEvent.setup();
+    const view = await render(
+      <WishlistScreen vehicleId="db143cdc-e68c-46f0-849e-69f7a1873f58" onSignOut={jest.fn()} />
+    );
+
+    await user.press(await view.findByLabelText('Mark Front brake pads done'));
+    await view.findByLabelText('Mark done');
+
     expect(belowFloor(auditText(view))).toEqual([]);
   });
 
@@ -490,6 +605,7 @@ describe('the service milestone screen', () => {
   it('reads at AA on the milestone, once the reading is confirmed', async () => {
     request.mockResolvedValue(CAR);
 
+    const user = userEvent.setup();
     const view = await render(
       <ServiceMilestoneScreen
         vehicleId="db143cdc-e68c-46f0-849e-69f7a1873f58"
@@ -497,7 +613,7 @@ describe('the service milestone screen', () => {
       />
     );
 
-    fireEvent.press(await view.findByText('That is right'));
+    await user.press(await view.findByText('That is right'));
 
     // The oil interval lands the car inside a milestone; brake fluid has no
     // recorded date, so it renders in the "timed by date" block rather than
@@ -533,6 +649,7 @@ describe('the service milestone screen', () => {
       },
     });
 
+    const user = userEvent.setup();
     const view = await render(
       <ServiceMilestoneScreen
         vehicleId="a1000000-0000-0000-0000-000000000001"
@@ -540,7 +657,7 @@ describe('the service milestone screen', () => {
       />
     );
 
-    fireEvent.press(await view.findByText('That is right'));
+    await user.press(await view.findByText('That is right'));
 
     await view.findByText('Timed by date, not mileage');
     expect(view.queryByText(/Brake fluid flush/)).not.toBeNull();
@@ -578,9 +695,10 @@ describe('the sign-in screen', () => {
  */
 describe('sign-up', () => {
   it('reads at AA in create-account mode', async () => {
+    const user = userEvent.setup();
     const view = await render(<SignInScreen />);
 
-    fireEvent.press(await view.findByText('New here? Create an account'));
+    await user.press(await view.findByText('New here? Create an account'));
 
     await view.findByText('Create your garage');
     expect(belowFloor(auditText(view))).toEqual([]);
@@ -600,17 +718,56 @@ describe('add a car', () => {
   });
 
   it('reads at AA with the form filled and both choices rendered', async () => {
+    const user = userEvent.setup();
     const view = await render(
       <AddVehicleScreen onAdded={jest.fn()} onSignOut={jest.fn()} />
     );
 
-    fireEvent.changeText(view.getByLabelText('Model year'), '2020');
-    fireEvent.changeText(view.getByLabelText('Make'), 'Subaru');
-    fireEvent.changeText(view.getByLabelText('Model'), 'WRX');
+    await user.type(view.getByLabelText('Model year'), '2020');
+    await user.type(view.getByLabelText('Make'), 'Subaru');
+    await user.type(view.getByLabelText('Model'), 'WRX');
+
+    /*
+      The submit is the whole reason to fill the form: it changes fill between
+      `submitOff` and `submit`, and the enabled one is what this case exists to
+      measure. Asserted rather than assumed — everything else on this screen
+      renders identically empty or full, so without this the case would measure
+      the disabled state again under a name that says otherwise.
+    */
+    expect(view.getByLabelText('Add to my garage').props.accessibilityState).toMatchObject({
+      disabled: false,
+    });
 
     // Both the selected and unselected chip, since they are different fills.
     await view.findByText('Not for me');
     expect(belowFloor(auditText(view))).toEqual([]);
   });
+});
 
+/**
+ * The tail sentinel — what the "do not add a test below this line" warning
+ * became.
+ *
+ * From 8 to 15 August 2026 every `render` past the add-a-car case came back
+ * with a null tree, so anything added here audited nothing and passed. Four
+ * cases were written below and all four went green while proving nothing; the
+ * response at the time was a warning comment telling the next person not to
+ * try, and the four cases moved to `surface-contrast.test.tsx`.
+ *
+ * The cause is fixed — un-awaited `fireEvent` calls leaving React's act scope
+ * open, see `jest.setup.js` — and the warning is gone. This stands in its place
+ * and does the job the warning could not: it mounts the simplest screen in the
+ * app at the very foot of the file and insists that a render *here* still
+ * measures something. Keep it last. Add new cases above it.
+ */
+describe('the last render in this file still measures something', () => {
+  it('mounts and audits after every case above it', async () => {
+    const view = await render(<SignInScreen />);
+
+    await view.findByText('Sign in');
+
+    // Not a contrast assertion — `belowFloor` covers that on every case above.
+    // This asserts the *harness* still works this far down the file.
+    expect(auditText(view).length).toBeGreaterThan(3);
+  });
 });

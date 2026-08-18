@@ -72,9 +72,25 @@ describe('the mobile client', () => {
   });
 
   it('never queries a Supabase table directly', () => {
-    // `.from(` is how every table read and write starts in supabase-js. This
-    // is the VehicleCard rule.
-    const offenders = files.filter((f) => /\.from\s*\(/.test(f.code)).map((f) => f.rel);
+    /*
+      `.from(` is how every table read and write starts in supabase-js. This
+      is the VehicleCard rule.
+
+      ⚠ `Array.from` is carved out, and the carve-out is as narrow as it can
+      be. `Skeleton.tsx` builds its placeholder rows with `Array.from({ length
+      })` — an ordinary idiom with nothing to do with Supabase — and tripped
+      this on 14 Aug. The lookbehind excludes that receiver and nothing else:
+      a client called `Array` does not exist, so `supabase.from`, `client.from`
+      and every aliased form are still caught.
+
+      Fixed here rather than in the component on purpose. A security guard that
+      false-positives on normal JavaScript is one somebody eventually loosens
+      properly, under deadline, in a way nobody reviews — the same reasoning
+      `stripComments` above already encodes.
+    */
+    const offenders = files
+      .filter((f) => /(?<!\bArray)\.from\s*\(/.test(f.code))
+      .map((f) => f.rel);
 
     expect(offenders).toEqual([]);
   });

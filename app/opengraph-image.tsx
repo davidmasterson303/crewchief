@@ -137,8 +137,10 @@ export default async function OpengraphImage() {
           }}
         />
 
-        {/* Wordmark. The lucide `car-front` path the nav uses, drawn at 40px so
-            the card carries the same mark as the page it opens. */}
+        {/* Wordmark. The Sweep horizontal lockup at its 46px master size —
+            the same geometry components/brand/Logo.tsx renders in the nav,
+            restated here because Satori renders JSX, not our components.
+            Mark cyan-400, redline #FF4436, name Inter 700 at 32/-0.035em. */}
         <div
           style={{
             position: 'absolute',
@@ -148,13 +150,15 @@ export default async function OpengraphImage() {
             alignItems: 'center',
           }}
         >
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" />
-            <circle cx="7" cy="17" r="2" />
-            <path d="M9 17h6" />
-            <circle cx="17" cy="17" r="2" />
+          <svg width="46" height="46" viewBox="0 0 100 100">
+            <g fill="none" strokeLinecap="butt">
+              <path d="M50 85 A35 35 0 1 1 85 50" stroke="#22D3EE" strokeWidth="10" />
+              <path d="M74.75 25.25 A35 35 0 0 1 85 50" stroke="#FF4436" strokeWidth="10" />
+              <path d="M50 50 L55.21 20.45" stroke="#22D3EE" strokeWidth="8" />
+            </g>
+            <circle cx="50" cy="50" r="5.5" fill="#22D3EE" />
           </svg>
-          <div style={{ marginLeft: 16, fontSize: 34, fontWeight: 600, color: '#FFFFFF', letterSpacing: '-0.01em' }}>
+          <div style={{ marginLeft: 16, fontSize: 32, fontWeight: 700, color: '#F5F3F0', letterSpacing: '-0.035em' }}>
             CrewChief
           </div>
         </div>

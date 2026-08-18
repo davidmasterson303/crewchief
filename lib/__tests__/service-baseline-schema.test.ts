@@ -9,13 +9,19 @@
  * the error is discarded by a `catch`, and the only place the disagreement is
  * visible is the source of both sides.
  *
- * There is a live example sitting in the tree. `LogServiceModal` inserts
+ * The example this was written against was `LogServiceModal`: it inserted
  * `service_mileage` — a column that has never existed — with
  * `source: 'manual_entry'`, which is not in the CHECK either. Two rejections in
- * one statement, shipped, and invisible because the component is reached only
- * through `UpcomingMaintenance`, which nothing renders. That is the shape this
+ * one statement, shipped, and invisible because the component was reached only
+ * through `UpcomingMaintenance`, which nothing rendered. That is the shape this
  * pins: not a bug someone will see, a bug nobody will see until it is on the
  * critical path.
+ *
+ * Both files were deleted rather than repaired, which is the answer the last
+ * case below already argued for. The case did not go with them — it changed
+ * subject. What mattered was never that one dead component named an illegal
+ * value; it was that the vocabulary stays closed, and that the next writer of
+ * this table cannot quietly open it.
  *
  * Read off disk rather than executed. Running the insert needs a live Supabase,
  * and the property that matters is what the migration declares against what the
@@ -27,6 +33,29 @@ import { join } from 'node:path';
 
 const ROOT = join(__dirname, '..', '..');
 const MIGRATIONS = join(ROOT, 'supabase', 'migrations');
+
+/*
+  Everywhere a write to this table could plausibly be spelled.
+
+  `supabase/` is deliberately absent: the migration that adds the CHECK also
+  *names* the value it excludes, in a comment explaining the exclusion, and a
+  scan that read it would report the constraint as its own violator.
+*/
+const SCANNED = ['app', 'components', 'hooks', 'lib', 'packages', 'apps'];
+
+function sourceFiles(dirs: string[]): string[] {
+  const out: string[] = [];
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === '__tests__' || entry.name === 'node_modules') continue;
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (/\.tsx?$/.test(entry.name)) out.push(full);
+    }
+  };
+  for (const dir of dirs) walk(join(ROOT, dir));
+  return out;
+}
 
 /**
  * SQL with its comments removed.
@@ -131,23 +160,37 @@ describe('the source vocabulary', () => {
   });
 });
 
-describe('what is deliberately still broken', () => {
-  it('does not legalise LogServiceModal-s dead insert', () => {
+describe('the vocabulary stays closed', () => {
+  it('does not admit manual_entry', () => {
     /*
-      `source: 'manual_entry'` is not in the CHECK and is not being added.
-
-      It would be one word to "fix", and that is the trap: the component is
-      unreachable, so adding a fourth stored meaning would be inventing
-      vocabulary for code nobody runs — and `20260801120000` added this
-      constraint precisely to stop a fourth writer inventing a fourth meaning.
-      The dead writer is a separate clean-up, and deleting it is the likelier
-      right answer than legalising it.
+      It would be one word to add, and that is the trap. `20260801120000` added
+      this constraint precisely to stop a fourth writer inventing a fourth
+      meaning for the same fact, and `'manual'` already carries "a person typed
+      this in". A second spelling of it is not a new meaning, it is a synonym —
+      and two spellings of one meaning is how `service_mileage` and
+      `mileage_at_service` happened one column over.
     */
     expect(sourceCheck).not.toMatch(/'manual_entry'/);
+  });
 
-    const modal = readFileSync(join(ROOT, 'components', 'LogServiceModal.tsx'), 'utf8');
-    // If this ever fails, the component was wired up — at which point the
-    // insert above is a live defect and this test is the thing that says so.
-    expect(modal).toMatch(/'manual_entry'/);
+  it('is not written by anything in the tree', () => {
+    /*
+      The other half, and the half that used to be a file read.
+
+      `LogServiceModal.tsx` was the one writer of `'manual_entry'`, so this case
+      pointed at that file and asserted the string was still in it — a tripwire
+      for the component being wired up. The file is gone, and pointing at a
+      named file was always the weaker form: it could only see the writer it
+      already knew about.
+
+      So it scans instead. Any *new* insert naming a value the CHECK does not
+      admit fails here, whatever it is called and wherever it lives, which is
+      the property the CHECK exists to have.
+    */
+    const offenders = sourceFiles(SCANNED)
+      .filter((f) => /source:\s*['"]manual_entry['"]/.test(readFileSync(f, 'utf8')))
+      .map((f) => f.slice(ROOT.length + 1));
+
+    expect(offenders).toEqual([]);
   });
 });

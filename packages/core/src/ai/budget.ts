@@ -19,9 +19,10 @@
  * than dollars or features. A token ceiling protects the bill without claiming
  * to know what anyone will pay.
  *
- * When 5.2 lands and a profile can say which plan it is on, `TIERS` gains
- * entries and `resolveTier` stops returning a constant. Nothing else here
- * should need to change.
+ * `TIERS` is where a new plan gets its ceiling. **Which tier an account is
+ * actually on is no longer decided here** — that moved to
+ * `@crewchief/core/entitlement`, which reads a stored record against the clock,
+ * because a subscription expires and a constant cannot.
  */
 
 /** The billable quantity a budget is measured in. See `billableTokens`. */
@@ -63,17 +64,6 @@ export const TIERS: Record<TierName, Tier> = {
   free: { name: 'free', monthlyOutputTokens: 400_000 },
   paid: { name: 'paid', monthlyOutputTokens: 2_000_000 },
 };
-
-/**
- * Which tier an account is on.
- *
- * Constant until 5.2 gives a profile somewhere to record a subscription. It is
- * a function rather than a constant so the call sites are already written
- * against the right shape — swapping the body is then the whole change.
- */
-export function resolveTier(_userId: string | null): Tier {
-  return TIERS.free;
-}
 
 /**
  * The public demo's own ceiling.

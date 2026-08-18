@@ -10,7 +10,10 @@ import {
   View,
 } from 'react-native';
 
+import Card from '../components/Card';
+import Button from '../components/Button';
 import { apiRequest, ApiRequestError } from '../api/client';
+import { Skeleton, SkeletonCard } from '../components/Skeleton';
 import {
   evaluateSchedule,
   milestoneReason,
@@ -27,6 +30,8 @@ import {
 import { historyLookups, type ServiceHistoryRow } from '@crewchief/core/service-history';
 import { validateMileageUpdate } from '@crewchief/core/mileage-tracking';
 import { wishlistItemIdentifier } from '@crewchief/core/wishlist-identifier';
+import { border, radius, status, surface, text } from '../theme';
+import { interFace } from '../theme/fonts';
 
 /**
  * Phase 5.6 — where a service-due notification lands.
@@ -99,7 +104,23 @@ interface VehicleResponse {
  * before Track A2a.
  */
 interface MaintenanceResponse {
-  lineItems?: ServiceHistoryRow[] | null;
+  /**
+   * `maintenance_line_items` — the service record.
+   *
+   * ⚠ **Not `lineItems`, which this screen read until 12 Aug 2026.** That key
+   * carries `invoice_line_items`: the raw lines extracted from an uploaded
+   * invoice. They have a `description` and a price and **no `service_date` and
+   * no `mileage_at_service`** — so every lookup built from them returned null,
+   * and the A2a fix below silently did nothing.
+   *
+   * It typechecked because `ServiceHistoryRow` accepts `description` *or*
+   * `item_description`, so invoice rows satisfy the type while being unable to
+   * answer the question. The server sweep has always read the right table
+   * (`route.ts:424`), which is why the notification and the screen it opens
+   * could disagree: the sweep knew when the oil was last changed and this
+   * screen said "unknown".
+   */
+  maintenanceLineItems?: ServiceHistoryRow[] | null;
 }
 
 type State =
@@ -154,7 +175,7 @@ export function ServiceMilestoneScreen({ vehicleId, onSignOut }: Props) {
         name: [vehicle?.year, vehicle?.make, vehicle?.model].filter(Boolean).join(' ') || 'this car',
         mileage,
         schedule: Array.isArray(rawSchedule) ? (rawSchedule as ScheduleEntry[]) : [],
-        history: Array.isArray(history?.lineItems) ? history.lineItems : [],
+        history: Array.isArray(history?.maintenanceLineItems) ? history.maintenanceLineItems : [],
       });
       setReading(String(mileage));
     } catch (error) {
@@ -247,10 +268,11 @@ export function ServiceMilestoneScreen({ vehicleId, onSignOut }: Props) {
   );
 
   if (state.kind === 'loading') {
+    // One card: this screen resolves into a single milestone or a mileage gate.
     return (
-      <View style={styles.centre}>
-        <ActivityIndicator color="rgba(255,255,255,0.6)" />
-      </View>
+      <ScrollView contentContainerStyle={styles.body}>
+        <SkeletonCard lines={3} />
+      </ScrollView>
     );
   }
 
@@ -291,13 +313,22 @@ export function ServiceMilestoneScreen({ vehicleId, onSignOut }: Props) {
           onSubmitEditing={() => void confirm()}
         />
 
-        <Pressable
-          style={styles.primaryCta}
-          accessibilityRole="button"
+        {/*
+          The inverse CTA, from the primitive.
+
+          ⚠ It also closes a double-submit. This was a bare `Pressable` with no
+          `disabled` — the label changed to "Saving…" and the control stayed
+          live, so a second tap fired `confirm()` again mid-write. `Button`'s
+          `busy` blocks the press and keeps the accessible name, which a label
+          swapped for "Saving…" does not: a screen reader loses the verb at the
+          moment it matters.
+        */}
+        <Button
+          label="That is right"
+          variant="inverse"
+          busy={saving}
           onPress={() => void confirm()}
-        >
-          <Text style={styles.primaryCtaText}>{saving ? 'Saving…' : 'That is right'}</Text>
-        </Pressable>
+        />
       </ScrollView>
     );
   }
@@ -309,6 +340,12 @@ export function ServiceMilestoneScreen({ vehicleId, onSignOut }: Props) {
     counted from the odometer rather than from when the work was actually done.
 
     `historyLookups` returns all three, so it spreads.
+
+    ⚠ **A2a wired these up and fed them the wrong table.** Until 12 Aug the
+    history came from `lineItems` (`invoice_line_items`), which carries no
+    service date and no mileage — so the lookups still returned null and the
+    bug this comment describes was still live, behind a fix that looked
+    applied. See `MaintenanceResponse` above.
   */
   const services = evaluateSchedule({
     schedule: state.schedule,
@@ -331,14 +368,14 @@ export function ServiceMilestoneScreen({ vehicleId, onSignOut }: Props) {
           onAdd={addToWishlist}
         />
       ) : (
-        <View style={styles.card}>
+        <Card style={styles.cardGap}>
           <Text style={styles.cardTitle}>Nothing due right now</Text>
           <Text style={styles.body14}>
             {services.length === 0
               ? 'This car has no structured service schedule yet, so nothing can be worked out from its mileage.'
               : 'The next service is far enough out that it is not worth a trip.'}
           </Text>
-        </View>
+        </Card>
       )}
 
       {/*
@@ -347,7 +384,7 @@ export function ServiceMilestoneScreen({ vehicleId, onSignOut }: Props) {
         went missing from every car in the product.
       */}
       {unknowns.length > 0 && (
-        <View style={styles.card}>
+        <Card style={styles.cardGap}>
           <Text style={styles.cardTitle}>Timed by date, not mileage</Text>
           <Text style={styles.body14}>
             Nothing on record says when these were last done, so there is no due date to work
@@ -359,7 +396,7 @@ export function ServiceMilestoneScreen({ vehicleId, onSignOut }: Props) {
               {service.intervalMonths ? ` — every ${service.intervalMonths} months` : ''}
             </Text>
           ))}
-        </View>
+        </Card>
       )}
 
       <Text style={styles.footnote}>{SCHEDULE_BASIS_LABELS['generated-schedule']}</Text>
@@ -381,7 +418,7 @@ function MilestoneBlock({
   const basis = milestoneBasis(milestone.services);
 
   return (
-    <View style={styles.card}>
+    <Card style={styles.cardGap}>
       <Text style={styles.cardTitle}>
         {milestone.mileage === null
           ? 'Next service'
@@ -427,7 +464,7 @@ function MilestoneBlock({
           </View>
         );
       })}
-    </View>
+    </Card>
   );
 }
 
@@ -435,70 +472,75 @@ const styles = StyleSheet.create({
   body: { padding: 20, gap: 14, paddingBottom: 40 },
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 10 },
 
-  name: { color: '#fff', fontSize: 24, fontWeight: '700', letterSpacing: -0.5 },
-  mileageLine: { color: 'rgba(255,255,255,0.5)', fontSize: 14, marginTop: -10 },
+  name: { color: text.primary, fontSize: 24, fontFamily: interFace('700'), fontWeight: '700', letterSpacing: -0.5 },
+  mileageLine: { color: text.muted, fontSize: 14, marginTop: -10 },
 
-  gateLead: { color: '#fff', fontSize: 18, fontWeight: '600' },
-  gateBody: { color: 'rgba(255,255,255,0.7)', fontSize: 14, lineHeight: 20 },
+  gateLead: { color: text.primary, fontSize: 18, fontFamily: interFace('600'), fontWeight: '600' },
+  gateBody: { color: text.secondary, fontSize: 14, lineHeight: 20 },
   input: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 12,
+    backgroundColor: surface.raised,
+    borderRadius: radius.button,
     paddingHorizontal: 14,
     fontSize: 16,
-    color: '#fff',
+    color: text.primary,
     minHeight: 48,
   },
 
-  primaryCta: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    minHeight: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryCtaText: { color: '#080808', fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
 
-  card: { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 14, padding: 16, gap: 10 },
-  cardTitle: { color: '#fff', fontSize: 17, fontWeight: '700', letterSpacing: -0.2 },
-  reason: { color: 'rgba(255,255,255,0.7)', fontSize: 14, lineHeight: 20 },
-  basis: { color: 'rgba(255,255,255,0.5)', fontSize: 12 },
+  /**
+   * The card, on the ladder rather than beside it.
+   *
+   * ⚠ This was a **private copy** — `surface.raised` with no border, where the
+   * `Card` primitive is `surface.card` with `border.panel`. `raised` is the
+   * ladder's step for bars, tab strips and chips; a card painted on it sits one
+   * step off from every other card in the app, which is precisely the "twelve
+   * slightly different containers" the primitive set was built to end.
+   *
+   * The gap is kept as it was. Padding and gaps across this app want a pass
+   * with a designer's eye rather than a find-and-replace — see the note in
+   * `mobile-radius-scale.test.ts` on why that rule was scoped to radius.
+   */
+  cardGap: { gap: 10 },
+  cardTitle: { color: text.primary, fontSize: 17, fontFamily: interFace('700'), fontWeight: '700', letterSpacing: -0.2 },
+  reason: { color: text.secondary, fontSize: 14, lineHeight: 20 },
+  basis: { color: text.muted, fontSize: 12 },
 
   service: {
     gap: 8,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
+    borderTopColor: border.panel,
   },
   serviceHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  serviceName: { color: '#fff', fontSize: 15, fontWeight: '600', flexShrink: 1 },
-  overdue: { color: '#e0a468', fontSize: 12, fontWeight: '700' },
-  body14: { color: 'rgba(255,255,255,0.7)', fontSize: 14, lineHeight: 20 },
+  serviceName: { color: text.primary, fontSize: 15, fontFamily: interFace('600'), fontWeight: '600', flexShrink: 1 },
+  overdue: { color: status.attention, fontSize: 12, fontFamily: interFace('700'), fontWeight: '700' },
+  body14: { color: text.secondary, fontSize: 14, lineHeight: 20 },
 
   addCta: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 10,
+    backgroundColor: surface.raised,
+    borderRadius: radius.button,
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
   /* An explicit fill, never `opacity` — see WishlistScreen: the contrast audit
      cannot see a parent alpha, so a faded control is an unmeasured one. */
-  addCtaDone: { backgroundColor: 'rgba(255,255,255,0.04)' },
-  addCtaText: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  addCtaDoneText: { color: 'rgba(255,255,255,0.6)' },
+  addCtaDone: { backgroundColor: surface.raised },
+  addCtaText: { color: text.primary, fontSize: 14, fontFamily: interFace('600'), fontWeight: '600' },
+  addCtaDoneText: { color: text.secondary },
 
-  unknownItem: { color: 'rgba(255,255,255,0.7)', fontSize: 14, lineHeight: 20 },
-  footnote: { color: 'rgba(255,255,255,0.5)', fontSize: 12, lineHeight: 18 },
+  unknownItem: { color: text.secondary, fontSize: 14, lineHeight: 20 },
+  footnote: { color: text.muted, fontSize: 12, lineHeight: 18 },
 
-  errorTitle: { color: '#fff', fontSize: 17, fontWeight: '600' },
-  errorBody: { color: 'rgba(255,255,255,0.5)', fontSize: 14, textAlign: 'center' },
+  errorTitle: { color: text.primary, fontSize: 17, fontFamily: interFace('600'), fontWeight: '600' },
+  errorBody: { color: text.muted, fontSize: 14, textAlign: 'center' },
   button: {
     marginTop: 6,
     paddingHorizontal: 18,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: radius.button,
+    backgroundColor: surface.raised,
     minHeight: 44,
     justifyContent: 'center',
   },
-  buttonText: { color: '#fff', fontSize: 14 },
+  buttonText: { color: text.primary, fontSize: 14 },
 });

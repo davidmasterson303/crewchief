@@ -272,3 +272,41 @@ export function progressionSummary(rungs: ModRung[], completed: string[]): strin
 
   return `${completed.length} done. Here ${rungs.length === 1 ? 'is' : 'are'} the next ${rungs.length}.`;
 }
+
+/**
+ * ── The ladder, as five named rungs ─────────────────────────────────────────
+ *
+ * `nextRungs` returns *parts*; this is the **scale those parts are placed on**.
+ * The mobile baseline draws it explicitly — five rungs with a marker on the one
+ * that is next — where the web tab only implies it by grouping.
+ *
+ * The order is `ROLE_ORDER`, exported as a list so no client re-states it.
+ * `ROLE_ORDER` stays private because it is a sort key; this is the sequence.
+ *
+ * The wording lives here for the reason `progressionSummary` does: a ladder the
+ * phone labels "Handling" and the web labels "Control" is two ladders. And
+ * `control` is not called "Control" — the rung's whole argument is *when* it
+ * comes, which is why its `rationale` opens with "Worth doing before more power,
+ * not after". The label carries that argument rather than naming a part
+ * category, because the label is what most owners will read.
+ */
+export const ROLE_LADDER: readonly ModRole[] = [
+  'foundation',
+  'control',
+  'enabling',
+  'durability',
+  'cosmetic',
+];
+
+const ROLE_LABEL: Record<ModRole, string> = {
+  foundation: 'Foundation',
+  control: 'Control before more power',
+  enabling: 'Enabling',
+  durability: 'Durability',
+  cosmetic: 'Cosmetic',
+};
+
+/** The rung's name, in the owner's terms. One wording across every client. */
+export function roleLabel(role: ModRole): string {
+  return ROLE_LABEL[role];
+}

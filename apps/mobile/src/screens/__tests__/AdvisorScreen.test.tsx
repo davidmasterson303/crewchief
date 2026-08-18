@@ -140,11 +140,20 @@ describe('provenance', () => {
     const view = await renderAdvisor();
     await view.findByText('Looks fine.');
 
-    // "Based on", never "Sources" — the claim is what was put in front of the
-    // model, not what it used.
-    expect(view.getByText('Based on')).toBeTruthy();
-    expect(view.getByText('Service records')).toBeTruthy();
-    expect(view.getByText('Recall data')).toBeTruthy();
+    /*
+      "Based on", never "Sources" — the claim is what was put in front of the
+      model, not what it used.
+
+      Matched as one string rather than three nodes. Provenance was a "Based on"
+      label followed by a chip per kind; it is now a single `ProvenanceRow` line,
+      because a badge beside a generated answer borrows the appearance of a
+      verified one — and because those chips rendered at 11px, under the type
+      floor. The rule this asserts is unchanged; only the markup is.
+    */
+    expect(view.getByText(/^Based on/)).toBeTruthy();
+    expect(view.getByText(/Service records/)).toBeTruthy();
+    expect(view.getByText(/Recall data/)).toBeTruthy();
+    expect(view.queryByText(/Sources/)).toBeNull();
   });
 
   it('claims nothing when the server sent no kinds', async () => {

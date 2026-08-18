@@ -81,6 +81,7 @@ export default function SettingsPage() {
   const [displayName, setDisplayName] = useState('');
   const [distanceUnit, setDistanceUnit] = useState<DistanceUnit>('mi');
   const [vehicleCount, setVehicleCount] = useState(0);
+  const [hasLiveSubscription, setHasLiveSubscription] = useState(false);
 
   // Derived, not stored — a separate error state can drift out of sync with
   // the value it describes.
@@ -96,6 +97,7 @@ export default function SettingsPage() {
       if (cancelled) return;
       if (result.success) {
         setVehicleCount(result.vehicleCount ?? 0);
+        setHasLiveSubscription(result.hasLiveSubscription ?? false);
       }
       if (result.success && result.profile) {
         setDisplayName(result.profile.display_name ?? '');
@@ -281,6 +283,7 @@ export default function SettingsPage() {
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         vehicleCount={vehicleCount}
+        hasLiveSubscription={hasLiveSubscription}
       />
     </div>
   );

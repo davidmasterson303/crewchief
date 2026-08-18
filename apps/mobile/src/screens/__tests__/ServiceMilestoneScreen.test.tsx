@@ -51,12 +51,30 @@ const VEHICLE = {
  * Routes each call by path, because the screen fires both in parallel and
  * `mockResolvedValueOnce` would bind to whichever happened to settle first.
  */
-function respondWith(lineItems: unknown[] | Error) {
+function respondWith(maintenanceLineItems: unknown[] | Error) {
   request.mockImplementation(async (path: string) => {
     if (path.startsWith('/load-vehicle')) return VEHICLE as never;
     if (path.startsWith('/load-maintenance-data')) {
-      if (lineItems instanceof Error) throw lineItems;
-      return { lineItems } as never;
+      if (maintenanceLineItems instanceof Error) throw maintenanceLineItems;
+      /*
+        ⚠ Both keys are returned, and they carry different things — because the
+        real route returns both and the screen read the wrong one until
+        12 Aug 2026.
+
+        `lineItems` is `invoice_line_items`: a description and a price, with no
+        service date and no mileage. `maintenanceLineItems` is the service
+        record. A mock returning only the key the screen happens to read cannot
+        tell the two apart, and this suite could not: it mirrored the bug.
+
+        The decoy is shaped like a real invoice row so that a screen reading it
+        would visibly answer "unknown" rather than crash.
+      */
+      return {
+        lineItems: [
+          { description: 'Engine oil and filter', quantity: 1, total_price: 92.4 },
+        ],
+        maintenanceLineItems,
+      } as never;
     }
     return {} as never;
   });
@@ -184,5 +202,69 @@ describe('when the maintenance request fails', () => {
     await passTheGate(user, view);
 
     expect(view.queryByText(/Could not load/i)).toBeNull();
+  });
+});
+
+describe('the history it reads is the service record, not the invoice lines', () => {
+  /*
+    The bug this pins, found 12 Aug 2026 and live since A2a shipped.
+
+    `/load-maintenance-data` returns two things that both look like history:
+
+      lineItems             -> invoice_line_items      (description, price)
+      maintenanceLineItems  -> maintenance_line_items  (+ service_date, mileage)
+
+    This screen read `lineItems`. Those rows carry **no service date and no
+    mileage**, so every lookup built from them returned null — and A2a's fix,
+    which exists precisely to stop every time-based service reporting
+    "unknown", silently did nothing.
+
+    It typechecked because `ServiceHistoryRow` accepts `description` *or*
+    `item_description`, so an invoice row satisfies the type while being
+    structurally unable to answer the question. **The server sweep always read
+    the right table**, which is what makes this worth a guard: the notification
+    could say a service was due since 85,000 miles while the screen it opened
+    said nobody knows.
+
+    The assertions below are about the "Timed by date, not mileage" card, which
+    is the screen's own admission that it has no record — the exact symptom.
+  */
+
+  it('stops reporting a service as undated once a dated record exists', async () => {
+    respondWith([
+      {
+        item_description: 'Brake fluid replacement',
+        service_date: '2026-02-10',
+        mileage_at_service: 58_000,
+        source: 'invoice',
+      },
+    ]);
+
+    const user = userEvent.setup();
+    const view = await render(<ServiceMilestoneScreen vehicleId="v1" onSignOut={jest.fn()} />);
+    await passTheGate(user, view);
+
+    /*
+      Asserted as the *absence* of the screen's own admission rather than the
+      presence of the service name — once a service is dated it leaves the
+      "Timed by date, not mileage" card and may not be rendered anywhere else,
+      so presence is the wrong signal and was the first version of this test.
+    */
+    expect(view.queryByText(/Nothing on record says when these were last done/)).toBeNull();
+  });
+
+  it('does not mistake an invoice line for a service record', async () => {
+    /*
+      The decoy alone. `respondWith([])` still leaves `lineItems` populated with
+      an invoice-shaped row — if the screen ever reads that key again, it would
+      believe it has history and this goes red.
+    */
+    respondWith([]);
+
+    const user = userEvent.setup();
+    const view = await render(<ServiceMilestoneScreen vehicleId="v1" onSignOut={jest.fn()} />);
+    await passTheGate(user, view);
+
+    expect(await view.findByText(/Nothing on record says when these were last done/)).toBeTruthy();
   });
 });

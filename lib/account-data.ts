@@ -2,6 +2,7 @@ import { getServiceRoleClient } from '@/lib/supabase';
 import { requireSession } from '@/lib/api-auth';
 import { vehicleStoragePrefixes } from '@crewchief/core/storage-paths';
 import { logger } from '@crewchief/core/logger';
+import { hasLiveEntitlement, readFailureMeansNoSubscription } from '@crewchief/core/entitlement';
 
 const DOCUMENTS_BUCKET = 'vehicle-documents';
 
@@ -129,10 +130,62 @@ export async function getProfile() {
     .select('id', { count: 'exact', head: true })
     .eq('user_id', session.userId);
 
+  /*
+    E5, and it rides along here for the same reason `vehicleCount` does: the
+    delete confirmation needs it, and a second round trip to learn one boolean
+    is a round trip the settings page would make on every visit.
+
+    ── Which way this fails, and why it is the opposite of the budget path ─────
+
+    An unreadable entitlement resolves to "warn anyway". `lib/ai-budget.ts`
+    reads the same failure as `free`, because there the cost of guessing wrong
+    is a paying customer losing their allowance. Here the cost of guessing
+    wrong is somebody deleting their account and being billed by Apple
+    afterwards with no account left to manage it from. A warning shown to a
+    non-subscriber is a confusing sentence; a warning withheld from a
+    subscriber is a recurring charge they cannot stop.
+  */
+  const { data: entitlement, error: entitlementError } = await client
+    .from('account_entitlements')
+    .select('tier, expires_at')
+    .eq('user_id', session.userId)
+    .maybeSingle();
+
+  /*
+    A missing table is the one read failure that is NOT ambiguous: nothing can
+    have written a subscription to a table that does not exist. It is also a
+    state this project passes through by construction, because the code ships in
+    one commit and the migration is applied separately — and in that window,
+    failing toward the warning would tell every user to cancel a subscription
+    none of them have.
+  */
+  const tableAbsent = readFailureMeansNoSubscription(
+    (entitlementError as { code?: string } | null)?.code
+  );
+
+  if (entitlementError && !tableAbsent) {
+    logger.warn('PROFILE:ENTITLEMENT_READ', 'Could not read entitlement; warning anyway', {
+      userId: session.userId,
+      message: entitlementError.message,
+    });
+  }
+
+  const hasLiveSubscription = entitlementError && !tableAbsent
+    ? true
+    : hasLiveEntitlement(
+        entitlement
+          ? {
+              tier: entitlement.tier as string | null,
+              expiresAt: entitlement.expires_at as string | null,
+            }
+          : null
+      );
+
   return {
     success: true,
     profile: (data as Profile) ?? null,
     vehicleCount: count ?? 0,
+    hasLiveSubscription,
   };
 }
 

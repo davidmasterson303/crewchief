@@ -13,8 +13,16 @@ import {
 
 import { askAdvisor, MAX_MESSAGE_LENGTH } from '../api/consultant';
 import { ApiRequestError } from '../api/client';
+import Button from '../components/Button';
+import EmptyState from '../components/EmptyState';
+import ProvenanceRow from '../components/ProvenanceRow';
+import { Skeleton } from '../components/Skeleton';
+import { border, radius, space, status, surface, text, type } from '../theme';
 import { CONTEXT_KIND_LABELS, type ContextKind } from '@crewchief/core/consultant-context-kinds';
+import type { ConsultantEstimate } from '@crewchief/core/consultant-estimate';
+import EstimateWell from '../components/EstimateWell';
 import { parseAnswer } from '@crewchief/core/answer-markup';
+import { interFace } from '../theme/fonts';
 
 /**
  * Phase 3.4 — ask the advisor about one car.
@@ -39,10 +47,21 @@ import { parseAnswer } from '@crewchief/core/answer-markup';
  * every answer. So this screen keeps exactly one piece of durable state —
  * `sessionId` — and the messages it draws are a **local echo for the eye**, not
  * the record. Reopening the screen starts a new thread; it does not resume the
- * old one, and it does not pretend to. Resuming is a session list, which is
- * `GET`-shaped work no route exposes to a bearer token yet, so building a
- * picker here would mean querying Supabase from the device — the second answer
- * to "who may see what" that `api/client.ts` exists to prevent.
+ * old one, and it does not pretend to.
+ *
+ * ⚠ **The reason given here for that was wrong, and was wrong when written.**
+ * It said resuming "is `GET`-shaped work no route exposes to a bearer token
+ * yet", so a picker would mean querying Supabase from the device. But
+ * `GET /api/v1/consultant/conversations` authorizes through
+ * `authorizeVehicleAccess` — the same bearer-capable path every other call here
+ * uses — and it shipped in **this screen's own commit**, `28ee713`.
+ *
+ * So no route needed building and nothing would have to touch Supabase
+ * directly. What is actually missing is a conversation list in the UI and a
+ * decision about whether reopening resumes the last thread or offers a choice.
+ * That is a product call for Phase 5.5, not a technical blocker — recorded
+ * accurately on 12 Aug 2026 after the original reason was checked and did not
+ * hold.
  *
  * `sessionId` lives in a ref rather than state on purpose. It is read inside an
  * async send and never rendered, so putting it in state would schedule a render
@@ -67,7 +86,18 @@ import { parseAnswer } from '@crewchief/core/answer-markup';
 
 type Turn =
   | { id: string; role: 'you'; text: string }
-  | { id: string; role: 'advisor'; text: string; kinds: ContextKind[] };
+  | {
+      id: string;
+      role: 'advisor';
+      text: string;
+      kinds: ContextKind[];
+      /**
+       * Present only when the answer priced something, which is rarely.
+       * Optional here for the same reason it is optional on the wire — a well
+       * that renders on ordinary advice would show a price nobody inferred.
+       */
+      estimate?: ConsultantEstimate;
+    };
 
 /**
  * Ids for the list, not identity. `Date.now()` alone collides when a question
@@ -141,6 +171,7 @@ export function AdvisorScreen({
           role: 'advisor',
           text: answer.response,
           kinds: answer.contextKinds,
+          ...(answer.estimate ? { estimate: answer.estimate } : {}),
         },
       ]);
       // Only now, because the question is only safely somewhere else once the
@@ -213,7 +244,7 @@ export function AdvisorScreen({
         keyExtractor={(turn) => turn.id}
         contentContainerStyle={styles.transcript}
         renderItem={({ item }) => <TurnView turn={item} />}
-        ListEmptyComponent={<EmptyState />}
+        ListEmptyComponent={<AdvisorEmptyState />}
         /*
           Content-size rather than a call after each setState: the answer's
           height is not known until it has laid out, and scrolling before that
@@ -227,8 +258,21 @@ export function AdvisorScreen({
 
       {busy ? (
         <View style={styles.thinking}>
-          <ActivityIndicator color="rgba(255,255,255,0.5)" size="small" />
+          {/*
+            A stage label plus bars shaped like the answer that is coming —
+            not a centred spinner. An advisor reply is three or four lines of
+            prose, so that is what waits in its place; a spinner says only
+            "something is happening somewhere".
+
+            The label is the honest part: it names the stage rather than
+            implying progress nobody is measuring.
+          */}
           <Text style={styles.thinkingText}>Reading this car's history…</Text>
+          <View style={styles.thinkingBars}>
+            <Skeleton width="100%" />
+            <Skeleton width="92%" />
+            <Skeleton width="60%" />
+          </View>
         </View>
       ) : null}
 
@@ -240,22 +284,43 @@ export function AdvisorScreen({
           value={draft}
           onChangeText={setDraft}
           placeholder="Ask about this car…"
-          placeholderTextColor="rgba(255,255,255,0.3)"
+          /*
+            ⚠ Named, because a placeholder is not a label — and this was the one
+            unlabelled input left in the app, on the screen the product's whole
+            argument rests on. VoiceOver reads a placeholder as the field's
+            *value* while it is empty and drops it entirely once someone types,
+            so a returning screen-reader user found an unnamed box containing
+            their own half-written question. `Field` states this rule; this
+            input cannot be a `Field` — a chat composer takes no visible label —
+            so it carries the name directly.
+          */
+          accessibilityLabel="Ask about this car"
+          placeholderTextColor={text.muted}
           multiline
           // Not `editable={!busy}`: a disabled input drops the keyboard and
           // loses the caret, and there is nothing wrong with typing the next
           // question while this one is in flight. Only sending is gated.
           returnKeyType="default"
         />
-        <Pressable
-          style={[styles.send, !canSend && styles.sendDisabled]}
+        {/*
+          The inverse CTA, from the primitive.
+
+          ⚠ It also puts this on the 44pt floor. The hand-rolled version had
+          `paddingVertical: 13` and no `minHeight`, so its height depended on
+          the label's line box — which is how a control quietly stops meeting a
+          coarse-pointer target without anyone changing a number.
+
+          `small` rather than `large`: it sits beside the composer's input, and
+          the size names the type weight, never the height. Both clear 44.
+        */}
+        <Button
+          label="Ask"
+          variant="inverse"
+          size="small"
           onPress={() => void send()}
           disabled={!canSend}
-          accessibilityRole="button"
           accessibilityLabel="Send question to the advisor"
-        >
-          <Text style={styles.sendText}>Ask</Text>
-        </Pressable>
+        />
       </View>
 
       {overLength ? (
@@ -341,135 +406,135 @@ function TurnView({ turn }: { turn: Turn }) {
   return (
     <View style={styles.advisorRow}>
       <AnswerText answer={turn.text} />
-      {turn.kinds.length > 0 ? (
-        <View style={styles.chipRow}>
-          <Text style={styles.chipPrefix}>Based on</Text>
-          {turn.kinds.map((kind) => (
-            <View key={kind} style={styles.chip}>
-              <Text style={styles.chipText}>{CONTEXT_KIND_LABELS[kind]}</Text>
-            </View>
-          ))}
-        </View>
-      ) : null}
+      {/*
+        A quiet line, not a row of badges.
+
+        Two reasons, and the second was a live defect. A badge beside a
+        generated answer borrows the appearance of a verified one — which is why
+        `ProvenanceRow` is deliberately not a `Chip`. And these chips rendered
+        at **11px**, under the 12px floor: the same defect the design system
+        carries in its own `.chip`, reached independently here. `type.label` is
+        12 and the primitive has no size prop.
+      */}
+      <ProvenanceRow kinds={turn.kinds.map((kind) => CONTEXT_KIND_LABELS[kind])} />
+      {/*
+        Below the provenance line, not above it.
+
+        The order is an argument about what the numbers are. Provenance
+        qualifies the whole answer — what the advisor could see when it said
+        this — and the prices are part of what was said, so they sit inside the
+        scope that sentence sets rather than after it. Put the well first and
+        the "Based on" line reads as a footnote to the estimate alone, which
+        narrows a claim that was never that narrow.
+      */}
+      {turn.estimate ? <EstimateWell estimate={turn.estimate} /> : null}
     </View>
   );
 }
 
 /**
  * The empty state names what the advisor can see, because the alternative is a
- * blank screen that invites "what do I even ask". These three are not canned
- * prompts to tap — they are examples, and making them buttons would turn a
- * conversation into a menu on the first screen a new user meets.
+ * blank screen that invites "what do I even ask".
+ *
+ * ⚠ The three examples are **not** canned prompts to tap. Making them buttons
+ * would turn a conversation into a menu on the first screen a new user meets,
+ * which is why they go through `EmptyState`'s `children` — a slot the primitive
+ * documents as taking quiet content and never controls.
+ *
+ * ── Why this used the primitive late ────────────────────────────────────────
+ *
+ * It was a local function *called `EmptyState`*, shadowing the import that
+ * would have replaced it. A private copy is easy to spot when it is named
+ * `emptyBlock`; one wearing the primitive's own name is invisible, and this is
+ * how the primitive reached 15 Aug with zero callers while four screens rolled
+ * their own.
  */
-function EmptyState() {
+function AdvisorEmptyState() {
   return (
-    <View style={styles.empty}>
-      <Text style={styles.emptyTitle}>Ask about this car</Text>
-      <Text style={styles.emptyBody}>
-        The advisor already knows its service history, open issues, recalls and mods. You do not
-        need to explain them.
-      </Text>
+    <EmptyState
+      headline="Ask about this car"
+      body="The advisor already knows its service history, open issues, recalls and mods. You do not need to explain them."
+    >
       <Text style={styles.emptyExample}>“Is the timing chain something I should worry about?”</Text>
       <Text style={styles.emptyExample}>“What should I do at the next service?”</Text>
       <Text style={styles.emptyExample}>“Is $1,400 fair for front control arms?”</Text>
-    </View>
+    </EmptyState>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#080808' },
+  container: { flex: 1, backgroundColor: surface.page },
 
-  transcript: { padding: 18, gap: 18, flexGrow: 1 },
+  transcript: { padding: space.lg, gap: space.lg, flexGrow: 1 },
 
   youRow: { alignItems: 'flex-end' },
   youBubble: {
-    backgroundColor: 'rgba(255,255,255,0.10)',
-    borderRadius: 16,
-    borderTopRightRadius: 4,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    backgroundColor: surface.well,
+    borderRadius: radius.card,
+    borderTopRightRadius: radius.well,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
     maxWidth: '85%',
   },
-  youText: { color: '#fff', fontSize: 15, lineHeight: 21 },
+  youText: { ...type.body, color: text.primary, lineHeight: 21 },
 
-  advisorRow: { gap: 8 },
-  advisorText: { color: 'rgba(255,255,255,0.92)', fontSize: 15, lineHeight: 22 },
+  advisorRow: { gap: space.sm },
+  advisorText: { ...type.body, color: text.primary },
   /* Weight only. A brighter colour as well would make ordinary text read as dimmed. */
-  advisorBold: { fontWeight: '700' },
+  advisorBold: { fontFamily: interFace('700'), fontWeight: '700' },
   answer: { gap: 2 },
-  answerGap: { height: 8 },
+  answerGap: { height: space.sm },
   /* Hanging indent: the glyph sits outside the text column so wrapped lines align. */
-  bulletRow: { flexDirection: 'row', gap: 8, paddingRight: 4 },
-  bulletMark: { color: 'rgba(255,255,255,0.5)', fontSize: 15, lineHeight: 22 },
+  bulletRow: { flexDirection: 'row', gap: space.sm, paddingRight: space.xs },
+  bulletMark: { ...type.body, color: text.muted },
 
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
-  chipPrefix: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '600' },
-  chip: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  chipText: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '600' },
 
-  empty: { flex: 1, justifyContent: 'center', gap: 10, paddingHorizontal: 4 },
-  emptyTitle: { color: '#fff', fontSize: 20, fontWeight: '700', letterSpacing: -0.3 },
-  emptyBody: { color: 'rgba(255,255,255,0.5)', fontSize: 14, lineHeight: 20 },
-  emptyExample: { color: 'rgba(255,255,255,0.5)', fontSize: 14, lineHeight: 20 },
+  emptyExample: { ...type.body, fontSize: 14, lineHeight: 20, color: text.muted },
 
-  thinking: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18 },
-  thinkingText: { color: 'rgba(255,255,255,0.5)', fontSize: 13 },
+  thinking: { gap: space.sm, paddingHorizontal: space.lg },
+  thinkingBars: { gap: space.sm },
+  thinkingText: { ...type.value, color: text.muted },
 
-  /* #f87171 — the same red SignInScreen uses, and above the AA floor on #080808. */
-  error: { color: '#f87171', fontSize: 13, paddingHorizontal: 18, paddingTop: 8 },
-  counter: { color: '#f87171', fontSize: 12, paddingHorizontal: 18, paddingBottom: 6 },
+  /* #f87171 — the same red SignInScreen uses, and above the AA floor on `surface.page`. */
+  error: { ...type.value, color: status.dangerText, paddingHorizontal: space.lg, paddingTop: space.sm },
+  counter: { fontSize: 12, color: status.dangerText, paddingHorizontal: space.lg, paddingBottom: 6 },
 
   composer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    gap: 10,
-    padding: 14,
+    gap: space.sm,
+    padding: space.md,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.10)',
+    borderTopColor: border.panel,
   },
   input: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: surface.raised,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingTop: 12,
-    paddingBottom: 12,
-    color: '#fff',
+    borderColor: border.field,
+    borderRadius: radius.well,
+    paddingHorizontal: space.md,
+    paddingTop: space.md,
+    paddingBottom: space.md,
+    color: text.primary,
     fontSize: 16,
     // Four lines before it scrolls, so a long question stays visible while it
     // is written without the composer eating the transcript.
     maxHeight: 120,
   },
-  send: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    paddingHorizontal: 18,
-    paddingVertical: 13,
-  },
   /*
-    An explicit fill, not `opacity`.
+    ⚠ **The send button's three colours are deliberately NOT tokenised**, for
+    the same reason as the advisor CTA on the vehicle screen: they are measured
+    values with a history.
 
-    This was `opacity: 0.35`, which put the near-black "Ask" label at **1.61:1**
-    against a 4.5 floor — effectively invisible on the product's flagship
-    screen. It survived every check because both contrast guards were blind to
-    it: the source scan reads colour literals and sees none here, and the
-    rendered-pixel suite did not composite a parent alpha until 7 Aug.
+    `sendDisabled` was `opacity: 0.35`, which put the near-black "Ask" label at
+    **1.61:1** against a 4.5 floor — effectively invisible on the product's
+    flagship screen. It survived every check because both guards were blind to
+    it: the source scan reads colour literals and sees none in an opacity, and
+    the rendered-pixel suite did not composite parent alpha until 7 Aug.
 
-    Same construction as the 4.47:1 defect found on this screen on 6 Aug, and
-    the second time a *disabled* state has been the one nothing measured.
-
-    #b8b8b8 keeps the label at roughly 9:1 while reading clearly as
-    unavailable — a disabled control still has to say what it is.
+    #b8b8b8 keeps the label near 9:1 while still reading as unavailable. A
+    token substitution here would re-open a defect that took two attempts to
+    find, and a disabled control still has to say what it is.
   */
-  sendDisabled: { backgroundColor: '#b8b8b8' },
-  sendText: { color: '#080808', fontSize: 15, fontWeight: '600' },
 });

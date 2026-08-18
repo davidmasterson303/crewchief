@@ -1,5 +1,7 @@
 import { render, userEvent, waitFor } from '@testing-library/react-native';
 
+import { everHadVehicle, recordEverHadVehicle } from '../../onboarding/first-run-storage';
+
 import { GarageScreen } from '../GarageScreen';
 import { apiRequest, ApiRequestError } from '../../api/client';
 
@@ -26,6 +28,37 @@ import { apiRequest, ApiRequestError } from '../../api/client';
  * on screen.
  */
 
+/*
+  The notification module is mocked so the C5 primer effect is deterministic.
+
+  `GarageScreen` now reads the push permission and the primer dismissal when
+  the vehicle list resolves. Left unmocked those are real async calls into
+  `expo-notifications` and the Keychain, which resolve *after* the assertions
+  and update state outside `act()` — visible as "overlapping act() calls"
+  warnings and, once, as a failure that did not reproduce.
+
+  A test that passes eight times out of nine is not passing. The default here
+  is `granted`, which is the state that shows no primer, so every existing
+  assertion sees the screen it was written against. The primer's own behaviour
+  is covered in `push-priming.test.ts`, where the rule lives.
+*/
+/**
+ * Controlled per test, because it decides which of the two empty states
+ * renders. Defaults to a returning install — the majority case across this
+ * file, and the one every other test here predates.
+ */
+jest.mock('../../onboarding/first-run-storage', () => ({
+  everHadVehicle: jest.fn().mockResolvedValue(true),
+  recordEverHadVehicle: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('../../notifications/register', () => ({
+  currentPushPermission: jest.fn().mockResolvedValue('granted'),
+  primerDismissedOn: jest.fn().mockResolvedValue(null),
+  recordPrimerDismissed: jest.fn().mockResolvedValue(undefined),
+  registerForPush: jest.fn().mockResolvedValue({ status: 'registered' }),
+}));
+
 jest.mock('../../api/client', () => {
   const actual = jest.requireActual('../../api/client');
   return { ...actual, apiRequest: jest.fn() };
@@ -51,7 +84,18 @@ const M235I = {
  * `view.findByText is not a function`, or an unpopulated `screen` reporting
  * that render "has not been called", neither of which names the cause.
  */
-function renderGarage(overrides: { onAddVehicle?: () => void } = {}) {
+function renderGarage(
+  overrides: {
+    onAddVehicle?: () => void;
+    /*
+      The picker seam. `src/media/pick-image.ts` is the only module that imports
+      `expo-image-picker`, and the screen takes the picker as a prop for exactly
+      this reason — a native module in the graph crashes a build that lacks it,
+      and there is no picker at all in a test runner.
+    */
+    pickPhoto?: () => Promise<unknown>;
+  } = {}
+) {
   return render(
     <GarageScreen
       accessToken="test-token"
@@ -59,6 +103,7 @@ function renderGarage(overrides: { onAddVehicle?: () => void } = {}) {
       onSignOut={jest.fn()}
       onOpenVehicle={jest.fn()}
       onAddVehicle={overrides.onAddVehicle ?? jest.fn()}
+      pickPhoto={overrides.pickPhoto as never}
     />
   );
 }
@@ -72,10 +117,22 @@ describe('the garage', () => {
     const view = await renderGarage();
 
     expect(await view.findByText('2015 BMW M235i')).toBeTruthy();
-    // Formatted, not raw. `vehicle_status` reached the screen as
-    // "daily_driver" once, and only looking at it caught that.
-    expect(view.getByText('Daily Driver')).toBeTruthy();
-    expect(view.getByText('66,000 mi')).toBeTruthy();
+
+    /*
+      The trim, the status and the mileage are one subtitle now — the bay has a
+      single identity lockup where the card had a header and a meta row. The
+      claims are unchanged and both still matter:
+
+        - **Formatted, not raw.** `vehicle_status` reached the screen as
+          "daily_driver" once, and only looking at it caught that.
+        - **Grouped, not concatenated.** The separator earns its place only
+          when there is something on both sides, so a car with no trim must not
+          render a leading "· ".
+    */
+    expect(view.getByText('xDrive · Daily Driver · 66,000 mi')).toBeTruthy();
+
+    // Recalls stay on the bay. A garage that shows condition but not an open
+    // safety defect is showing the reassuring half.
     expect(view.getByText('2 recalls')).toBeTruthy();
   });
 });
@@ -121,13 +178,73 @@ describe('App Store 5.1.1(v) — account deletion stays reachable', () => {
   });
 
   it('offers Account to an account with no cars', async () => {
-    // The ordinary first-run state, and not a failure.
+    // An empty garage is the ordinary first-run state, and not a failure.
     request.mockResolvedValue({ vehicles: [] });
 
     const view = await renderGarage();
 
     expect(await view.findByLabelText('Account')).toBeTruthy();
-    expect(view.getByText('No vehicles yet')).toBeTruthy();
+  });
+
+  it('offers Account behind the opening explanation too', async () => {
+    /*
+      ⚠ The reason the first-run screen replaces the *body* and not the screen.
+
+      Somebody who has just signed up, cannot work out what this is, and wants
+      to sign out or delete the account they just made is the person most likely
+      to need Account and the one a full-screen takeover would hide it from —
+      the failure this screen's own header comment already warns about.
+    */
+    (everHadVehicle as jest.Mock).mockResolvedValue(false);
+    request.mockResolvedValue({ vehicles: [] });
+
+    const view = await renderGarage();
+
+    expect(await view.findByText('Start with one car')).toBeTruthy();
+    expect(view.getByLabelText('Account')).toBeTruthy();
+  });
+});
+
+describe('which empty garage you get', () => {
+  it('explains the product to an install that has never had a car', async () => {
+    (everHadVehicle as jest.Mock).mockResolvedValue(false);
+    request.mockResolvedValue({ vehicles: [] });
+
+    const view = await renderGarage();
+
+    expect(await view.findByText('Start with one car')).toBeTruthy();
+    expect(view.queryByText('No vehicles yet')).toBeNull();
+  });
+
+  it('says only that it is empty to someone who has had one before', async () => {
+    /*
+      A year-old account that sold its last car is not a new user. Greeting it
+      with "Start with one car" is the product forgetting them, which is why the
+      stored fact is "ever had a vehicle" rather than "seen onboarding" —
+      `@crewchief/core/first-run` carries the argument.
+    */
+    (everHadVehicle as jest.Mock).mockResolvedValue(true);
+    request.mockResolvedValue({ vehicles: [] });
+
+    const view = await renderGarage();
+
+    expect(await view.findByText('No vehicles yet')).toBeTruthy();
+    expect(view.queryByText('Start with one car')).toBeNull();
+  });
+
+  it('remembers a garage that had cars in it, so the explanation does not return', async () => {
+    /*
+      Recorded on a **load** that returns cars rather than on the create. The
+      two differ for the case that matters: signing in on a second phone to an
+      account that already has cars never runs a create, and a flag written only
+      there would leave that install believing forever that this is a first run.
+    */
+    (everHadVehicle as jest.Mock).mockResolvedValue(false);
+    request.mockResolvedValue({ vehicles: [M235I] });
+
+    await renderGarage();
+
+    await waitFor(() => expect(recordEverHadVehicle).toHaveBeenCalled());
   });
 });
 
@@ -200,5 +317,103 @@ describe('adding a car', () => {
     await user.press(view.getByLabelText('Add a car'));
 
     expect(onAddVehicle).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('adding a photograph', () => {
+  const PICKED = {
+    uri: 'file:///tmp/car.jpg',
+    name: 'car.jpg',
+    type: 'image/jpeg',
+    size: 400 * 1024,
+  };
+
+  it('offers no control when the build has no picker', async () => {
+    /*
+      Omitted means no control, never a control that fails. The picker is a
+      native module and a build without it cannot be asked for a photograph —
+      showing the button anyway would be a dead end dressed as an affordance.
+    */
+    request.mockResolvedValue({ vehicles: [M235I] });
+
+    const view = await renderGarage();
+    await view.findByText('2015 BMW M235i');
+
+    expect(view.queryByLabelText('Add photo')).toBeNull();
+  });
+
+  it('offers Add photo on a car that has none', async () => {
+    /*
+      ⚠ The defect David found on 15 Aug. The identity plate is a finished
+      design for a car with no photograph, and it was the only reachable state —
+      a plate you cannot replace is a dead end rather than a fallback.
+    */
+    request.mockResolvedValue({ vehicles: [M235I] });
+
+    const view = await renderGarage({ pickPhoto: jest.fn() });
+    await view.findByText('2015 BMW M235i');
+
+    expect(view.getByLabelText('Add photo')).toBeTruthy();
+  });
+
+  it('says nothing at all when the picker is dismissed', async () => {
+    /*
+      Dismissal is not a failure, and it must stay distinguishable from one.
+      Showing "cancelled" after a deliberate tap on Cancel is how an app feels
+      accusatory.
+    */
+    request.mockResolvedValue({ vehicles: [M235I] });
+    const pickPhoto = jest.fn().mockResolvedValue(null);
+
+    const view = await renderGarage({ pickPhoto });
+    await view.findByText('2015 BMW M235i');
+
+    await userEvent.setup().press(view.getByLabelText('Add photo'));
+
+    await waitFor(() => expect(pickPhoto).toHaveBeenCalled());
+    expect(view.queryByText('That photo was not saved')).toBeNull();
+  });
+
+  it('shows the refusal the owner can act on', async () => {
+    /*
+      The size ceiling is genuinely reachable from a phone — there is no image
+      manipulator in this build to cap a dimension with — so its message names
+      the numbers and reaches the screen intact rather than becoming a generic
+      failure.
+    */
+    request.mockResolvedValue({ vehicles: [M235I] });
+    const pickPhoto = jest
+      .fn()
+      .mockResolvedValue({ ...PICKED, size: 3 * 1024 * 1024 });
+
+    const view = await renderGarage({ pickPhoto });
+    await view.findByText('2015 BMW M235i');
+
+    await userEvent.setup().press(view.getByLabelText('Add photo'));
+
+    expect(await view.findByText(/the limit is 1\.5 MB/)).toBeTruthy();
+  });
+
+  it('refetches the garage after a photo lands, rather than patching the row', async () => {
+    /*
+      The upload returns a signed URL, but the garage row carries a `photo_url`
+      the server signs its own way. Writing one into a row the next refresh
+      overwrites is the disagreement that reads as a photo flickering back to
+      the plate.
+    */
+    request.mockResolvedValue({ vehicles: [M235I] });
+    const pickPhoto = jest.fn().mockResolvedValue(PICKED);
+
+    const view = await renderGarage({ pickPhoto });
+    await view.findByText('2015 BMW M235i');
+
+    const before = request.mock.calls.length;
+    await userEvent.setup().press(view.getByLabelText('Add photo'));
+
+    await waitFor(() => {
+      const paths = request.mock.calls.slice(before).map((call) => call[0]);
+      expect(paths).toContain('/upload-photo');
+      expect(paths).toContain('/vehicles');
+    });
   });
 });

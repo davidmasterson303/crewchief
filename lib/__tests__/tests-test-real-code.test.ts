@@ -37,8 +37,77 @@ const TESTS_DIR = __dirname;
  * used as a blanket excuse.
  */
 const STATIC_ANALYSIS_SUITES = [
+  // Reads globals.css and tailwind.config.ts to prove the sport register
+  // overrides only tokens something actually reads. There is nothing to
+  // import: the subject is a block of CSS custom properties, and the failure
+  // it pins is SILENT — overriding a token nothing reads changes nothing and
+  // looks exactly like working code. jsdom resolves neither `var()` through
+  // Tailwind's generated utilities nor `clip-path`, so the rendered check the
+  // guard would otherwise want is not available under any runner here.
+  'register-tokens.test.ts',
   'auth-posture.test.ts',
   'internal-fetch-posture.test.ts',
+  // Reads app/, lib/ and packages/ off disk to prove that the one function in
+  // this app which spends money without authorizing — `researchVehicleDossier`
+  // — has exactly two importers, and that each still carries the check it
+  // claims. It cannot import its subject: the property is *which other files
+  // import that module*, which importing it tells you nothing about. The
+  // failure it pins is silent — a third caller that forgot to authorize
+  // compiles, passes every other suite, and looks like a working feature.
+  'vehicle-research-callers.test.ts',
+  // Reads the migration corpus, plus app/, components/, hooks/ and lib/, to
+  // prove `account_entitlements` is never user-writable. There is nothing to
+  // import: the subject is SQL and the absence of a write in client code. The
+  // failure it pins is a *revenue* bug wearing a correct-looking policy — a
+  // scoped `FOR ALL`, which is right on every other table in this schema and
+  // here hands any signed-in user the paid tier.
+  'entitlement-not-user-writable.test.ts',
+  // Reads app/ and components/ off disk, plus globals.css, for RP4's two
+  // browser-free assertions: nothing renders under 12px, and no field is small
+  // enough for iOS Safari to zoom the page on focus. There is nothing to
+  // import — the subject is a Tailwind class in JSX and a CSS media query, and
+  // jsdom resolves neither Tailwind's generated utilities nor a
+  // `pointer: coarse` media query, so the rendered check the guard would prefer
+  // is not available under any runner here.
+  //
+  // The failure it pins is SILENT and invisible on a desktop: the page zooms on
+  // focus and never restores the scale, and the user is horizontally scrolled
+  // for the rest of the session. It also pins the *forbidden fix*, which is
+  // worse than the bug because it works — `user-scalable=no` stops the zoom and
+  // fails WCAG 1.4.4 with nothing on the page to say so.
+  'viewport-floors.test.ts',
+  // Reads globals.css and components/ClusterGauge.tsx off disk to pin the three
+  // accessibility affordances whose regression is invisible to whoever causes
+  // it: the gauge's forced-colors restatement, the focus and coarse-pointer
+  // paths on hover-revealed controls, and the 44px hit area. There is nothing
+  // to import — the subject is a media query and the classnames a component
+  // renders, and jsdom resolves neither `forced-colors: active` nor Tailwind's
+  // generated utilities.
+  //
+  // The failure it pins is SILENT in the strongest sense: nobody develops in
+  // Windows High Contrast or with a coarse pointer, so a rename that unhooks
+  // the block leaves a clean diff, a correct-looking page, and a dial that
+  // shows a full ring at every score.
+  'inclusive-affordances.test.ts',
+  // Reads apps/mobile/app.json and both package.json files to prove the iOS
+  // privacy manifest still describes the app that ships. There is nothing to
+  // import — the subject is a block of configuration, and the failure it pins
+  // is only observable *after* a build has been spent: Apple cross-checks the
+  // manifest against the App Store Connect answers and rejects a mismatch.
+  'privacy-manifest.test.ts',
+  // Reads the mobile navigator, garage and primer off disk to prove the app
+  // obeys the priming rule rather than merely containing it. It cannot import
+  // its subject: those are React Native modules and this runner would fail on
+  // the transform. The failure it pins — iOS's one irreversible permission
+  // dialog raised uninvited — is not observable at runtime on any machine here.
+  'push-primer-wiring.test.ts',
+  // Reads the migration corpus to prove no table created after 1 Aug 2026 was
+  // left holding TRUNCATE for `authenticated`. There is nothing to import: the
+  // subject is SQL. RLS cannot gate TRUNCATE — it is table-level — so the
+  // failure it pins is a role able to empty a table outright, past every policy
+  // in the schema. The rule was written in prose on 1 Aug and then ignored four
+  // times, which is what makes it a ratchet rather than a paragraph.
+  'truncate-revoked.test.ts',
   // Reads apps/mobile off disk to prove the Expo client never queries Supabase
   // directly. It cannot import what it checks: those modules are React Native,
   // and loading one under this runner would fail on the transform rather than
@@ -180,8 +249,10 @@ const STATIC_ANALYSIS_SUITES = [
   // Reads the A2a migration against the modules that name its column and its
   // source value. Same class as `mod-details-goal-key`: an agreement between
   // SQL and TypeScript that no runtime here checks, because Postgres rejects
-  // the write and the error is swallowed. `LogServiceModal` has been inserting
-  // a non-existent column with an illegal source for months without a symptom.
+  // the write and the error is swallowed. `LogServiceModal` inserted a
+  // non-existent column with an illegal source for months without a symptom —
+  // it has since been deleted, and the suite now scans the tree for the next
+  // writer to spell that source rather than watching the one file.
   'service-baseline-schema.test.ts',
   // Reads the sweep route and its Netlify scheduler. The route sends a push to
   // every account in the product, so its authorization is the most abusable
@@ -195,6 +266,11 @@ const STATIC_ANALYSIS_SUITES = [
   // observable in a rendered test; the evidence is a browser measurement
   // recorded in that file's docblock, and this is the ratchet.
   'dashboard-tabs-prefetch.test.ts',
+  // Reads the button primitive's cva string. jsdom computes no layout, so it
+  // cannot tell 40px from 44px, and it does not composite a var() against a
+  // backdrop — the rendered evidence is a browser measurement recorded in that
+  // component's docblock. What regresses is which classes are declared.
+  'button-primitive.test.ts',
 ];
 
 /**

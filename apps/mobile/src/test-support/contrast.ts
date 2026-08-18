@@ -31,8 +31,25 @@ import { StyleSheet, Text } from 'react-native';
  * styles, far more truthfully. Neither is a superset of the other.
  */
 
-/** Every CrewChief screen renders on this. */
-export const SCREEN_BACKGROUND = '#080808';
+/**
+ * Every CrewChief screen renders on this.
+ *
+ * ⚠ **Moved from `#080808` to `#100F0D` on 14 Aug** with the v8 token layer.
+ * The old value was a flat neutral black this app invented; `surface.page` is
+ * the warm graphite web has always used, and the two clients looking like two
+ * products was largely this one literal, repeated 27 times.
+ *
+ * **It is lighter**, so every light-on-dark ratio measured here got slightly
+ * *worse* — this constant is the backdrop the whole suite composites against,
+ * so a stale value here would report ratios the app never renders. Changing it
+ * is the point: anything that fails now was already failing on the device.
+ *
+ * Not imported from `../theme` on purpose. A harness that reads the value it is
+ * checking cannot detect the value being wrong — it would agree with any drift.
+ * These two must be kept equal by hand, and `theme-backdrop.test.ts` fails if
+ * they are not.
+ */
+export const SCREEN_BACKGROUND = '#100F0D';
 
 /**
  * WCAG 2.1 AA. Large text — 18pt, or 14pt bold — may use 3:1.
@@ -233,6 +250,36 @@ export function auditText(
   rootBackground: string = SCREEN_BACKGROUND
 ): TextAudit[] {
   const tree = view.toJSON() as HostNode | HostNode[] | null;
+
+  /*
+    ── A null tree is a harness fault, never a measurement ──────────────────
+
+    `toJSON()` returns null when the root mounted nothing, and an audit of
+    nothing is empty — which every `belowFloor(...) === []` assertion reads as
+    a pass. That is how the whole of `contrast.test.tsx` went blind below one
+    case on 15 Aug 2026 and reported it in green.
+
+    The cause is worth naming here because the symptom points nowhere near it:
+    **RNTL 14's `render`, `fireEvent` and `userEvent` are all async and all
+    have to be awaited.** An un-awaited one leaves React's `actScopeDepth`
+    above zero for the rest of the module registry, and every later `act` then
+    captures a non-zero `prevActScopeDepth`, takes the branch that skips
+    `flushActQueue`, and leaves its render work sitting in a queue nobody
+    drains. Nothing throws; the root is simply never committed.
+
+    `jest.setup.js` fails the test that leaks the scope. This catches the same
+    corruption at the point of measurement, including any other way a tree
+    might arrive empty.
+  */
+  if (tree === null) {
+    throw new Error(
+      'auditText: the rendered tree is null, so nothing was measured. ' +
+        'Usually an un-awaited `render`/`fireEvent`/`userEvent` earlier in this ' +
+        'file — all three are async in RNTL 14 — which leaves React\'s act scope ' +
+        'open and stops every later render from committing.'
+    );
+  }
+
   const roots = Array.isArray(tree) ? tree : [tree];
   const base = parseColor(rootBackground)!.rgb;
 
@@ -284,8 +331,37 @@ export function auditText(
     .filter((audit): audit is TextAudit => audit !== null);
 }
 
-/** The audits that fail their own requirement, formatted for an assertion. */
-export function belowFloor(audits: TextAudit[]): string[] {
+/**
+ * The audits that fail their own requirement, formatted for an assertion.
+ *
+ * ── Why an empty input throws rather than returning `[]` ────────────────────
+ *
+ * Every call site reads `expect(belowFloor(...)).toEqual([])`, and an empty
+ * audit satisfies that. So the assertion that proves the most when it fails
+ * proves nothing at all when the audit is empty, and it says so in green.
+ *
+ * This project has now watched that happen three times — §0.16's source
+ * scanner passing "has no text below the AA floor" on an empty scan, the four
+ * cases written below `contrast.test.tsx`'s add-a-car test that measured a
+ * null tree, and the bay surfaces that were written there first. Each was
+ * caught by a hand-written anti-vacuous guard that someone remembered to add.
+ * The guard belongs here instead, where forgetting it is not an option.
+ *
+ * `allowEmpty` exists for the one honest case: a filtered subset that a test
+ * asserts the size of itself.
+ */
+export function belowFloor(
+  audits: TextAudit[],
+  { allowEmpty = false }: { allowEmpty?: boolean } = {}
+): string[] {
+  if (audits.length === 0 && !allowEmpty) {
+    throw new Error(
+      'belowFloor: nothing was audited, so `toEqual([])` would pass without ' +
+        'measuring anything. Check the screen actually rendered the text you ' +
+        'meant to measure. Pass `{ allowEmpty: true }` if an empty set is the point.'
+    );
+  }
+
   return audits
     .filter((audit) => audit.ratio < audit.required)
     .map(

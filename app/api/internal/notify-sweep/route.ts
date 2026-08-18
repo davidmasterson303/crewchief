@@ -12,6 +12,7 @@ import {
   isWorthNotifying,
   milestoneReason,
   nextMilestone,
+  nextService,
 } from '@crewchief/core/service-due';
 import { historyLookups } from '@crewchief/core/service-history';
 import {
@@ -19,7 +20,10 @@ import {
   headlineService,
   recallsToRaise,
   shouldRaiseService,
+  vehiclesToGenerate,
+  type GenerationCandidate,
 } from '@crewchief/core/notification-sweep';
+import { researchVehicleDossier } from '@/lib/vehicle-research';
 
 /**
  * The nightly sweep. Phase 5, C1–C3.
@@ -63,8 +67,29 @@ const PAGE_SIZE = 200;
 
 interface SweepSummary {
   vehiclesScanned: number;
+  /**
+   * What the run **decided** to send, before delivery and regardless of
+   * `dryRun`.
+   *
+   * ⚠ These exist because `recallsSent`/`servicesSent` cannot answer the
+   * question a dry run is asked. They only increment inside the delivery loop,
+   * which `dryRun` skips — so a dry run reported zeros no matter what it had
+   * decided, and the route's own docblock advertises it as the way to make the
+   * first production run and to diagnose a suspected runaway.
+   *
+   * A dry run reporting "0 sent" when it would have sent four hundred is worse
+   * than no dry run: it reads as reassurance. Found by running it — the counts
+   * were right there in the plans and never reached the summary.
+   */
+  recallsPlanned: number;
+  servicesPlanned: number;
+  /** What was actually delivered. Always 0 under `dryRun`, by construction. */
   recallsSent: number;
   servicesSent: number;
+  /** Dossiers generated this run for cars that had never had one. C4. */
+  schedulesGenerated: number;
+  /** Eligible cars left for tomorrow because the generation budget ran out. */
+  generationBacklog: number;
   capped: boolean;
   dryRun: boolean;
 }
@@ -105,8 +130,19 @@ export async function POST(request: NextRequest) {
   }
 
   if (!secretMatches(request.headers.get('x-cron-secret'), secret)) {
-    // Deliberately says nothing about why. A caller probing this should not
-    // learn whether the secret was absent, short, or merely wrong.
+    /*
+      Says nothing about *why the supplied secret failed* — absent, short or
+      merely wrong all return this, so nothing here narrows a guess.
+
+      ⚠ It does not hide whether the route is configured at all: the 503 above
+      is distinguishable from this 401, so an anonymous caller can learn that
+      `CRON_SECRET` is unset. That was written as though it were hidden, and it
+      is not. **Keeping it that way is deliberate** — the distinction is how a
+      silently inert sweep gets diagnosed from outside, which is exactly how it
+      was caught on 12 Aug, and it is not worth much to an attacker: "this
+      endpoint refuses everything" is a reason to leave, and neither code helps
+      guess a secret that is being compared in constant time.
+    */
     return Response.json({ success: false, error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -116,8 +152,12 @@ export async function POST(request: NextRequest) {
 
   const summary: SweepSummary = {
     vehiclesScanned: 0,
+    recallsPlanned: 0,
+    servicesPlanned: 0,
     recallsSent: 0,
     servicesSent: 0,
+    schedulesGenerated: 0,
+    generationBacklog: 0,
     capped: false,
     dryRun,
   };
@@ -129,6 +169,15 @@ export async function POST(request: NextRequest) {
   */
   const recallCandidates: Array<{ userId: string; vehicleId: string; name: string; campaignNumber: string; summary: string }> = [];
   const serviceCandidates: Array<{ userId: string; vehicleId: string; name: string; service: string; reason: string }> = [];
+  /*
+    C4. Cars that reached `collectService` with no schedule to evaluate. They
+    are gathered rather than acted on here for the same reason the send
+    candidates are: the generation budget applies to the run as a whole, and a
+    per-page budget would spend ten on every page.
+  */
+  const generationCandidates: GenerationCandidate[] = [];
+  /** Vehicle rows kept by id, so a generated car can be re-evaluated without re-reading it. */
+  const scanned = new Map<string, { row: VehicleRow; name: string }>();
 
   for (let page = 0; ; page += 1) {
     const { data: vehicles, error } = await client
@@ -156,17 +205,95 @@ export async function POST(request: NextRequest) {
       summary.vehiclesScanned += 1;
 
       const name = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ') || 'your car';
+      scanned.set(vehicle.id, { row: vehicle, name });
 
       await collectRecalls(client, vehicle, name, recallCandidates);
-      await collectService(client, vehicle, name, today, serviceCandidates);
+      await collectService(client, vehicle, name, today, serviceCandidates, generationCandidates);
     }
 
     if (vehicles.length < PAGE_SIZE) break;
   }
 
+  /*
+    ── C4: generate the missing schedules, then re-evaluate those cars ────────
+
+    This runs before the cap and the sends, because a car generated tonight
+    should be able to produce tonight's notification. The alternative — queue it
+    and notify tomorrow — adds a day of latency for no benefit.
+
+    ⚠ **Nothing here runs under `dryRun`.** A dry run is documented as "every
+    query, every decision, no sends", and it is how a suspected runaway is
+    diagnosed. A dry run that spent money on a Pro-model call for ten cars
+    would be a trap sprung by exactly the person being careful. The generation
+    is behind the same flag as the send, deliberately.
+  */
+  const generationPlan = vehiclesToGenerate(generationCandidates);
+  summary.generationBacklog = generationPlan.considered - generationPlan.send.length;
+
+  if (generationPlan.capped) {
+    /*
+      Warn, not error — and this is the difference from `SWEEP_SEND_CAP`.
+      Hitting the send cap means a dedupe broke. Hitting this one means there
+      is a backlog of new cars, which is what success looks like. The budget
+      degrades the feature by a day rather than breaking it.
+    */
+    logger.warn('CRON:SWEEP', 'Generation budget spent; the rest wait for tomorrow', {
+      generated: generationPlan.send.length,
+      waiting: summary.generationBacklog,
+    });
+  }
+
+  if (!dryRun) {
+    for (const candidate of generationPlan.send) {
+      const scan = scanned.get(candidate.vehicleId);
+      if (!scan) continue;
+
+      try {
+        const outcome = await researchVehicleDossier(
+          {
+            id: scan.row.id,
+            year: scan.row.year,
+            make: scan.row.make,
+            model: scan.row.model,
+          },
+          candidate.userId
+        );
+
+        if (!outcome.success || outcome.unsupported) continue;
+
+        summary.schedulesGenerated += 1;
+
+        /*
+          Re-run the service collection for this car alone, now that it has a
+          schedule. `needsGeneration` is deliberately omitted: if it somehow
+          still has no schedule, it must not re-enter the queue it just left.
+        */
+        await collectService(client, scan.row, scan.name, today, serviceCandidates);
+      } catch (error) {
+        /*
+          One car's failure is not the run's. A sweep that aborted here would
+          let a single malformed vehicle silence notifications for everybody
+          else — the failure mode this module is written against.
+        */
+        logger.error('CRON:SWEEP', error as Error, {
+          stage: 'Generating a missing schedule',
+          vehicleId: candidate.vehicleId,
+        });
+      }
+    }
+  }
+
   const recallPlan = applySendCap(recallCandidates);
   const servicePlan = applySendCap(serviceCandidates);
   summary.capped = recallPlan.capped || servicePlan.capped;
+
+  /*
+    Recorded before the delivery branch, so a dry run reports what it decided
+    rather than what it sent. This is the line that makes `?dryRun=1` worth
+    running.
+  */
+  summary.recallsPlanned = recallPlan.send.length;
+  summary.servicesPlanned = servicePlan.send.length;
 
   if (summary.capped) {
     /*
@@ -236,7 +363,14 @@ export async function POST(request: NextRequest) {
 }
 
 type Client = ReturnType<typeof getServiceRoleClient>;
-type VehicleRow = { id: string; user_id: string; current_mileage: number | null };
+type VehicleRow = {
+  id: string;
+  user_id: string;
+  current_mileage: number | null;
+  year: number;
+  make: string;
+  model: string;
+};
 
 async function collectRecalls(
   client: Client,
@@ -270,7 +404,8 @@ async function collectService(
   vehicle: VehicleRow,
   name: string,
   today: string,
-  into: Array<{ userId: string; vehicleId: string; name: string; service: string; reason: string }>
+  into: Array<{ userId: string; vehicleId: string; name: string; service: string; reason: string }>,
+  needsGeneration?: GenerationCandidate[]
 ) {
   const mileage = typeof vehicle.current_mileage === 'number' ? vehicle.current_mileage : 0;
   if (mileage <= 0) return;
@@ -278,7 +413,7 @@ async function collectService(
   const [{ data: knowledge }, { data: sent }, { data: history }] = await Promise.all([
     client
       .from('vehicle_knowledge_base')
-      .select('maintenance_schedule')
+      .select('maintenance_schedule, research_status')
       .eq('vehicle_id', vehicle.id)
       .maybeSingle(),
     client
@@ -293,7 +428,36 @@ async function collectService(
   ]);
 
   const schedule = knowledge?.maintenance_schedule;
-  if (!Array.isArray(schedule) || schedule.length === 0) return;
+  if (!Array.isArray(schedule) || schedule.length === 0) {
+    /*
+      C4 — the lazy-regeneration gap.
+
+      Until this branch existed, the sweep simply returned here, so a car whose
+      owner had never opened its dashboard never became eligible for a service
+      notification. Reaching someone who is *not* in the app is the whole point
+      of the feature, so the unreachable population was exactly the intended
+      one — and every car added on the phone starts in it.
+
+      `needsGeneration` is absent on the second pass (see `regenerate`), which
+      is what stops a car that generated and still has no schedule from being
+      queued again inside the same run.
+    */
+    if (needsGeneration) {
+      const { count } = await client
+        .from('device_push_tokens')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', vehicle.user_id);
+
+      needsGeneration.push({
+        vehicleId: vehicle.id,
+        userId: vehicle.user_id,
+        researchStatus: (knowledge?.research_status as string | undefined) ?? null,
+        hasPushToken: (count ?? 0) > 0,
+        mileage,
+      });
+    }
+    return;
+  }
 
   const services = evaluateSchedule({
     schedule,
@@ -301,6 +465,41 @@ async function collectService(
     today,
     ...historyLookups(history ?? []),
   });
+
+  /*
+    ── The garage row's next service, written back ────────────────────────────
+
+    ⚠ **Before the raise gate below, and that ordering is the whole point.**
+    Put this after it and only the cars that earned a notification would ever
+    have a stored next service — which is a quiet way of leaving most of the
+    garage blank while looking like it works.
+
+    `nextService` rather than `nextMilestone`: the row asks what is next, not
+    whether it is worth interrupting someone about. A card that went blank
+    because the next service is far away would be hiding the reassuring answer.
+
+    Best-effort. A failed write is not a reason to skip a notification — the
+    sweep's actual job — so it is logged and stepped over. The column simply
+    keeps yesterday's value, which `next_service_updated_at` makes visible.
+  */
+  const upcoming = nextService(services);
+
+  const { error: nextServiceError } = await client
+    .from('vehicles')
+    .update({
+      next_service_label: upcoming?.service ?? null,
+      // Null when the service is date-driven. Not zero — see the migration.
+      next_service_at_miles: upcoming?.dueAtMiles ?? null,
+      next_service_updated_at: new Date().toISOString(),
+    })
+    .eq('id', vehicle.id);
+
+  if (nextServiceError) {
+    logger.warn('CRON:SWEEP', 'Could not store the next service', {
+      vehicleId: vehicle.id,
+      error: nextServiceError.message,
+    });
+  }
 
   const milestone = nextMilestone(services, { horizonMiles: 5_000 });
 

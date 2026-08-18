@@ -8,13 +8,18 @@
  *
  * ── Why this is not `UpcomingMaintenance.tsx` ───────────────────────────────
  *
- * That component exists, renders nowhere, and carries a hardcoded
- * `COMMON_INTERVALS` table: oil every 5,000 miles, plugs every 30,000, for
- * every car in the product. A generic table is a reasonable placeholder on a
- * screen someone chose to open and a bad basis for an unprompted notification —
- * "your transmission fluid is due" is a claim about *this* car, and a Honda and
- * a BMW do not share an interval. R14 recorded the component as unrendered; the
- * table is the likelier reason it never was.
+ * That component rendered nowhere and carried a hardcoded `COMMON_INTERVALS`
+ * table: oil every 5,000 miles, plugs every 30,000, for every car in the
+ * product. A generic table is a reasonable placeholder on a screen someone
+ * chose to open and a bad basis for an unprompted notification — "your
+ * transmission fluid is due" is a claim about *this* car, and a Honda and a BMW
+ * do not share an interval. R14 recorded the component as unrendered; the table
+ * is the likelier reason it never was.
+ *
+ * It has since been deleted, so the table is no longer in the tree to be
+ * reached for. The heading stays because the argument is about *approach* and
+ * outlives the file: a schedule this module cannot source from the vehicle is a
+ * schedule it should decline to assert, not one to fill in from an average.
  *
  * This reads the vehicle's own schedule instead, which is why `81022f9` had to
  * make that schedule structured first.
@@ -527,4 +532,37 @@ function overdueBy(service: ServiceDue): number {
   }
 
   return Math.abs(service.milesRemaining ?? 0);
+}
+
+/**
+ * The next thing this car needs — with no opinion about whether to interrupt.
+ *
+ * ── Why this is not `nextMilestone` with a bigger horizon ───────────────────
+ *
+ * `nextMilestone` answers *"is there a visit worth raising"*, and it says no in
+ * two ways that are right for a notification and wrong for a garage row: it
+ * returns `null` past its horizon, and again for a time-driven service that is
+ * merely `soon`. A card that reads "Next service" must not go blank because the
+ * next service happens to be far away — far away **is** the answer, and it is a
+ * reassuring one.
+ *
+ * Same split `isWorthNotifying` already makes, one step earlier: what is next is
+ * a fact, whether to interrupt someone about it is a judgement.
+ *
+ * `unknown` services are excluded for the reason `nextMilestone` excludes them —
+ * a service with no record to count from has no due point, so calling it "next"
+ * would be inventing one. A car whose every service is unknown returns `null`,
+ * which the caller must render as *"no schedule yet"* rather than *"nothing
+ * due"*: those are different claims and only one of them is safe.
+ */
+export function nextService(services: ServiceDue[]): ServiceDue | null {
+  const bookable = services.filter((service) => service.status !== 'unknown');
+
+  const ordered = [...bookable].sort(
+    (a, b) =>
+      STATUS_URGENCY[a.status] - STATUS_URGENCY[b.status] ||
+      (a.milesRemaining ?? Number.MAX_SAFE_INTEGER) - (b.milesRemaining ?? Number.MAX_SAFE_INTEGER)
+  );
+
+  return ordered[0] ?? null;
 }
