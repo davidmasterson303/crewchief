@@ -130,9 +130,22 @@ deploys, an ignore rule needs an inverted exit code to be right, and one
 failure mode. `demo-live` had been running the pattern correctly all along —
 9 builds against 111 from the same commit stream.
 
-This is a **promote gate**, not drift: `scripts/promote-demo.mjs` is the only
-way `demo-live` moves, so what is public is deliberately behind `main`. Run the
-dry run first; it verifies the exact build that is about to become public.
+Each release branch has its own gate, and they run in order:
+
+```
+main  ->  promote-web.mjs   ->  web-live   ->  promote-demo.mjs  ->  demo-live
+```
+
+Both dry-run by default; pass `--apply` to publish.
+
+⚠ **They verify differently, and the difference is not an oversight.**
+`promote-demo` checks the exact build about to become the demo *before* it
+becomes the demo — it can, because that commit is already live on `web-live`.
+`promote-web` has no upstream live build to interrogate, because nothing deploys
+`main` any more. So it verifies everything decidable from source first, then
+**waits for the deploy and confirms the hostname is serving the merge commit**.
+That second half matters: Netlify can accept a push and fail the build, and this
+branch's failure mode is a hostname silently frozen on its last good deploy.
 
 ⚠ **`crewchief.davidmasterson.co` is gated behind `web-live`** — it is the App
 Store listing's privacy-policy URL and the origin the mobile app talks to
