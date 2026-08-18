@@ -193,8 +193,22 @@ export function IllustrationFrame({
         cy={GROUND_Y}
         rx={(REAR_AXLE_X - FRONT_AXLE_X) / 2 + 16}
         ry={3.5}
-        fill="hsl(var(--muted-foreground))"
-        opacity={0.18}
+        /*
+          ⚠ The contact takes the vehicle's hue when there is one — this is the
+          **underlight** half of Design's "a rim or underlight", and it is here
+          rather than only on the body because of what a card actually renders.
+
+          Measured on the live page: a card draws this art at 120px, so the rim
+          stroke lands at about 1px at half opacity and is invisible. An area
+          survives that; a hairline does not. And an underlight is the more
+          literal answer to "so it sits in the bay instead of floating on it" —
+          the hue reads as light coming back off the floor.
+
+          Still light and not paint: it is the contact shadow being coloured,
+          never the body being filled.
+        */
+        fill={tint ?? 'hsl(var(--muted-foreground))'}
+        opacity={tint ? 0.3 : 0.18}
       />
 
       {/* The ground. Low contrast on purpose — it anchors, it should not read
