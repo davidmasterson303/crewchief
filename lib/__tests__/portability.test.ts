@@ -166,6 +166,14 @@ const NOT_PORTABLE: Record<string, string> = {
     own entitlement, which is the one thing this whole track exists to prevent.
   */
   'lib/apple-jws.ts': 'node:crypto X509Certificate — server-only by design',
+  /*
+    The write half of the same split. Every decision about what an Apple
+    notification means lives in `packages/core/src/apple-subscription.ts` and is
+    portable; what stays here is the service-role client, and it stays here for
+    the reason `entitlement-not-user-writable.test.ts` exists — a client that
+    could write this table could grant itself the paid tier.
+  */
+  'lib/entitlement-store.ts': 'writes with the service role — reaches Supabase through lib/supabase',
   'lib/supabase.ts': 'constructs Supabase clients',
   'lib/api-auth.ts': 'Supabase, and reads next/headers',
   'lib/account-data.ts': 'reaches Supabase through lib/supabase',
