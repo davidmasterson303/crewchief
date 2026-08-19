@@ -18,7 +18,7 @@ jest.mock('../client', () => {
   class ApiRequestError extends Error {
     status: number;
     origin: string;
-    constructor({ status, origin = 'server' }: { status: number; origin?: string }) {
+    constructor({ status, origin = 'server' }: { status: number; message: string; origin?: string }) {
       super(`status ${status}`);
       this.status = status;
       this.origin = origin;
@@ -67,7 +67,7 @@ describe('what the server said', () => {
     [400, 'rejected'],
     [500, 'network'],
   ])('maps a %s from the route', async (status, kind) => {
-    mockApiRequest.mockRejectedValue(new ApiRequestError({ status: status as number }));
+    mockApiRequest.mockRejectedValue(new ApiRequestError({ status: status as number, message: 'from the route' }));
     await expect(verifyPurchase('j')).resolves.toMatchObject({ kind });
   });
 });
@@ -80,14 +80,14 @@ describe('failures where nothing was ever asked', () => {
       would tell somebody Apple would not confirm a transaction that was never
       presented to anybody.
     */
-    mockApiRequest.mockRejectedValue(new ApiRequestError({ status: 401, origin: 'device' }));
+    mockApiRequest.mockRejectedValue(new ApiRequestError({ status: 401, message: 'Not signed in', origin: 'device' }));
 
     await expect(verifyPurchase('j')).resolves.toEqual({ kind: 'network' });
   });
 
   it('still treats a server 401 as rejected', async () => {
     // Anti-vacuous: the rule above is about origin, not about the status.
-    mockApiRequest.mockRejectedValue(new ApiRequestError({ status: 401, origin: 'server' }));
+    mockApiRequest.mockRejectedValue(new ApiRequestError({ status: 401, message: 'Unauthorized', origin: 'server' }));
 
     await expect(verifyPurchase('j')).resolves.toEqual({ kind: 'rejected' });
   });
