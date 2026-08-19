@@ -174,6 +174,13 @@ const NOT_PORTABLE: Record<string, string> = {
   */
   'lib/apple-root-ca.ts': 'trust anchor for lib/apple-jws — server-only by design',
   /*
+    Unwraps Apple's envelope by verifying each layer, so it inherits
+    `lib/apple-jws`'s server-only constraint for the same reason: the fields
+    that decide what an account gets live in the inner blobs, and a client that
+    verified those would be asserting its own entitlement.
+  */
+  'lib/apple-notification.ts': 'verifies nested JWS through lib/apple-jws — server-only by design',
+  /*
     The write half of the same split. Every decision about what an Apple
     notification means lives in `packages/core/src/apple-subscription.ts` and is
     portable; what stays here is the service-role client, and it stays here for
