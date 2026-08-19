@@ -167,6 +167,13 @@ const NOT_PORTABLE: Record<string, string> = {
   */
   'lib/apple-jws.ts': 'node:crypto X509Certificate — server-only by design',
   /*
+    Travels with the verifier it anchors. The certificate itself is public and
+    would be harmless on a device, but a mobile client has no business holding
+    a trust anchor for payloads it must never verify: a client that verified its
+    own receipts would be asserting its own entitlement.
+  */
+  'lib/apple-root-ca.ts': 'trust anchor for lib/apple-jws — server-only by design',
+  /*
     The write half of the same split. Every decision about what an Apple
     notification means lives in `packages/core/src/apple-subscription.ts` and is
     portable; what stays here is the service-role client, and it stays here for
