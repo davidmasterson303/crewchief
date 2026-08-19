@@ -77,5 +77,15 @@ module.exports = {
 
   // Screens only. The static scans that already cover this app live in the web
   // suite and must not be collected twice.
-  testMatch: ['<rootDir>/src/**/__tests__/**/*.test.tsx'],
+  /*
+    `.ts` as well as `.tsx`, and the difference is not cosmetic.
+
+    Every suite here was a component test when this was written, so `.tsx` was
+    an accurate description. E8 added the first mobile test with no JSX in it —
+    `src/api/__tests__/purchases.test.ts` — and under the old pattern that file
+    was collected by nothing: it existed, it was committed, it typechecked, and
+    it never ran. A test that cannot fail is worse than an absent one, because
+    the absent one is visible.
+  */
+  testMatch: ['<rootDir>/src/**/__tests__/**/*.test.ts?(x)'],
 };
