@@ -49,8 +49,8 @@
 > | | |
 > |---|---|
 > | `main` | **`fc96184`**, pushed. 14 commits on 12 Aug, all deployed |
-> | Web tests | **2300**, green | 
-> | Mobile tests | **174**, green |
+> | Web tests | ~~2300~~ → **2615**, green (18 Aug) |
+> | Mobile tests | ~~174~~ → **316**, green (18 Aug). ⚠ 10 of those were being collected by nothing until 18 Aug — `testMatch` was `*.test.tsx`, so the first mobile test without JSX existed, typechecked and never ran while jest reported all suites green |
 > | Typechecks | Three, all clean |
 > | Migrations | All applied **except `20260813020000`** (TRUNCATE revokes) — Cowork's |
 > | `demo-live` | **~27 commits behind `main`** — the public demo serves pre-v8 design |
