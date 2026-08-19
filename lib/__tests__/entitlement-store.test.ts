@@ -27,7 +27,6 @@ jest.mock('@/lib/supabase', () => ({
   }),
 }));
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
 const { applyVerifiedAppleEvent } = require('@/lib/entitlement-store');
 
 const USER = '11111111-2222-3333-4444-555555555555';
