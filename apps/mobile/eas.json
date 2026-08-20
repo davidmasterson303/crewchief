@@ -17,6 +17,15 @@
       "distribution": "internal"
     },
 
+    "device": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": {
+        "simulator": false
+      },
+      "channel": "device"
+    },
+
     "production": {
       "autoIncrement": true
     }
