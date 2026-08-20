@@ -143,12 +143,34 @@ const PORTABLE: string[] = [
   /*
     Added 14 Aug with the legal pages. It is constants plus a re-export of
     `SUBSCRIPTION_CANCEL_PATH` from core, so it qualifies — but it has not been
-    moved into the package, deliberately: two of its three values are visibly
-    unfinished placeholders waiting on Q2, and promoting an unfinished module
-    into the shared package invites a second client to import it and ship the
-    placeholder. It moves when the entity question is answered.
+    moved into the package.
+
+    ⚠ **The reason recorded here has expired.** It read: "two of its three
+    values are visibly unfinished placeholders waiting on Q2, and promoting an
+    unfinished module into the shared package invites a second client to import
+    it and ship the placeholder." Both placeholders were filled in on 18 and
+    19 Aug and are live, so that hazard is gone — and note the stated release
+    condition ("when the entity question is answered") was never the real one:
+    Q2 is still open and the placeholders went anyway.
+
+    Moving it is now an ordinary refactor rather than something to avoid, and
+    is deliberately not bundled into the commit that noticed.
   */
   'lib/legal.ts',
+  /*
+    Added 20 Aug with the demo-banner gate. Pure string parsing, no imports at
+    all, so it qualifies mechanically — and this list is the honest home for it.
+
+    ⚠ It was first filed under NOT_PORTABLE with the reason "names a web
+    deployment, no meaning on the mobile client". That is a judgment about
+    usefulness rather than a technical blocker, and the `really is blocked`
+    assertion rejected it — correctly. A stay-behind list that accepts opinions
+    stops being a list of blockers.
+
+    It stays in lib/ rather than moving to core for the ordinary reason: nothing
+    outside the web app asks the question yet.
+  */
+  'lib/site-role.ts',
 ];
 
 /**

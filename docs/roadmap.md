@@ -1,5 +1,126 @@
 # CrewChief roadmap — image pipeline, backdrop, cockpit direction, and responsive web
 
+> ### ⚠ 19 Aug — E8's server half shipped, and both hostnames are current
+>
+> **Everything below the next block predates this and its sequencing is older still.**
+> This is the session that changed the most in one day; read it before acting on
+> anything under it.
+>
+> ---
+>
+> #### What is now live on both hostnames
+>
+> | | |
+> |---|---|
+> | `crewchief.davidmasterson.co` | `83b7b24e` (`web-live`) — App Store URL + the app's API |
+> | `crewchief-demo.davidmasterson.co` | `9a32aca2` (`demo-live`) — the portfolio piece |
+>
+> Both promoted 19 Aug through the scripted gates, both verified by fetching the
+> pages rather than by reading the script's output. `verify-demo` passed against
+> production with **the two standing warnings** (client-rendered content absent
+> from initial HTML — the script's own comment says this is not a failure).
+>
+> ⚠ `/api/version` reports the **merge** commit on both, never the `main` commit
+> named in the promote message. This has cost real time twice.
+>
+> #### The legal pages are finished — operator *and* contact
+>
+> `[OPERATOR NAME …]` and `[CONTACT EMAIL …]` had been rendering as literal body
+> text on the page App Review reads since 17 Aug. Both are now named and live:
+> **David Masterson** (settled by Apple's Individual enrolment — Q2 never gated
+> it) and **`crewchief.support@gmail.com`**.
+>
+> ⚠ The contact is **deliberately not a domain address**, and that looks like a
+> compromise without being one: `support@davidmasterson.co` carries David's name,
+> which gives back most of what a dedicated address was for, and `crewchief.co`
+> is not his. Apple requires a support **URL** in the listing, not a domain-based
+> contact. It is verified receiving and delegated to his own mailbox.
+>
+> `LAST_UPDATED` is a **ship date, not an edit date**. It read 18 August for a day
+> while the contact was still bracketed — and since nothing deploys from `main`,
+> no reader ever saw it. A date describing a change readers could not see is the
+> same defect as one preceding the change it describes.
+>
+> #### E8 — the entire server half is built, tested and live
+>
+> Seven commits. The decision layers are pure and were built first *because* they
+> need no Apple credentials, so none of it waited on the membership:
+>
+> | | |
+> |---|---|
+> | `apple-subscription.ts` | notification → entitlement state machine, 21 tests |
+> | `apple-jws.ts` | ES256 + certificate chain, on Node's own `X509Certificate`, **no new dependency** |
+> | `apple-root-ca.ts` | Apple Root CA - G3, **committed rather than configured** |
+> | `apple-notification.ts` | unwraps **all three** JWS layers |
+> | `entitlement-store.ts` | the service-role writer `entitlement-not-user-writable` had been waiting for |
+> | `purchase-flow.ts` | client decisions — `grantsAccess` true for **one** input combination |
+> | two routes | `/api/v1/iap/verify` (401) and `/api/internal/apple-notifications` (400) |
+>
+> The four failure modes that have no error message, each mutation-verified:
+> **Apple does not guarantee notification order** (a delayed `DID_RENEW` after an
+> `EXPIRED` resurrects a dead subscription, silently); **a refund is not a lapse**;
+> **a sandbox event must never overwrite a Production entitlement** — while App
+> Review runs entirely in sandbox, so refusing sandbox outright is not available;
+> and **an ignored notification must not advance the ordering clock**.
+>
+> ⚠ **A StoreKit success entitles nobody.** Only the server has checked Apple's
+> signature, and the device is the party that benefits from lying about it.
+>
+> #### ⛔ The one thing that blocks E8 working in production
+>
+> **`20260818120000` is written and NOT applied** — verified against the live
+> database 19 Aug, all five columns return `42703`. Until it lands, the webhook
+> **refuses to write and returns 503**. That refusal is deliberate: without
+> `last_signed_date` there is no ordering guard, and a degraded write is an
+> entitlement a late retry can silently rewind. Apple retries for three days, so
+> nothing is lost — but nothing is recorded either.
+>
+> #### ⚠ Found 19 Aug, not yet decided: web-live serves the demo framing
+>
+> `DemoBanner` renders unconditionally in `app/layout.tsx:137` — no environment
+> gate, no hostname check. So **`crewchief.davidmasterson.co/privacy`, the URL in
+> the App Store listing, carries a "PORTFOLIO DEMO · Shared demo garage"
+> masthead**, and the root serves the three demo cars.
+>
+> Same failure shape as the operator placeholder: the unconditional banner was
+> correct when there was one site and that site was the demo. The 17 Aug hostname
+> split made it wrong on one of the two, and nothing announced it. There is
+> currently **no variable that distinguishes the two sites**.
+>
+> A presentation risk rather than a rejection risk, but it is on the one page that
+> can least afford ambiguity. **David's call**; it costs a promote.
+>
+> #### Instruments that caught real defects this session
+>
+> Worth recording, because each was silent to review:
+>
+> - `entitlement-not-user-writable` was satisfied by the words
+>   `getServiceRoleClient` appearing in a **docblock** while the code used another
+>   client — CLAUDE.md §5's `.tap-target-44` failure, reproduced by the first file
+>   careful enough to document itself. Comments are stripped before the scan now.
+> - The mobile runner's `testMatch` was `*.test.tsx`, so the first mobile test with
+>   no JSX **was collected by nothing** — committed, typechecked, never run, while
+>   jest reported every suite green.
+> - The JWS validity loop passed all sixteen tests while checking only the leaf,
+>   because every fixture shared one generation time.
+>
+> #### Next, in order
+>
+> | # | What | Who | Note |
+> |---|---|---|---|
+> | **1** | **Apply `20260818120000`** | **Cowork / David** | ⛔ Additive only — five nullable columns, no drops, no policy or grant touched. The modal should NOT fire. Until this lands the IAP webhook 503s every notification |
+> | **2** | **App Store Connect setup** | **David** · weekend | Products matching `PRODUCT_TIERS` **exactly**, the notifications URL, a sandbox tester, App Review info. Setup sheet with the verified strings was delivered 18 Aug. ✅ The promote it depended on is already done |
+> | **3** | **D2 — the price** | **David** | Standing recommendation $8.99/mo · $79/yr. Blocks creating the products, not the code: Apple returns a localised price and the app renders that |
+> | **4** | **The `DemoBanner` decision** | **David** | Gate it on an env var (cleanest — the codebase has no site-distinguishing flag yet), gate on hostname, or leave it. Costs a promote |
+> | **5** | **`expo-iap` + the store adapter** | Claude Code | The last of E8. A native module, so it **costs an EAS build**, and a purchase cannot be tested until 2 lands. Everything it plugs into is built and tested |
+> | **6** | **E6 — the upgrade prompt** | Claude Code | ~0.5 ed, and **it is now genuinely unblocked** — it was correctly blocked on E8 because there was nothing to buy. `ai-budget.test.ts:174` asserts the limit message offers no upgrade; that assertion becomes wrong once 5 ships |
+>
+> ⚠ **Ordering that is not a preference:** CLAUDE.md §8 says a mobile build needing
+> a new `/api/v1/*` route must be promoted first. That is **already satisfied** —
+> both routes reached `web-live` on 19 Aug, before any build exists. Do not undo it
+> by reverting the promote.
+
+
 > ### ⚠ 17 Aug — what closed, and where the session is written up
 >
 > **RP4's browser-free half shipped** (`viewport-floors.test.ts`) and **RP2 was given the
@@ -48,12 +169,13 @@
 >
 > | | |
 > |---|---|
-> | `main` | **`fc96184`**, pushed. 14 commits on 12 Aug, all deployed |
-> | Web tests | ~~2300~~ → **2615**, green (18 Aug) |
-> | Mobile tests | ~~174~~ → **316**, green (18 Aug). ⚠ 10 of those were being collected by nothing until 18 Aug — `testMatch` was `*.test.tsx`, so the first mobile test without JSX existed, typechecked and never ran while jest reported all suites green |
-> | Typechecks | Three, all clean |
-> | Migrations | All applied **except `20260813020000`** (TRUNCATE revokes) — Cowork's |
-> | `demo-live` | **~27 commits behind `main`** — the public demo serves pre-v8 design |
+> | `main` | ~~`fc96184`~~ → **`8ee6484`**, pushed (19 Aug) |
+> | Web tests | ~~2300~~ → **2616**, green (19 Aug) |
+> | Mobile tests | ~~174~~ → **329**, green (19 Aug). ⚠ 10 of those were collected by nothing until 18 Aug — `testMatch` was `*.test.tsx`, so the first mobile test without JSX existed, typechecked and never ran while jest reported all suites green |
+> | Typechecks | Three, all clean — ⚠ run the mobile one **from inside `apps/mobile`**; the root `tsc` resolves a different config and reports phantom errors |
+> | Migrations | ⛔ **`20260818120000` written and NOT applied** — E8's five columns, all `42703` against live on 19 Aug. **This is the only thing stopping the IAP webhook recording anything.** ~~`20260813020000`~~ applied 16 Aug; ~~`20260815190000`~~ **applied** — re-probed live 19 Aug, `next_service_label` and `next_service_due_on` both present, so the entry below claiming it is outstanding is stale |
+> | `demo-live` | ~~27 commits behind~~ → **current**, `9a32aca2`, promoted 19 Aug |
+> | `web-live` | **current**, `83b7b24e`, promoted 19 Aug. Exists and has since 17 Aug — the note below saying it needs creating is dead |
 >
 > ### ⛔ Do not act on these — they are dead instructions below
 >
