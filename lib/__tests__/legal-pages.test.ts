@@ -23,6 +23,8 @@ import { join } from 'node:path';
 
 import { SUBSCRIPTION_CANCEL_PATH } from '@crewchief/core/account-deletion';
 
+import { CONTACT_EMAIL, LAST_UPDATED, OPERATOR } from '@/lib/legal';
+
 const root = join(__dirname, '..', '..');
 const read = (p: string) => readFileSync(join(root, p), 'utf8');
 
@@ -119,48 +121,92 @@ describe('the two documents cannot contradict the app', () => {
   });
 });
 
-describe('what is still unfinished is visibly unfinished — now on a public page', () => {
-  it('has not shipped a plausible-looking fake operator or contact', () => {
+describe('who operates the service, and who to write to about it', () => {
+  /*
+    ── Both constants are now real, and the guard changed shape with them ──────
+
+    This block was a countdown for five days. `OPERATOR` was filled in on 18 Aug
+    — the Apple membership is **Individual, not Organization**, so the seller
+    name is David's legal name whatever the entity question (Q2) decides — and
+    `CONTACT_EMAIL` on 19 Aug. Both were bracketed placeholders rendering as
+    literal body text on a page App Review reads, and both are now named.
+
+    **What the assertions guard has inverted, and deliberately.** While the
+    values were absent the risk was somebody replacing them with something that
+    merely *read* finished. Now that they are present the risk is the reverse: a
+    later edit quietly putting a placeholder, an empty string or an unmonitored
+    address back. So each one asserts a real value and separately asserts that a
+    placeholder would still be caught.
+
+    ⚠ A green run here does not mean the public page is fixed. Nothing deploys
+    from `main`; `crewchief.davidmasterson.co` serves `web-live`, and these
+    values reach a reader only after a promote.
+  */
+
+  it('names a real operator rather than a bracketed placeholder', () => {
+    expect(OPERATOR).toBe('David Masterson');
+
+    // Anti-vacuous: this must still be able to catch a placeholder coming back.
+    expect(OPERATOR).not.toMatch(/[[\]]|TBD|not yet|to be decided/i);
+    expect(OPERATOR.trim().length).toBeGreaterThan(0);
+  });
+
+  it('names a contact address somebody actually reads', () => {
     /*
-      CrewChief has no legal entity (Q2, open). The placeholders are bracketed
-      and self-describing on purpose: a policy naming an entity that does not
-      exist is worse than one that admits it is incomplete, and the failure mode
-      to guard against is a well-meaning edit replacing them with something that
-      *reads* finished.
+      `crewchief.support@gmail.com` — deliberately not a domain address, and
+      that is worth recording because it looks like a compromise and is not.
 
-      This test goes red when they are filled in. That is the intent — it is the
-      prompt to delete it and link the pages publicly.
-
-      ── ⚠ 17 Aug: THE PREMISE ABOVE HAS FLIPPED ─────────────────────────────
-
-      `lib/legal.ts` says these "must be replaced before either page is linked
-      publicly". **They are now linked publicly.** Two things happened on the
-      same day:
-
-        - The mobile Account screen builds its Terms and Privacy links from
-          `API_BASE_URL`, which is now `https://crewchief.davidmasterson.co` —
-          a real hostname on its own certificate, not a generated preview name.
-        - That same URL goes in the App Store listing's privacy-policy field,
-          which App Review reads.
-
-      So `[OPERATOR NAME — see Q2, entity not yet formed]` currently renders as
-      **literal body text on a public page**, and Q2 has stopped being only a
-      revenue question. Found by Cowork while wiring the domain; verified by
-      fetching the live page.
-
-      This assertion is deliberately **not** inverted yet, because filling it in
-      is David's call and turning the suite red would block unrelated work on a
-      decision that is not an engineering one. It is a countdown now rather than
-      a steady state, and it must be resolved before submission rather than
-      before launch.
-
-      ⚠ The Apple enrolment may already have answered it: the membership is
-      **Individual, not Organization**, so the App Store seller name is David's
-      personal legal name. An operator field naming that is consistent with what
-      Apple will display, and needs no entity to exist first.
+      `support@davidmasterson.co` carries David's name, which gives back most of
+      what a dedicated address was for, and `crewchief.co` is not his. Apple
+      requires a support *URL* in the listing, not a domain-based address, so a
+      customer is pointed at the site either way. The property that matters on a
+      privacy policy is that the address is answered — this one is verified
+      receiving and delegated to his own mailbox.
     */
-    const legal = read('lib/legal.ts');
-    expect(legal).toContain('[OPERATOR NAME');
-    expect(legal).toContain('[CONTACT EMAIL');
+    expect(CONTACT_EMAIL).toBe('crewchief.support@gmail.com');
+  });
+
+  it('would still catch a placeholder or an unreachable address coming back', () => {
+    /*
+      Anti-vacuous, and the direction of the risk has flipped. While these were
+      empty the hazard was a plausible-looking fake; now that they are filled it
+      is a regression putting a bracket, a blank or a bare word back — none of
+      which would look wrong in a diff.
+    */
+    expect(CONTACT_EMAIL).not.toMatch(/[[\]]|TBD|not yet|to be decided/i);
+    expect(CONTACT_EMAIL).toMatch(/^[^@\s]+@[^@\s]+\.[^@\s]+$/);
+  });
+
+  it('interpolates both constants rather than restating them in the pages', () => {
+    /*
+      Asserting the sources were found at all. Without this, both guards above
+      keep passing while a page renders a hardcoded literal beside them — the
+      constant would be correct and the published document wrong, which is the
+      exact defect `lib/legal.ts` centralises these to prevent.
+    */
+    for (const [name, source] of [['privacy', privacy], ['terms', terms]] as const) {
+      expect(`${name}: ${source.includes('{OPERATOR}')}`).toBe(`${name}: true`);
+      expect(`${name}: ${source.includes('{CONTACT_EMAIL}')}`).toBe(`${name}: true`);
+    }
+  });
+
+  it('carries a last-updated date no earlier than the operator being named', () => {
+    /*
+      `LAST_UPDATED` is the date the content changed *for a reader*, which is
+      the ship date rather than the commit date — nothing deploys from `main`,
+      so a date moved on 18 August described a change nobody could see. Operator
+      and contact reach the public page together on 19 August.
+
+      Pinned to an exact literal rather than a floor, deliberately. A floor
+      would let any edit drag the date forward, including a styling one, and the
+      file's own docblock is explicit that a date which moves for a CSS change
+      teaches people the date means nothing. An exact pin makes every bump a
+      line somebody had to write on purpose.
+    */
+    expect(LAST_UPDATED).toBe('19 August 2026');
+    expect(new Date(LAST_UPDATED).getTime()).not.toBeNaN();
+    expect(new Date(LAST_UPDATED).getTime()).toBeGreaterThanOrEqual(
+      new Date('14 August 2026').getTime(),
+    );
   });
 });

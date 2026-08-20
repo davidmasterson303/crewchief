@@ -157,11 +157,33 @@ function exportedActions(source: string): Fn[] {
  *   'vehicle-scoped' — must go through lib/api-auth
  *   'session'        — must call auth.getUser() directly
  *   'public'         — deliberately unauthenticated; justify in the comment
+ *   'signature-gated' — no credential; the caller proves itself by signing the
+ *                      payload. Apple's webhook, and nothing else so far
  *   'secret-gated'   — no user session, but a shared secret from the
  *                      environment. For routes that cost money to call and are
  *                      invoked by tooling rather than by people
  */
-const ROUTE_POSTURE: Record<string, 'vehicle-scoped' | 'session' | 'public' | 'secret-gated'> = {
+const ROUTE_POSTURE: Record<
+  string,
+  'vehicle-scoped' | 'session' | 'public' | 'secret-gated' | 'signature-gated'
+> = {
+  /*
+    Apple IAP purchase verification, Phase 6 E8. 'session' because the resource
+    is the caller's own entitlement — there is no vehicle. The route trusts the
+    session for *who* and Apple's signature for *what*, and neither is allowed
+    to assert the other: the body carries no tier, product or expiry.
+  */
+  'app/api/v1/iap/verify/route.ts': 'session',
+  /*
+    App Store Server Notifications V2, Phase 6 E8. Not 'public' — that would be
+    false, since an unsigned payload is refused — and not 'secret-gated', which
+    would mean a shared secret this route deliberately does not have: Apple is
+    told the URL, so a secret would live in a dashboard field and in every
+    request log while guarding an endpoint that already requires Apple's own
+    signature. The URL being public is fine; nothing acts on an unverified
+    payload, which is what the assertion below checks.
+  */
+  'app/api/internal/apple-notifications/route.ts': 'signature-gated',
   'app/api/v1/vehicles/route.ts': 'session',
   /*
     Account deletion, App Store 5.1.1(v). 'session' rather than
@@ -394,6 +416,34 @@ describe('API routes', () => {
     expect(source).toMatch(/headers\.get\(/);
     // Fails closed: there is a branch on the secret being absent.
     expect(source).toMatch(/if\s*\(!\s*secret\s*\)/);
+  });
+
+  it.each(
+    Object.entries(ROUTE_POSTURE)
+      .filter(([, posture]) => posture === 'signature-gated')
+      .map(([route]) => route)
+  )('%s actually gates on a signature, and acts only after it', (route) => {
+    /*
+      Same rule as 'secret-gated': a label nothing checks is decoration.
+
+      The ordering assertion is the one that matters. A route could verify the
+      payload perfectly and still have written the entitlement three lines
+      earlier, and no amount of correct crypto below that point would help.
+      So this checks that the rejection branch appears *before* anything is
+      applied — which is a property of the file that a careless edit reorders.
+    */
+    const source = readFileSync(join(ROOT, route), 'utf8');
+
+    // It anchors against the pinned roots rather than parsing unverified JSON.
+    expect(source).toMatch(/getAppleRootCertificates\(\)/);
+    expect(source).toMatch(/parseAppleNotification|verifyAppleSignedPayload/);
+
+    const rejectsAt = source.indexOf('if (!parsed.ok)');
+    const appliesAt = source.indexOf('applyVerifiedAppleEvent(');
+
+    expect(rejectsAt).toBeGreaterThan(-1);
+    expect(appliesAt).toBeGreaterThan(-1);
+    expect(`rejects@${rejectsAt < appliesAt}`).toBe('rejects@true');
   });
 
   it.each(

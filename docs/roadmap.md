@@ -1,5 +1,28 @@
 # CrewChief roadmap — image pipeline, backdrop, cockpit direction, and responsive web
 
+> ### ⚠ 17 Aug — what closed, and where the session is written up
+>
+> **RP4's browser-free half shipped** (`viewport-floors.test.ts`) and **RP2 was given the
+> verdicts its own status line already had.** Item 5 closed. Three "do not regress" items
+> gained a guard (`inclusive-affordances.test.ts`) — the three whose regression is invisible
+> to whoever causes it.
+>
+> **Item 12 no longer needs a photographer.** Design settled it 17 Aug: store captures come
+> from a photograph-free garage, illustrations carrying the heroes and plates the lists. The
+> blocker was never the photo — it was the trademark caveat on recognisable marques, which a
+> cheaper photo does not answer. **Item 18 is unblocked with what is already in the repo.**
+>
+> **Item 14's template has been delivered** as a spec by Design, so **R7 is buildable**.
+>
+> ⚠ **Item 13's remaining half was re-scoped and is smaller than written.** It says the
+> cluster kit should enter `tokens.json` so React Native "inherits rather than re-derives"
+> it. RN already does not re-derive it — both clients import
+> `packages/core/src/cluster-geometry.ts` under a drift test. Design accepted the correction
+> and split it: **core keeps the numbers, `tokens.json` gets the light** (band ramp, gauge
+> colours, glow radii), because RN cannot read a CSS custom property.
+>
+> **The full session is §0.16b of the plan of record**, not here.
+>
 > ⚠ **This file is a plan of record, not a rulebook.** The working rules — the
 > ones that have cost time, about verifying against the artefact rather than the
 > board, what proves a commit, and which failures here are silent — now live in
@@ -26,8 +49,8 @@
 > | | |
 > |---|---|
 > | `main` | **`fc96184`**, pushed. 14 commits on 12 Aug, all deployed |
-> | Web tests | **2300**, green | 
-> | Mobile tests | **174**, green |
+> | Web tests | ~~2300~~ → **2615**, green (18 Aug) |
+> | Mobile tests | ~~174~~ → **316**, green (18 Aug). ⚠ 10 of those were being collected by nothing until 18 Aug — `testMatch` was `*.test.tsx`, so the first mobile test without JSX existed, typechecked and never ran while jest reported all suites green |
 > | Typechecks | Three, all clean |
 > | Migrations | All applied **except `20260813020000`** (TRUNCATE revokes) — Cowork's |
 > | `demo-live` | **~27 commits behind `main`** — the public demo serves pre-v8 design |

@@ -59,6 +59,28 @@ function withoutComments(sql: string): string {
   return sql.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--[^\n]*/g, ' ');
 }
 
+/**
+ * The same idea for TypeScript, and it is not decoration.
+ *
+ * ⚠ Found 18 Aug by mutation, not by review. The walk below asked
+ * `source.includes('getServiceRoleClient')`. When E8's writer arrived it
+ * carried a docblock *explaining* that it uses the service role — so switching
+ * its actual client to a browser one left the guard green, because the promise
+ * was still there in prose two hundred lines above the call.
+ *
+ * That is precisely the failure `CLAUDE.md` §5 records against `.tap-target-44`
+ * ("found the string in a comment 600 lines above the rule"), reproduced here
+ * by the first file careful enough to document itself.
+ *
+ * `//` preceded by a colon is left alone so a URL in a string literal is not
+ * mistaken for a comment and used to truncate the line.
+ */
+function withoutTsComments(source: string): string {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+}
+
 describe('account_entitlements is service-role-write-only', () => {
   const touching = migrationsTouching(TABLE);
 
@@ -172,6 +194,8 @@ describe('account_entitlements is service-role-write-only', () => {
     */
     const roots = ['app', 'components', 'hooks', 'lib'];
     const offenders: string[] = [];
+    /** Every file the walk actually read that mentions the table. */
+    const seen: string[] = [];
 
     function walk(dir: string) {
       let entries: string[];
@@ -193,8 +217,9 @@ describe('account_entitlements is service-role-write-only', () => {
         }
         if (!/\.(ts|tsx)$/.test(entry)) continue;
 
-        const source = readFileSync(full, 'utf8');
+        const source = withoutTsComments(readFileSync(full, 'utf8'));
         if (!source.includes(`'${TABLE}'`) && !source.includes(`"${TABLE}"`)) continue;
+        seen.push(full);
 
         const writes = /\.(insert|update|upsert|delete)\s*\(/.test(source);
         if (writes && !source.includes('getServiceRoleClient')) {
@@ -206,5 +231,20 @@ describe('account_entitlements is service-role-write-only', () => {
     for (const root of roots) walk(join(__dirname, '..', '..', root));
 
     expect(offenders).toEqual([]);
+
+    /*
+      ⚠ Anti-vacuous, and it could not be written until 18 Aug because until
+      then nothing wrote this table at all.
+
+      `walk` swallows unreadable directories and returns. If a rename, a moved
+      root or a bad path ever made it traverse nothing, `offenders` would be
+      empty and this test would report a clean application forever — the exact
+      shape `CLAUDE.md` §5 records ("a suite whose walker silently returned
+      nothing reported a clean app forever").
+
+      E8's writer is now the thing that proves the walk reaches real files.
+    */
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.some((f) => f.endsWith('entitlement-store.ts'))).toBe(true);
   });
 });
