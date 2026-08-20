@@ -6,6 +6,7 @@ import { ThemeProvider } from 'next-themes';
 import { QueryProvider } from '@/components/QueryProvider';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import DemoBanner from '@/components/DemoBanner';
+import { isDemoSite } from '@/lib/site-role';
 import { AuthProvider } from '@/components/AuthProvider';
 import { INTRO_PLAYED_KEY, INTRO_PLAYED_VALUE } from '@crewchief/core/intro-gate';
 
@@ -134,7 +135,19 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           <AuthProvider>
           <QueryProvider>
-            <DemoBanner />
+            {/*
+              Gated 20 Aug. This rendered unconditionally, which was right while
+              there was one site and it was the demo — and wrong from the moment
+              `crewchief.davidmasterson.co` became the App Store listing's URL,
+              because the privacy policy Apple reads carried a "PORTFOLIO DEMO"
+              masthead. Unset means product; see `lib/site-role.ts` for why that
+              direction rather than the other.
+
+              The flex column above is unaffected by its absence: the consultant
+              shell takes "the rest of the viewport", and there is simply more
+              of it.
+            */}
+            {isDemoSite(process.env.CREWCHIEF_DEMO_SITE) && <DemoBanner />}
             <ErrorBoundary context="ROOT_LAYOUT">
               {children}
             </ErrorBoundary>
