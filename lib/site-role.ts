@@ -64,3 +64,53 @@ const ENABLED = 'true';
 export function isDemoSite(value: string | undefined | null): boolean {
   return value?.trim().toLowerCase() === ENABLED;
 }
+
+/**
+ * ── The share card, which is the other thing that differs per site ──────────
+ *
+ * Found 20 Aug by Cowork, and it had been wrong on the App Store's hostname
+ * since the 17 Aug split. `crewchief.davidmasterson.co` was serving:
+ *
+ *     og:url          https://crewchief-demo.davidmasterson.co/
+ *     og:description  "…Live demo with sample vehicles — no signup required."
+ *     og:image        https://crewchief-demo.davidmasterson.co/opengraph-image
+ *
+ * The **visible** page was correct throughout, which is exactly why it survived
+ * every visual pass and both promotes. Metadata is the part of a page nobody
+ * looks at and everybody else reads.
+ *
+ * Two costs, and the first is the expensive one. Apple reads this hostname, and
+ * a support URL whose preview calls the product a "live demo … no signup
+ * required" argues the Guideline 4.2 case against us in our own words. The
+ * second: every share of the product link previewed as — and navigated to — the
+ * recruiter demo.
+ *
+ * Derived from the same flag as the masthead rather than a second variable.
+ * One fact about a deployment should have one source, and this one is already
+ * set correctly on both sites.
+ */
+
+export const DEMO_ORIGIN = 'https://crewchief-demo.davidmasterson.co';
+export const PRODUCT_ORIGIN = 'https://crewchief.davidmasterson.co';
+
+/** The origin a build should claim as its own in canonical and share tags. */
+export function siteOrigin(demo: boolean): string {
+  return demo ? DEMO_ORIGIN : PRODUCT_ORIGIN;
+}
+
+/**
+ * The share-card description.
+ *
+ * ⚠ The product copy must not describe CrewChief as a demo, and
+ * `site-role.test.ts` asserts the word is absent. That is not stylistic: it is
+ * the sentence Apple would quote back.
+ *
+ * The demo copy keeps "no signup required" because on that host it is true and
+ * it is the whole invitation — a recruiter following a portfolio link should
+ * know they can look without an account.
+ */
+export function shareDescription(demo: boolean): string {
+  return demo
+    ? 'An AI consultant that knows your car. Live demo with sample vehicles — no signup required.'
+    : 'Track your vehicles, log service history, and get answers from an AI consultant that knows your car — its issues, schedule, and history.';
+}

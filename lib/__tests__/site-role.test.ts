@@ -12,7 +12,13 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { isDemoSite } from '@/lib/site-role';
+import {
+  DEMO_ORIGIN,
+  PRODUCT_ORIGIN,
+  isDemoSite,
+  shareDescription,
+  siteOrigin,
+} from '@/lib/site-role';
 
 describe('an unconfigured deploy is the product site', () => {
   it.each([
@@ -49,13 +55,19 @@ describe('an unconfigured deploy is the product site', () => {
   });
 });
 
-describe('the banner is not rendered unconditionally', () => {
-  /** Source with comments removed — the docblocks here name `DemoBanner`. */
-  const layout = readFileSync(join(__dirname, '..', '..', 'app', 'layout.tsx'), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/\{\/\*[\s\S]*?\*\/\}/g, ' ')
-    .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+/**
+ * `app/layout.tsx` with comments removed.
+ *
+ * Stripped because this file's own docblocks name `DemoBanner`, `siteOrigin`
+ * and the demo hostname while *explaining* them — and a scan satisfied by prose
+ * is the failure CLAUDE.md §5 records twice over.
+ */
+const layout = readFileSync(join(__dirname, '..', '..', 'app', 'layout.tsx'), 'utf8')
+  .replace(/\/\*[\s\S]*?\*\//g, ' ')
+  .replace(/\{\/\*[\s\S]*?\*\/\}/g, ' ')
+  .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 
+describe('the banner is not rendered unconditionally', () => {
   it('renders it only behind the site-role gate', () => {
     /*
       The structural half, and the reason this test exists rather than trusting
@@ -84,5 +96,48 @@ describe('the banner is not rendered unconditionally', () => {
     */
     expect(layout).toContain('process.env.CREWCHIEF_DEMO_SITE');
     expect(layout).not.toContain('NEXT_PUBLIC_CREWCHIEF_DEMO_SITE');
+  });
+});
+
+describe('the share card describes the site it is actually on', () => {
+  /*
+    Found live on 20 Aug: the App Store's hostname was serving the demo's
+    `og:url`, `og:image` and description. The visible page was correct
+    throughout, which is why two promotes and every visual pass missed it —
+    metadata is the part of a page nobody looks at and everybody else reads.
+  */
+
+  it('claims its own origin, not the other site’s', () => {
+    expect(siteOrigin(false)).toBe(PRODUCT_ORIGIN);
+    expect(siteOrigin(true)).toBe(DEMO_ORIGIN);
+    // The bug in one assertion: the product must not advertise the demo host.
+    expect(siteOrigin(false)).not.toContain('demo');
+  });
+
+  it('never calls the product a demo', () => {
+    /*
+      ⚠ Not stylistic. Apple reads this hostname, and "live demo … no signup
+      required" is the Guideline 4.2 argument made in our own words.
+    */
+    expect(shareDescription(false).toLowerCase()).not.toContain('demo');
+    expect(shareDescription(false).toLowerCase()).not.toContain('no signup');
+  });
+
+  it('keeps the invitation on the demo, where it is true', () => {
+    // Anti-vacuous: the rule above must not have flattened both to one string.
+    expect(shareDescription(true).toLowerCase()).toContain('demo');
+    expect(shareDescription(true)).not.toBe(shareDescription(false));
+  });
+
+  it('is wired into the layout rather than left as a helper nobody calls', () => {
+    /*
+      The same structural check the masthead needed, and for the same reason:
+      a correct helper beside a hardcoded literal is exactly what shipped here.
+    */
+    expect(layout).toContain('siteOrigin(');
+    expect(layout).toContain('shareDescription(');
+    // No demo host as a bare literal anywhere in the metadata any more.
+    expect(layout).not.toMatch(/url:\s*'https:\/\/crewchief-demo/);
+    expect(layout).not.toMatch(/metadataBase[\s\S]{0,120}'https:\/\/crewchief-demo/);
   });
 });
