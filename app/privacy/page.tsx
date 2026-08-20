@@ -44,10 +44,12 @@ export const metadata: Metadata = {
  * is the privacy-policy URL in the App Store listing. It is not a draft waiting
  * for a launch date; it is what App Review reads.
  *
- * `OPERATOR` was filled in on 18 Aug — Apple's Individual membership settled it
- * without needing an entity. **`CONTACT_EMAIL` is still bracketed and still
- * renders as literal body text below**, pending a dedicated address. See
- * `lib/legal.ts`.
+ * ✅ Both are now named — `OPERATOR` on 18 Aug, once Apple's Individual
+ * membership settled it without needing an entity, and `CONTACT_EMAIL` on
+ * 19 Aug. Nothing bracketed renders below any more, and `LAST_UPDATED` moves
+ * with them because who operates a service and how to reach them is the
+ * substance of the document rather than its trim. See `lib/legal.ts` for why
+ * the contact is deliberately not a domain address.
  */
 export default function PrivacyPolicyPage() {
   return (

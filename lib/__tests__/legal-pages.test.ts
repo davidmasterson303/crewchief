@@ -123,29 +123,24 @@ describe('the two documents cannot contradict the app', () => {
 
 describe('who operates the service, and who to write to about it', () => {
   /*
-    ── ⚠ Read this before "fixing" either assertion ────────────────────────────
+    ── Both constants are now real, and the guard changed shape with them ──────
 
-    These two constants are at different stages on purpose, and the asymmetry is
-    the whole content of this block.
+    This block was a countdown for five days. `OPERATOR` was filled in on 18 Aug
+    — the Apple membership is **Individual, not Organization**, so the seller
+    name is David's legal name whatever the entity question (Q2) decides — and
+    `CONTACT_EMAIL` on 19 Aug. Both were bracketed placeholders rendering as
+    literal body text on a page App Review reads, and both are now named.
 
-    `OPERATOR` was a bracketed placeholder until 18 Aug. It is now David's legal
-    name, because the Apple membership submitted 16 Aug is **Individual, not
-    Organization** — so the App Store seller name is his personal name whatever
-    the entity question (Q2) eventually decides. The placeholder outlived its
-    premise: `lib/legal.ts` said it must be replaced "before either page is
-    linked publicly", and the pages went public on 17 Aug when
-    `crewchief.davidmasterson.co` became both the mobile client's API origin and
-    the App Store listing's privacy-policy URL.
-
-    `CONTACT_EMAIL` is still bracketed, and still renders as literal body text on
-    that public page. It is not an oversight — David is standing up a dedicated
-    address rather than publishing a personal one, and there is nothing true to
-    write until it exists. **The assertion below goes red the moment it is
-    filled in. That is the intent**: it is the prompt to bump `LAST_UPDATED` and
-    promote to `web-live`, not a regression.
+    **What the assertions guard has inverted, and deliberately.** While the
+    values were absent the risk was somebody replacing them with something that
+    merely *read* finished. Now that they are present the risk is the reverse: a
+    later edit quietly putting a placeholder, an empty string or an unmonitored
+    address back. So each one asserts a real value and separately asserts that a
+    placeholder would still be caught.
 
     ⚠ A green run here does not mean the public page is fixed. Nothing deploys
-    from `main`; `crewchief.davidmasterson.co` serves `web-live`.
+    from `main`; `crewchief.davidmasterson.co` serves `web-live`, and these
+    values reach a reader only after a promote.
   */
 
   it('names a real operator rather than a bracketed placeholder', () => {
@@ -156,15 +151,30 @@ describe('who operates the service, and who to write to about it', () => {
     expect(OPERATOR.trim().length).toBeGreaterThan(0);
   });
 
-  it('has not shipped a plausible-looking fake contact address', () => {
+  it('names a contact address somebody actually reads', () => {
     /*
-      The failure mode guarded against is a well-meaning edit substituting
-      something that *reads* finished — `support@crewchief.com`, an address
-      nobody monitors, or one on a hostname with no MX. A bracketed placeholder
-      is worse-looking and better: it cannot silently fail to reach anyone.
+      `crewchief.support@gmail.com` — deliberately not a domain address, and
+      that is worth recording because it looks like a compromise and is not.
+
+      `support@davidmasterson.co` carries David's name, which gives back most of
+      what a dedicated address was for, and `crewchief.co` is not his. Apple
+      requires a support *URL* in the listing, not a domain-based address, so a
+      customer is pointed at the site either way. The property that matters on a
+      privacy policy is that the address is answered — this one is verified
+      receiving and delegated to his own mailbox.
     */
-    expect(CONTACT_EMAIL).toContain('[CONTACT EMAIL');
-    expect(CONTACT_EMAIL).not.toContain('@');
+    expect(CONTACT_EMAIL).toBe('crewchief.support@gmail.com');
+  });
+
+  it('would still catch a placeholder or an unreachable address coming back', () => {
+    /*
+      Anti-vacuous, and the direction of the risk has flipped. While these were
+      empty the hazard was a plausible-looking fake; now that they are filled it
+      is a regression putting a bracket, a blank or a bare word back — none of
+      which would look wrong in a diff.
+    */
+    expect(CONTACT_EMAIL).not.toMatch(/[[\]]|TBD|not yet|to be decided/i);
+    expect(CONTACT_EMAIL).toMatch(/^[^@\s]+@[^@\s]+\.[^@\s]+$/);
   });
 
   it('interpolates both constants rather than restating them in the pages', () => {
@@ -182,12 +192,18 @@ describe('who operates the service, and who to write to about it', () => {
 
   it('carries a last-updated date no earlier than the operator being named', () => {
     /*
-      `LAST_UPDATED` is the date the *content* changed, and naming the operator
-      of the service is the most substantive line in either document. Leaving it
-      at 14 August published a policy whose stated last-changed date preceded
-      the change it was describing.
+      `LAST_UPDATED` is the date the content changed *for a reader*, which is
+      the ship date rather than the commit date — nothing deploys from `main`,
+      so a date moved on 18 August described a change nobody could see. Operator
+      and contact reach the public page together on 19 August.
+
+      Pinned to an exact literal rather than a floor, deliberately. A floor
+      would let any edit drag the date forward, including a styling one, and the
+      file's own docblock is explicit that a date which moves for a CSS change
+      teaches people the date means nothing. An exact pin makes every bump a
+      line somebody had to write on purpose.
     */
-    expect(LAST_UPDATED).toBe('18 August 2026');
+    expect(LAST_UPDATED).toBe('19 August 2026');
     expect(new Date(LAST_UPDATED).getTime()).not.toBeNaN();
     expect(new Date(LAST_UPDATED).getTime()).toBeGreaterThanOrEqual(
       new Date('14 August 2026').getTime(),
