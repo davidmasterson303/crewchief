@@ -156,6 +156,38 @@ const PORTABLE: string[] = [
  * is visible rather than rediscovered mid-move.
  */
 const NOT_PORTABLE: Record<string, string> = {
+  /*
+    The same split this file keeps recording, and the cleanest instance of it.
+    The *decision* — what an Apple notification does to an entitlement — is in
+    `packages/core/src/apple-subscription.ts` and is portable and pure. What
+    stays here is `node:crypto`'s `X509Certificate`, which React Native does not
+    have and should not: verifying Apple's signature is a server's job by
+    definition. A client that verified its own receipts would be asserting its
+    own entitlement, which is the one thing this whole track exists to prevent.
+  */
+  'lib/apple-jws.ts': 'node:crypto X509Certificate — server-only by design',
+  /*
+    Travels with the verifier it anchors. The certificate itself is public and
+    would be harmless on a device, but a mobile client has no business holding
+    a trust anchor for payloads it must never verify: a client that verified its
+    own receipts would be asserting its own entitlement.
+  */
+  'lib/apple-root-ca.ts': 'trust anchor for lib/apple-jws — server-only by design',
+  /*
+    Unwraps Apple's envelope by verifying each layer, so it inherits
+    `lib/apple-jws`'s server-only constraint for the same reason: the fields
+    that decide what an account gets live in the inner blobs, and a client that
+    verified those would be asserting its own entitlement.
+  */
+  'lib/apple-notification.ts': 'verifies nested JWS through lib/apple-jws — server-only by design',
+  /*
+    The write half of the same split. Every decision about what an Apple
+    notification means lives in `packages/core/src/apple-subscription.ts` and is
+    portable; what stays here is the service-role client, and it stays here for
+    the reason `entitlement-not-user-writable.test.ts` exists — a client that
+    could write this table could grant itself the paid tier.
+  */
+  'lib/entitlement-store.ts': 'writes with the service role — reaches Supabase through lib/supabase',
   'lib/supabase.ts': 'constructs Supabase clients',
   'lib/api-auth.ts': 'Supabase, and reads next/headers',
   'lib/account-data.ts': 'reaches Supabase through lib/supabase',
