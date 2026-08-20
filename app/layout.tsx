@@ -6,7 +6,10 @@ import { ThemeProvider } from 'next-themes';
 import { QueryProvider } from '@/components/QueryProvider';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import DemoBanner from '@/components/DemoBanner';
-import { isDemoSite } from '@/lib/site-role';
+import { isDemoSite, shareDescription, siteOrigin } from '@/lib/site-role';
+
+/** Resolved once: this build is either the demo or the product, never both. */
+const IS_DEMO = isDemoSite(process.env.CREWCHIEF_DEMO_SITE);
 import { AuthProvider } from '@/components/AuthProvider';
 import { INTRO_PLAYED_KEY, INTRO_PLAYED_VALUE } from '@crewchief/core/intro-gate';
 
@@ -33,13 +36,15 @@ export const metadata: Metadata = {
 
      NEXT_PUBLIC_SITE_URL lets deploy previews describe themselves rather than
      claiming to be production, which matters because a preview's card would
-     otherwise point at the live site's image. The literal is the fallback so
-     production is right whether or not the variable is set — an unset
-     variable degrades to "correct for prod", never back to localhost.
+     otherwise point at the live site's image.
+
+     ⚠ The fallback was the demo host as a literal, and that was right while
+     there was one site. After the 17 Aug split it meant the **App Store's
+     hostname served the demo's og:image and og:url** — invisible on the page,
+     read by every scraper and by Apple. It is derived from the site role now,
+     so each deployment claims itself.
   */
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL || 'https://crewchief-demo.davidmasterson.co'
-  ),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || siteOrigin(IS_DEMO)),
   title: 'CrewChief — Your Personal Auto Ownership Consultant',
   /*
      The favicon, apple-touch-icon and SVG icon are NOT declared here — they
@@ -52,11 +57,18 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
   description:
     'Track your vehicles, log service history, and get answers from an AI consultant that knows your car — its issues, schedule, and history.',
+  /*
+     Canonical, cheap insurance. `og:url` is treated as a canonicalisation hint
+     by search engines, and the product site previously had no `<link rel=
+     "canonical">` to outrank the demo URL it was advertising.
+  */
+  alternates: { canonical: '/' },
   openGraph: {
     title: 'CrewChief — Your Personal Auto Ownership Consultant',
-    description:
-      'An AI consultant that knows your car. Live demo with sample vehicles — no signup required.',
-    url: 'https://crewchief-demo.davidmasterson.co',
+    // Per-deployment. The product must never describe itself as a demo — see
+    // `lib/site-role.ts` for why that sentence is expensive on this hostname.
+    description: shareDescription(IS_DEMO),
+    url: siteOrigin(IS_DEMO),
     siteName: 'CrewChief',
     /*
        No `images` key. `app/opengraph-image.tsx` is the card now, and Next
