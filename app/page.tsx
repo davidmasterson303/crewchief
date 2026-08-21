@@ -145,13 +145,26 @@ function GarageContents() {
               <h1 className="text-4xl lg:text-5xl font-bold text-white mb-2 tracking-tight">
                 A Live Garage
               </h1>
+              {/*
+                ⚠ "demo" removed from the transient states on 21 Aug, and the
+                reason is not tone. This page is served by **both** deployments,
+                and on `crewchief.davidmasterson.co` it is the hostname in the
+                App Store listing — where copy calling the product a demo is the
+                Guideline 4.2 argument made in our own words. Same class as the
+                og:description fixed on 20 Aug.
+
+                Not gated per-site, because these two strings are honest on both
+                and a gate here would need a client-readable flag this component
+                does not otherwise want. The demo host still says what it is —
+                loudly, in the masthead above.
+              */}
               <p className="text-base text-white/50">
                 {isLoading
-                  ? 'Loading the demo garage…'
+                  ? 'Loading…'
                   : queryError
                   ? 'Unable to load vehicles'
                   : vehicles.length === 0
-                  ? 'Demo vehicles unavailable'
+                  ? 'Vehicles unavailable'
                   : 'Three cars, researched end to end — open any one for its dossier'}
               </p>
             </div>
