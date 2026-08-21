@@ -414,7 +414,33 @@ export async function enrichVehicle(vehicleId: string) {
     from a search any more.
   */
 
-  const dossier = await generateVehicleDossier(vehicleId);
+  /*
+    ⚠ `vehicle` is passed, and the argument is the whole point: it was omitted
+    from 27 Jul to 21 Aug, so every car added in that window silently got no
+    research. The row is already in hand from the query above — it was being
+    fetched and thrown away.
+  */
+  /*
+    Narrowed here rather than by loosening `VehicleResearchFacts`. The row comes
+    from `select('*')` and is `any`, so widening the contract to swallow nulls
+    would put the original defect back in a new costume: research would accept a
+    vehicle it cannot describe and fail further downstream. A car in the database
+    without a year, make or model cannot be researched, and saying so at the top
+    is cheaper than discovering it inside a prompt.
+  */
+  if (!vehicle.year || !vehicle.make || !vehicle.model) {
+    logger.error('ENRICH:INCOMPLETE', new Error('Vehicle row is missing year, make or model'), {
+      vehicleId,
+    });
+    return { success: false, error: 'This vehicle is missing the details research needs.' };
+  }
+
+  const dossier = await generateVehicleDossier(vehicleId, {
+    year: Number(vehicle.year),
+    make: String(vehicle.make),
+    model: String(vehicle.model),
+    trim: vehicle.trim ?? null,
+  });
   if (!dossier.success) {
     logger.error('ENRICH:RESEARCH_FAILED', new Error(dossier.error || 'unknown'), {
       vehicleId,
@@ -446,7 +472,31 @@ export async function enrichVehicle(vehicleId: string) {
   return { success: true, unsupported: !!dossier.unsupported };
 }
 
-export async function generateVehicleDossier(vehicleId: string, vehicleData?: any) {
+/**
+ * The facts research needs about a vehicle, which the caller must already have.
+ *
+ * ⚠ **Required, not optional, and that is the fix for a month-long outage.**
+ * This parameter was `vehicleData?: any`, and `enrichVehicle` — the path that
+ * runs when somebody adds a car, and the one the dashboard's retry button calls
+ * — invoked it with the id alone. It fetched the vehicle row three lines
+ * earlier and then discarded it.
+ *
+ * The result was that every vehicle added after 27 Jul (`8e9fafd`) got an empty
+ * dossier stub, no NHTSA record, and a retry button that could never succeed
+ * because retry went through the same broken call. Optional-with-a-runtime-guard
+ * made a compile error into a 200 response carrying `{ success: false }`.
+ */
+export interface VehicleResearchFacts {
+  year: number;
+  make: string;
+  model: string;
+  trim?: string | null;
+}
+
+export async function generateVehicleDossier(
+  vehicleId: string,
+  vehicleData: VehicleResearchFacts
+) {
   // Cost control: server actions are publicly invokable POST endpoints
   // and demo mode has no auth, so every Gemini-backed path is rate limited.
   {
@@ -461,6 +511,12 @@ export async function generateVehicleDossier(vehicleId: string, vehicleData?: an
     return { success: false, error: access.error };
   }
 
+  /*
+    Kept as a runtime check behind the now-required type, because this is a
+    server action: the type is erased at the boundary and a client can post
+    anything. What changed is that a *caller inside this repo* omitting it is
+    now a build failure rather than a silent 200.
+  */
   const vehicle = vehicleData || null;
   if (!vehicle) {
     return { success: false, error: 'Vehicle data is required' };
@@ -492,7 +548,7 @@ export async function generateVehicleDossier(vehicleId: string, vehicleData?: an
     not a wrong one.
   */
   if (outcome.success && !outcome.unsupported) {
-    fetchPowertrainOptions(vehicle.year, vehicle.make, vehicle.model, vehicle.trim)
+    fetchPowertrainOptions(vehicle.year, vehicle.make, vehicle.model, vehicle.trim ?? undefined)
       .then(async (ptResult) => {
         if (ptResult.success && ptResult.data) {
           await getServiceRoleClient()

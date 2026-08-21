@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { healthClaim, mayReassure } from '@crewchief/core/health-claims';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,6 +12,7 @@ import {
   CircleCheck as CheckCircle,
   Activity,
   ShieldAlert,
+  CircleHelp as HelpCircle,
   ChevronRight,
 } from 'lucide-react';
 import { generateVehicleHealthSummary } from '@/app/actions';
@@ -26,6 +28,14 @@ interface HealthSummaryProps {
   vehicleId: string;
   healthSummary: any;
   recalls?: any[];
+  /**
+   * Whether an NHTSA record exists for this vehicle at all — not whether it
+   * listed any recalls. Absent means the check never ran, which must never
+   * render as an all-clear. See `@crewchief/core/health-claims`.
+   */
+  recallsChecked?: boolean;
+  /** Whether vehicle research reached `completed`. */
+  researchComplete?: boolean;
   compact?: boolean;
 }
 
@@ -71,7 +81,14 @@ function ScoreRing({ score }: { score: number }) {
   );
 }
 
-export default function HealthSummary({ vehicleId, healthSummary, recalls = [], compact = false }: HealthSummaryProps) {
+export default function HealthSummary({
+  vehicleId,
+  healthSummary,
+  recalls = [],
+  recallsChecked = false,
+  researchComplete = false,
+  compact = false,
+}: HealthSummaryProps) {
   const router = useRouter();
   const [isRefreshing, setIsRefreshing] = useState(false);
   /** One auto-generation per mounted instance. See the effect below. */
@@ -176,15 +193,6 @@ export default function HealthSummary({ vehicleId, healthSummary, recalls = [], 
     return { label: band.label, color: band.textClass };
   };
 
-  const getEmptyStatusMessage = (status: string, type: string): string => {
-    if (!status || status.trim() === '' || status === 'null') {
-      if (type === 'recall') return 'No active recalls';
-      if (type === 'maintenance') return 'No items due';
-      if (type === 'issues') return 'No known issues';
-    }
-    return status;
-  };
-
   const scoreInfo = getScoreLabel(healthSummary.health_score);
 
   /*
@@ -236,9 +244,18 @@ export default function HealthSummary({ vehicleId, healthSummary, recalls = [], 
     );
   }
 
-  const maintenanceEmpty = !healthSummary.maintenance_status || healthSummary.maintenance_status.trim() === '';
-  const issuesEmpty = !healthSummary.issues_overview || healthSummary.issues_overview.trim() === '';
-  const recallEmpty = !healthSummary.recall_status || healthSummary.recall_status.trim() === '';
+  /*
+    ⚠ These were booleans — empty or not — and that collapsed "we looked and
+    found nothing" into the same cell as "we never looked". Only one of those
+    is reassuring, and on 21 Aug the second rendered a green tick and "No
+    active recalls" on a car inside the Takata campaigns.
+
+    The evidence that a lookup ran is passed in from the dashboard, because an
+    empty string cannot carry it.
+  */
+  const maintenanceClaim = healthClaim('maintenance', healthSummary.maintenance_status, researchComplete);
+  const issuesClaim = healthClaim('issues', healthSummary.issues_overview, researchComplete);
+  const recallClaim = healthClaim('recall', healthSummary.recall_status, recallsChecked);
 
   return (
     <Card className="bg-slate-900/60 border-white/10">
@@ -328,47 +345,61 @@ export default function HealthSummary({ vehicleId, healthSummary, recalls = [], 
         )}
 
         <div className="grid md:grid-cols-3 gap-3">
-          <div className={`p-4 rounded-xl border ${maintenanceEmpty ? 'bg-green-500/8 border-green-400/20' : 'bg-orange-500/8 border-orange-400/20'}`}>
+          <div className={`p-4 rounded-xl border ${
+            mayReassure(maintenanceClaim)
+              ? 'bg-green-500/8 border-green-400/20'
+              : maintenanceClaim.state === 'unknown'
+                ? 'bg-white/[0.04] border-white/12'
+                : 'bg-orange-500/8 border-orange-400/20'
+          }`}>
             <div className="flex items-center gap-2.5 mb-2">
-              {maintenanceEmpty
+              {mayReassure(maintenanceClaim)
                 ? <CheckCircle className="h-6 w-6 text-green-400" />
-                : <AlertCircle className="h-6 w-6 text-orange-400" />}
+                : maintenanceClaim.state === 'unknown'
+                  ? <HelpCircle className="h-6 w-6 text-white/45" />
+                  : <AlertCircle className="h-6 w-6 text-orange-400" />}
               <h4 className="text-sm font-semibold text-white">Maintenance</h4>
             </div>
-            <p className="text-sm text-white/65 leading-relaxed">
-              {getEmptyStatusMessage(healthSummary.maintenance_status, 'maintenance')}
-            </p>
+            <p className="text-sm text-white/65 leading-relaxed">{maintenanceClaim.text}</p>
           </div>
 
-          <div className={`p-4 rounded-xl border ${issuesEmpty ? 'bg-green-500/8 border-green-400/20' : 'bg-info-wash border-info-border'}`}>
+          <div className={`p-4 rounded-xl border ${
+            mayReassure(issuesClaim)
+              ? 'bg-green-500/8 border-green-400/20'
+              : issuesClaim.state === 'unknown'
+                ? 'bg-white/[0.04] border-white/12'
+                : 'bg-info-wash border-info-border'
+          }`}>
             <div className="flex items-center gap-2.5 mb-2">
-              {issuesEmpty
+              {mayReassure(issuesClaim)
                 ? <CheckCircle className="h-6 w-6 text-green-400" />
-                : <AlertCircle className="h-6 w-6 text-info" />}
+                : issuesClaim.state === 'unknown'
+                  ? <HelpCircle className="h-6 w-6 text-white/45" />
+                  : <AlertCircle className="h-6 w-6 text-info" />}
               <h4 className="text-sm font-semibold text-white">Known Issues</h4>
             </div>
-            <p className="text-sm text-white/65 leading-relaxed">
-              {getEmptyStatusMessage(healthSummary.issues_overview, 'issues')}
-            </p>
+            <p className="text-sm text-white/65 leading-relaxed">{issuesClaim.text}</p>
           </div>
 
           <RecallHistoryModal
             recalls={recalls}
             trigger={
               <div className={`p-4 rounded-xl border cursor-pointer transition-all group ${
-                recallEmpty
+                mayReassure(recallClaim)
                   ? 'bg-green-500/8 border-green-400/20 hover:bg-green-500/14 hover:border-green-400/35'
-                  : 'bg-orange-500/8 border-orange-400/20 hover:bg-orange-500/14 hover:border-orange-400/35'
+                  : recallClaim.state === 'unknown'
+                    ? 'bg-white/[0.04] border-white/12 hover:bg-white/[0.07] hover:border-white/20'
+                    : 'bg-orange-500/8 border-orange-400/20 hover:bg-orange-500/14 hover:border-orange-400/35'
               }`}>
                 <div className="flex items-center gap-2.5 mb-2">
-                  {recallEmpty
+                  {mayReassure(recallClaim)
                     ? <CheckCircle className="h-6 w-6 text-green-400" />
-                    : <ShieldAlert className="h-6 w-6 text-orange-400" />}
+                    : recallClaim.state === 'unknown'
+                      ? <HelpCircle className="h-6 w-6 text-white/45" />
+                      : <ShieldAlert className="h-6 w-6 text-orange-400" />}
                   <h4 className="text-sm font-semibold text-white">Recall Status</h4>
                 </div>
-                <p className="text-sm text-white/65 leading-relaxed mb-3">
-                  {getEmptyStatusMessage(healthSummary.recall_status, 'recall')}
-                </p>
+                <p className="text-sm text-white/65 leading-relaxed mb-3">{recallClaim.text}</p>
                 {/* Informational link, not a CTA — info rather than brand cyan. */}
                 <div className="flex items-center gap-1 text-xs font-medium text-info/70 group-hover:text-info-strong transition-colors">
                   <span>View recall history</span>

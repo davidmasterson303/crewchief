@@ -195,10 +195,19 @@ export default function DashboardPage({ params }: { params: { vehicleId: string 
               defaultOpen
               summary={healthSummaryLine(data.healthSummary?.health_score)}
             >
+              {/*
+                ⚠ `recallsChecked` is whether an NHTSA **row exists**, not
+                whether it listed recalls. Those are different facts and
+                conflating them is what put a green "No active recalls" tick on
+                a 2003 Accord whose lookup had never run. `maybeSingle()`
+                returns null when there is no row, which is the evidence.
+              */}
               <HealthSummary
                 healthSummary={data.healthSummary}
                 vehicleId={params.vehicleId}
                 recalls={data.nhtsa?.recalls || []}
+                recallsChecked={Boolean(data.nhtsa)}
+                researchComplete={data.knowledge?.research_status === 'completed'}
               />
             </CollapsibleSection>
 
