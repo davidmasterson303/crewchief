@@ -55,6 +55,18 @@ const STATIC_ANALYSIS_SUITES = [
   // failure it pins is silent — a third caller that forgot to authorize
   // compiles, passes every other suite, and looks like a working feature.
   'vehicle-research-callers.test.ts',
+  /*
+    Scans every call site of `generateVehicleDossier` for the argument that was
+    missing from 27 Jul to 21 Aug, which silently gave every newly added vehicle
+    an empty dossier and a retry button that could not work.
+
+    Nothing to import: the subject is *how a function is called*, not what it
+    returns, and the required parameter already makes the original defect a
+    build error. This exists because a type is one edit away from `?: any` —
+    which is exactly what it was — and a scan cannot be relaxed in the same
+    motion as the code it guards.
+  */
+  'dossier-arguments.test.ts',
   // Reads the migration corpus, plus app/, components/, hooks/ and lib/, to
   // prove `account_entitlements` is never user-writable. There is nothing to
   // import: the subject is SQL and the absence of a write in client code. The
