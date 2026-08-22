@@ -111,3 +111,55 @@ export function healthClaim(
 export function mayReassure(claim: HealthClaim): boolean {
   return claim.state === 'clear';
 }
+
+/**
+ * The recall evidence a prompt is allowed to state.
+ *
+ * ── Why this is here and not inline in the prompt ───────────────────────────
+ *
+ * The tile and the narrative contradicted each other on the same screen,
+ * 22 Aug. `healthClaim` above had already made the tile honest — "We have not
+ * checked this vehicle for recalls yet… This is not a clear result." — while
+ * the health summary's prompt was still handed `nhtsa?.recalls?.length || 0`
+ * and duly wrote **"While there are no active recalls…"** underneath it.
+ *
+ * One fix landed on the component; the generator kept its own copy of the
+ * question. So the rule lives in one place now, beside the tile's rule, and
+ * both are reached from the same `checked` flag. A safety claim split across
+ * two files drifts, and the half that drifts is the half nobody is testing.
+ *
+ * ⚠ **The prose is the more dangerous half.** It is what a person actually
+ * reads, it is phrased with the model's full fluency, and unlike the tile it
+ * carries no icon, colour or qualifier to argue with it.
+ *
+ * ── Why the unchecked branch is an instruction, not a value ─────────────────
+ *
+ * A prompt that omits the count, or passes `unknown`, still leaves the model
+ * free to reassure — models fill silence with the reassuring reading, and the
+ * summary's job is to sound confident. So the unchecked branch says what is
+ * not known **and forbids the inference explicitly**. The prohibition is the
+ * payload; the absence of a number is not enough.
+ */
+export function recallEvidenceForPrompt(params: {
+  checked: boolean;
+  count: number;
+  /** Up to three recall summaries, already trimmed by the caller. */
+  headlines?: string[];
+}): string {
+  if (!params.checked) {
+    return [
+      '- NOT CHECKED. No NHTSA lookup has run for this vehicle, so the number of recalls is UNKNOWN — it is not zero.',
+      '- You must NOT write that there are no recalls, that none are active, or anything a reader could take as an all-clear.',
+      '- Say plainly that recalls have not been checked yet, and let the rest of the assessment stand on the service history.',
+    ].join('\n');
+  }
+
+  const headlines = (params.headlines ?? []).filter((h) => h.trim() !== '');
+
+  return [
+    `- We checked NHTSA for this vehicle. Active Recalls: ${params.count}`,
+    ...(headlines.length > 0
+      ? headlines.map((h) => `  - ${h}`)
+      : ['  (none found)']),
+  ].join('\n');
+}

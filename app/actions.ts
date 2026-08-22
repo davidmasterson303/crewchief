@@ -15,6 +15,7 @@ import { POWERTRAIN_OPTIONS_PROMPT, CONSULTANT_SYSTEM_PROMPT, CONSULTANT_DOCUMEN
 import { researchVehicleDossier } from '@/lib/vehicle-research';
 import { showsModifications } from '@crewchief/core/mod-progression';
 import { logger } from '@crewchief/core/logger';
+import { healthClaim, recallEvidenceForPrompt } from '@crewchief/core/health-claims';
 import { checkRateLimit } from '@/lib/rate-limit';
 import {
   isModDetailCacheFresh,
@@ -1793,6 +1794,27 @@ export async function generateVehicleHealthSummary(vehicleId: string, forceRefre
 
     const completedIssues = issueTracking.filter((t: any) => t.status === 'completed').length;
     const totalIssues = knowledge?.known_issues?.length || 0;
+    /*
+      ⚠ **Whether the recall lookup ran at all**, which is a different question
+      from how many it found — and conflating them is the 21 Aug defect.
+
+      Found again 22 Aug, one element over. `health-claims.ts` fixed the
+      *tile*: a 2003 Accord with no NHTSA record now reads "We have not checked
+      this vehicle for recalls yet… This is not a clear result." On the same
+      screen, the generated narrative said **"While there are no active
+      recalls, key high-mileage services must be evaluated."**
+
+      The tile refused the claim and the prose made it anyway, because the
+      count below is `nhtsa?.recalls?.length || 0` and the prompt was handed
+      that zero with nothing to say where it came from. A model told "Active
+      Recalls: 0" writes "there are no active recalls", correctly. `null` is
+      never `0` — CLAUDE.md §6 — and a count is not evidence that anybody
+      looked.
+
+      Prose is the more dangerous of the two, because it is the part a person
+      actually reads and it carries no icon to qualify it.
+    */
+    const recallsChecked = Boolean(nhtsa);
     const activeRecalls = nhtsa?.recalls?.length || 0;
     const completedService = serviceItems.filter((s: any) => s.status === 'completed').length;
     const pendingService = serviceItems.filter((s: any) => s.status !== 'completed').length;
@@ -1828,8 +1850,13 @@ ISSUE STATUS:
 - Known Issues Addressed: ${completedIssues}/${totalIssues}
 
 RECALLS:
-- Active Recalls: ${activeRecalls}
-${nhtsa?.recalls?.slice(0, 3).map((r: any) => `  - ${r.summary || r.description || 'Recall'}`).join('\n') || 'None'}
+${recallEvidenceForPrompt({
+  checked: recallsChecked,
+  count: activeRecalls,
+  headlines: (nhtsa?.recalls ?? [])
+    .slice(0, 3)
+    .map((r: any) => r.summary || r.description || 'Recall'),
+})}
 
 Treat the invoice line items above as completed, documented work. An owner who
 has uploaded invoices has a documented history, and the assessment must not
@@ -1860,12 +1887,42 @@ Format as valid JSON only, no markdown.`;
 
     const responseText = result.text || '';
 
+    /*
+      ⚠ **The defaults used to be a clean bill of health**, and they applied
+      when the model's JSON failed to parse:
+
+          summary:            'Vehicle is in good condition'
+          maintenance_status: 'Maintenance records up to date'
+          recall_status:      'No recalls to date'
+          health_score:       70
+
+      So a parse failure on a car nobody had researched produced a confident
+      all-clear on every axis at once — the 21 Aug defect again, arriving
+      through the error path rather than the data. A fallback is what runs when
+      we know least; it is the last place that should sound certain.
+
+      They now say what is true when generation failed: nothing is known. The
+      score stays at 70 because it is a documented neutral rather than a claim
+      — `advice-range.ts` carries that argument — and the copy no longer
+      dresses it as good news.
+
+      `recall_status` routes through `healthClaim` so the string this writes
+      and the string the tile renders cannot drift apart: an unchecked vehicle
+      gets the same "we cannot say" sentence in both places. ⚠ Writing an
+      all-clear here would have defeated the tile fix anyway — `healthClaim`
+      treats any written status as evidence and would have rendered
+      "No recalls to date" verbatim.
+    */
     let healthData = {
       health_score: 70,
-      summary: 'Vehicle is in good condition',
+      summary: 'We could not generate an assessment for this vehicle.',
       red_flags: [] as string[],
-      maintenance_status: 'Maintenance records up to date',
-      recall_status: activeRecalls > 0 ? `${activeRecalls} active recalls` : 'No recalls to date',
+      maintenance_status: '',
+      recall_status: healthClaim(
+        'recall',
+        activeRecalls > 0 ? `${activeRecalls} active recalls` : '',
+        recallsChecked
+      ).text,
       issues_overview: `${completedIssues} of ${totalIssues} known issues addressed`,
       recommendations: ['Keep regular maintenance schedule'],
     };
@@ -1873,7 +1930,15 @@ Format as valid JSON only, no markdown.`;
     try {
       healthData = JSON.parse(responseText);
       if (healthData.health_score === undefined) healthData.health_score = 70;
-      if (!healthData.summary) healthData.summary = 'Vehicle is in good condition';
+      /*
+        ⚠ Same reasoning as the defaults above, and this one is easier to miss:
+        it re-imposes the all-clear on a *successful* parse whose summary came
+        back empty. The model declining to summarise is not evidence the car is
+        fine.
+      */
+      if (!healthData.summary) {
+        healthData.summary = 'We could not generate an assessment for this vehicle.';
+      }
       if (!Array.isArray(healthData.red_flags)) healthData.red_flags = [];
       if (!Array.isArray(healthData.recommendations)) healthData.recommendations = [];
     } catch {
@@ -2055,7 +2120,7 @@ export async function generateModificationDetails(vehicleId: string, modName: st
     try {
       const { data: cached } = await client
         .from('mod_detail_cache')
-        .select('details, cached_at')
+        .select('details, cached_at, hit_count')
         .eq('cache_key', cacheKey)
         .maybeSingle();
 
@@ -2063,6 +2128,22 @@ export async function generateModificationDetails(vehicleId: string, modName: st
         /*
           Fire-and-forget. A hit counter that can fail the request it is
           counting has the priorities backwards.
+
+          ⚠ `hit_count` has to be in the select above, and it was not. The
+          update reads it off the row it just fetched, so an unselected column
+          is `undefined`, `?? 0` makes it zero, and every hit writes 1. The
+          counter would have read 1 forever — not an error, not a wrong answer,
+          just a number that always agrees with itself. Its column comment
+          calls it "the cheapest way to find out whether the cache is worth
+          having, which is a question this project has been wrong about
+          before", and as written it could only ever answer "once".
+
+          It is still a **floor, not a count**: two simultaneous hits read the
+          same value and write the same increment, losing one. Making it exact
+          needs an atomic `UPDATE ... SET hit_count = hit_count + 1`, which is
+          an RPC and a grant, and this number does not carry a decision on its
+          own. A lower bound answers "is this cache earning its keep"; it must
+          not be quoted as a call count.
         */
         void client
           .from('mod_detail_cache')

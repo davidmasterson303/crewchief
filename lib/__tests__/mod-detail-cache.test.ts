@@ -216,4 +216,44 @@ describe('the call site uses it, and does not cache a failure', () => {
       expect(`${fn}:${config.includes("'LOW'")}`).toBe(`${fn}:true`);
     }
   });
+
+  it('selects every column the hit counter reads back', () => {
+    /*
+      ⚠ Found 22 Aug, before the table existed to collect a single wrong
+      number. The read selected `details, cached_at`; the update beneath it
+      read `cached.hit_count`, which an unselected column makes `undefined`.
+      With `?? 0` in front of it, **every hit wrote 1** — no error, no wrong
+      answer on screen, just a counter permanently agreeing with itself while
+      the column exists to answer "is this cache worth having".
+
+      Asserted against the update's own reads rather than a hardcoded list, so
+      a second counter column added later is covered without editing this.
+    */
+    const fn = actions.slice(
+      actions.indexOf('export async function generateModificationDetails')
+    );
+    const read = fn.indexOf("from('mod_detail_cache')");
+    expect(read).toBeGreaterThan(-1);
+
+    const select = fn.slice(fn.indexOf('.select(', read), fn.indexOf('.eq(', read));
+    const update = fn.slice(fn.indexOf('.update(', read), fn.indexOf('.then(', read));
+
+    // The scanner found real source, not an empty slice. CLAUDE.md §5.
+    expect(select).toContain('.select(');
+    expect(update).toContain('.update(');
+
+    const readBack = Array.from(update.matchAll(/cached[^\n]*?\)?\.(\w+)/g))
+      .map((m) => m[1])
+      .filter((name) => name !== 'details' && name !== 'cached_at');
+
+    expect(readBack.length).toBeGreaterThan(0);
+
+    for (const column of readBack) {
+      expect(`${column}:${select.includes(column)}`).toBe(`${column}:true`);
+    }
+
+    // Anti-vacuous: the same check still fails on the select it replaced.
+    const before = ".select('details, cached_at')";
+    expect(readBack.some((column) => !before.includes(column))).toBe(true);
+  });
 });
