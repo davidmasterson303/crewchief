@@ -16,6 +16,10 @@ import { researchVehicleDossier } from '@/lib/vehicle-research';
 import { showsModifications } from '@crewchief/core/mod-progression';
 import { logger } from '@crewchief/core/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
+import {
+  isModDetailCacheFresh,
+  modDetailCacheKey,
+} from '@crewchief/core/mod-detail-cache';
 import { platformClientIp } from '@crewchief/core/client-ip';
 import { recomputePerformanceStats } from '@/lib/performance-stats';
 import { recordAiUsageInBackground } from '@/lib/ai-usage';
@@ -2025,6 +2029,60 @@ export async function generateModificationDetails(vehicleId: string, modName: st
       performanceMindset || vehicle.performance_mindedness
     );
 
+    /*
+      ⚠ The cache read, and it is the whole reason this call stopped being 89%
+      of the AI bill.
+
+      Keyed on the **content of the question** rather than on `vehicle_id`, so
+      the first owner of a 2018 Accord to open "cold air intake" pays for it and
+      every owner after them does not. `performance_mod_cache` keys on the
+      vehicle and therefore cannot do this — see the core module.
+
+      A cache miss is not an error and a cache failure is not either: if the
+      table is absent or the read throws, this falls through to generating, and
+      the only cost is the call we were making anyway. That direction matters —
+      a cache that can take the feature down is worse than no cache.
+    */
+    const cacheKey = modDetailCacheKey({
+      year: vehicle.year,
+      make: vehicle.make,
+      model: vehicle.model,
+      modName,
+      performanceGoal,
+      ownershipObjective: vehicle.ownership_objective,
+    });
+
+    try {
+      const { data: cached } = await client
+        .from('mod_detail_cache')
+        .select('details, cached_at')
+        .eq('cache_key', cacheKey)
+        .maybeSingle();
+
+      if (cached && isModDetailCacheFresh(cached.cached_at as string)) {
+        /*
+          Fire-and-forget. A hit counter that can fail the request it is
+          counting has the priorities backwards.
+        */
+        void client
+          .from('mod_detail_cache')
+          .update({ hit_count: ((cached as { hit_count?: number }).hit_count ?? 0) + 1 })
+          .eq('cache_key', cacheKey)
+          .then(() => undefined, () => undefined);
+
+        logger.info('MODS:CACHE_HIT', 'Served modification details from cache', {
+          vehicleId,
+          modName,
+        });
+        return { success: true, data: cached.details };
+      }
+    } catch (cacheError) {
+      logger.warn('MODS:CACHE_READ_FAILED', 'Cache unavailable; generating', {
+        vehicleId,
+        error: (cacheError as Error)?.message,
+      });
+    }
+
     const prompt = `You are an expert automotive consultant analyzing a modification for a specific vehicle owner.
 
 VEHICLE:
@@ -2050,7 +2108,23 @@ Format as valid JSON only, no markdown or explanations.`;
     const result = await genAI.models.generateContent({
       model: FLASH_MODEL,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      config: withThinking(flashStructuredConfig, FLASH_MODEL, 'LOW'),
+      /*
+        ⚠ MINIMAL, not LOW — measured 21 Aug, same prompt, same model:
+
+          LOW      268 in · 432 out · 544 thinking · 6964ms · $0.00772
+          MINIMAL  268 in · 433 out ·   0 thinking · 3756ms · $0.00365
+
+        Same horsepower range, same parts and labour costs, same brands, same
+        MAF-transfer warning, same stage-1 pairing. 53% cheaper and 46% faster
+        for output a reader cannot tell apart. This path was **89% of all AI
+        spend** in the first three weeks of metering, and two thirds of each
+        call was reasoning nobody sees.
+
+        `models.ts` records the general measurement (unset 861 · HIGH 726 ·
+        LOW 424 · MINIMAL 0) and the roadmap's D2 note asked for exactly this
+        re-test on the non-prose paths once there was data. There is now.
+      */
+      config: withThinking(flashStructuredConfig, FLASH_MODEL, 'MINIMAL'),
     });
     recordAiUsageInBackground(
       { purpose: 'modification_details', model: FLASH_MODEL, userId: access.userId, vehicleId },
@@ -2058,6 +2132,13 @@ Format as valid JSON only, no markdown or explanations.`;
     );
 
     const responseText = result.text || '';
+    /*
+      ⚠ Gates the cache write. `details` below starts as generic placeholder
+      text — "Performance gains will vary" — which is a reasonable thing to show
+      once when a parse fails, and a **thirty-day lie** if it is cached and
+      served to every other owner of that car. Only a clean parse is stored.
+    */
+    let parsedCleanly = false;
     let details = {
       performance_impact: 'Performance gains will vary',
       reliability_impact: 'Check compatibility with your vehicle',
@@ -2077,6 +2158,7 @@ Format as valid JSON only, no markdown or explanations.`;
         installation_notes: (parsed.installationNotes as string | undefined) || details.installation_notes,
         compatibility_notes: (parsed.compatibilityNotes as string | undefined) || details.compatibility_notes,
       };
+      parsedCleanly = true;
     } catch (parseError) {
       logger.warn('MOD:PARSE_ERROR', 'Failed to parse modification details', { error: (parseError as Error).message });
     }
@@ -2111,6 +2193,35 @@ Format as valid JSON only, no markdown or explanations.`;
     if (upsertError) {
       console.error('Failed to save modification details:', upsertError);
       return { success: false, error: 'Failed to save details' };
+    }
+
+    /*
+      The content cache, written after the per-vehicle row rather than instead
+      of it. `modification_details` is this owner's record and is what the
+      screen reads; this is the shared answer that stops the next owner of the
+      same car paying for it again.
+
+      Fire-and-forget and failure-tolerant: a cache that can fail the request it
+      is accelerating has the priorities backwards. And only on a clean parse —
+      see `parsedCleanly`.
+    */
+    if (parsedCleanly) {
+      void client
+        .from('mod_detail_cache')
+        .upsert(
+          {
+            cache_key: cacheKey,
+            details,
+            year: typeof vehicle.year === 'number' ? vehicle.year : Number(vehicle.year) || null,
+            make: vehicle.make ?? null,
+            model: vehicle.model ?? null,
+            mod_name: modName,
+            performance_goal: performanceGoal,
+            cached_at: new Date().toISOString(),
+          },
+          { onConflict: 'cache_key' }
+        )
+        .then(() => undefined, () => undefined);
     }
 
     return { success: true, data: { ...details, performance_goal: performanceGoal } };
@@ -5341,7 +5452,9 @@ Respond with ONLY valid JSON, no markdown:
     const result = await genAI.models.generateContent({
       model: FLASH_MODEL,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      config: withThinking(flashStructuredConfig, FLASH_MODEL, 'LOW'),
+      // MINIMAL for the same reason as `generateModificationDetails` — a
+      // structured mod analysis, measured indistinguishable at 53% the cost.
+      config: withThinking(flashStructuredConfig, FLASH_MODEL, 'MINIMAL'),
     });
     recordAiUsageInBackground(
       { purpose: 'modification_backfill', model: FLASH_MODEL, userId: access.userId, vehicleId },
@@ -5572,7 +5685,8 @@ Respond with ONLY valid JSON:
         const result = await genAI.models.generateContent({
           model: FLASH_MODEL,
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          config: withThinking(flashStructuredConfig, FLASH_MODEL, 'LOW'),
+          // MINIMAL, as with the other two mod paths. Structured JSON, no prose.
+          config: withThinking(flashStructuredConfig, FLASH_MODEL, 'MINIMAL'),
         });
         // Inside a loop — one row per generated mod, which is the point. This
         // is the path most likely to surprise on cost.
