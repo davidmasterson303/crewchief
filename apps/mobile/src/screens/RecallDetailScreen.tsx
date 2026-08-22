@@ -19,6 +19,7 @@ import {
   type NormalisedRecall,
   type RecallSeverity,
 } from '@crewchief/core/recalls';
+import { healthClaim } from '@crewchief/core/health-claims';
 import { interFace } from '../theme/fonts';
 
 /**
@@ -60,7 +61,20 @@ type State =
   | { kind: 'loading' }
   | { kind: 'error'; message: string }
   | { kind: 'gone' }
-  | { kind: 'loaded'; name: string; recalls: NormalisedRecall[] };
+  | {
+      kind: 'loaded';
+      name: string;
+      recalls: NormalisedRecall[];
+      /**
+       * Whether an NHTSA lookup has ever run for this vehicle.
+       *
+       * ⚠ Separate from `recalls.length === 0`, and that is the entire point.
+       * An empty list means "checked, nothing found". A missing `nhtsa_data`
+       * row means "never checked". They arrive here as the same empty array
+       * and they are not the same statement — see the render.
+       */
+      checked: boolean;
+    };
 
 interface VehicleResponse {
   vehicle?: {
@@ -116,10 +130,18 @@ export function RecallDetailScreen({ vehicleId, title, onAskAdvisor, onSignOut }
           title ||
           'this vehicle';
 
+        /*
+          The row itself, not its contents. `first(...)` is undefined when no
+          NHTSA record exists for this vehicle, and that is the only evidence
+          in the payload that separates "we looked" from "we have not".
+        */
+        const nhtsa = first(vehicle?.nhtsa_data);
+
         setState({
           kind: 'loaded',
           name,
-          recalls: normaliseRecalls(first(vehicle?.nhtsa_data)?.recalls),
+          recalls: normaliseRecalls(nhtsa?.recalls),
+          checked: Boolean(nhtsa),
         });
       } catch (error) {
         if (error instanceof ApiRequestError && error.status === 401) {
@@ -210,21 +232,42 @@ export function RecallDetailScreen({ vehicleId, title, onAskAdvisor, onSignOut }
 
       <Text style={styles.name}>{state.name}</Text>
       <Text style={styles.count}>
-        {state.recalls.length === 0
-          ? 'No recalls on record'
-          : `${state.recalls.length} ${state.recalls.length === 1 ? 'recall' : 'recalls'} on record`}
+        {state.recalls.length > 0
+          ? `${state.recalls.length} ${state.recalls.length === 1 ? 'recall' : 'recalls'} on record`
+          : state.checked
+            ? 'No recalls on record'
+            : 'Recalls not checked yet'}
       </Text>
 
       {state.recalls.length === 0 && (
         <Card style={styles.cardGap}>
-          {/*
-            Not "you have no recalls". This app reads NHTSA's list, and an
-            empty list is a statement about that list rather than about the car.
-          */}
-          <Text style={styles.body14}>
-            NHTSA has no open recalls listed for this vehicle. That is their record, not a
-            guarantee — a dealer can check against the VIN.
-          </Text>
+          {state.checked ? (
+            /*
+              Not "you have no recalls". This app reads NHTSA's list, and an
+              empty list is a statement about that list rather than about the car.
+            */
+            <Text style={styles.body14}>
+              NHTSA has no open recalls listed for this vehicle. That is their record, not a
+              guarantee — a dealer can check against the VIN.
+            </Text>
+          ) : (
+            /*
+              ⚠ The web's 21 Aug defect, reached on mobile. Until now both
+              branches rendered the sentence above — so a car whose NHTSA record
+              had never been fetched was told "NHTSA has no open recalls listed
+              for this vehicle", which is a claim about a lookup that never ran.
+
+              The web copy was careful in one direction (an empty list is not a
+              guarantee about the car) and silent in the other (an empty list
+              might not be a list at all). `health-claims.ts` fixed that on the
+              web with three states; this is the same fix, one platform over,
+              on the screen a recall notification opens.
+            */
+            <Text style={styles.body14}>
+              {healthClaim('recall', '', false).text} We fetch it from NHTSA shortly after a
+              vehicle is added — open this screen again in a minute.
+            </Text>
+          )}
         </Card>
       )}
 

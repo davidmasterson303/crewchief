@@ -69,6 +69,21 @@ function respond(recalls: unknown[], { asArray = false } = {}) {
 }
 
 /**
+ * A vehicle whose NHTSA record has **never been fetched**.
+ *
+ * ⚠ Distinct from `respond([])`, and the distinction is the bug. That fixture
+ * supplies `nhtsa_data: { recalls: [] }` — a lookup that ran and found
+ * nothing. This one omits the row entirely, which is every vehicle between
+ * being added and being researched, and every vehicle whose research failed.
+ * Both reach the screen as an empty array.
+ */
+function respondUnresearched() {
+  request.mockResolvedValue({
+    vehicle: { year: 2003, make: 'Honda', model: 'Accord' },
+  } as never);
+}
+
+/**
  * Async, because `render` is.
  *
  * RNTL 14 returns a Promise — React 19 made mounting concurrent. The first
@@ -191,6 +206,62 @@ describe('when there is nothing to show', () => {
       string keeps that hedge from being softened away.
     */
     expect(await view.findByText('No recalls on record')).toBeTruthy();
+  });
+});
+
+describe('a vehicle nobody has checked yet', () => {
+  /*
+    ⚠ The web's 21 Aug defect, reached on mobile 22 Aug. A 2003 Accord — inside
+    the Takata campaigns — with no NHTSA record was shown "NHTSA has no open
+    recalls listed for this vehicle", which is a claim about a lookup that never
+    ran. Absence rendered as a finding, on a safety claim, on the screen a
+    recall notification opens.
+
+    The existing empty-state case above supplies `nhtsa_data: { recalls: [] }`
+    and is therefore about a *checked* car. Nothing tested the other shape,
+    which is why this survived the web fix.
+  */
+
+  it('does not claim NHTSA listed nothing', async () => {
+    respondUnresearched();
+    const { view } = await mount();
+
+    // The exact sentence that was wrong. It must not appear for this car.
+    expect(view.queryByText(/NHTSA has no open recalls listed/)).toBeNull();
+  });
+
+  it('says the check has not run', async () => {
+    respondUnresearched();
+    const { view } = await mount();
+
+    expect(await view.findByText('Recalls not checked yet')).toBeTruthy();
+    expect(await view.findByText(/have not checked this vehicle for recalls/i)).toBeTruthy();
+  });
+
+  it('refuses the all-clear reading in words', async () => {
+    /*
+      `health-claims.ts` puts "This is not a clear result." in the copy on
+      purpose — an absent panel invites the reader to fill it in with their own
+      optimism. Asserted here so the sentence cannot be trimmed to something
+      that merely sounds neutral.
+    */
+    respondUnresearched();
+    const { view } = await mount();
+
+    expect(await view.findByText(/not a clear result/i)).toBeTruthy();
+  });
+
+  it('still says "No recalls on record" when the lookup did run', async () => {
+    /*
+      ⚠ Anti-vacuous, and the direction that would quietly ruin the common
+      case: a screen that treated every empty list as unchecked would never
+      give anybody the reassuring answer they are entitled to.
+    */
+    respond([]);
+    const { view } = await mount();
+
+    expect(await view.findByText('No recalls on record')).toBeTruthy();
+    expect(view.queryByText('Recalls not checked yet')).toBeNull();
   });
 });
 
