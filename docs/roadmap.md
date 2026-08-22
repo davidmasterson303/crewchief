@@ -1,6 +1,6 @@
 # CrewChief roadmap — image pipeline, backdrop, cockpit direction, and responsive web
 
-> ### ✅ 22 Aug — START HERE. **The device build exists.** Install it; two migrations still waiting.
+> ### ✅ 22 Aug — START HERE. **Promoted and live.** Install the build; two migrations still waiting.
 >
 > **The device build is still the priority and still blocked on the same three minutes.**
 > Re-verified twice on 22 Aug, with the Expo token from `.env` so the CLI authenticates:
@@ -134,6 +134,31 @@
 > nightly sweep runs the old code from `web-live`. Whether it fires at all is unknown — see
 > the heartbeat, which exists precisely because that question has no answer today.
 >
+> #### 🚀 Promoted to `web-live`, 22 Aug — product host only
+>
+> ```
+> crewchief.davidmasterson.co   c0873aea   built 17:06   ← 20 commits
+> crewchief-demo.davidmasterson.co   eef03da   built 20 Aug   ← untouched
+> ```
+>
+> David's call, and the reasoning is worth keeping: the recall-honesty fix is exactly what
+> should be live before Apple looks, the CTA change was already greenlit, and **the demo host
+> has never manifested the recall bug** — all three demo vehicles have NHTSA rows — so it can
+> batch. Credits were past 75% on the 20th, which argues for one promote rather than two.
+>
+> Verified independently of the script: `/api/version` reports `c0873aea`, the landing page
+> serves "Add your vehicle" and "See a sample garage" and no "Enter demo", the demo host still
+> reports `eef03da`, and `verify-mobile-contract` against production passes every check it can
+> run.
+>
+> ⚠ As §8 warns, `/api/version` reports the **merge commit** `c0873aea`, not the `main` commit
+> `88306a9` named in the promote. Checking for the latter and concluding the deploy failed has
+> cost real time twice.
+>
+> ⚠ **`demo-live` is now 22 commits behind.** Nothing there manifests the recall defect, but
+> the CTA gate means a future demo promote needs `CREWCHIEF_DEMO_SITE=true` set on that site
+> or its landing page will start asking recruiters to sign up.
+>
 > #### ✅ THE BUILD IS DONE — install it on the phone
 >
 > ```
@@ -167,6 +192,27 @@
 > ⚠ **From here, JS is free.** `developmentClient: true` means every screen, colour and string
 > change reloads over Metro. Only a new native module costs another build — 5 of ~15 used this
 > period, resets 31 Aug.
+>
+> #### ❓ "Was the web health-summary prose fixed, or only the tile?" — **fixed, first commit of the day**
+>
+> `c0ebf9e`. Both halves of it:
+>
+> - the **prompt** no longer hands the model a bare `nhtsa?.recalls?.length || 0`. It builds
+>   the recall section through `recallEvidenceForPrompt`, which for an unchecked car states
+>   that the count is unknown **and forbids the inference** — omission alone is not enough,
+>   because a model given silence fills it with the reassuring reading.
+> - the **parse-failure fallback**, which nobody had seen. It defaulted to
+>   `'Vehicle is in good condition'` / `'Maintenance records up to date'` / `'No recalls to
+>   date'` — a clean bill of health on every axis, applied exactly when the model's JSON could
+>   not be read.
+>
+> Nine guards across `health-claims.test.ts` and `health-sees-filed-invoices.test.ts`, all
+> mutation-verified. The rule lives beside the tile's rule so the two cannot drift, and one
+> test asserts they agree on the same evidence.
+>
+> ⚠ The question was the right one to ask. The tile, the prose and the mobile screen were
+> **three separate places** making the same claim, fixed on three different days, and the only
+> reason the third was found is that somebody asked whether the second had been.
 >
 > #### While David was away — two fixes that need no build
 >
