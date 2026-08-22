@@ -55,7 +55,14 @@ import {
   findMissingFields,
   findLeakedFields,
 } from './lib/response-contract.mjs';
-import { classifyRun, exitCodeFor, parseArgs, OUTCOME } from './lib/run-outcome.mjs';
+import {
+  classifyRun,
+  credentialReason,
+  exitCodeFor,
+  parseArgs,
+  tokenExpiry,
+  OUTCOME,
+} from './lib/run-outcome.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -99,8 +106,51 @@ if (unknownFlags.length) {
   console.error(`Unknown flag(s): ${unknownFlags.join(', ')}. Only --strict is supported.`);
   process.exit(2);
 }
-const token = env('MOBILE_TEST_TOKEN');
+const rawToken = env('MOBILE_TEST_TOKEN');
 const ownedVehicleId = env('MOBILE_TEST_VEHICLE_ID');
+
+/*
+  ── ⚠ An expired credential is not evidence about the API ──────────────────
+
+  The docblock above already names this state: "an *unset* token skips the
+  credentialed checks, while a *set but expired* one fails them — the state
+  this repo has been in since 02:58 UTC on 2 Aug". `--strict` fixed the exit
+  code. It did not fix what the run *says*.
+
+  Run on 22 Aug against a token that expired on the 2nd, this reported three
+  blocking failures, one of them "/api/v1/vehicles rejected a valid bearer
+  token — a phone cannot load the garage". Every word of that is wrong except
+  the status code. The bearer was not valid, the route was not broken, and the
+  phone is fine. A 401 is the *correct* answer to an expired credential.
+
+  ⚠ This is CLAUDE.md §5's second warning rather than its first: not a guard
+  that passes while checking nothing, but one that fails loudly and points at
+  the wrong thing — on the check that gates a mobile build. The cost is a
+  debugging session into a bearer path that works, and the temptation is to
+  make it pass by deleting the credential, which §25 and `--strict` exist to
+  prevent.
+
+  So an expired token is treated exactly like an absent one: the credentialed
+  checks are NOT RUN and say why, with the date. That is not a weakening —
+  they genuinely cannot be performed without a usable credential, `--strict`
+  still exits 1, and the summary still refuses to call a partial run green.
+*/
+const tokenExpiredAt = rawToken ? tokenExpiry(rawToken) : null;
+const tokenIsExpired = tokenExpiredAt !== null && tokenExpiredAt.getTime() < Date.now();
+const token = tokenIsExpired ? null : rawToken;
+
+/** Why the credentialed checks cannot run, in the words the reader needs. */
+const tokenReason = credentialReason(rawToken) ?? 'MOBILE_TEST_TOKEN is not set';
+
+if (tokenIsExpired) {
+  const days = Math.floor((Date.now() - tokenExpiredAt.getTime()) / 86_400_000);
+  console.log(
+    `\n⚠ MOBILE_TEST_TOKEN expired ${tokenExpiredAt.toISOString()} (${days} day(s) ago).\n` +
+      '  The credentialed checks below are NOT RUN — an expired bearer proves nothing\n' +
+      '  about the API, and its 401 is the correct answer. Refresh it from a signed-in\n' +
+      '  session to run them.'
+  );
+}
 const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1)(:|$)/.test(base);
 
 /*
@@ -203,8 +253,8 @@ async function checkBearer() {
   console.log('\n4. The bearer path — what a phone actually does');
 
   if (!token) {
-    skip('MOBILE_TEST_TOKEN is not set — the bearer happy path is unverified');
-    skip('MOBILE_TEST_TOKEN is not set — cannot prove an unowned vehicle 404s for a real caller');
+    skip(`${tokenReason} — the bearer happy path is unverified`);
+    skip(`${tokenReason} — cannot prove an unowned vehicle 404s for a real caller`);
     return;
   }
 
@@ -305,7 +355,7 @@ async function checkResponseShapes() {
   }
 
   if (!token) {
-    skip('MOBILE_TEST_TOKEN is not set — the garage list is unverified, and it is the route that was broken');
+    skip(`${tokenReason} — the garage list is unverified, and it is the route that was broken`);
     return;
   }
 
@@ -448,7 +498,7 @@ if (outcome === OUTCOME.PARTIAL) {
   console.log(
     `\x1b[33mPARTIAL\x1b[0m — everything run passed, but ${notRun} check(s) did not run.`
   );
-  console.log('This is not a green build. Set MOBILE_TEST_TOKEN and MOBILE_TEST_VEHICLE_ID');
+  console.log(`This is not a green build. ${tokenReason}; set MOBILE_TEST_TOKEN and MOBILE_TEST_VEHICLE_ID`);
   console.log('to exercise the credentialed half, and CORS_ALLOWED_ORIGINS for the preflight.');
   if (strict) {
     console.log('\x1b[31m--strict was passed, so this exits non-zero.\x1b[0m');
