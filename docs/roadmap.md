@@ -1,6 +1,6 @@
 # CrewChief roadmap — image pipeline, backdrop, cockpit direction, and responsive web
 
-> ### ⚠ 22 Aug — START HERE. Four commits shipped; two migrations and one Apple link are waiting.
+> ### ✅ 22 Aug — START HERE. **The device build exists.** Install it; two migrations still waiting.
 >
 > **The device build is still the priority and still blocked on the same three minutes.**
 > Re-verified twice on 22 Aug, with the Expo token from `.env` so the CLI authenticates:
@@ -134,7 +134,86 @@
 > nightly sweep runs the old code from `web-live`. Whether it fires at all is unknown — see
 > the heartbeat, which exists precisely because that question has no answer today.
 >
-> #### ✈️ Device build pre-flight — done. One command after the Apple auth.
+> #### ✅ THE BUILD IS DONE — install it on the phone
+>
+> ```
+> Build     f7969888-056d-4da3-a9ed-fd893de5afe8   finished, 5 min
+> Profile   device   ·   commit fe84c92
+> Install   https://expo.dev/accounts/masterson303/projects/crewchief/builds/f7969888-056d-4da3-a9ed-fd893de5afe8
+> ```
+>
+> **Open that link on the iPhone and tap Install.** It is an internal-distribution build,
+> so it installs straight from the page — no TestFlight, no App Store.
+>
+> Credentials came out on the right team, which was the whole risk:
+>
+> ```
+> Distribution Certificate  P4873P8FQ9 (DAVID RYAN MASTERSON (Individual))
+> Provisioning Profile      W3YFH8T4QP, active
+> Provisioned devices       iPhone (UDID: 00008140-0001796C2E9B001C)
+> Bundle Identifier         co.davidmasterson.crewchief
+> ```
+>
+> ⚠ **Metro must be running for the app to load anything**, on the same Wi-Fi as the phone:
+>
+> ```
+> cd apps/mobile && npx expo start --dev-client
+> ```
+>
+> ⚠ The device was **already registered** when the Apple link completed — `device:create` was
+> never needed. And only one Apple team appeared on the account, so the two-teams trap could
+> not fire on this build.
+>
+> ⚠ **From here, JS is free.** `developmentClient: true` means every screen, colour and string
+> change reloads over Metro. Only a new native module costs another build — 5 of ~15 used this
+> period, resets 31 Aug.
+>
+> #### ⏱ A 30s budget on a 23–30s call, found by running the sweep for real
+>
+> The sweep selected the reviewer's Accord, spent 32 seconds, and reported
+> `schedulesGenerated: 0`. The database said why: `research_status = 'failed'`, no NHTSA row,
+> and **no `vehicle_dossier` usage row at all** — the response never came back to be metered.
+>
+> `RESEARCH_TIMEOUT_MS` is 30s and the dossier call takes 23–30s. Both faces of that coin
+> turned up the same day.
+>
+> ⚠ **The cost is not one lost night.** A timeout writes `failed`, and `vehiclesToGenerate`
+> filter 1 never offers a `failed` car again — correctly, since retrying a genuine failure
+> nightly is the runaway it exists to prevent. The escape hatch is the retry button, and the
+> sweep's whole purpose is cars whose owner is *not in the app to press it*. One marginal
+> timeout removed a car from research permanently, on exactly the population the feature was
+> built for.
+>
+> Fixed in `eea01d5`: the sweep passes **60s**, the interactive path keeps 30s (its "somebody
+> is watching a spinner" argument does not apply at 3am), and a test asserts the budget times
+> the generation cap stays under the scheduled function's ceiling.
+>
+> **Proven on the same car:** the re-run took 39.7s — longer than 30, inside 60 — and returned
+> `schedulesGenerated: 1`.
+>
+> #### ✅ The reviewer's Accord is researched, and the dossier measurement is stable
+>
+> ```
+> research_status   completed        known_issues 7 · schedule 8 · reliability 6
+> nhtsa_data        24 recalls       the Takata campaigns, real data
+> ```
+>
+> That closes the App Review concern: the account Apple may sign into no longer shows "we
+> cannot say" on recalls. ⚠ Its recalls are **not yet raised as notifications** — `collectRecalls`
+> runs before generation, so the next sweep raises them, as one digest, to an account with no
+> device.
+>
+> Second dossier measurement, against the first:
+>
+> ```
+> 22 Aug 12:31   1,054 in · 1,802 out · 2,045 thinking · 4,901 total
+> 22 Aug 15:23   1,054 in · 1,756 out · 1,921 thinking · 4,731 total
+> ```
+>
+> Stable at **~4,700–4,900 tokens, $0.03–0.04 a vehicle**. The figure is no longer a single
+> observation.
+>
+> #### ✈️ Device build pre-flight — what was checked before spending the build
 >
 > Everything checkable without Apple credentials has been checked, 22 Aug:
 >
