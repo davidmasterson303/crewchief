@@ -168,6 +168,43 @@
 > change reloads over Metro. Only a new native module costs another build — 5 of ~15 used this
 > period, resets 31 Aug.
 >
+> #### While David was away — two fixes that need no build
+>
+> ⚠ **Correction to `9a38827`'s commit message.** It says the mobile recall fix "ships with
+> the next build". **That is wrong for a `developmentClient` build.** Metro serves the JS, so
+> installing `f7969888` and connecting it to `expo start --dev-client` picks up every JS
+> commit since — including that fix. No rebuild. That is the whole economics of the dev
+> client and the message understated it; left in history rather than rewritten, corrected
+> here.
+>
+> **`9a38827` — the recall screen told an unchecked car that NHTSA found nothing.** The
+> 21 Aug web defect, one platform over, found by asking what the device build is about to put
+> in David's hand. `RecallDetailScreen` rendered *"NHTSA has no open recalls listed for this
+> vehicle"* whenever `recalls` was empty — including when no `nhtsa_data` row existed and the
+> lookup had never run. The copy carefully refuses to say the car is clear, then asserts the
+> list was consulted. Three states now, using `health-claims.ts` rather than a second copy of
+> the rule, so the platforms cannot drift.
+>
+> ⚠ **Two tests had encoded the defect.** The contrast case passed `nhtsa_data: null` while
+> asserting "No recalls on record" — named for a checked car, supplied an unchecked one.
+>
+> **`39f7f0b` — the product host asks you to use the product.** David's greenlit CTA change:
+> primary **"Add your vehicle"** → `/signup`, secondary **"See a sample garage"**; the
+> recruiter host keeps "Enter demo" unchanged.
+>
+> The blocking detail is solved and worth knowing: `CREWCHIEF_DEMO_SITE` is a **server**
+> variable and both `app/page.tsx` and `LandingHero` are `'use client'`. A browser hostname
+> check is the wrong answer — it does not exist during SSR or hydration, so the primary CTA
+> would visibly flip after first paint. The flag is resolved once in `app/layout.tsx`, where
+> it already was for `DemoBanner`, and published through `SiteRoleProvider`.
+>
+> Verified against real servers, both directions: unset serves "Add your vehicle" and "See a
+> sample garage" and no "Enter demo"; `CREWCHIEF_DEMO_SITE=true` serves only "Enter demo".
+>
+> ⚠ Not included: the *"What a CrewChief garage looks like"* heading from the original
+> proposal. The greenlight names the two CTAs and the gate; the heading has no specified
+> placement and the hero already has an h1.
+>
 > #### ⏱ A 30s budget on a 23–30s call, found by running the sweep for real
 >
 > The sweep selected the reviewer's Accord, spent 32 seconds, and reported
