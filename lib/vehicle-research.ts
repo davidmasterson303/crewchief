@@ -88,6 +88,17 @@ export interface ResearchOutcome {
   error?: string;
   unsupported?: boolean;
   data?: z.infer<typeof VehicleDataSchema>;
+  /**
+   * The dossier already existed, so nothing was generated and nothing was
+   * billed.
+   *
+   * Distinct from `success` alone because the two callers need to tell them
+   * apart: the sweep counts what it generated, and counting a short-circuit
+   * would report a night's work that never happened. It is the same reason
+   * `unsupported` is separate — "we did not spend" has more than one cause and
+   * they are not interchangeable.
+   */
+  alreadyResearched?: boolean;
 }
 
 /**
@@ -107,6 +118,46 @@ export async function researchVehicleDossier(
 
   try {
     const client = getServiceRoleClient();
+
+    /*
+      ── Do not pay twice for a dossier this vehicle already has ──────────────
+
+      ⚠ Added 22 Aug, from a live run that cost the discovery. Research for a
+      new Accord **succeeded** — full dossier written, 24 NHTSA recalls stored,
+      `research_status = 'completed'` — while the browser was told it had
+      failed, because the request outlived its response and `enrichVehicle`
+      came back with no body at all. The screen showed the failure state and a
+      retry button.
+
+      Pressing it went straight from the authorization check to the prompt.
+      Nothing between the two asked whether the work had already been done, so
+      a retry on a *successful* dossier spent another Pro call — the most
+      expensive one in the product, ~4,900 tokens, measured the same day. The
+      only reason it did not happen is that nobody pressed the button.
+
+      ⚠ **The retry button is not wrong and this does not disable it.** Only
+      `completed` short-circuits. A `failed` or `pending` row still generates,
+      which is exactly what that button is for: its purpose is a dossier that
+      is missing, and a missing dossier is not what this guard sees.
+
+      Deliberately no `force` option. There is no caller that wants one today,
+      and a flag whose only user is a future maybe is a flag that gets passed
+      `true` by the next person in a hurry. Re-research is a real need when it
+      arrives — it should arrive with its own reasoning about staleness.
+    */
+    const { data: existing } = await client
+      .from('vehicle_knowledge_base')
+      .select('research_status, last_research_date')
+      .eq('vehicle_id', vehicleId)
+      .maybeSingle();
+
+    if (existing?.research_status === 'completed') {
+      logger.info('RESEARCH:ALREADY_DONE', 'Dossier already generated; not spending again', {
+        vehicleId,
+        lastResearchDate: existing.last_research_date,
+      });
+      return { success: true, alreadyResearched: true };
+    }
 
     const prompt = VEHICLE_RESEARCH_PROMPT(vehicle.year, vehicle.make, vehicle.model);
 
