@@ -5,9 +5,9 @@
  *
  * ── Why this is a ratchet and not another paragraph ─────────────────────────
  *
- * The same defect has now been found in **three separate places on three
- * separate days**, each time by a person looking at a screen rather than by
- * anything in the build:
+ * The same defect has been found in **five separate places**, each of the
+ * first three by a person looking at a screen rather than by anything in the
+ * build:
  *
  *   21 Aug  the web recall tile — a green tick and "No active recalls" on a
  *           2003 Accord inside the Takata campaigns, because its NHTSA record
@@ -18,19 +18,31 @@
  *   22 Aug  the mobile recall screen — "NHTSA has no open recalls listed for
  *           this vehicle" for a car with no `nhtsa_data` row at all.
  *
- * `health-claims.ts` was written for the first. It did not prevent the second
- * or the third, because neither of those *used* it — they each kept their own
- * copy of the question. CLAUDE.md's own account of `truncate-revoked` names
- * this shape exactly: a rule "correctly identified, correctly written down,
- * and ignored" is something that needs a ratchet rather than a paragraph.
+ * ⚠ **The last two were found by this scan, on its first run**, which is the
+ * argument for it existing:
+ *
+ *   22 Aug  `RecallHistoryModal` — a **green** icon, "No recalls to date" and
+ *           "This vehicle has a clean safety record". A claim about the *car*
+ *           rather than about NHTSA's list, and it sat behind the very tile
+ *           that correctly said nothing had been checked.
+ *   22 Aug  `IssuesTab` — "No known issues for this vehicle" on an empty list.
+ *           ⚠ This one was **true**, by an upstream early return in
+ *           `VehicleInsights` that nothing in the file stated. Made explicit
+ *           rather than left ambient; see the note there on required props.
+ *
+ * `health-claims.ts` was written for the first. It did not prevent any of the
+ * others, because none of them *used* it — each kept its own copy of the
+ * question. CLAUDE.md's own account of `truncate-revoked` names this shape
+ * exactly: a rule "correctly identified, correctly written down, and ignored"
+ * is something that needs a ratchet rather than a paragraph.
  *
  * ── What this asserts, and what it deliberately does not ────────────────────
  *
  * **Any source that states a check came back clean must import the module that
  * decides whether it may.** Not that it renders correctly — a static scan
  * cannot know that — but that the file has the rule in scope at all. Every one
- * of the three defects above would have failed this: each hardcoded a
- * reassuring sentence in a file that had never heard of `health-claims.ts`.
+ * of the five defects above would have failed this: each stated a clean
+ * result in a file that had never heard of `health-claims.ts`.
  *
  * ⚠ It cannot catch a *silence*. `VehicleDetailScreen` renders its recall
  * banner behind `recalls > 0`, so an unchecked car and a clean one both show
