@@ -108,7 +108,7 @@
 >
 > | | |
 > |---|---|
-> | **Price** | **$3.99/mo · $29.99/yr + 7-day trial** proposed by Cowork, awaiting a yes. ⚠ Claude Code's rider: at $3.99 (net $3.39 at 15%) the paid ceiling of **2,000,000** tokens is ~$15 worst case — **4.4× net revenue**, sized for a $9–15 price. Recommend `TIERS.paid` → **1,000,000**. Still 2.5× free and ~3× the heaviest real user |
+> | **Price** | ✅ **Settled 21 Aug: $3.99/mo · $29.99/yr + 7-day trial.** David's constraint is explicit and worth carrying: *"it's important I don't lose money on this."* The ceiling rider is **done** — `TIERS.paid` is now 1,000,000 (`cb88f87`). ⏳ Still to do in App Store Connect: create the products at that price, add the trial, and **apply for the Small Business Program** — 15% vs 30% is worth more than the price decision itself ($3.39 vs $2.79 a subscriber) |
 > | **Positioning** | *"CrewChief is a product being taken to market through the App Store, not a working demo. The demo remains a sales asset on the product site and a portfolio asset on the recruiter site."* Say yes and propose it to the KB — `cc-marketing-0002` still records "a working demo, not a commercial product" and its own open question was answered by action, never recorded |
 > | **The CTA** | Follows from the positioning. Cowork's proposal: primary "Add your vehicle" → signup, secondary "See a sample garage", heading "What a CrewChief garage looks like". Demo host keeps "Enter demo". Same gate as the masthead. ⚠ `LandingHero` is a client component and cannot read `CREWCHIEF_DEMO_SITE` — needs a server wrapper or a provider |
 > | **LLC** | The genuinely open half of `cc-business-0001`. Personal-liability question, not paperwork. Reversible: Apple converts Individual → Organization without re-enrolment |
@@ -133,6 +133,42 @@
 > ⚠ **The dossier call has never been measured** — no research purpose appears in the table at
 > all, consistent with it never having completed. It is the biggest single call in the product and
 > the only unmeasured one. **Measure it the first time research succeeds.**
+>
+> #### 💸 Cost control — shipped 21 Aug, and the bill is not where anyone assumed
+>
+> Three weeks of metering (`ai_usage_events`, 2–21 Aug): 292 calls, $2.26. Of that,
+> **`modification_details` was 232 calls and $2.02 — 89%.** The consultant, which the cost
+> conversation is always about, was 3%.
+>
+> `cb88f87` does three things:
+>
+> - **A content-keyed cache** (`mod_detail_cache`). That call had **no cache at any level** while
+>   being the most cacheable one in the product — its prompt reads six values and none identifies
+>   a person or a car. Keyed on the *question*, not on `vehicle_id`, so the first owner of a 2018
+>   Accord to open a mod pays and everyone after them does not. ⚠ `performance_mod_cache` does not
+>   already do this: it caches the mod *list* and keys on the vehicle.
+> - **`MINIMAL` thinking on the three mod paths.** Measured, same prompt and model:
+>   `LOW 268 in · 432 out · 544 thinking · $0.00772` versus
+>   `MINIMAL 268 in · 433 out · 0 thinking · $0.00365` — same horsepower figures, costs, brands
+>   and warnings, at 53% the cost and 46% the latency. ⚠ **The consultant and health summary stay
+>   at `LOW` deliberately** (3% and 0.3% of spend; prose and the recall tiles). A test pins that
+>   boundary.
+> - **`TIERS.paid` 2,000,000 → 1,000,000.** At $3.99 with Apple's 15%, net is $3.39, and a 2M
+>   ceiling is ~$15 — **4.4× the revenue it protects.** A ceiling above net revenue is not a
+>   ceiling, it is a maximum loss.
+>
+> Effect on the heaviest real month measured: **$3.10 → well under $0.50**, falling further as the
+> cache warms.
+>
+> ⚠ **Two hazards built against, both silent.** A cache key narrower than the prompt serves one
+> car's answer for another's — so a test reads the prompt itself and asserts every interpolated
+> value is a key field. And only a *clean parse* is cached: `details` starts as placeholder text
+> ("Performance gains will vary"), fine to show once on a parse failure and a thirty-day lie if
+> served to every other owner of that car.
+>
+> ⚠ **The dossier call is still absent from all of these numbers**, because it has never
+> completed. It is the biggest single call in the product. Measure it the first time research
+> succeeds.
 >
 > #### What is left on E8
 >
@@ -333,11 +369,11 @@
 >
 > | | |
 > |---|---|
-> | `main` | ~~`fc96184`~~ → ~~`8ee6484`~~ → **`7a662f3`**, pushed (21 Aug) |
+> | `main` | → **`cb88f87`**, pushed (21 Aug). ⚠ **2 commits unpromoted to `web-live`, 4 to `demo-live`** — the safety/research fixes are live; the cost work is not |
 > | Web tests | ~~2300~~ → **2616**, green (19 Aug) |
 > | Mobile tests | ~~174~~ → **329**, green (19 Aug). ⚠ 10 of those were collected by nothing until 18 Aug — `testMatch` was `*.test.tsx`, so the first mobile test without JSX existed, typechecked and never ran while jest reported all suites green |
 > | Typechecks | Three, all clean — ⚠ run the mobile one **from inside `apps/mobile`**; the root `tsc` resolves a different config and reports phantom errors |
-> | Migrations | ✅ **`20260818120000` APPLIED 21 Aug by Cowork** and verified — five columns resolve, CHECK validated, `original_transaction_id` still UNIQUE, `authenticated` still SELECT-only. The IAP webhook can record. ~~⛔ written and NOT applied~~ — E8's five columns, all `42703` against live on 19 Aug. **This is the only thing stopping the IAP webhook recording anything.** ~~`20260813020000`~~ applied 16 Aug; ~~`20260815190000`~~ **applied** — re-probed live 19 Aug, `next_service_label` and `next_service_due_on` both present, so the entry below claiming it is outstanding is stale |
+> | Migrations | ⛔ **`20260821140000` (`mod_detail_cache`) WRITTEN, NOT APPLIED** — verified 21 Aug. The cost cache is inert until it runs; the code falls through to generating, so nothing breaks, but every day unapplied is full price. ✅ **`20260818120000` APPLIED 21 Aug by Cowork** and verified — five columns resolve, CHECK validated, `original_transaction_id` still UNIQUE, `authenticated` still SELECT-only. The IAP webhook can record. ~~⛔ written and NOT applied~~ — E8's five columns, all `42703` against live on 19 Aug. **This is the only thing stopping the IAP webhook recording anything.** ~~`20260813020000`~~ applied 16 Aug; ~~`20260815190000`~~ **applied** — re-probed live 19 Aug, `next_service_label` and `next_service_due_on` both present, so the entry below claiming it is outstanding is stale |
 > | `demo-live` | ~~27 commits behind~~ → **current**, `9a32aca2`, promoted 19 Aug |
 > | `web-live` | **current**, `f3278984` (21 Aug). Exists and has since 17 Aug — the note below saying it needs creating is dead |
 > | `demo-live` | `eef03da7` — ⚠ **2 commits behind `main`**, deliberately |
