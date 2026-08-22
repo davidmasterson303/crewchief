@@ -451,6 +451,64 @@ export async function createVehicle(vehicleData: {
  * the §21 provenance problem in a new costume — a UI implying data it does
  * not have.
  */
+/**
+ * Just the research status, for a client that is waiting on it.
+ *
+ * ── Why this exists ─────────────────────────────────────────────────────────
+ *
+ * `enrichVehicle` both *starts* the research and *reports* it, and on 22 Aug
+ * that turned out to be two jobs. A real run wrote a complete dossier and 24
+ * NHTSA recalls in about sixty seconds, and the browser was told it had
+ * failed: the request outlived its response, the action returned no body, and
+ * `VehicleResearchStatus` read `.success` off `undefined`.
+ *
+ * The work was never the problem. **The answer had nowhere to arrive.** A
+ * client that waits on one long response has exactly one chance to hear the
+ * outcome, and that chance is spent on the leg most likely to be cut. The
+ * status is in the database the whole time.
+ *
+ * So the client keeps starting the work with `enrichVehicle` — §11's rule
+ * stands, the work needs a request that owns it — and stops depending on its
+ * return value. This is what it reads instead.
+ *
+ * ⚠ Cheap on purpose: one authorized read of one column, no model call, no
+ * write. It is polled every few seconds by a page somebody is looking at, and
+ * anything heavier here becomes a cost that scales with patience.
+ */
+export async function getResearchStatus(vehicleId: string) {
+  try {
+    /*
+      `read`, not `write`. This file is `'use server'`, so every export is a
+      public POST endpoint — including this one — and a status reader has no
+      business holding a write intent.
+    */
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'read' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
+    const { data } = await getServiceRoleClient()
+      .from('vehicle_knowledge_base')
+      .select('research_status')
+      .eq('vehicle_id', vehicleId)
+      .maybeSingle();
+
+    /*
+      A missing row reports `null` rather than an error. It is the state a
+      vehicle is in for the moment between its insert and its knowledge-base
+      insert, and the caller's job is to keep waiting — not to decide something
+      has gone wrong.
+    */
+    return { success: true, status: (data?.research_status as string | null) ?? null };
+  } catch (error) {
+    logger.warn('RESEARCH:STATUS_READ_FAILED', 'Could not read research status', {
+      vehicleId,
+      error: (error as Error)?.message,
+    });
+    return { success: false, error: 'Could not read research status' };
+  }
+}
+
 export async function enrichVehicle(vehicleId: string) {
   const startedAt = Date.now();
 
