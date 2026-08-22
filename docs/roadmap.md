@@ -1,6 +1,161 @@
 # CrewChief roadmap — image pipeline, backdrop, cockpit direction, and responsive web
 
-> ### ⚠ 21 Aug — START HERE. The device build is three minutes of David's time away.
+> ### ⚠ 22 Aug — START HERE. Four commits shipped; two migrations and one Apple link are waiting.
+>
+> **The device build is still the priority and still blocked on the same three minutes.**
+> Re-verified twice on 22 Aug, with the Expo token from `.env` so the CLI authenticates:
+>
+> ```
+> $ eas device:list
+> No Apple teams found for account masterson303.
+> ```
+>
+> `EXPO_TOKEN` in `.env` works and authenticates as `masterson303` — so **everything after
+> the Apple link is Claude Code's**, including `device:create` and the build. Only step 1
+> needs David:
+>
+> ```
+> cd apps/mobile && npx eas-cli credentials
+> ```
+>
+> ---
+>
+> #### ✅ Verified in production today — both 21 Aug fixes work
+>
+> David added a 2003 Accord (`91c9eaae`) through the real user path at 12:31:26. Sixty
+> seconds later: `research_status = completed`, a dossier with 7 known issues and a 9-item
+> maintenance schedule, and **24 NHTSA recalls** including the Takata inflator campaigns.
+>
+> `7a662f3` works. The recall tile correctly refused to claim an all-clear on an unresearched
+> car. **The board's "deployed and UNVERIFIED" line is closed.**
+>
+> ⚠ **A report that research "still fails" was wrong at the data layer, and the distinction
+> is the useful part.** The work completes; the *browser* is told it failed. The request
+> outlives its response, `enrichVehicle` returns no body, and the client reads `.success` off
+> `undefined` — `RESEARCH_STATUS:THREW`. One invocation ran 12:31:26 → 12:32:26 with writes at
+> +30s and +60s, so the function was not killed at 10s or 26s; the gateway gave up on the
+> response while the function ran on. **Netlify's function log for that minute is the one
+> piece of evidence not available from here** — the CLI is not logged in on this machine.
+>
+> So the fix is not to make research faster or split the dossier into stages. It is to stop
+> the browser awaiting a call that already works: the component already receives `status`, and
+> `research_status` reaches `completed` on its own. **Poll it.** That is the next research
+> task and it is small.
+>
+> #### 💰 The dossier is measured, for the first time
+>
+> ```
+> gemini-2.5-pro    1,054 in · 1,802 out · 2,045 thinking · 4,901 total · one attempt
+> ```
+>
+> **≈ $0.03–0.04 per vehicle** ($1.25/$10 per M for 2.5 Pro; ≈$0.030 at the flat $1.50/$7.50
+> the older figures use). Against `modification_details` at $0.0087 a call, a dossier is the
+> most expensive single call in the product — about 1.5% of the entire three-week bill, spent
+> once per vehicle added. `lib/vehicle-research.ts:140` says D6 is decided on this number; it
+> now has it.
+>
+> ⚠ **Thinking is 2,045 of 3,847 billed output tokens — 53% of what the call costs.**
+> `proStructuredConfig` sets temperature, topK, topP and `maxOutputTokens` and **no thinking
+> level**. It is the largest unexamined lever left in the bill. Unlike the mod paths this is a
+> research-and-judgment call, so the 21 Aug precedent (consultant and health summary stay at
+> `LOW`) may well apply — but it is now measurable the same way, and the invoice-extraction
+> note in `app/actions.ts` describes the corpus method for settling exactly this.
+>
+> ⚠ **Usage is recorded per attempt, before the parse** (`vehicle-research.ts:137`). A flow
+> that fails downstream still bills, and the retry loop bills up to three times. "No dossier
+> completed" and "a dossier was billed" are both true statements about the same run.
+>
+> #### What shipped 22 Aug
+>
+> | | |
+> |---|---|
+> | `c0ebf9e` | **the prose asserted the all-clear the tile had just refused** — see below |
+> | `bc24206` | a dossier that already exists is never paid for twice |
+> | `a0561b6` | research on activity, notify on devices — and one car is one push |
+> | `9c34b7d` | a VIN somebody else owns sent you to their car, then to nowhere |
+>
+> **⚠ The safety fix is the one to understand.** On the same screen where the tile said "We
+> have not checked this vehicle for recalls yet… This is not a clear result", the generated
+> narrative said **"While there are no active recalls, key high-mileage services must be
+> evaluated."** The 21 Aug fix landed on the component; the generator kept its own copy of the
+> question (`nhtsa?.recalls?.length || 0`), and a model handed "Active Recalls: 0" writes
+> "there are no active recalls", correctly. **Prose is the more dangerous half** — it is what
+> a person reads, and it carries no icon to qualify it.
+>
+> The same function's parse-failure defaults were `'Vehicle is in good condition'`,
+> `'Maintenance records up to date'` and `'No recalls to date'` — a clean bill of health on
+> every axis, applied exactly when least is known. Both are fixed; the rule lives in
+> `health-claims.ts` beside the tile's rule so the halves cannot drift again.
+>
+> **The generation gate was filtering on the wrong thing.** `vehiclesToGenerate` required
+> `hasPushToken`, which is sound about notifications and wrong about dossiers — a dossier
+> feeds the dashboard, the health report and the consultant's context, none of which involve
+> a phone. The reviewer's account has no device, so its Accord was unreachable by design.
+> Now: **research on `last_sign_in_at` within 90 days, notify on device tokens.**
+>
+> #### ⛔ Two migrations written and NOT applied — one SQL trip
+>
+> ```
+> supabase/migrations/20260821140000_the_same_car_should_not_be_researched_twice.sql
+> supabase/migrations/20260822120000_a_sweep_that_did_not_run_looks_like_a_quiet_night.sql
+> ```
+>
+> Both additive-only, one new table each, no drops and no grants touched — the "Potential
+> issue detected" modal should not fire on either. Until they land: the mod-detail cache is
+> inert (full price, nothing broken — the code falls through to generating), and the sweep
+> still has no durable record that it ran.
+>
+> #### ⚠ 24 push notifications are queued for the next real sweep
+>
+> A dry run against production, 22 Aug, before the fix:
+>
+> ```
+> scanned 3 · recallsPlanned 24 · servicesPlanned 1
+> ```
+>
+> The Accord's 24 un-raised campaigns were 24 separate pushes, to one phone, in one evening.
+> `SWEEP_SEND_CAP` is 200 for the whole run and there was no per-vehicle limit.
+> `recallsToRaise` already refuses this shape in the other direction — one recall repeating
+> nightly "ends with notifications disabled and every future recall unheard" — and 24 at once
+> ends the same way. It only happens on the first sweep after a car's recalls are fetched,
+> which means it lands on new users.
+>
+> `digestRecalls` fixes it: **one car is one notification**, headed by the count, with every
+> campaign still deduped. After:
+>
+> ```
+> scanned 3 · recallsPlanned 1 · recallCampaignsRaised 24 · generationPlanned 1
+> ```
+>
+> ⚠ **The fix is on `main`, and nothing deploys from `main`.** Until someone promotes, the
+> nightly sweep runs the old code from `web-live`. Whether it fires at all is unknown — see
+> the heartbeat, which exists precisely because that question has no answer today.
+>
+> #### State
+>
+> ```
+> main                 9c34b7d + this commit, clean
+> unpromoted           8 to web-live, 10 to demo-live  (counting this one)
+> web tests            150 suites / 2735 passing
+> mobile tests          23 suites /  329 passing
+> migrations pending   20260821140000, 20260822120000
+> ```
+>
+> #### Next, in order
+>
+> | # | What | Who |
+> |---|---|---|
+> | **1** | `npx eas-cli credentials` — the Apple link | **David · 3 min** |
+> | **2** | Apply the two migrations | **David / Cowork · one trip** |
+> | **3** | Poll `research_status` instead of awaiting `enrichVehicle` | Claude Code |
+> | **4** | Register the UDID, one EAS build, device QA | Claude Code |
+> | **5** | Measure a thinking level on the dossier against a corpus | Claude Code |
+>
+> ⚠ **The `DemoBanner` and CTA decisions below are still David's, and `20260818120000` is
+> done** — the ⛔ on it in the 19 Aug block was stale for three days and is now struck through.
+
+
+> ### 21 Aug — the device build is three minutes of David's time away. **Superseded by the 22 Aug block above; the blocker is unchanged and its research and cost sections are now out of date.**
 >
 > **David's stated priority is getting CrewChief onto his own iPhone.** Everything needed for
 > that is built and committed. It is blocked on exactly one thing, and it is not code.
@@ -308,7 +463,7 @@
 >
 > | # | What | Who | Note |
 > |---|---|---|---|
-> | **1** | **Apply `20260818120000`** | **Cowork / David** | ⛔ Additive only — five nullable columns, no drops, no policy or grant touched. The modal should NOT fire. Until this lands the IAP webhook 503s every notification |
+> | **1** | ~~Apply `20260818120000`~~ | — | ✅ **DONE — verified applied 22 Aug.** All five `account_entitlements` columns resolve against the live database (`last_signed_date`, `environment`, `revoked_at`, `auto_renew_status`, `latest_transaction_id`). The IAP webhook no longer 503s. This sat here as a ⛔ CRITICAL for three days after it had landed |
 > | **2** | **App Store Connect setup** | **David** · weekend | Products matching `PRODUCT_TIERS` **exactly**, the notifications URL, a sandbox tester, App Review info. Setup sheet with the verified strings was delivered 18 Aug. ✅ The promote it depended on is already done |
 > | **3** | **D2 — the price** | **David** | Standing recommendation $8.99/mo · $79/yr. Blocks creating the products, not the code: Apple returns a localised price and the app renders that |
 > | **4** | **The `DemoBanner` decision** | **David** | Gate it on an env var (cleanest — the codebase has no site-distinguishing flag yet), gate on hostname, or leave it. Costs a promote |
