@@ -39,8 +39,10 @@
 >
 > So the fix is not to make research faster or split the dossier into stages. It is to stop
 > the browser awaiting a call that already works: the component already receives `status`, and
-> `research_status` reaches `completed` on its own. **Poll it.** That is the next research
-> task and it is small.
+> `research_status` reaches `completed` on its own. **Poll it.** ✅ Shipped the same day as
+> `b6d05a8`: `enrichVehicle` still starts the work, because §11 says the work needs a request
+> that owns it, but the record decides the outcome. Only `failed`, or three minutes of
+> `pending`, shows the retry button now.
 >
 > #### 💰 The dossier is measured, for the first time
 >
@@ -73,6 +75,7 @@
 > | `bc24206` | a dossier that already exists is never paid for twice |
 > | `a0561b6` | research on activity, notify on devices — and one car is one push |
 > | `9c34b7d` | a VIN somebody else owns sent you to their car, then to nowhere |
+> | `b6d05a8` | **the dossier landed and the browser was told it had failed** — the action's return value is a hint now; `research_status` is the verdict |
 >
 > **⚠ The safety fix is the one to understand.** On the same screen where the tile said "We
 > have not checked this vehicle for recalls yet… This is not a clear result", the generated
@@ -134,9 +137,9 @@
 > #### State
 >
 > ```
-> main                 9c34b7d + this commit, clean
-> unpromoted           8 to web-live, 10 to demo-live  (counting this one)
-> web tests            150 suites / 2735 passing
+> main                 b6d05a8, clean
+> unpromoted           10 to web-live, 12 to demo-live
+> web tests            150 suites / 2737 passing
 > mobile tests          23 suites /  329 passing
 > migrations pending   20260821140000, 20260822120000
 > ```
@@ -147,9 +150,10 @@
 > |---|---|---|
 > | **1** | `npx eas-cli credentials` — the Apple link | **David · 3 min** |
 > | **2** | Apply the two migrations | **David / Cowork · one trip** |
-> | **3** | Poll `research_status` instead of awaiting `enrichVehicle` | Claude Code |
-> | **4** | Register the UDID, one EAS build, device QA | Claude Code |
+> | **3** | ~~Poll `research_status` instead of awaiting `enrichVehicle`~~ | ✅ **`b6d05a8`** |
+> | **4** | Register the UDID, one EAS build, device QA | Claude Code · after 1 |
 > | **5** | Measure a thinking level on the dossier against a corpus | Claude Code |
+> | **6** | Decide whether a UNIQUE VIN should block a car's new owner | **David** |
 >
 > ⚠ **The `DemoBanner` and CTA decisions below are still David's, and `20260818120000` is
 > done** — the ⛔ on it in the 19 Aug block was stale for three days and is now struck through.
