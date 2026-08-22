@@ -10,7 +10,12 @@
  * all-clear on a safety claim.
  */
 
-import { healthClaim, mayReassure, type ClaimKind } from '@crewchief/core/health-claims';
+import {
+  healthClaim,
+  mayReassure,
+  recallEvidenceForPrompt,
+  type ClaimKind,
+} from '@crewchief/core/health-claims';
 
 const KINDS: ClaimKind[] = ['recall', 'maintenance', 'issues'];
 
@@ -108,5 +113,79 @@ describe('the three states stay three', () => {
     );
 
     expect(Array.from(states).sort()).toEqual(['attention:false', 'clear:true', 'unknown:false']);
+  });
+});
+
+describe('the narrative cannot claim what the tile refused', () => {
+  /*
+    ⚠ Found 22 Aug on a live run, one element over from the defect this file
+    was written for. The tile said "We have not checked this vehicle for
+    recalls yet… This is not a clear result." and the generated prose on the
+    same screen said **"While there are no active recalls, key high-mileage
+    services must be evaluated."**
+
+    The tile had been fixed and the prompt had not, because the prompt held its
+    own copy of the question: `nhtsa?.recalls?.length || 0`. A model handed
+    "Active Recalls: 0" writes "there are no active recalls", correctly.
+  */
+
+  it('never states a count when nothing was checked', () => {
+    const block = recallEvidenceForPrompt({ checked: false, count: 0 });
+
+    // The zero is the whole bug. It must not reach the model in any form.
+    expect(block).not.toMatch(/Active Recalls:/);
+    expect(block).not.toMatch(/\b0\b/);
+  });
+
+  it('forbids the inference rather than merely omitting the number', () => {
+    /*
+      Omission is not enough and this is the assertion that says so. A model
+      given no recall section fills the silence with the reassuring reading —
+      the summary's whole job is to sound confident. The prohibition is the
+      payload.
+    */
+    const block = recallEvidenceForPrompt({ checked: false, count: 0 });
+
+    expect(block).toMatch(/NOT CHECKED/);
+    expect(block).toMatch(/UNKNOWN — it is not zero/);
+    expect(block).toMatch(/must NOT write that there are no recalls/i);
+  });
+
+  it('still reports a real check, including a clean one', () => {
+    /*
+      Anti-vacuous in the direction that matters. A rule that refused to state
+      any recall information would pass every assertion above while making the
+      summary useless — "we checked and found nothing" is a real answer and the
+      owner is entitled to it.
+    */
+    const clean = recallEvidenceForPrompt({ checked: true, count: 0 });
+    expect(clean).toMatch(/Active Recalls: 0/);
+    expect(clean).toMatch(/none found/);
+
+    const found = recallEvidenceForPrompt({
+      checked: true,
+      count: 24,
+      headlines: ["Driver's air bag inflator may rupture"],
+    });
+    expect(found).toMatch(/Active Recalls: 24/);
+    expect(found).toMatch(/inflator may rupture/);
+  });
+
+  it('agrees with the tile on the same evidence', () => {
+    /*
+      The two halves that drifted, pinned to one flag. Whatever `checked` says,
+      the tile and the prompt must be making the same claim — that is the
+      property whose absence produced a screen contradicting itself.
+    */
+    for (const checked of [true, false]) {
+      const tileReassures = mayReassure(healthClaim('recall', '', checked));
+      const promptAllowsAllClear = !/must NOT write/i.test(
+        recallEvidenceForPrompt({ checked, count: 0 })
+      );
+
+      expect(`checked=${checked}:${tileReassures}`).toBe(
+        `checked=${checked}:${promptAllowsAllClear}`
+      );
+    }
   });
 });

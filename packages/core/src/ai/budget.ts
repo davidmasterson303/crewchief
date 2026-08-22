@@ -62,7 +62,24 @@ export interface Tier {
  */
 export const TIERS: Record<TierName, Tier> = {
   free: { name: 'free', monthlyOutputTokens: 400_000 },
-  paid: { name: 'paid', monthlyOutputTokens: 2_000_000 },
+  /*
+    ⚠ Lowered 2,000,000 → 1,000,000 on 21 Aug, when the price landed at $3.99.
+
+    The old ceiling was sized for a $9–15 subscription. At $3.99, Apple's 15%
+    leaves $3.39 — so a ceiling of 2M output-equivalent tokens (~$15 at Flash's
+    $7.50/M) was **4.4× the revenue it was supposed to protect**. A ceiling
+    above net revenue is not a ceiling, it is a maximum loss.
+
+    1M is ~$7.50 worst case, still 2.5× the free tier, and roughly three times
+    the heaviest month any real account has ever produced: the developer's own
+    account, building daily, measured $3.10/month across every purpose.
+
+    ⚠ It remains a fuse rather than a plan. Nobody real is expected to approach
+    it, and the two changes shipped alongside — caching modification details and
+    dropping their thinking budget — cut typical spend by more than this cap
+    does. This bounds the tail; those reduce the median.
+  */
+  paid: { name: 'paid', monthlyOutputTokens: 1_000_000 },
 };
 
 /**

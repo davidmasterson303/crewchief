@@ -16,9 +16,11 @@ import userEvent from '@testing-library/user-event';
 import { VehicleResearchStatus } from '@/components/VehicleResearchStatus';
 
 const enrichVehicle = jest.fn();
+const getResearchStatus = jest.fn();
 
 jest.mock('@/app/actions', () => ({
   enrichVehicle: (...args: unknown[]) => enrichVehicle(...args),
+  getResearchStatus: (...args: unknown[]) => getResearchStatus(...args),
 }));
 
 const VEHICLE = 'b2000000-0000-4000-8000-000000000001';
@@ -26,6 +28,8 @@ const VEHICLE = 'b2000000-0000-4000-8000-000000000001';
 beforeEach(() => {
   enrichVehicle.mockReset();
   enrichVehicle.mockResolvedValue({ success: true });
+  getResearchStatus.mockReset();
+  getResearchStatus.mockResolvedValue({ success: true, status: 'pending' });
 });
 
 describe('a vehicle whose research has landed', () => {
@@ -94,15 +98,77 @@ describe('when research fails', () => {
     await waitFor(() => expect(enrichVehicle).toHaveBeenCalledWith(VEHICLE));
   });
 
-  it('shows the failure state when a pending run comes back unsuccessful', async () => {
+  it('shows the failure state when the record says the research failed', async () => {
     enrichVehicle.mockResolvedValue({ success: false, error: 'upstream exploded' });
+    getResearchStatus.mockResolvedValue({ success: true, status: 'failed' });
+
     render(<VehicleResearchStatus vehicleId={VEHICLE} status="pending" onComplete={() => {}} />);
+
     expect(await screen.findByRole('button', { name: /retry/i })).toBeInTheDocument();
   });
+});
 
-  it('shows the failure state when enrichment throws', async () => {
-    enrichVehicle.mockRejectedValue(new Error('network died'));
-    render(<VehicleResearchStatus vehicleId={VEHICLE} status="pending" onComplete={() => {}} />);
-    expect(await screen.findByRole('button', { name: /retry/i })).toBeInTheDocument();
+describe('a call that never came back', () => {
+  /*
+    ⚠ These two replaced assertions that a thrown or unsuccessful
+    `enrichVehicle` means failure. That was the contract until 22 Aug, when a
+    live run wrote a complete dossier and 24 NHTSA recalls in about sixty
+    seconds while this component showed the failure state and a retry button.
+
+    The request had outlived its response, the action returned no body, and
+    `result.success` threw on `undefined`. The work was never the problem —
+    the answer had nowhere to arrive.
+
+    So the action's return value is a hint and `research_status` is the
+    verdict. The old tests were not wrong about the code; they were pinning a
+    contract that turned out to describe the wrong thing.
+  */
+
+  it('completes when the record says so, even though the call rejected', async () => {
+    const onComplete = jest.fn();
+    enrichVehicle.mockRejectedValue(new Error('gateway gave up'));
+    getResearchStatus.mockResolvedValue({ success: true, status: 'completed' });
+
+    render(<VehicleResearchStatus vehicleId={VEHICLE} status="pending" onComplete={onComplete} />);
+
+    await waitFor(() => expect(onComplete).toHaveBeenCalled());
+    expect(screen.queryByRole('button', { name: /retry/i })).not.toBeInTheDocument();
+  });
+
+  it('completes when the record says so, even though the call reported failure', async () => {
+    /*
+      The other half, and the less obvious one. A *returned* failure is a
+      server that reached the end and said so — but `enrichVehicle` can report
+      failure for a dossier that completed on an earlier attempt, which is the
+      exact state a retry lands in.
+    */
+    const onComplete = jest.fn();
+    enrichVehicle.mockResolvedValue({ success: false, error: 'enrichment failed' });
+    getResearchStatus.mockResolvedValue({ success: true, status: 'completed' });
+
+    render(<VehicleResearchStatus vehicleId={VEHICLE} status="pending" onComplete={onComplete} />);
+
+    await waitFor(() => expect(onComplete).toHaveBeenCalled());
+    expect(screen.queryByRole('button', { name: /retry/i })).not.toBeInTheDocument();
+  });
+
+  it('keeps waiting rather than declaring failure while the record still says pending', async () => {
+    /*
+      Anti-vacuous in the direction that matters. A component that never showed
+      the failure state would pass both assertions above while stranding
+      everybody whose research genuinely failed — so this pins that a pending
+      record produces neither an early completion nor an early retry button.
+    */
+    const onComplete = jest.fn();
+    enrichVehicle.mockRejectedValue(new Error('gateway gave up'));
+    getResearchStatus.mockResolvedValue({ success: true, status: 'pending' });
+
+    render(<VehicleResearchStatus vehicleId={VEHICLE} status="pending" onComplete={onComplete} />);
+
+    await waitFor(() => expect(getResearchStatus).toHaveBeenCalledWith(VEHICLE));
+
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /retry/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/still learning about this car/i)).toBeInTheDocument();
   });
 });

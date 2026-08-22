@@ -98,12 +98,41 @@ export function recallNotification(params: {
   vehicleId: string;
   vehicleName: string;
   recallSummary: string;
+  /**
+   * How many campaigns this one notification covers, including the one in the
+   * body. Defaults to 1 — a single recall reads exactly as it always did.
+   *
+   * ⚠ Added 22 Aug, when a dry run showed 24 campaigns on one car queued as 24
+   * separate pushes. See `digestRecalls`.
+   */
+  campaignCount?: number;
 }): NotificationContent {
   const { vehicleId, vehicleName, recallSummary } = params;
+  const count = params.campaignCount ?? 1;
 
+  if (count <= 1) {
+    return {
+      title: `Recall notice — ${vehicleName}`,
+      body: `${truncate(recallSummary, 140)} Tap to see what it means and what to do.`,
+      url: recallsUrl(vehicleId),
+    };
+  }
+
+  /*
+    ⚠ "match your" rather than "affect your", and that is not hedging for its
+    own sake. CLAUDE.md §10: recalls match on **year, make and model — not
+    VIN**. Telling an owner that 24 recalls *affect their car* claims their
+    specific vehicle was checked against each campaign, which is exactly the
+    overclaim `advice-range.ts` argues against and `health-claims.ts` was
+    written to undo one screen over.
+
+    The count is still the headline, because it is the true and useful part:
+    somebody whose car matches two dozen campaigns needs to open the screen,
+    and that is what this notification is for.
+  */
   return {
-    title: `Recall notice — ${vehicleName}`,
-    body: `${truncate(recallSummary, 140)} Tap to see what it means and what to do.`,
+    title: `${count} recalls match your ${vehicleName}`,
+    body: `Including: ${truncate(recallSummary, 120)} Tap to see all ${count} and what to do about them.`,
     url: recallsUrl(vehicleId),
   };
 }

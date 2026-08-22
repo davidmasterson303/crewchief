@@ -111,8 +111,12 @@ export interface GenerationCandidate {
   userId: string;
   /** `research_status` from `vehicle_knowledge_base`, or null when no row exists. */
   researchStatus: string | null;
-  /** Whether the account has at least one registered device. */
-  hasPushToken: boolean;
+  /**
+   * `last_sign_in_at` for the owning account, ISO, or null if never.
+   *
+   * ⚠ This was `hasPushToken`, and the swap is the point — see filter 3.
+   */
+  lastSignInAt: string | null;
   /** `current_mileage`. A car with no reading cannot produce a due date. */
   mileage: number | null;
 }
@@ -147,25 +151,90 @@ export interface GenerationCandidate {
  * row with `pending`, so a null here means something else is wrong and the
  * sweep is not the place to repair it.
  *
- * **3. No push token, no generation.** Spending a Pro call at 3am to compute a
- * notification for an account with no registered device is money for nobody.
+ * **3. The account has signed in recently.** ⚠ **This filter used to read
+ * `hasPushToken`, and it was filtering on the wrong thing.**
+ *
+ * The reasoning was "spending a Pro call at 3am for an account with no
+ * registered device is money for nobody", which is sound about *notifications*
+ * and wrong about *dossiers*. A dossier is not notification fuel. It feeds the
+ * web dashboard, the health report and the consultant's context — none of
+ * which involve a phone. Gating research on device registration conflated who
+ * should be *told* something with whose data is worth *building*.
+ *
+ * The cost of that conflation was visible in production on 22 Aug: the App
+ * Store reviewer's account has no device and never will unless Apple registers
+ * one, so its 2003 Accord — a car inside the Takata campaigns — sat at
+ * `research_status = 'pending'` with no NHTSA record, and the sweep could not
+ * reach it by design. Every web-only user is in the same position, and after
+ * `health-claims.ts` their recall tile honestly reads "we cannot say" forever.
+ *
+ * So the brake stays and its subject changes: **research on account activity,
+ * notify on device tokens.** An account that signed in within
+ * `RESEARCH_ACTIVITY_WINDOW_DAYS` is somebody who might open the dashboard the
+ * dossier is for. A dormant account is still money for nobody, which is the
+ * part of the old reasoning that was right.
+ *
+ * ⚠ A null `lastSignInAt` does **not** pass. An account that has never signed
+ * in has never seen a dashboard, and "never" must not read as "recently" —
+ * `null` is never `0`, in dates as much as in odometers.
  *
  * **4. `mileage > 0`.** `collectService` already refuses these, so generating
  * for one could not produce a notification even if it succeeded.
  */
 export function vehiclesToGenerate(
   candidates: GenerationCandidate[],
-  cap: number = SWEEP_GENERATE_CAP
+  cap: number = SWEEP_GENERATE_CAP,
+  now: Date = new Date()
 ): SweepPlan<GenerationCandidate> {
   const eligible = candidates.filter(
     (candidate) =>
       candidate.researchStatus === 'pending' &&
-      candidate.hasPushToken &&
+      signedInRecently(candidate.lastSignInAt, now) &&
       typeof candidate.mileage === 'number' &&
       candidate.mileage > 0
   );
 
   return applySendCap(eligible, cap);
+}
+
+/**
+ * How recently an account must have signed in for its cars to be worth
+ * researching.
+ *
+ * Ninety days is a judgement, not a measurement, and it is written here rather
+ * than inlined so it can be argued with. The question it answers is "is there
+ * a person who might look at this?" — a quarter is long enough to cover
+ * somebody who checks their car seasonally, and short enough that an abandoned
+ * account stops costing Pro calls within one billing quarter.
+ *
+ * ⚠ It is a **cost** brake, not a correctness one. Widening it spends more and
+ * breaks nothing; narrowing it leaves honest `unknown` tiles on real accounts.
+ * That asymmetry is why the number errs long.
+ */
+export const RESEARCH_ACTIVITY_WINDOW_DAYS = 90;
+
+/**
+ * Whether an account counts as active.
+ *
+ * ⚠ Exported so the rule is one thing rather than a date comparison repeated
+ * at a call site, and so a test can hold it to the boundary directly. An
+ * unparseable or absent timestamp is **not** recent: absence is not evidence
+ * of activity, and this is the direction that spends nothing rather than the
+ * one that guesses.
+ */
+export function signedInRecently(lastSignInAt: string | null | undefined, now: Date): boolean {
+  if (!lastSignInAt) return false;
+
+  const seen = new Date(lastSignInAt).getTime();
+  if (Number.isNaN(seen)) return false;
+
+  const ageMs = now.getTime() - seen;
+
+  // A future timestamp is clock skew, not activity — but it is also not a
+  // reason to refuse, since the account plainly exists and signed in.
+  if (ageMs < 0) return true;
+
+  return ageMs <= RESEARCH_ACTIVITY_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 }
 
 /**
@@ -283,6 +352,92 @@ export function applySendCap<T>(candidates: T[], cap: number = SWEEP_SEND_CAP): 
     considered: candidates.length,
     capped: candidates.length > cap,
   };
+}
+
+/** One night's recall notification for one car, covering every campaign on it. */
+export interface RecallDigest {
+  userId: string;
+  vehicleId: string;
+  name: string;
+  /**
+   * Every campaign this one notification covers.
+   *
+   * ⚠ All of them get a dedupe row, not just the one in the body. Writing only
+   * the headline's row would re-raise the other twenty-three tomorrow night,
+   * and the night after — the runaway `recallsToRaise` refuses to start,
+   * arriving instead through the send path.
+   */
+  campaignNumbers: string[];
+  /** The campaign the body leads with. The first un-raised one for this car. */
+  headline: string;
+}
+
+/**
+ * One car, one recall notification — however many campaigns it has.
+ *
+ * ── The night this was written for ──────────────────────────────────────────
+ *
+ * 22 Aug, a dry run against production: `recallsPlanned: 24`. A 2003 Accord
+ * had just had its NHTSA record fetched for the first time, and every one of
+ * its twenty-four un-raised campaigns was a separate push. `SWEEP_SEND_CAP` is
+ * 200 for the whole run and there was no per-vehicle limit, so all 24 would
+ * have gone out that evening, to one phone, about one car.
+ *
+ * ⚠ **That is the failure `recallsToRaise` already refuses in its own
+ * docblock** — "it ends with notifications disabled and every future recall
+ * unheard" — arriving from the other direction. That paragraph is about the
+ * same recall repeating nightly; this is twenty-four different ones arriving
+ * at once. The user-visible event is identical, and so is the ending.
+ *
+ * It only appears on the *first* sweep after a car's recalls are fetched,
+ * because every campaign is deduped afterwards. That makes it rare, and it
+ * makes it land on new users — the population least willing to spend goodwill
+ * on a product that has just buzzed twenty-four times.
+ *
+ * ── Why a digest rather than a cap ──────────────────────────────────────────
+ *
+ * A per-vehicle cap of, say, three would send three and silently drop
+ * twenty-one safety notices, or defer them to later nights and buzz for a
+ * week. The count is the honest headline: an owner who learns their car has 24
+ * open campaigns has been told the important thing, and the screen behind the
+ * tap has all of them.
+ *
+ * ⚠ **Grouping is by vehicle, not by account.** Two cars with recalls produce
+ * two notifications, because they are two different actions the owner has to
+ * take and the destination screen is per-vehicle. Collapsing across cars would
+ * make the notification unactionable to save a buzz.
+ */
+export function digestRecalls(
+  candidates: Array<{
+    userId: string;
+    vehicleId: string;
+    name: string;
+    campaignNumber: string;
+    summary: string;
+  }>
+): RecallDigest[] {
+  const byVehicle = new Map<string, RecallDigest>();
+
+  for (const candidate of candidates) {
+    const existing = byVehicle.get(candidate.vehicleId);
+
+    if (existing) {
+      existing.campaignNumbers.push(candidate.campaignNumber);
+      continue;
+    }
+
+    byVehicle.set(candidate.vehicleId, {
+      userId: candidate.userId,
+      vehicleId: candidate.vehicleId,
+      name: candidate.name,
+      campaignNumbers: [candidate.campaignNumber],
+      headline: candidate.summary,
+    });
+  }
+
+  // Insertion order — the scan's order, which is the vehicle table's order.
+  // Stable, so a capped run truncates the same way twice.
+  return Array.from(byVehicle.values());
 }
 
 /**

@@ -15,7 +15,13 @@ import { POWERTRAIN_OPTIONS_PROMPT, CONSULTANT_SYSTEM_PROMPT, CONSULTANT_DOCUMEN
 import { researchVehicleDossier } from '@/lib/vehicle-research';
 import { showsModifications } from '@crewchief/core/mod-progression';
 import { logger } from '@crewchief/core/logger';
+import { healthClaim, recallEvidenceForPrompt } from '@crewchief/core/health-claims';
+import { CONTACT_EMAIL } from '@/lib/legal';
 import { checkRateLimit } from '@/lib/rate-limit';
+import {
+  isModDetailCacheFresh,
+  modDetailCacheKey,
+} from '@crewchief/core/mod-detail-cache';
 import { platformClientIp } from '@crewchief/core/client-ip';
 import { recomputePerformanceStats } from '@/lib/performance-stats';
 import { recordAiUsageInBackground } from '@/lib/ai-usage';
@@ -124,16 +130,89 @@ export async function decodeVIN(vin: string) {
 
     const vinUpper = vin.toUpperCase();
 
+    /*
+      ── Whose garage, and the three faults this one query had ────────────────
+
+      Found 22 Aug by entering a VIN that another account already held. The
+      user was told "This vehicle is already in your garage", waited two
+      seconds, and was **bounced to the garage with no message at all** — the
+      redirect went to a dashboard `authorizeVehicleAccess` correctly refuses.
+
+      Three separate faults, one query:
+
+      1. **`client` is the service role, so this searched every account.** The
+         VIN column is `UNIQUE` across the whole table, so the row that came
+         back was as likely to be a stranger's as the caller's.
+      2. **The message asserted ownership the query had not established.** "In
+         your garage" is a claim about *whose* car it is, and the filter that
+         would have made it true was missing.
+      3. **It handed the caller another account's `vehicleId`**, which the form
+         then navigated to. Authorization held — nothing leaked, and the bounce
+         *is* the authorization working — but the dead end was manufactured
+         here, two layers earlier.
+
+      Now scoped to the caller. `.eq('user_id', session.userId)` on a
+      service-role client is the explicit filter `requireCaller`'s docblock
+      argues for: RLS is the control, and an explicit filter means a policy
+      regression surfaces as a bug in one path rather than a cross-tenant read.
+    */
     logger.debug('VIN:CHECK_EXISTING', 'Checking for existing vehicle');
-    const { data: existingVehicle } = await client
+    const { data: ownedVehicle } = await client
+      .from('vehicles')
+      .select('id')
+      .eq('vin', vinUpper)
+      .eq('user_id', session.userId)
+      .maybeSingle();
+
+    if (ownedVehicle) {
+      logger.warn('VIN:ALREADY_IN_GARAGE', 'Vehicle already in this garage', {
+        vehicleId: ownedVehicle.id,
+      });
+      return {
+        success: false,
+        error: 'This vehicle is already in your garage',
+        vehicleId: ownedVehicle.id,
+      };
+    }
+
+    /*
+      Not the caller's, but somebody's. The insert would fail on the UNIQUE
+      constraint anyway, and it would fail as "Failed to save vehicle" six
+      screens later — after the whole wizard had been filled in.
+
+      ⚠ **No `vehicleId` here, deliberately.** That field is what the form
+      redirects on, and there is nowhere to send this person: the vehicle is
+      not theirs to open. Returning it produced the silent bounce.
+
+      ⚠ The message says a VIN is registered and nothing else. No owner, no id,
+      no "belongs to <someone>". It is a real if small disclosure — you can
+      learn a given VIN is in CrewChief — and the alternative is a dead end
+      with no explanation, which is worse for the one person who has a genuine
+      reason to be here: somebody who has just bought the car.
+
+      ⚠ Which is a product limitation this does not fix. A `UNIQUE` VIN means a
+      sold car can never be added by its new owner, and the honest answer for
+      them is a support conversation rather than a self-service path. Changing
+      that is a migration and a decision about what transferring a vehicle
+      means; naming it here so the next reader knows the constraint is the
+      cause and not this branch.
+    */
+    const { data: registeredElsewhere } = await client
       .from('vehicles')
       .select('id')
       .eq('vin', vinUpper)
       .maybeSingle();
 
-    if (existingVehicle) {
-      logger.warn('VIN:ALREADY_EXISTS', 'Vehicle already in garage', { vehicleId: existingVehicle.id });
-      return { success: false, error: 'This vehicle is already in your garage', vehicleId: existingVehicle.id };
+    if (registeredElsewhere) {
+      logger.warn('VIN:REGISTERED_ELSEWHERE', 'VIN belongs to another account', {
+        // Not the vehicle id: this log line is about a caller who does not own
+        // it, and an id here is one copy-paste from a support reply.
+        vinLength: vinUpper.length,
+      });
+      return {
+        success: false,
+        error: `This VIN is already registered to another CrewChief account. If you have just bought this vehicle, contact ${CONTACT_EMAIL} and we will transfer it.`,
+      };
     }
 
     logger.debug('VIN:FETCHING_NHTSA', 'Fetching NHTSA data');
@@ -372,6 +451,64 @@ export async function createVehicle(vehicleData: {
  * the §21 provenance problem in a new costume — a UI implying data it does
  * not have.
  */
+/**
+ * Just the research status, for a client that is waiting on it.
+ *
+ * ── Why this exists ─────────────────────────────────────────────────────────
+ *
+ * `enrichVehicle` both *starts* the research and *reports* it, and on 22 Aug
+ * that turned out to be two jobs. A real run wrote a complete dossier and 24
+ * NHTSA recalls in about sixty seconds, and the browser was told it had
+ * failed: the request outlived its response, the action returned no body, and
+ * `VehicleResearchStatus` read `.success` off `undefined`.
+ *
+ * The work was never the problem. **The answer had nowhere to arrive.** A
+ * client that waits on one long response has exactly one chance to hear the
+ * outcome, and that chance is spent on the leg most likely to be cut. The
+ * status is in the database the whole time.
+ *
+ * So the client keeps starting the work with `enrichVehicle` — §11's rule
+ * stands, the work needs a request that owns it — and stops depending on its
+ * return value. This is what it reads instead.
+ *
+ * ⚠ Cheap on purpose: one authorized read of one column, no model call, no
+ * write. It is polled every few seconds by a page somebody is looking at, and
+ * anything heavier here becomes a cost that scales with patience.
+ */
+export async function getResearchStatus(vehicleId: string) {
+  try {
+    /*
+      `read`, not `write`. This file is `'use server'`, so every export is a
+      public POST endpoint — including this one — and a status reader has no
+      business holding a write intent.
+    */
+    const access = await authorizeVehicleAccess(vehicleId, { intent: 'read' });
+    if (!access.ok) {
+      return { success: false, error: access.error };
+    }
+
+    const { data } = await getServiceRoleClient()
+      .from('vehicle_knowledge_base')
+      .select('research_status')
+      .eq('vehicle_id', vehicleId)
+      .maybeSingle();
+
+    /*
+      A missing row reports `null` rather than an error. It is the state a
+      vehicle is in for the moment between its insert and its knowledge-base
+      insert, and the caller's job is to keep waiting — not to decide something
+      has gone wrong.
+    */
+    return { success: true, status: (data?.research_status as string | null) ?? null };
+  } catch (error) {
+    logger.warn('RESEARCH:STATUS_READ_FAILED', 'Could not read research status', {
+      vehicleId,
+      error: (error as Error)?.message,
+    });
+    return { success: false, error: 'Could not read research status' };
+  }
+}
+
 export async function enrichVehicle(vehicleId: string) {
   const startedAt = Date.now();
 
@@ -1789,6 +1926,27 @@ export async function generateVehicleHealthSummary(vehicleId: string, forceRefre
 
     const completedIssues = issueTracking.filter((t: any) => t.status === 'completed').length;
     const totalIssues = knowledge?.known_issues?.length || 0;
+    /*
+      ⚠ **Whether the recall lookup ran at all**, which is a different question
+      from how many it found — and conflating them is the 21 Aug defect.
+
+      Found again 22 Aug, one element over. `health-claims.ts` fixed the
+      *tile*: a 2003 Accord with no NHTSA record now reads "We have not checked
+      this vehicle for recalls yet… This is not a clear result." On the same
+      screen, the generated narrative said **"While there are no active
+      recalls, key high-mileage services must be evaluated."**
+
+      The tile refused the claim and the prose made it anyway, because the
+      count below is `nhtsa?.recalls?.length || 0` and the prompt was handed
+      that zero with nothing to say where it came from. A model told "Active
+      Recalls: 0" writes "there are no active recalls", correctly. `null` is
+      never `0` — CLAUDE.md §6 — and a count is not evidence that anybody
+      looked.
+
+      Prose is the more dangerous of the two, because it is the part a person
+      actually reads and it carries no icon to qualify it.
+    */
+    const recallsChecked = Boolean(nhtsa);
     const activeRecalls = nhtsa?.recalls?.length || 0;
     const completedService = serviceItems.filter((s: any) => s.status === 'completed').length;
     const pendingService = serviceItems.filter((s: any) => s.status !== 'completed').length;
@@ -1824,8 +1982,13 @@ ISSUE STATUS:
 - Known Issues Addressed: ${completedIssues}/${totalIssues}
 
 RECALLS:
-- Active Recalls: ${activeRecalls}
-${nhtsa?.recalls?.slice(0, 3).map((r: any) => `  - ${r.summary || r.description || 'Recall'}`).join('\n') || 'None'}
+${recallEvidenceForPrompt({
+  checked: recallsChecked,
+  count: activeRecalls,
+  headlines: (nhtsa?.recalls ?? [])
+    .slice(0, 3)
+    .map((r: any) => r.summary || r.description || 'Recall'),
+})}
 
 Treat the invoice line items above as completed, documented work. An owner who
 has uploaded invoices has a documented history, and the assessment must not
@@ -1856,12 +2019,42 @@ Format as valid JSON only, no markdown.`;
 
     const responseText = result.text || '';
 
+    /*
+      ⚠ **The defaults used to be a clean bill of health**, and they applied
+      when the model's JSON failed to parse:
+
+          summary:            'Vehicle is in good condition'
+          maintenance_status: 'Maintenance records up to date'
+          recall_status:      'No recalls to date'
+          health_score:       70
+
+      So a parse failure on a car nobody had researched produced a confident
+      all-clear on every axis at once — the 21 Aug defect again, arriving
+      through the error path rather than the data. A fallback is what runs when
+      we know least; it is the last place that should sound certain.
+
+      They now say what is true when generation failed: nothing is known. The
+      score stays at 70 because it is a documented neutral rather than a claim
+      — `advice-range.ts` carries that argument — and the copy no longer
+      dresses it as good news.
+
+      `recall_status` routes through `healthClaim` so the string this writes
+      and the string the tile renders cannot drift apart: an unchecked vehicle
+      gets the same "we cannot say" sentence in both places. ⚠ Writing an
+      all-clear here would have defeated the tile fix anyway — `healthClaim`
+      treats any written status as evidence and would have rendered
+      "No recalls to date" verbatim.
+    */
     let healthData = {
       health_score: 70,
-      summary: 'Vehicle is in good condition',
+      summary: 'We could not generate an assessment for this vehicle.',
       red_flags: [] as string[],
-      maintenance_status: 'Maintenance records up to date',
-      recall_status: activeRecalls > 0 ? `${activeRecalls} active recalls` : 'No recalls to date',
+      maintenance_status: '',
+      recall_status: healthClaim(
+        'recall',
+        activeRecalls > 0 ? `${activeRecalls} active recalls` : '',
+        recallsChecked
+      ).text,
       issues_overview: `${completedIssues} of ${totalIssues} known issues addressed`,
       recommendations: ['Keep regular maintenance schedule'],
     };
@@ -1869,7 +2062,15 @@ Format as valid JSON only, no markdown.`;
     try {
       healthData = JSON.parse(responseText);
       if (healthData.health_score === undefined) healthData.health_score = 70;
-      if (!healthData.summary) healthData.summary = 'Vehicle is in good condition';
+      /*
+        ⚠ Same reasoning as the defaults above, and this one is easier to miss:
+        it re-imposes the all-clear on a *successful* parse whose summary came
+        back empty. The model declining to summarise is not evidence the car is
+        fine.
+      */
+      if (!healthData.summary) {
+        healthData.summary = 'We could not generate an assessment for this vehicle.';
+      }
       if (!Array.isArray(healthData.red_flags)) healthData.red_flags = [];
       if (!Array.isArray(healthData.recommendations)) healthData.recommendations = [];
     } catch {
@@ -2025,6 +2226,76 @@ export async function generateModificationDetails(vehicleId: string, modName: st
       performanceMindset || vehicle.performance_mindedness
     );
 
+    /*
+      ⚠ The cache read, and it is the whole reason this call stopped being 89%
+      of the AI bill.
+
+      Keyed on the **content of the question** rather than on `vehicle_id`, so
+      the first owner of a 2018 Accord to open "cold air intake" pays for it and
+      every owner after them does not. `performance_mod_cache` keys on the
+      vehicle and therefore cannot do this — see the core module.
+
+      A cache miss is not an error and a cache failure is not either: if the
+      table is absent or the read throws, this falls through to generating, and
+      the only cost is the call we were making anyway. That direction matters —
+      a cache that can take the feature down is worse than no cache.
+    */
+    const cacheKey = modDetailCacheKey({
+      year: vehicle.year,
+      make: vehicle.make,
+      model: vehicle.model,
+      modName,
+      performanceGoal,
+      ownershipObjective: vehicle.ownership_objective,
+    });
+
+    try {
+      const { data: cached } = await client
+        .from('mod_detail_cache')
+        .select('details, cached_at, hit_count')
+        .eq('cache_key', cacheKey)
+        .maybeSingle();
+
+      if (cached && isModDetailCacheFresh(cached.cached_at as string)) {
+        /*
+          Fire-and-forget. A hit counter that can fail the request it is
+          counting has the priorities backwards.
+
+          ⚠ `hit_count` has to be in the select above, and it was not. The
+          update reads it off the row it just fetched, so an unselected column
+          is `undefined`, `?? 0` makes it zero, and every hit writes 1. The
+          counter would have read 1 forever — not an error, not a wrong answer,
+          just a number that always agrees with itself. Its column comment
+          calls it "the cheapest way to find out whether the cache is worth
+          having, which is a question this project has been wrong about
+          before", and as written it could only ever answer "once".
+
+          It is still a **floor, not a count**: two simultaneous hits read the
+          same value and write the same increment, losing one. Making it exact
+          needs an atomic `UPDATE ... SET hit_count = hit_count + 1`, which is
+          an RPC and a grant, and this number does not carry a decision on its
+          own. A lower bound answers "is this cache earning its keep"; it must
+          not be quoted as a call count.
+        */
+        void client
+          .from('mod_detail_cache')
+          .update({ hit_count: ((cached as { hit_count?: number }).hit_count ?? 0) + 1 })
+          .eq('cache_key', cacheKey)
+          .then(() => undefined, () => undefined);
+
+        logger.info('MODS:CACHE_HIT', 'Served modification details from cache', {
+          vehicleId,
+          modName,
+        });
+        return { success: true, data: cached.details };
+      }
+    } catch (cacheError) {
+      logger.warn('MODS:CACHE_READ_FAILED', 'Cache unavailable; generating', {
+        vehicleId,
+        error: (cacheError as Error)?.message,
+      });
+    }
+
     const prompt = `You are an expert automotive consultant analyzing a modification for a specific vehicle owner.
 
 VEHICLE:
@@ -2050,7 +2321,23 @@ Format as valid JSON only, no markdown or explanations.`;
     const result = await genAI.models.generateContent({
       model: FLASH_MODEL,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      config: withThinking(flashStructuredConfig, FLASH_MODEL, 'LOW'),
+      /*
+        ⚠ MINIMAL, not LOW — measured 21 Aug, same prompt, same model:
+
+          LOW      268 in · 432 out · 544 thinking · 6964ms · $0.00772
+          MINIMAL  268 in · 433 out ·   0 thinking · 3756ms · $0.00365
+
+        Same horsepower range, same parts and labour costs, same brands, same
+        MAF-transfer warning, same stage-1 pairing. 53% cheaper and 46% faster
+        for output a reader cannot tell apart. This path was **89% of all AI
+        spend** in the first three weeks of metering, and two thirds of each
+        call was reasoning nobody sees.
+
+        `models.ts` records the general measurement (unset 861 · HIGH 726 ·
+        LOW 424 · MINIMAL 0) and the roadmap's D2 note asked for exactly this
+        re-test on the non-prose paths once there was data. There is now.
+      */
+      config: withThinking(flashStructuredConfig, FLASH_MODEL, 'MINIMAL'),
     });
     recordAiUsageInBackground(
       { purpose: 'modification_details', model: FLASH_MODEL, userId: access.userId, vehicleId },
@@ -2058,6 +2345,13 @@ Format as valid JSON only, no markdown or explanations.`;
     );
 
     const responseText = result.text || '';
+    /*
+      ⚠ Gates the cache write. `details` below starts as generic placeholder
+      text — "Performance gains will vary" — which is a reasonable thing to show
+      once when a parse fails, and a **thirty-day lie** if it is cached and
+      served to every other owner of that car. Only a clean parse is stored.
+    */
+    let parsedCleanly = false;
     let details = {
       performance_impact: 'Performance gains will vary',
       reliability_impact: 'Check compatibility with your vehicle',
@@ -2077,6 +2371,7 @@ Format as valid JSON only, no markdown or explanations.`;
         installation_notes: (parsed.installationNotes as string | undefined) || details.installation_notes,
         compatibility_notes: (parsed.compatibilityNotes as string | undefined) || details.compatibility_notes,
       };
+      parsedCleanly = true;
     } catch (parseError) {
       logger.warn('MOD:PARSE_ERROR', 'Failed to parse modification details', { error: (parseError as Error).message });
     }
@@ -2111,6 +2406,35 @@ Format as valid JSON only, no markdown or explanations.`;
     if (upsertError) {
       console.error('Failed to save modification details:', upsertError);
       return { success: false, error: 'Failed to save details' };
+    }
+
+    /*
+      The content cache, written after the per-vehicle row rather than instead
+      of it. `modification_details` is this owner's record and is what the
+      screen reads; this is the shared answer that stops the next owner of the
+      same car paying for it again.
+
+      Fire-and-forget and failure-tolerant: a cache that can fail the request it
+      is accelerating has the priorities backwards. And only on a clean parse —
+      see `parsedCleanly`.
+    */
+    if (parsedCleanly) {
+      void client
+        .from('mod_detail_cache')
+        .upsert(
+          {
+            cache_key: cacheKey,
+            details,
+            year: typeof vehicle.year === 'number' ? vehicle.year : Number(vehicle.year) || null,
+            make: vehicle.make ?? null,
+            model: vehicle.model ?? null,
+            mod_name: modName,
+            performance_goal: performanceGoal,
+            cached_at: new Date().toISOString(),
+          },
+          { onConflict: 'cache_key' }
+        )
+        .then(() => undefined, () => undefined);
     }
 
     return { success: true, data: { ...details, performance_goal: performanceGoal } };
@@ -5341,7 +5665,9 @@ Respond with ONLY valid JSON, no markdown:
     const result = await genAI.models.generateContent({
       model: FLASH_MODEL,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      config: withThinking(flashStructuredConfig, FLASH_MODEL, 'LOW'),
+      // MINIMAL for the same reason as `generateModificationDetails` — a
+      // structured mod analysis, measured indistinguishable at 53% the cost.
+      config: withThinking(flashStructuredConfig, FLASH_MODEL, 'MINIMAL'),
     });
     recordAiUsageInBackground(
       { purpose: 'modification_backfill', model: FLASH_MODEL, userId: access.userId, vehicleId },
@@ -5572,7 +5898,8 @@ Respond with ONLY valid JSON:
         const result = await genAI.models.generateContent({
           model: FLASH_MODEL,
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          config: withThinking(flashStructuredConfig, FLASH_MODEL, 'LOW'),
+          // MINIMAL, as with the other two mod paths. Structured JSON, no prose.
+          config: withThinking(flashStructuredConfig, FLASH_MODEL, 'MINIMAL'),
         });
         // Inside a loop — one row per generated mod, which is the point. This
         // is the path most likely to surprise on cost.

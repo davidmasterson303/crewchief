@@ -184,3 +184,59 @@ describe('a long recall summary', () => {
     expect(body).toBe('Brake line corrosion. Tap to see what it means and what to do.');
   });
 });
+
+describe('a car with more than one recall', () => {
+  /*
+    ⚠ 22 Aug: a 2003 Accord's NHTSA record arrived with 24 campaigns on it, and
+    the sweep had them queued as 24 separate pushes for one evening. The digest
+    makes that one notification; this is what it is allowed to say.
+  */
+  const many = recallNotification({
+    vehicleId: 'abc',
+    vehicleName: '2003 Honda Accord',
+    recallSummary: "The driver's air bag inflator may rupture.",
+    campaignCount: 24,
+  });
+
+  it('leads with the count, because that is the actionable fact', () => {
+    expect(many.title).toContain('24');
+    expect(many.title).toContain('2003 Honda Accord');
+  });
+
+  it('says the recalls match the car rather than affect it', () => {
+    /*
+      ⚠ CLAUDE.md §10 — recalls match on **year, make and model, not VIN**.
+      "24 recalls affect your car" claims this specific vehicle was checked
+      against each campaign, which is the overclaim `health-claims.ts` was
+      written to undo one screen over. The count is true; the stronger verb is
+      not.
+    */
+    expect(many.title).toMatch(/match/i);
+    expect(many.title).not.toMatch(/affect/i);
+    expect(many.body).not.toMatch(/affect/i);
+  });
+
+  it('still names one of them, so the notice is not abstract', () => {
+    expect(many.body).toContain('inflator may rupture');
+  });
+
+  it('lands on the same screen as a single recall', () => {
+    expect(pathOf(many.url)).toBe('vehicle/abc/recalls');
+  });
+
+  it('leaves the single-recall copy exactly as it was', () => {
+    /*
+      Anti-vacuous. The common case is one recall, and a digest of one would be
+      a regression in the ordinary path — "1 recalls match your Accord".
+    */
+    const one = recallNotification({
+      vehicleId: 'abc',
+      vehicleName: 'Accord',
+      recallSummary: 'Brake line corrosion.',
+      campaignCount: 1,
+    });
+
+    expect(one.title).toBe('Recall notice — Accord');
+    expect(one.body).toBe('Brake line corrosion. Tap to see what it means and what to do.');
+  });
+});

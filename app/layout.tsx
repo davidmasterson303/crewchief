@@ -11,6 +11,7 @@ import { isDemoSite, shareDescription, siteOrigin } from '@/lib/site-role';
 /** Resolved once: this build is either the demo or the product, never both. */
 const IS_DEMO = isDemoSite(process.env.CREWCHIEF_DEMO_SITE);
 import { AuthProvider } from '@/components/AuthProvider';
+import { SiteRoleProvider } from '@/components/SiteRoleProvider';
 import { INTRO_PLAYED_KEY, INTRO_PLAYED_VALUE } from '@crewchief/core/intro-gate';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -145,6 +146,17 @@ export default function RootLayout({
       */}
       <body className={`${inter.className} h-[100dvh] flex flex-col`}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+          {/*
+            Resolved on the server, published to the client tree.
+
+            `IS_DEMO` is already computed above from `CREWCHIEF_DEMO_SITE`, and
+            `DemoBanner` below reads it directly because this file is a server
+            component. The landing page cannot: `app/page.tsx` and
+            `LandingHero` are both `'use client'`, and server env is not in the
+            client bundle. See `SiteRoleProvider` for why a hostname check in
+            the browser is the wrong answer.
+          */}
+          <SiteRoleProvider isDemo={IS_DEMO}>
           <AuthProvider>
           <QueryProvider>
             {/*
@@ -177,6 +189,7 @@ export default function RootLayout({
             />
           </QueryProvider>
           </AuthProvider>
+          </SiteRoleProvider>
         </ThemeProvider>
       </body>
     </html>

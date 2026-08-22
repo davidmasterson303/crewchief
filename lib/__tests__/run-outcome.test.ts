@@ -15,8 +15,10 @@
 
 import {
   classifyRun,
+  credentialReason,
   exitCodeFor,
   parseArgs,
+  tokenExpiry,
   OUTCOME,
 } from '../../scripts/lib/run-outcome.mjs';
 
@@ -118,5 +120,76 @@ describe('parseArgs', () => {
     expect(parseArgs(['node', 's', '--strick'], { defaultBase }).unknownFlags).toEqual([
       '--strick',
     ]);
+  });
+});
+
+describe('an expired credential is not evidence about the API', () => {
+  /*
+    ⚠ 22 Aug. `verify-mobile-contract.mjs` ran against a token that expired on
+    2 Aug and reported three blocking failures, one of them
+    "/api/v1/vehicles rejected a valid bearer token — a phone cannot load the
+    garage". Every word wrong except the status code: the bearer was not
+    valid, the route was not broken, and a 401 is the correct answer to an
+    expired token.
+
+    CLAUDE.md §5's second warning — a guard that fails loudly and points at the
+    wrong thing — on the check that gates a mobile build.
+  */
+
+  /** A JWT with only the claim this reads. Signature is irrelevant and absent. */
+  function jwtExpiring(atSeconds: number): string {
+    const payload = Buffer.from(JSON.stringify({ exp: atSeconds })).toString('base64url');
+    return `header.${payload}.signature`;
+  }
+
+  const NOW = new Date('2026-08-22T14:00:00Z');
+  const EXPIRED = jwtExpiring(Math.floor(new Date('2026-08-02T02:58:00Z').getTime() / 1000));
+  const VALID = jwtExpiring(Math.floor(new Date('2026-09-30T00:00:00Z').getTime() / 1000));
+
+  it('reads the expiry out of a token', () => {
+    expect(tokenExpiry(EXPIRED)?.toISOString()).toBe('2026-08-02T02:58:00.000Z');
+  });
+
+  it('names the expiry as the reason, with its date', () => {
+    // The date is the whole point: "expired" alone still invites a debugging
+    // session. "expired 2026-08-02" ends one.
+    expect(credentialReason(EXPIRED, NOW)).toBe('MOBILE_TEST_TOKEN expired 2026-08-02');
+  });
+
+  it('distinguishes an expired token from an absent one', () => {
+    /*
+      They are different situations with different fixes, and the script
+      previously treated only the absent case as "not run" — which is why the
+      expired one surfaced as a broken API.
+    */
+    expect(credentialReason('', NOW)).toBe('MOBILE_TEST_TOKEN is not set');
+    expect(credentialReason(EXPIRED, NOW)).not.toBe(credentialReason('', NOW));
+  });
+
+  it('says nothing is wrong with a token that is still good', () => {
+    /*
+      ⚠ Anti-vacuous, and the direction that matters. A helper that always
+      reported a reason would turn every credentialed check into NOT RUN
+      forever — silencing the half of the suite that gates a mobile build,
+      which is worse than the false alarm it replaced.
+    */
+    expect(credentialReason(VALID, NOW)).toBeNull();
+  });
+
+  it('treats a token it cannot parse as usable, and lets the server decide', () => {
+    /*
+      A local parser failing is not grounds to skip a real check. The server's
+      401 remains the authority; this only tells a human which situation they
+      are in.
+    */
+    expect(tokenExpiry('not-a-jwt')).toBeNull();
+    expect(tokenExpiry('a.!!!.c')).toBeNull();
+    expect(credentialReason('not-a-jwt', NOW)).toBeNull();
+  });
+
+  it('does not treat a token expiring later today as expired', () => {
+    // Boundary, in the direction that would silence a working credential.
+    const laterToday = jwtExpiring(Math.floor(NOW.getTime() / 1000) + 3600);
+    expect(credentialReason(laterToday, NOW)).toBeNull();
   });
 });
