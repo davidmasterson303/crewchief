@@ -76,6 +76,37 @@ import { z } from 'zod';
  */
 export const RESEARCH_TIMEOUT_MS = 30_000;
 
+/**
+ * The budget when nobody is waiting — the nightly sweep.
+ *
+ * ── ⚠ Measured, after a 30s budget lost a car permanently ───────────────────
+ *
+ * The dossier call takes **23-30 seconds**. `RESEARCH_TIMEOUT_MS` is 30. That
+ * is not a timeout, it is a coin flip, and both faces were observed on 22 Aug:
+ * a successful run finished in ~30s, and a sweep run an hour later timed out
+ * against the same model on the same kind of car.
+ *
+ * ⚠ **A timeout in the sweep is not recoverable the way an interactive one
+ * is.** It writes `research_status = 'failed'`, and `vehiclesToGenerate`
+ * filter 1 never offers a `failed` car again — correctly, because retrying a
+ * genuine failure nightly is the runaway that module exists to prevent. The
+ * user's escape hatch is the retry button, and the sweep's entire purpose is
+ * cars whose owner is *not in the app to press it*. So one marginal timeout
+ * removes a car from research permanently, silently, and on the population the
+ * feature was built for.
+ *
+ * The interactive budget stays at 30s: its own docblock's reasoning holds —
+ * three deadlines plus backoff is 96 seconds of somebody watching a spinner.
+ * **That argument does not apply at 3am.** Nobody is watching, so the only
+ * cost of waiting is the function's own execution time.
+ *
+ * ⚠ **This multiplies against `SWEEP_GENERATE_CAP`.** Ten cars at 60s is ten
+ * minutes of a Netlify scheduled function that gets fifteen, before NHTSA
+ * fetches. Raising either number without the other in mind is how the sweep
+ * starts dying halfway through and reporting a partial night as a whole one.
+ */
+export const SWEEP_RESEARCH_TIMEOUT_MS = 60_000;
+
 export interface VehicleForResearch {
   id: string;
   year: number;
@@ -112,9 +143,17 @@ export interface ResearchOutcome {
  */
 export async function researchVehicleDossier(
   vehicle: VehicleForResearch,
-  userId: string | null
+  userId: string | null,
+  options: { timeoutMs?: number } = {}
 ): Promise<ResearchOutcome> {
   const vehicleId = vehicle.id;
+  /*
+    Defaults to the interactive budget, so the two existing callers keep the
+    behaviour they were written against and only the sweep opts into a longer
+    wait. A default of the *longer* value would have quietly made every
+    dashboard visit willing to hang for a minute.
+  */
+  const timeoutMs = options.timeoutMs ?? RESEARCH_TIMEOUT_MS;
 
   try {
     const client = getServiceRoleClient();
@@ -180,7 +219,7 @@ export async function researchVehicleDossier(
               contents: prompt,
               config: proStructuredConfig,
             }),
-          RESEARCH_TIMEOUT_MS,
+          timeoutMs,
           'vehicle research'
         );
         // Recorded per attempt, not per dossier. A retried research call is

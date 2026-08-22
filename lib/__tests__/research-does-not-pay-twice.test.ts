@@ -40,7 +40,14 @@ jest.mock('@/lib/ai-usage', () => ({ recordAiUsageInBackground: jest.fn() }));
 import { getServiceRoleClient } from '@/lib/supabase';
 import { genAI } from '@/lib/gemini';
 import { recordAiUsageInBackground } from '@/lib/ai-usage';
-import { researchVehicleDossier } from '@/lib/vehicle-research';
+import {
+  RESEARCH_TIMEOUT_MS,
+  SWEEP_RESEARCH_TIMEOUT_MS,
+  researchVehicleDossier,
+} from '@/lib/vehicle-research';
+import { SWEEP_GENERATE_CAP } from '@crewchief/core/notification-sweep';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const generateContent = genAI.models.generateContent as jest.Mock;
 const serviceRole = getServiceRoleClient as jest.Mock;
@@ -124,4 +131,77 @@ describe('the guard does not disable the retry button', () => {
       expect(generateContent).toHaveBeenCalled();
     }
   );
+});
+
+describe('nobody is watching the sweep, so it waits longer', () => {
+  /*
+    ⚠ Measured 22 Aug, after a 30s budget lost a car permanently. The dossier
+    call takes 23-30 seconds and `RESEARCH_TIMEOUT_MS` is 30 — not a timeout, a
+    coin flip. Both faces were observed the same day: one run finished at ~30s,
+    a sweep run an hour later timed out on the same kind of car.
+
+    The sweep's timeout is not recoverable the way an interactive one is. It
+    writes `research_status = 'failed'`, and filter 1 in `vehiclesToGenerate`
+    never offers a failed car again — correctly, since retrying a genuine
+    failure nightly is the runaway that module prevents. The escape hatch is
+    the retry button, and the sweep exists for owners who are not in the app to
+    press it.
+  */
+
+  it('gives the unwatched path a longer budget than the watched one', () => {
+    expect(SWEEP_RESEARCH_TIMEOUT_MS).toBeGreaterThan(RESEARCH_TIMEOUT_MS);
+  });
+
+  it('leaves room above the measured call time rather than sitting on it', () => {
+    // 23-30s observed. A budget inside that range is the defect being fixed.
+    expect(SWEEP_RESEARCH_TIMEOUT_MS).toBeGreaterThanOrEqual(45_000);
+  });
+
+  it('cannot outlast the scheduled function it runs inside', () => {
+    /*
+      ⚠ The second-order failure, asserted rather than left in prose: the
+      budget multiplies against the generation cap. Ten cars at sixty seconds
+      is ten minutes of a Netlify scheduled function that gets fifteen, before
+      NHTSA fetches. Raising either number alone is how a sweep starts dying
+      halfway through and reporting a partial night as a whole one.
+    */
+    const worstCaseMs = SWEEP_GENERATE_CAP * SWEEP_RESEARCH_TIMEOUT_MS;
+    const functionCeilingMs = 15 * 60 * 1000;
+
+    expect(worstCaseMs).toBeLessThan(functionCeilingMs * 0.8);
+  });
+
+  it('is what the sweep actually passes', () => {
+    // The constant existing is not the same as the sweep using it.
+    const route = readFileSync(
+      join(__dirname, '..', '..', 'app', 'api', 'internal', 'notify-sweep', 'route.ts'),
+      'utf8'
+    ).replace(/\/\*[\s\S]*?\*\//g, ' ');
+
+    expect(route).toMatch(/timeoutMs:\s*SWEEP_RESEARCH_TIMEOUT_MS/);
+  });
+
+  it('honours a caller-supplied budget instead of the default', async () => {
+    /*
+      Behavioural, and the reason the option exists at all. A model call that
+      never answers must be abandoned at the budget the caller set — proven
+      with a tiny one so the test does not wait.
+    */
+    serviceRole.mockReturnValue(clientReturning({ research_status: 'pending' }));
+    generateContent.mockImplementation(() => new Promise(() => {}));
+
+    const outcome = await researchVehicleDossier(ACCORD, 'user-1', { timeoutMs: 40 });
+
+    expect(outcome.success).toBe(false);
+  });
+
+  it('still defaults to the interactive budget when no option is given', () => {
+    /*
+      ⚠ Anti-vacuous in the direction that would go unnoticed: defaulting to
+      the *longer* value would quietly make every dashboard visit willing to
+      hang for a minute, which is the trade the interactive docblock refuses.
+    */
+    const source = readFileSync(join(__dirname, '..', 'vehicle-research.ts'), 'utf8');
+    expect(source).toMatch(/options\.timeoutMs\s*\?\?\s*RESEARCH_TIMEOUT_MS/);
+  });
 });

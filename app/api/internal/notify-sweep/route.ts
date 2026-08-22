@@ -24,7 +24,7 @@ import {
   vehiclesToGenerate,
   type GenerationCandidate,
 } from '@crewchief/core/notification-sweep';
-import { researchVehicleDossier } from '@/lib/vehicle-research';
+import { researchVehicleDossier, SWEEP_RESEARCH_TIMEOUT_MS } from '@/lib/vehicle-research';
 
 /**
  * The nightly sweep. Phase 5, C1–C3.
@@ -286,7 +286,17 @@ export async function POST(request: NextRequest) {
             make: scan.row.make,
             model: scan.row.model,
           },
-          candidate.userId
+          candidate.userId,
+          /*
+            ⚠ A longer budget than a dashboard visit gets, because nobody is
+            watching this one. The dossier call takes 23-30s against a 30s
+            interactive deadline, and on 22 Aug that coin came up tails here:
+            the run timed out, wrote `research_status = 'failed'`, and filter 1
+            in `vehiclesToGenerate` will never offer that car again. The retry
+            button is the escape hatch, and this sweep exists precisely for
+            owners who are not in the app to press it.
+          */
+          { timeoutMs: SWEEP_RESEARCH_TIMEOUT_MS }
         );
 
         if (!outcome.success || outcome.unsupported) continue;
