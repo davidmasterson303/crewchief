@@ -17,6 +17,7 @@ import {
 import { historyLookups } from '@crewchief/core/service-history';
 import {
   applySendCap,
+  digestRecalls,
   headlineService,
   recallsToRaise,
   shouldRaiseService,
@@ -82,10 +83,33 @@ interface SweepSummary {
    * were right there in the plans and never reached the summary.
    */
   recallsPlanned: number;
+  /**
+   * Campaigns covered by those notifications.
+   *
+   * ⚠ Distinct from `recallsPlanned` since 22 Aug, when one car turned out to
+   * carry 24 of them. `recallsPlanned` counts pushes and is what the send cap
+   * governs; this counts dedupe rows and is what says how much was actually
+   * communicated. One notification covering 24 campaigns is the intended
+   * shape, and a summary that reported only "1" would hide it.
+   */
+  recallCampaignsRaised: number;
   servicesPlanned: number;
   /** What was actually delivered. Always 0 under `dryRun`, by construction. */
   recallsSent: number;
   servicesSent: number;
+  /**
+   * What the run **decided** to generate, before spending and regardless of
+   * `dryRun`.
+   *
+   * ⚠ Same defect as `recallsPlanned`/`servicesPlanned` above, in the one
+   * branch that spends Pro-model calls: `schedulesGenerated` only increments
+   * inside the generation loop, which `dryRun` skips, so a dry run reported
+   * zero no matter how many cars it had selected. That made the dry run — the
+   * documented way to make the first production run safely — unable to answer
+   * "how much is this about to spend", which is the only question worth asking
+   * before a run that costs money.
+   */
+  generationPlanned: number;
   /** Dossiers generated this run for cars that had never had one. C4. */
   schedulesGenerated: number;
   /** Eligible cars left for tomorrow because the generation budget ran out. */
@@ -153,9 +177,11 @@ export async function POST(request: NextRequest) {
   const summary: SweepSummary = {
     vehiclesScanned: 0,
     recallsPlanned: 0,
+    recallCampaignsRaised: 0,
     servicesPlanned: 0,
     recallsSent: 0,
     servicesSent: 0,
+    generationPlanned: 0,
     schedulesGenerated: 0,
     generationBacklog: 0,
     capped: false,
@@ -188,6 +214,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       logger.error('CRON:SWEEP', new Error(error.message), { stage: 'Reading vehicles' });
+      await recordSweepRun(client, summary, 'Could not read vehicles');
       return Response.json({ success: false, error: 'Could not read vehicles' }, { status: 500 });
     }
 
@@ -227,7 +254,10 @@ export async function POST(request: NextRequest) {
     would be a trap sprung by exactly the person being careful. The generation
     is behind the same flag as the send, deliberately.
   */
+  await resolveSignInActivity(client, generationCandidates);
+
   const generationPlan = vehiclesToGenerate(generationCandidates);
+  summary.generationPlanned = generationPlan.send.length;
   summary.generationBacklog = generationPlan.considered - generationPlan.send.length;
 
   if (generationPlan.capped) {
@@ -261,6 +291,18 @@ export async function POST(request: NextRequest) {
 
         if (!outcome.success || outcome.unsupported) continue;
 
+        /*
+          ⚠ A short-circuit is not a generation. `researchVehicleDossier`
+          returns `alreadyResearched` when the dossier already existed and it
+          spent nothing — counting that would report work the night never did,
+          in the one number that says whether C4 is earning its budget.
+
+          It should not happen from here, because `vehiclesToGenerate` only
+          ever offers `pending` rows. "Should not happen" is why it is checked:
+          the alternative is a counter that is right until two sweeps overlap.
+        */
+        if (outcome.alreadyResearched) continue;
+
         summary.schedulesGenerated += 1;
 
         /*
@@ -283,7 +325,16 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const recallPlan = applySendCap(recallCandidates);
+  /*
+    ⚠ Digested **before** the cap, not after.
+
+    The cap exists to stop a runaway reaching the user base; it counts
+    notifications, and after this call one car is one notification however many
+    campaigns it carries. Capping the raw candidates first would let a single
+    car with 24 recalls eat an eighth of the run's entire send budget — and,
+    worse, would make `capped` fire for a night that was never abnormal.
+  */
+  const recallPlan = applySendCap(digestRecalls(recallCandidates));
   const servicePlan = applySendCap(serviceCandidates);
   summary.capped = recallPlan.capped || servicePlan.capped;
 
@@ -293,6 +344,10 @@ export async function POST(request: NextRequest) {
     running.
   */
   summary.recallsPlanned = recallPlan.send.length;
+  summary.recallCampaignsRaised = recallPlan.send.reduce(
+    (total, digest) => total + digest.campaignNumbers.length,
+    0
+  );
   summary.servicesPlanned = servicePlan.send.length;
 
   if (summary.capped) {
@@ -315,7 +370,8 @@ export async function POST(request: NextRequest) {
         recallNotification({
           vehicleId: candidate.vehicleId,
           vehicleName: candidate.name,
-          recallSummary: candidate.summary,
+          recallSummary: candidate.headline,
+          campaignCount: candidate.campaignNumbers.length,
         })
       );
 
@@ -326,12 +382,19 @@ export async function POST(request: NextRequest) {
         them; leaving the row unwritten would re-raise it every night until
         they install the app, and then send a months-old backlog at once.
       */
+      /*
+        ⚠ **Every** campaign in the digest gets a row, not just the one named in
+        the body. Writing only the headline's row would leave the other
+        twenty-three un-raised, so tomorrow night would send a digest of 23,
+        then 22 — a countdown, nightly, which is the runaway this module exists
+        to prevent wearing its most plausible disguise.
+      */
       await client.from('recall_notifications').upsert(
-        {
+        candidate.campaignNumbers.map((campaignNumber) => ({
           vehicle_id: candidate.vehicleId,
-          campaign_number: candidate.campaignNumber,
+          campaign_number: campaignNumber,
           severity: 'standard',
-        },
+        })),
         { onConflict: 'vehicle_id,campaign_number' }
       );
 
@@ -359,7 +422,63 @@ export async function POST(request: NextRequest) {
 
   logger.info('CRON:SWEEP', 'Sweep complete', { ...summary });
 
+  await recordSweepRun(client, summary);
+
   return Response.json({ success: true, ...summary });
+}
+
+/**
+ * The heartbeat. One row per run, including the runs that decide to send
+ * nothing.
+ *
+ * ── Why this is not just the log line above ─────────────────────────────────
+ *
+ * `recall_notifications` had no row newer than 16 August, and the database
+ * could not say whether that was six quiet nights or a sweep that had stopped
+ * running. Both states produced identical evidence: no notifications, no rows,
+ * no errors. The canary is the precedent — it sat on a branch that could not
+ * fire `schedule` and had never run once, and nothing said so.
+ *
+ * The `logger.info` above does record it, in Netlify's function logs, behind a
+ * login this project's tooling does not hold. A heartbeat that needs a
+ * dashboard to read is one nobody reads.
+ *
+ * ── Failure-tolerant, and loudly so ─────────────────────────────────────────
+ *
+ * ⚠ Awaited rather than fire-and-forget: this is the last thing the run does,
+ * and the request must not return before the row is written or the serverless
+ * container can be frozen mid-insert. But a throw here must never fail the
+ * sweep — the sweep's job is notifications, and a monitor that can take down
+ * the thing it monitors is worse than no monitor.
+ *
+ * ⚠ So a failed write logs at **error**, and the reason is CLAUDE.md §5: an
+ * empty table reads as "the sweep is dead", which is a false alarm if the truth
+ * is "the insert failed" — and a guard that cries wolf gets made to pass. The
+ * table is absent until `20260822120000` is applied, and every run until then
+ * takes this path.
+ */
+async function recordSweepRun(client: Client, summary: SweepSummary, error?: string) {
+  try {
+    const { error: writeError } = await client.from('sweep_runs').insert({
+      dry_run: summary.dryRun,
+      ok: error === undefined,
+      error: error ?? null,
+      vehicles_scanned: summary.vehiclesScanned,
+      recalls_planned: summary.recallsPlanned,
+      services_planned: summary.servicesPlanned,
+      recalls_sent: summary.recallsSent,
+      services_sent: summary.servicesSent,
+      schedules_generated: summary.schedulesGenerated,
+      generation_backlog: summary.generationBacklog,
+      capped: summary.capped,
+    });
+
+    if (writeError) throw new Error(writeError.message);
+  } catch (heartbeatError) {
+    logger.error('CRON:SWEEP', heartbeatError as Error, {
+      stage: 'Recording the heartbeat — the sweep itself is unaffected',
+    });
+  }
 }
 
 type Client = ReturnType<typeof getServiceRoleClient>;
@@ -396,6 +515,51 @@ async function collectRecalls(
       campaignNumber,
       summary: recall.summary ?? recall.component ?? 'A safety recall affects this vehicle.',
     });
+  }
+}
+
+/**
+ * Fill in `lastSignInAt` for each candidate, one lookup per **account**.
+ *
+ * ── Why this is a separate pass ─────────────────────────────────────────────
+ *
+ * The fact belongs to the account, not the car. Resolving it inside the scan
+ * would look it up once per vehicle, so an owner with four cars would be
+ * queried four times a night for the same answer.
+ *
+ * ── Why the admin API and not a table read ──────────────────────────────────
+ *
+ * `last_sign_in_at` lives on `auth.users`, which PostgREST does not expose —
+ * CLAUDE.md §2. `auth.admin.getUserById` is the service-role path to it, and
+ * this route already holds the service role.
+ *
+ * ⚠ **A failed lookup leaves `null`, and `null` does not pass the filter.**
+ * That direction is deliberate: the failure mode of guessing "active" is a
+ * Pro-model call for an account nobody is behind, every night, for every car
+ * it owns. The failure mode of guessing "dormant" is a dossier that waits a
+ * day. One of those is recoverable by the next sweep and the other compounds.
+ */
+async function resolveSignInActivity(client: Client, candidates: GenerationCandidate[]) {
+  const byUser = new Map<string, string | null>();
+
+  for (const candidate of candidates) {
+    if (byUser.has(candidate.userId)) continue;
+
+    try {
+      const { data, error } = await client.auth.admin.getUserById(candidate.userId);
+      if (error) throw new Error(error.message);
+      byUser.set(candidate.userId, data.user?.last_sign_in_at ?? null);
+    } catch (error) {
+      logger.warn('CRON:SWEEP', 'Could not read sign-in activity; treating as dormant', {
+        userId: candidate.userId,
+        error: (error as Error)?.message,
+      });
+      byUser.set(candidate.userId, null);
+    }
+  }
+
+  for (const candidate of candidates) {
+    candidate.lastSignInAt = byUser.get(candidate.userId) ?? null;
   }
 }
 
@@ -443,16 +607,26 @@ async function collectService(
       queued again inside the same run.
     */
     if (needsGeneration) {
-      const { count } = await client
-        .from('device_push_tokens')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', vehicle.user_id);
+      /*
+        ⚠ `lastSignInAt` is filled in **after** the scan, not here.
 
+        This ran a `device_push_tokens` count per candidate car, which was one
+        query per car for a fact that belongs to the account. The replacement —
+        `last_sign_in_at`, see filter 3 in `vehiclesToGenerate` — is an
+        admin-API read, and doing that per car would be worse: a person with
+        four cars would be looked up four times, every night.
+
+        So the candidate is pushed with `null` and the owning accounts are
+        resolved once each, in `resolveSignInActivity`, before the filter runs.
+        ⚠ `null` is the safe placeholder: if the resolution step is ever
+        skipped or fails, the filter refuses rather than generating for
+        everybody.
+      */
       needsGeneration.push({
         vehicleId: vehicle.id,
         userId: vehicle.user_id,
         researchStatus: (knowledge?.research_status as string | undefined) ?? null,
-        hasPushToken: (count ?? 0) > 0,
+        lastSignInAt: null,
         mileage,
       });
     }

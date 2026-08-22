@@ -172,6 +172,130 @@ describe('the dedupe writes', () => {
   });
 });
 
+describe('one car is one recall push', () => {
+  /*
+    ⚠ The decision is unit-tested in `notification-sweep.test.ts`. Pinned here
+    is the wiring, because both ways this regresses are silent: digesting after
+    the cap, and deduping only the campaign that made it into the body.
+  */
+
+  it('digests before the cap, so one car cannot eat the send budget', () => {
+    /*
+      The cap counts notifications. Capping raw candidates would let a car with
+      24 recalls consume an eighth of the run's budget and fire `capped` — the
+      line that is documented as "this should page somebody" — on a night that
+      was entirely normal.
+    */
+    expect(route).toMatch(/applySendCap\(digestRecalls\(recallCandidates\)\)/);
+  });
+
+  it('writes a dedupe row for every campaign, not just the headline', () => {
+    /*
+      ⚠ Otherwise tonight sends a digest of 24, tomorrow 23, then 22 — the
+      nightly runaway this module exists to prevent, wearing the disguise of a
+      fix for it.
+    */
+    const upsert = route.slice(
+      route.indexOf("from('recall_notifications').upsert"),
+      route.indexOf('onConflict', route.indexOf("from('recall_notifications').upsert"))
+    );
+
+    expect(upsert.length).toBeGreaterThan(20);
+    expect(upsert).toMatch(/campaignNumbers\.map/);
+  });
+
+  it('tells the model how many campaigns the one push covers', () => {
+    expect(route).toMatch(/campaignCount:\s*candidate\.campaignNumbers\.length/);
+  });
+
+  it('reports pushes and campaigns as different numbers', () => {
+    /*
+      One notification covering 24 campaigns is the intended shape, and a
+      summary reporting only "1" would hide exactly the situation that produced
+      this change.
+    */
+    expect(route).toMatch(/recallCampaignsRaised/);
+  });
+});
+
+describe('the heartbeat', () => {
+  /*
+    Added 22 Aug. `recall_notifications` had no row newer than 16 August, and
+    nothing in the database could say whether that was six quiet nights or a
+    sweep that had stopped running — both states produce no rows, no errors and
+    no notifications. CLAUDE.md §7, and the canary is the precedent.
+  */
+  const heartbeat = route.indexOf("from('sweep_runs')");
+
+  it('writes a row for every run that starts', () => {
+    expect(heartbeat).toBeGreaterThan(-1);
+
+    /*
+      Both exits that represent a real run: the completed sweep and the failed
+      vehicle read. Counted rather than located, because the whole value of the
+      table is that a run which decided nothing still leaves a trace.
+    */
+    const calls = route.match(/recordSweepRun\(/g) ?? [];
+    expect(calls.length).toBeGreaterThanOrEqual(3); // two call sites, one definition
+  });
+
+  it('records the quiet nights, not only the sends', () => {
+    /*
+      ⚠ The assertion the table exists for. A heartbeat written only when
+      something was sent reproduces the exact ambiguity it was built to remove:
+      a working sweep with nothing to say would still leave no evidence.
+    */
+    const complete = route.indexOf("logger.info('CRON:SWEEP', 'Sweep complete'");
+    const write = route.indexOf('recordSweepRun(client, summary)', complete);
+    const response = route.indexOf('success: true', complete);
+
+    expect(complete).toBeGreaterThan(-1);
+    expect(`writtenBeforeResponse:${write > -1 && write < response}`).toBe(
+      'writtenBeforeResponse:true'
+    );
+  });
+
+  it('is awaited, so the container cannot be frozen mid-insert', () => {
+    // A fire-and-forget heartbeat on a serverless runtime records nothing on
+    // exactly the runs that end promptly — which is most of them.
+    expect(route).toMatch(/await\s+recordSweepRun\(/);
+  });
+
+  it('cannot fail the sweep it is monitoring', () => {
+    const body = route.slice(route.indexOf('async function recordSweepRun'));
+    expect(body).toMatch(/try\s*{/);
+    expect(body).toMatch(/catch/);
+
+    /*
+      Anti-vacuous: a `try` proves nothing if the catch rethrows or the route
+      returns an error from it. The failure must be logged and stepped over.
+    */
+    const handler = body.slice(body.indexOf('catch'), body.indexOf('\n}'));
+    expect(handler).toMatch(/logger\.error/);
+    expect(handler).not.toMatch(/throw|return Response/);
+  });
+
+  it('never lets an unauthorized caller write a row', () => {
+    /*
+      The 401 and the 503 write nothing, deliberately — they are not runs, and
+      this table must not become a surface an anonymous caller can append to.
+    */
+    const unauthorized = route.indexOf("error: 'Unauthorized'");
+    expect(unauthorized).toBeGreaterThan(-1);
+    expect(`heartbeatAfterAuth:${heartbeat > unauthorized}`).toBe('heartbeatAfterAuth:true');
+  });
+
+  it('marks a hand-run diagnosis as one', () => {
+    /*
+      ⚠ Without this, somebody debugging the sweep at noon makes the scheduler
+      look alive at midnight. "Did it fire" has to be answerable as
+      `dry_run = false`.
+    */
+    const body = route.slice(route.indexOf('async function recordSweepRun'));
+    expect(body).toMatch(/dry_run:\s*summary\.dryRun/);
+  });
+});
+
 describe('the scheduler', () => {
   it('carries a schedule', () => {
     expect(scheduler).toMatch(/schedule:/);

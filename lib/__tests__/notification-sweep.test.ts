@@ -14,14 +14,17 @@
  */
 
 import {
+  RESEARCH_ACTIVITY_WINDOW_DAYS,
   SERVICE_COOLDOWN_DAYS,
   SWEEP_GENERATE_CAP,
   SWEEP_SEND_CAP,
   applySendCap,
   daysBetween,
+  digestRecalls,
   headlineService,
   recallsToRaise,
   shouldRaiseService,
+  signedInRecently,
   vehiclesToGenerate,
   type GenerationCandidate,
 } from '@crewchief/core/notification-sweep';
@@ -331,20 +334,24 @@ describe('headlineService', () => {
  * need to exist and a filter whose absence is not should be hard to delete by
  * accident.
  */
+/** A fixed clock, so the window's boundary is asserted rather than drifted past. */
+const NOW = new Date('2026-08-22T12:00:00Z');
+const DAY = 24 * 60 * 60 * 1000;
+
 describe('vehiclesToGenerate', () => {
   function candidate(overrides: Partial<GenerationCandidate> = {}): GenerationCandidate {
     return {
       vehicleId: 'v1',
       userId: 'u1',
       researchStatus: 'pending',
-      hasPushToken: true,
+      lastSignInAt: '2026-08-20T09:00:00Z',
       mileage: 61_000,
       ...overrides,
     };
   }
 
-  it('generates for a pending car whose owner has a device and an odometer reading', () => {
-    const plan = vehiclesToGenerate([candidate()]);
+  it('generates for a pending car whose owner is active and has an odometer reading', () => {
+    const plan = vehiclesToGenerate([candidate()], undefined, NOW);
 
     expect(plan.send).toHaveLength(1);
     expect(plan.capped).toBe(false);
@@ -386,8 +393,66 @@ describe('vehiclesToGenerate', () => {
     expect(vehiclesToGenerate([candidate({ researchStatus: null })]).send).toHaveLength(0);
   });
 
-  it('does not spend a model call for an account with no registered device', () => {
-    expect(vehiclesToGenerate([candidate({ hasPushToken: false })]).send).toHaveLength(0);
+  it('generates for an active account that has never registered a device', () => {
+    /*
+      ⚠ **This filter used to read `hasPushToken`, and it was the wrong
+      question.** A dossier is not notification fuel — it feeds the web
+      dashboard, the health report and the consultant's context, none of which
+      involve a phone. Gating research on device registration conflated who
+      should be *told* something with whose data is worth *building*.
+
+      It had a live cost: the App Store reviewer's account has no device, so
+      its 2003 Accord — inside the Takata campaigns — sat at `pending` with no
+      NHTSA record, unreachable by the sweep by design. Every web-only user was
+      in the same position.
+
+      This assertion is the fix stated as a property: no device, still
+      researched.
+    */
+    const plan = vehiclesToGenerate([candidate()], undefined, NOW);
+    expect(plan.send).toHaveLength(1);
+  });
+
+  it('does not spend a model call for a dormant account', () => {
+    /*
+      The brake that survived the swap, with its subject corrected. A dormant
+      account is still money for nobody — that half of the old reasoning was
+      right.
+    */
+    const dormant = candidate({ lastSignInAt: '2026-01-01T00:00:00Z' });
+    expect(vehiclesToGenerate([dormant], undefined, NOW).send).toHaveLength(0);
+  });
+
+  it('treats an account that has never signed in as dormant', () => {
+    /*
+      ⚠ `null` is never "recently". An account that has never signed in has
+      never seen the dashboard the dossier is for, and absence must not read as
+      activity — the same rule as a missing odometer or a missing recall check.
+    */
+    expect(vehiclesToGenerate([candidate({ lastSignInAt: null })], undefined, NOW).send).toHaveLength(0);
+  });
+
+  it('holds the window at its boundary in both directions', () => {
+    /*
+      Anti-vacuous. A filter that answered "recent" for everything, or for
+      nothing, would satisfy one of the two assertions above and this pins
+      which side of the line each case falls on.
+    */
+    const justInside = new Date(NOW.getTime() - (RESEARCH_ACTIVITY_WINDOW_DAYS - 1) * DAY);
+    const justOutside = new Date(NOW.getTime() - (RESEARCH_ACTIVITY_WINDOW_DAYS + 1) * DAY);
+
+    expect(signedInRecently(justInside.toISOString(), NOW)).toBe(true);
+    expect(signedInRecently(justOutside.toISOString(), NOW)).toBe(false);
+  });
+
+  it('does not refuse an account whose timestamp is in the future', () => {
+    // Clock skew is not a reason to withhold research from an account that
+    // plainly exists and plainly signed in.
+    expect(signedInRecently('2027-01-01T00:00:00Z', NOW)).toBe(true);
+  });
+
+  it('treats an unparseable timestamp as dormant', () => {
+    expect(signedInRecently('not a date', NOW)).toBe(false);
   });
 
   it('does not generate for a car with no odometer reading', () => {
@@ -446,5 +511,82 @@ describe('vehiclesToGenerate', () => {
     expect(plan.send).toHaveLength(1);
     expect(plan.send[0].vehicleId).toBe('good');
     expect(plan.capped).toBe(false);
+  });
+});
+
+describe('one car is one recall notification', () => {
+  /*
+    ⚠ 22 Aug, dry run against production: `recallsPlanned: 24`. A 2003 Accord
+    had just had its NHTSA record fetched, and all twenty-four un-raised
+    campaigns were queued as twenty-four separate pushes — to one phone, about
+    one car, in one evening. The send cap is 200 for the whole run, so nothing
+    would have stopped it.
+
+    `recallsToRaise` already refuses this shape in the other direction: one
+    recall repeating nightly "ends with notifications disabled and every future
+    recall unheard". Twenty-four arriving at once ends the same way.
+  */
+  function candidate(campaignNumber: string, overrides: Record<string, string> = {}) {
+    return {
+      userId: 'u1',
+      vehicleId: 'v1',
+      name: '2003 Honda Accord',
+      campaignNumber,
+      summary: `Summary for ${campaignNumber}`,
+      ...overrides,
+    };
+  }
+
+  it('collapses every campaign on one car into a single notification', () => {
+    const digests = digestRecalls(
+      ['19V182000', '15V320000', '14V700000'].map((c) => candidate(c))
+    );
+
+    expect(digests).toHaveLength(1);
+    expect(digests[0].campaignNumbers).toEqual(['19V182000', '15V320000', '14V700000']);
+  });
+
+  it('carries every campaign number, so none is left to re-raise tomorrow', () => {
+    /*
+      ⚠ The assertion that stops the fix becoming a slower version of the bug.
+      Deduping only the headline would send 24 tonight, 23 tomorrow, 22 the
+      night after — a countdown, forever.
+    */
+    const campaigns = Array.from({ length: 24 }, (_, i) => `C${i}`);
+    const [digest] = digestRecalls(campaigns.map((c) => candidate(c)));
+
+    expect(digest.campaignNumbers).toHaveLength(24);
+    expect(new Set(digest.campaignNumbers).size).toBe(24);
+  });
+
+  it('does not collapse two cars into one notification', () => {
+    /*
+      Anti-vacuous, and a real product boundary: two cars are two different
+      actions and the destination screen is per-vehicle. A digest that grouped
+      by account would save a buzz by making the notification unactionable.
+    */
+    const digests = digestRecalls([
+      candidate('A1'),
+      candidate('B1', { vehicleId: 'v2', name: '2015 BMW M235i' }),
+    ]);
+
+    expect(digests).toHaveLength(2);
+    expect(digests.map((d) => d.vehicleId)).toEqual(['v1', 'v2']);
+  });
+
+  it('leads with the first un-raised campaign', () => {
+    const [digest] = digestRecalls([candidate('FIRST'), candidate('SECOND')]);
+    expect(digest.headline).toBe('Summary for FIRST');
+  });
+
+  it('leaves a single recall as exactly one notification', () => {
+    // The common case must not become a digest of one.
+    const digests = digestRecalls([candidate('ONLY')]);
+    expect(digests).toHaveLength(1);
+    expect(digests[0].campaignNumbers).toEqual(['ONLY']);
+  });
+
+  it('is empty for a night with nothing to raise', () => {
+    expect(digestRecalls([])).toEqual([]);
   });
 });
