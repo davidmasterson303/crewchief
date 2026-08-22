@@ -1,5 +1,169 @@
 # CrewChief roadmap — image pipeline, backdrop, cockpit direction, and responsive web
 
+> ### ⚠ 21 Aug — START HERE. The device build is three minutes of David's time away.
+>
+> **David's stated priority is getting CrewChief onto his own iPhone.** Everything needed for
+> that is built and committed. It is blocked on exactly one thing, and it is not code.
+>
+> ---
+>
+> #### ⛔ The only blocker: Expo is not linked to the Apple Developer account
+>
+> ```
+> $ eas device:list
+> No Apple teams found for account masterson303.
+> ```
+>
+> Re-verified 21 Aug. The membership is **active** (confirmed by David 19 Aug), but the Expo
+> account has never been connected to the Apple team — so there are no signing certificates, and
+> registering the phone is not even reachable yet.
+>
+> ⚠ **This is not the UDID step.** An earlier note said the blocker was device registration; that
+> was wrong and cost a day. Registration comes *after* the link.
+>
+> | | | |
+> |---|---|---|
+> | **1** | `cd apps/mobile && npx eas-cli credentials` — sign in with Apple ID, complete 2FA | **David · ~3 min** |
+> | **2** | `eas device:create` → register the iPhone's UDID (a link David opens on the phone) | Claude Code + David |
+> | **3** | `eas build --platform ios --profile device` | Claude Code · ~15 min, 1 build |
+>
+> **Claude Code cannot do step 1** — it needs an Apple ID password and a live 2FA code, and
+> handing an agent credentials is refused regardless of capability. Cowork cannot either: the
+> prompt is on the Mac, so iPhone Mirroring does not help.
+>
+> #### What is already done for the device path
+>
+> - **`device` profile exists** in `apps/mobile/eas.json` (`d5cb8fe`) — `developmentClient: true`,
+>   internal distribution, `simulator: false`.
+> - ⚠ **`developmentClient` is the whole economics.** One build, then Metro serves the JS: every
+>   screen, colour and string change is free. A standalone build costs one of ~12 monthly iOS
+>   builds *per string change*. Only a new native module costs another.
+> - **The path is proven.** A simulator build ran end to end 20 Aug (`924a303a`), installed via
+>   `xcrun simctl`, connected to Metro, and reached the sign-in screen. Screenshots in that
+>   session. **4 EAS builds used ever**, all simulator; the period resets 31 Aug.
+>
+> #### Restarting the simulator loop (free, works today, no Apple link needed)
+>
+> ```
+> cd apps/mobile && npx expo start --dev-client
+> ```
+>
+> The app is still installed on the iPhone 16 Pro simulator. ⚠ Metro is **down** — it was killed
+> when the previous session ended, so nothing will reload until this is run.
+>
+> ⚠ **The live simulator panel does not work.** `mcp__Claude_Code_iOS_Simulator__attach` insists
+> Xcode is not selected even though `xcode-select -p` already returns the path it asks for and
+> `simctl` works fine. Its environment resolves differently. The command it wants is
+> `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer` (needs David's password).
+> Until then: `xcrun simctl` for install/launch/screenshot, and **no tapping** — `osascript` is
+> denied assistive access, so Claude Code can reach the sign-in screen and no further.
+>
+> ---
+>
+> #### What shipped 20–21 Aug
+>
+> | | |
+> |---|---|
+> | `dbc35cb` | each site's share card describes that site — the App Store hostname was serving the demo's `og:url`, `og:image` **and** description |
+> | `ad0733b` | the demo masthead is gated behind `CREWCHIEF_DEMO_SITE`, unset meaning product |
+> | `21c514e` | **an unrun check is not an all-clear** — see below |
+> | `7a662f3` | **research never ran for a new vehicle** — see below |
+> | `d5cb8fe` | the `device` build profile |
+>
+> **⚠ The safety fix is the one to understand first.** A 2003 Honda Accord — inside the Takata
+> airbag campaigns — displayed a **green tick and "No active recalls"**, because its NHTSA record
+> had never been fetched and the tile read an empty status as good news. Nothing errored. The
+> check had simply never run, and *absence rendered as an all-clear on a safety claim*.
+> `packages/core/src/health-claims.ts` now has three states, and `unknown` is never green and
+> never a tick. `CLAUDE.md` §6 named this exactly: `null` is never `0`.
+>
+> **⚠ The research bug that caused it.** `enrichVehicle` fetched the vehicle row and then called
+> `generateVehicleDossier(vehicleId)` — no second argument — three lines later. From 27 Jul
+> (`8e9fafd`) to 21 Aug, **every vehicle added got an empty dossier, no NHTSA record, and a retry
+> button that could never work**, because retry called the same broken function. The parameter is
+> required now, so the defect is a build error rather than a 200 carrying `{ success: false }`.
+>
+> #### ⏳ The research fix is deployed and UNVERIFIED
+>
+> Live on `web-live` (`f3278984`), but nobody has loaded the page:
+>
+> ```
+> reviewer last_sign_in_at   2026-08-21T11:53:15   (the sign-up moment; zero sessions since)
+> research_status            pending
+> nhtsa_data rows            0
+> ```
+>
+> ⚠ **`last_sign_in_at` is the instrument that settles this, and it was learned the hard way.**
+> An hour went into theorising about cached bundles and effects not firing, when one query showed
+> nobody had signed in. **Before diagnosing why a page did not do something, check that anyone
+> loaded it.** Readable via `GET {SUPABASE_URL}/auth/v1/admin/users` with `SUPABASE_SECRET_KEY`.
+>
+> Two ways to close it: David signs in and opens the vehicle, **or** Claude Code runs a one-off
+> script calling `researchVehicleDossier` with the service role and the reviewer's `user_id`.
+> ⚠ Do **not** call `enrichVehicle`/`generateVehicleDossier` outside a session — that means going
+> around `authorizeVehicleAccess`, and `vehicle-research-callers.test.ts` keeps that list closed
+> deliberately. The sweep is already an authorized caller of the core; use that path.
+>
+> #### Decisions waiting on David — nothing else is blocked on code
+>
+> | | |
+> |---|---|
+> | **Price** | **$3.99/mo · $29.99/yr + 7-day trial** proposed by Cowork, awaiting a yes. ⚠ Claude Code's rider: at $3.99 (net $3.39 at 15%) the paid ceiling of **2,000,000** tokens is ~$15 worst case — **4.4× net revenue**, sized for a $9–15 price. Recommend `TIERS.paid` → **1,000,000**. Still 2.5× free and ~3× the heaviest real user |
+> | **Positioning** | *"CrewChief is a product being taken to market through the App Store, not a working demo. The demo remains a sales asset on the product site and a portfolio asset on the recruiter site."* Say yes and propose it to the KB — `cc-marketing-0002` still records "a working demo, not a commercial product" and its own open question was answered by action, never recorded |
+> | **The CTA** | Follows from the positioning. Cowork's proposal: primary "Add your vehicle" → signup, secondary "See a sample garage", heading "What a CrewChief garage looks like". Demo host keeps "Enter demo". Same gate as the masthead. ⚠ `LandingHero` is a client component and cannot read `CREWCHIEF_DEMO_SITE` — needs a server wrapper or a provider |
+> | **LLC** | The genuinely open half of `cc-business-0001`. Personal-liability question, not paperwork. Reversible: Apple converts Individual → Organization without re-enrolment |
+> | **App Store Connect** | ⚠ **Paid Applications agreement FIRST** — StoreKit reportedly returns an empty product list until it is active, and the forms can sit pending for days |
+> | **Rotate the reviewer password** | It is in a transcript. The risk is the portfolio write-up, not the file |
+>
+> #### Real AI economics — measured, not modelled
+>
+> All 292 metered calls, 2–21 Aug, input **and** output at $1.50/$7.50 per M:
+>
+> ```
+> you (75834ade)   235 calls   $2.06   →  $3.10/month at this rate
+> modification_details   232 calls   $2.019   89.4% of all spend
+> consultant              10 calls   $0.068    3.0%
+> ```
+>
+> ⚠ **`modification_details` is 89% of real spend, not the consultant.** Any cost model that omits
+> it — including the "heavy month ≈ $0.20" figure — is optimistic by roughly 15×. The consultant
+> *is* rate limited (`consultant:${vehicleId}`, `ai` tier), so that worry is closed; but the tier
+> is 10/60s, a burst limit rather than a budget. `TIERS.paid` is the real ceiling.
+>
+> ⚠ **The dossier call has never been measured** — no research purpose appears in the table at
+> all, consistent with it never having completed. It is the biggest single call in the product and
+> the only unmeasured one. **Measure it the first time research succeeds.**
+>
+> #### What is left on E8
+>
+> `expo-iap` and the store adapter — the last piece, and it needs App Store Connect products
+> before a purchase can be tested. Everything it plugs into is built, tested and live: the state
+> machine, JWS verification, the pinned Apple root, the envelope parser, the entitlement writer,
+> both routes, the purchase logic and the paywall. ⚠ **`PaywallScreen` is built and tested but
+> nothing routes to it** — wire it when the adapter lands. **E6** (upgrade prompt, ~0.5 ed) is
+> genuinely unblocked the moment IAP ships.
+>
+> #### Housekeeping
+>
+> - **`demo-live` is 2 commits behind** — missing the recall safety fix and the research fix.
+>   Nothing there manifests either bug (all three demo vehicles have NHTSA rows), so it was left
+>   deliberately rather than spending two builds.
+> - ⚠ **Netlify credits passed 75%.** Seven builds on 20 Aug, **four of them avoidable** — the
+>   banner gate was promoted separately from a promote a few hours earlier, doubling both sites.
+>   The lever is batching promotes, not promoting per change.
+>
+> #### Instruments that caught real defects this week — all silent to review
+>
+> - `entitlement-not-user-writable` was satisfied by `getServiceRoleClient` appearing in a
+>   **docblock** while the code used another client. Comments are stripped before the scan now.
+> - The mobile runner's `testMatch` was `*.test.tsx`, so the first mobile test with no JSX **was
+>   collected by nothing** — committed, typechecked, never run, jest green.
+> - The JWS validity loop passed all sixteen tests while checking only the leaf.
+> - `portability.test.ts` rejected a NOT_PORTABLE entry whose reason was a judgment rather than a
+>   technical blocker. It was right to.
+> - `tests-test-real-code.test.ts` refused a new source-scanner until it was allowlisted with a
+>   justification.
+
 > ### ⚠ 19 Aug — E8's server half shipped, and both hostnames are current
 >
 > **Everything below the next block predates this and its sequencing is older still.**
@@ -169,13 +333,14 @@
 >
 > | | |
 > |---|---|
-> | `main` | ~~`fc96184`~~ → **`8ee6484`**, pushed (19 Aug) |
+> | `main` | ~~`fc96184`~~ → ~~`8ee6484`~~ → **`7a662f3`**, pushed (21 Aug) |
 > | Web tests | ~~2300~~ → **2616**, green (19 Aug) |
 > | Mobile tests | ~~174~~ → **329**, green (19 Aug). ⚠ 10 of those were collected by nothing until 18 Aug — `testMatch` was `*.test.tsx`, so the first mobile test without JSX existed, typechecked and never ran while jest reported all suites green |
 > | Typechecks | Three, all clean — ⚠ run the mobile one **from inside `apps/mobile`**; the root `tsc` resolves a different config and reports phantom errors |
-> | Migrations | ⛔ **`20260818120000` written and NOT applied** — E8's five columns, all `42703` against live on 19 Aug. **This is the only thing stopping the IAP webhook recording anything.** ~~`20260813020000`~~ applied 16 Aug; ~~`20260815190000`~~ **applied** — re-probed live 19 Aug, `next_service_label` and `next_service_due_on` both present, so the entry below claiming it is outstanding is stale |
+> | Migrations | ✅ **`20260818120000` APPLIED 21 Aug by Cowork** and verified — five columns resolve, CHECK validated, `original_transaction_id` still UNIQUE, `authenticated` still SELECT-only. The IAP webhook can record. ~~⛔ written and NOT applied~~ — E8's five columns, all `42703` against live on 19 Aug. **This is the only thing stopping the IAP webhook recording anything.** ~~`20260813020000`~~ applied 16 Aug; ~~`20260815190000`~~ **applied** — re-probed live 19 Aug, `next_service_label` and `next_service_due_on` both present, so the entry below claiming it is outstanding is stale |
 > | `demo-live` | ~~27 commits behind~~ → **current**, `9a32aca2`, promoted 19 Aug |
-> | `web-live` | **current**, `83b7b24e`, promoted 19 Aug. Exists and has since 17 Aug — the note below saying it needs creating is dead |
+> | `web-live` | **current**, `f3278984` (21 Aug). Exists and has since 17 Aug — the note below saying it needs creating is dead |
+> | `demo-live` | `eef03da7` — ⚠ **2 commits behind `main`**, deliberately |
 >
 > ### ⛔ Do not act on these — they are dead instructions below
 >
