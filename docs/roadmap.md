@@ -134,6 +134,70 @@
 > nightly sweep runs the old code from `web-live`. Whether it fires at all is unknown — see
 > the heartbeat, which exists precisely because that question has no answer today.
 >
+> #### ⚠ `/api/version` is not cacheable — it was reporting a genuinely old deploy
+>
+> Checked twice against the live hostname, 22 Aug 14:16 UTC:
+>
+> ```
+> cache-status: "Netlify Durable"; fwd=bypass
+> cache-status: "Netlify Edge";    fwd=miss; fwd-status=200
+> cache-control: no-store,no-cache,must-revalidate,max-age=0
+> body: {"commit":"f327898…","branch":"web-live","builtAt":"2026-08-21T15:44:06.940Z"}
+> ```
+>
+> The durable cache is bypassed, the edge missed, and the route already sets
+> `dynamic = 'force-dynamic'`, `revalidate = 0` **and** the `no-store` header. It cannot be
+> more uncached than it is.
+>
+> **The day-old commit was the truth.** `web-live` was last built 21 Aug 15:44 and nothing has
+> been promoted since. The instrument reported a stale *deploy*, was read as a stale *cache*,
+> and was one step from being "fixed" for telling the truth — CLAUDE.md §5's warning, inverted.
+> Do not cache-bust this route.
+>
+> #### 🍎 App Store Connect — status and one trap
+>
+> ⚠ **David's Apple ID is on two teams and App Store Connect opens on the wrong one.**
+> "Exclusive Resorts LLC" is his employer; everything for CrewChief — bundle id
+> `co.davidmasterson.crewchief`, the app record, certificates, provisioning profiles — belongs
+> to **DAVID RYAN MASTERSON** (personal, Individual enrolment). **Hit twice already.** The
+> employer team is the default and nothing on screen says it is wrong. Check the active team
+> before every session that creates anything.
+>
+> | | |
+> |---|---|
+> | W-9 | Active |
+> | Digital Services Act | Active, declared **non-trader** |
+> | Bank account | Added, Processing |
+> | Paid Applications agreement | Pending User Info — Apple's clock, a few days |
+>
+> ⚠ **Non-trader means the EU must be excluded from app availability at launch.** A step
+> someone takes, not an automatic consequence. Trader status is per-app and editable later.
+>
+> ⚠ IAP products can be created now but **cannot be tested** until the agreement is active —
+> StoreKit returns an empty product list, which looks exactly like a configuration mistake.
+>
+> #### The EAS blocker was Expo, not Apple
+>
+> `eas-cli credentials` was failing at **Expo login**: the account (`masterson303`, org
+> `masterson303apps`) had Password "Not configured" and only a Google sign-in. A password is
+> now set. ✅ **`EXPO_TOKEN` is already in `.env` and works** — verified authenticating as
+> `masterson303` twice on 22 Aug — so the recommended token export is already in place and
+> non-interactive builds need nothing further on the Expo side. An App Store Connect API key
+> would do the same for the Apple side.
+>
+> #### KB — decisions staged, not written
+>
+> `p-20260822142329-d9ac`: price, Small Business Program, App Store Connect constraints, the
+> new positioning entry superseding `cc-marketing-0002`, the CTA, and the sweep gate.
+>
+> ⚠ **Approval order matters.** `p-20260802194500-rev5` has been pending since 2 Aug and also
+> edits `cc-marketing-0002`. Approve rev5 first, then `p-20260805-cost`, then this one.
+>
+> ⚠ It also **corrects a figure**: "a heavy user costs ~$0.20/month" omits
+> `modification_details` (89% of measured spend, ~$3.10/month for the heaviest real user) and
+> the dossier (never measured until 22 Aug). $3.99 still works — because of the cost work
+> shipped 21 Aug, not as a property of the product.
+>
 > #### State
 >
 > ```
