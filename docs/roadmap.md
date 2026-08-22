@@ -134,6 +134,52 @@
 > nightly sweep runs the old code from `web-live`. Whether it fires at all is unknown — see
 > the heartbeat, which exists precisely because that question has no answer today.
 >
+> #### ✈️ Device build pre-flight — done. One command after the Apple auth.
+>
+> Everything checkable without Apple credentials has been checked, 22 Aug:
+>
+> | | |
+> |---|---|
+> | `eas.json` `device` profile | resolves clean — `developmentClient`, internal, `simulator: false`, `credentialsSource: remote` |
+> | bundle id | `co.davidmasterson.crewchief` ✓ — **must be created on the personal team** |
+> | `extra.apiBaseUrl` | `https://crewchief.davidmasterson.co` ✓ |
+> | mobile tests | 23 suites / 329 passing |
+> | EAS builds used | 4 ever, all simulator; ~15/month, resets 31 Aug |
+> | `expo-doctor` | 19/21 — the two remaining are not new, see below |
+>
+> **One thing was found and fixed** (`df2ac25`): a top-level `splash` key that SDK 57's
+> schema rejects. It arrived in the icon sweep `5a36c2d`, **after** the last successful
+> build, so it had never been through one — inert, never rendered, and a schema error on
+> the one build we get. Keeping it meant installing `expo-splash-screen`, which is **not**
+> already transitive (checked, per §9) and is a native module. It belongs on a later build.
+>
+> The two remaining doctor failures were checked against the last successful build rather
+> than assumed: **duplicate react** (19.2.3 mobile / 18.2.0 root) is byte-identical to
+> `0004ac4` and the three builds before it — the monorepo's shape, not a risk — and six
+> **expo patch mismatches** within SDK 57, left alone deliberately because dependency churn
+> immediately before a scarce build trades a known state for an unknown one.
+>
+> ⚠ `verify:mobile` reports **PARTIAL**, not green, and that is now honest: `MOBILE_TEST_TOKEN`
+> expired 2 Aug, so the three credentialed checks cannot run. It previously reported this as
+> three blocking failures including "a phone cannot load the garage" (`be2194a`).
+>
+> **The blocker is Apple auth and nothing else.** Two ways:
+>
+> ```
+> cd apps/mobile && npx eas-cli credentials      # Apple ID + 2FA, ~3 min
+> ```
+>
+> ⚠⚠ **When it asks which team, choose `DAVID RYAN MASTERSON`.** The employer team
+> "Exclusive Resorts LLC" is the default and this trap has already been hit twice.
+>
+> Or create an **App Store Connect API key** on the personal team (Users and Access →
+> Integrations → Team Keys, `.p8` downloadable once) and future builds need no interactive
+> login at all. `EXPO_TOKEN` already covers the Expo half.
+>
+> Then, without David: `eas device:create` → UDID link on the phone →
+> `eas build --platform ios --profile device` → ~15 min, one build. After that
+> `developmentClient` means **every JS change is free**.
+>
 > #### ⚠ `/api/version` is not cacheable — it was reporting a genuinely old deploy
 >
 > Checked twice against the live hostname, 22 Aug 14:16 UTC:
