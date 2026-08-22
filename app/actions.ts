@@ -16,6 +16,7 @@ import { researchVehicleDossier } from '@/lib/vehicle-research';
 import { showsModifications } from '@crewchief/core/mod-progression';
 import { logger } from '@crewchief/core/logger';
 import { healthClaim, recallEvidenceForPrompt } from '@crewchief/core/health-claims';
+import { CONTACT_EMAIL } from '@/lib/legal';
 import { checkRateLimit } from '@/lib/rate-limit';
 import {
   isModDetailCacheFresh,
@@ -129,16 +130,89 @@ export async function decodeVIN(vin: string) {
 
     const vinUpper = vin.toUpperCase();
 
+    /*
+      ── Whose garage, and the three faults this one query had ────────────────
+
+      Found 22 Aug by entering a VIN that another account already held. The
+      user was told "This vehicle is already in your garage", waited two
+      seconds, and was **bounced to the garage with no message at all** — the
+      redirect went to a dashboard `authorizeVehicleAccess` correctly refuses.
+
+      Three separate faults, one query:
+
+      1. **`client` is the service role, so this searched every account.** The
+         VIN column is `UNIQUE` across the whole table, so the row that came
+         back was as likely to be a stranger's as the caller's.
+      2. **The message asserted ownership the query had not established.** "In
+         your garage" is a claim about *whose* car it is, and the filter that
+         would have made it true was missing.
+      3. **It handed the caller another account's `vehicleId`**, which the form
+         then navigated to. Authorization held — nothing leaked, and the bounce
+         *is* the authorization working — but the dead end was manufactured
+         here, two layers earlier.
+
+      Now scoped to the caller. `.eq('user_id', session.userId)` on a
+      service-role client is the explicit filter `requireCaller`'s docblock
+      argues for: RLS is the control, and an explicit filter means a policy
+      regression surfaces as a bug in one path rather than a cross-tenant read.
+    */
     logger.debug('VIN:CHECK_EXISTING', 'Checking for existing vehicle');
-    const { data: existingVehicle } = await client
+    const { data: ownedVehicle } = await client
+      .from('vehicles')
+      .select('id')
+      .eq('vin', vinUpper)
+      .eq('user_id', session.userId)
+      .maybeSingle();
+
+    if (ownedVehicle) {
+      logger.warn('VIN:ALREADY_IN_GARAGE', 'Vehicle already in this garage', {
+        vehicleId: ownedVehicle.id,
+      });
+      return {
+        success: false,
+        error: 'This vehicle is already in your garage',
+        vehicleId: ownedVehicle.id,
+      };
+    }
+
+    /*
+      Not the caller's, but somebody's. The insert would fail on the UNIQUE
+      constraint anyway, and it would fail as "Failed to save vehicle" six
+      screens later — after the whole wizard had been filled in.
+
+      ⚠ **No `vehicleId` here, deliberately.** That field is what the form
+      redirects on, and there is nowhere to send this person: the vehicle is
+      not theirs to open. Returning it produced the silent bounce.
+
+      ⚠ The message says a VIN is registered and nothing else. No owner, no id,
+      no "belongs to <someone>". It is a real if small disclosure — you can
+      learn a given VIN is in CrewChief — and the alternative is a dead end
+      with no explanation, which is worse for the one person who has a genuine
+      reason to be here: somebody who has just bought the car.
+
+      ⚠ Which is a product limitation this does not fix. A `UNIQUE` VIN means a
+      sold car can never be added by its new owner, and the honest answer for
+      them is a support conversation rather than a self-service path. Changing
+      that is a migration and a decision about what transferring a vehicle
+      means; naming it here so the next reader knows the constraint is the
+      cause and not this branch.
+    */
+    const { data: registeredElsewhere } = await client
       .from('vehicles')
       .select('id')
       .eq('vin', vinUpper)
       .maybeSingle();
 
-    if (existingVehicle) {
-      logger.warn('VIN:ALREADY_EXISTS', 'Vehicle already in garage', { vehicleId: existingVehicle.id });
-      return { success: false, error: 'This vehicle is already in your garage', vehicleId: existingVehicle.id };
+    if (registeredElsewhere) {
+      logger.warn('VIN:REGISTERED_ELSEWHERE', 'VIN belongs to another account', {
+        // Not the vehicle id: this log line is about a caller who does not own
+        // it, and an id here is one copy-paste from a support reply.
+        vinLength: vinUpper.length,
+      });
+      return {
+        success: false,
+        error: `This VIN is already registered to another CrewChief account. If you have just bought this vehicle, contact ${CONTACT_EMAIL} and we will transfer it.`,
+      };
     }
 
     logger.debug('VIN:FETCHING_NHTSA', 'Fetching NHTSA data');
