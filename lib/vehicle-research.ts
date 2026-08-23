@@ -76,6 +76,37 @@ import { z } from 'zod';
  */
 export const RESEARCH_TIMEOUT_MS = 30_000;
 
+/**
+ * The budget when nobody is waiting — the nightly sweep.
+ *
+ * ── ⚠ Measured, after a 30s budget lost a car permanently ───────────────────
+ *
+ * The dossier call takes **23-30 seconds**. `RESEARCH_TIMEOUT_MS` is 30. That
+ * is not a timeout, it is a coin flip, and both faces were observed on 22 Aug:
+ * a successful run finished in ~30s, and a sweep run an hour later timed out
+ * against the same model on the same kind of car.
+ *
+ * ⚠ **A timeout in the sweep is not recoverable the way an interactive one
+ * is.** It writes `research_status = 'failed'`, and `vehiclesToGenerate`
+ * filter 1 never offers a `failed` car again — correctly, because retrying a
+ * genuine failure nightly is the runaway that module exists to prevent. The
+ * user's escape hatch is the retry button, and the sweep's entire purpose is
+ * cars whose owner is *not in the app to press it*. So one marginal timeout
+ * removes a car from research permanently, silently, and on the population the
+ * feature was built for.
+ *
+ * The interactive budget stays at 30s: its own docblock's reasoning holds —
+ * three deadlines plus backoff is 96 seconds of somebody watching a spinner.
+ * **That argument does not apply at 3am.** Nobody is watching, so the only
+ * cost of waiting is the function's own execution time.
+ *
+ * ⚠ **This multiplies against `SWEEP_GENERATE_CAP`.** Ten cars at 60s is ten
+ * minutes of a Netlify scheduled function that gets fifteen, before NHTSA
+ * fetches. Raising either number without the other in mind is how the sweep
+ * starts dying halfway through and reporting a partial night as a whole one.
+ */
+export const SWEEP_RESEARCH_TIMEOUT_MS = 60_000;
+
 export interface VehicleForResearch {
   id: string;
   year: number;
@@ -88,6 +119,17 @@ export interface ResearchOutcome {
   error?: string;
   unsupported?: boolean;
   data?: z.infer<typeof VehicleDataSchema>;
+  /**
+   * The dossier already existed, so nothing was generated and nothing was
+   * billed.
+   *
+   * Distinct from `success` alone because the two callers need to tell them
+   * apart: the sweep counts what it generated, and counting a short-circuit
+   * would report a night's work that never happened. It is the same reason
+   * `unsupported` is separate — "we did not spend" has more than one cause and
+   * they are not interchangeable.
+   */
+  alreadyResearched?: boolean;
 }
 
 /**
@@ -101,12 +143,60 @@ export interface ResearchOutcome {
  */
 export async function researchVehicleDossier(
   vehicle: VehicleForResearch,
-  userId: string | null
+  userId: string | null,
+  options: { timeoutMs?: number } = {}
 ): Promise<ResearchOutcome> {
   const vehicleId = vehicle.id;
+  /*
+    Defaults to the interactive budget, so the two existing callers keep the
+    behaviour they were written against and only the sweep opts into a longer
+    wait. A default of the *longer* value would have quietly made every
+    dashboard visit willing to hang for a minute.
+  */
+  const timeoutMs = options.timeoutMs ?? RESEARCH_TIMEOUT_MS;
 
   try {
     const client = getServiceRoleClient();
+
+    /*
+      ── Do not pay twice for a dossier this vehicle already has ──────────────
+
+      ⚠ Added 22 Aug, from a live run that cost the discovery. Research for a
+      new Accord **succeeded** — full dossier written, 24 NHTSA recalls stored,
+      `research_status = 'completed'` — while the browser was told it had
+      failed, because the request outlived its response and `enrichVehicle`
+      came back with no body at all. The screen showed the failure state and a
+      retry button.
+
+      Pressing it went straight from the authorization check to the prompt.
+      Nothing between the two asked whether the work had already been done, so
+      a retry on a *successful* dossier spent another Pro call — the most
+      expensive one in the product, ~4,900 tokens, measured the same day. The
+      only reason it did not happen is that nobody pressed the button.
+
+      ⚠ **The retry button is not wrong and this does not disable it.** Only
+      `completed` short-circuits. A `failed` or `pending` row still generates,
+      which is exactly what that button is for: its purpose is a dossier that
+      is missing, and a missing dossier is not what this guard sees.
+
+      Deliberately no `force` option. There is no caller that wants one today,
+      and a flag whose only user is a future maybe is a flag that gets passed
+      `true` by the next person in a hurry. Re-research is a real need when it
+      arrives — it should arrive with its own reasoning about staleness.
+    */
+    const { data: existing } = await client
+      .from('vehicle_knowledge_base')
+      .select('research_status, last_research_date')
+      .eq('vehicle_id', vehicleId)
+      .maybeSingle();
+
+    if (existing?.research_status === 'completed') {
+      logger.info('RESEARCH:ALREADY_DONE', 'Dossier already generated; not spending again', {
+        vehicleId,
+        lastResearchDate: existing.last_research_date,
+      });
+      return { success: true, alreadyResearched: true };
+    }
 
     const prompt = VEHICLE_RESEARCH_PROMPT(vehicle.year, vehicle.make, vehicle.model);
 
@@ -129,7 +219,7 @@ export async function researchVehicleDossier(
               contents: prompt,
               config: proStructuredConfig,
             }),
-          RESEARCH_TIMEOUT_MS,
+          timeoutMs,
           'vehicle research'
         );
         // Recorded per attempt, not per dossier. A retried research call is

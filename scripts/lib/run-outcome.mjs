@@ -71,3 +71,60 @@ export function parseArgs(argv, { defaultBase }) {
     unknownFlags: [...flags].filter((f) => f !== '--strict'),
   };
 }
+
+/**
+ * When a JWT stops being usable, or `null` if that cannot be read.
+ *
+ * ── ⚠ Why a verifier needs this ─────────────────────────────────────────────
+ *
+ * An expired credential and a broken API return the **same HTTP status**. On
+ * 22 Aug `verify-mobile-contract.mjs` ran against a token that had expired on
+ * the 2nd and reported three blocking failures, one of them "/api/v1/vehicles
+ * rejected a valid bearer token — a phone cannot load the garage". Every word
+ * of that was wrong except the status code: the bearer was not valid, the
+ * route was not broken, and a 401 is the *correct* answer to an expired token.
+ *
+ * That is CLAUDE.md §5's second warning rather than its first — not a guard
+ * that passes while checking nothing, but one that fails loudly and points at
+ * the wrong thing, on the check that gates a mobile build. Its cost is a
+ * debugging session into a working path, and its temptation is to go green by
+ * deleting the credential.
+ *
+ * ⚠ **This verifies nothing and must not be used as a security check.** It
+ * reads one unauthenticated claim out of the payload. The server checks the
+ * signature; this only tells a human which of two identical-looking situations
+ * they are in.
+ */
+export function tokenExpiry(jwt) {
+  if (typeof jwt !== 'string') return null;
+
+  const payload = jwt.split('.')[1];
+  if (!payload) return null;
+
+  try {
+    const json = Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString();
+    const exp = JSON.parse(json).exp;
+    return typeof exp === 'number' && Number.isFinite(exp) ? new Date(exp * 1000) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Why the credentialed checks cannot run, in the words the reader needs.
+ *
+ * Returns `null` when the token is usable. An unreadable token is reported as
+ * usable on purpose: this is a diagnostic, and refusing to run real checks
+ * because a *local parser* could not read something is the failure mode that
+ * turns a helper into an obstacle. The server's 401 remains the authority.
+ */
+export function credentialReason(jwt, now = new Date()) {
+  if (!jwt) return 'MOBILE_TEST_TOKEN is not set';
+
+  const expiry = tokenExpiry(jwt);
+  if (expiry !== null && expiry.getTime() < now.getTime()) {
+    return `MOBILE_TEST_TOKEN expired ${expiry.toISOString().slice(0, 10)}`;
+  }
+
+  return null;
+}

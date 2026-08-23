@@ -34,6 +34,7 @@ import { everHadVehicle, recordEverHadVehicle } from '../onboarding/first-run-st
 import { uploadVehiclePhoto } from '../api/photos';
 import type { InvoiceFile } from '../api/documents';
 import { getHealthBandJudgement } from '@crewchief/core/health-band';
+import { normaliseRecalls } from '@crewchief/core/recalls';
 import { localToday } from '@crewchief/core/garage-next-service';
 import { interFace } from '../theme/fonts';
 
@@ -93,6 +94,19 @@ interface Vehicle {
   */
   vehicle_health_summary?: HealthSummary | HealthSummary[] | null;
   nhtsa_data?: { recalls?: unknown[] | null } | { recalls?: unknown[] | null }[] | null;
+  /**
+   * Campaigns this owner has marked repaired — embedded by the route.
+   *
+   * ⚠ A to-many embed, so always an array. It is what lets the chip go **down**:
+   * before 23 Aug the count came straight off `nhtsa_data.recalls` and there was
+   * no way to clear a recall from anywhere in the app, so the badge was
+   * permanent. A badge that can never go down stops being read.
+   */
+  recall_actions?: Array<{ campaign_number?: string | null }> | null;
+  /** Written by the nightly sweep. See `GarageBay` for the row that draws them. */
+  next_service_label?: string | null;
+  next_service_at_miles?: number | null;
+  next_service_due_on?: string | null;
 }
 
 function first<T>(value: T | T[] | null | undefined): T | undefined {
@@ -154,8 +168,29 @@ function VehicleBay({
   const health = first(vehicle.vehicle_health_summary);
   const score = typeof health?.health_score === 'number' ? health.health_score : null;
 
-  const recalls = first(vehicle.nhtsa_data)?.recalls;
-  const recallCount = Array.isArray(recalls) ? recalls.length : 0;
+  /*
+    ── Open recalls, and two corrections in one line ─────────────────────────
+
+    This was `recalls.length` off the raw payload. Both halves were wrong:
+
+      - **It counted rows the recall screen refuses to draw.** `normaliseRecall`
+        drops a record with neither a summary nor a component — "an entry
+        rendering as a blank card is not information" — so a chip reading "3
+        recalls" could lead to a screen showing two. `native-wishlist.spec.html`
+        names that exact failure and why it is expensive: *"a count that
+        disagrees with what is on screen is the fastest way to lose a user's
+        trust in every other number."*
+      - **It counted campaigns the owner had already dealt with**, because until
+        23 Aug there was no way to say so. Now there is, and this subtracts it.
+  */
+  const marked = new Set(
+    (vehicle.recall_actions ?? []).flatMap((action) =>
+      typeof action?.campaign_number === 'string' ? [action.campaign_number] : []
+    )
+  );
+  const recallCount = normaliseRecalls(first(vehicle.nhtsa_data)?.recalls).filter(
+    (recall) => !recall.campaignNumber || !marked.has(recall.campaignNumber)
+  ).length;
 
   /*
     `Premium · Daily driver · 48,210 mi` — the board's subtitle, assembled here

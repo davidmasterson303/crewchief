@@ -147,10 +147,29 @@ export const register = {
  * Status colours.
  *
  * ⚠ **The health band is not here.** Thresholds, wording and colour are owned
- * by `@crewchief/core/health-band` and read at runtime. `attention` and
- * `critical` below are the *banner* families and happen to share hues with two
- * bands; they are not a second copy of the ramp, and a build reading must never
- * be coloured from either — a low build is stock, not a fault.
+ * by `@crewchief/core/health-band` and read at runtime.
+ *
+ * ── ⚠ 23 Aug: "happen to share hues" was doing a lot of work ────────────────
+ *
+ * This docblock used to say `attention` and `critical` "happen to share hues
+ * with two bands". They did not share hues — they were **the same hex**:
+ * `attention` was `#E0A468`, which is the health ramp's `warn`, and `critical`
+ * was `#E08882`, which is its `bad`. So the sentence asserting these were not a
+ * second copy of the ramp sat directly above a second copy of the ramp.
+ *
+ * Design's ruling: **attention is `#FB923C`**, and the two families are meant to
+ * rhyme without matching, because a gauge reading and a status chip are
+ * different claims — sharing a colour makes a 61 look like something you can
+ * dismiss. The garage bay had that live: a dial reading in warn amber with a
+ * recall chip beside it in the same amber the dial uses for Critical.
+ *
+ * `critical: '#E08882'` is **gone** rather than recoloured. It had no call
+ * sites — the critical chip reads `dangerText` (`#F87171`, which is already the
+ * system's value) and the banners read `criticalFill`/`criticalBorder`. A dead
+ * token holding a colliding hex is how a collision comes back.
+ *
+ * A build reading must still never be coloured from either — a low build is
+ * stock, not a fault.
  */
 export const status = {
   confirm: '#4ADE80',
@@ -163,8 +182,8 @@ export const status = {
    * before then.
    */
   confirmFill: 'rgba(22,163,74,0.95)',
-  attention: '#E0A468',
-  critical: '#E08882',
+  /** Design's value, 23 Aug. Not the health ramp's `warn` — see the docblock. */
+  attention: '#FB923C',
   danger: '#DC2626',
   dangerText: '#F87171',
   /** Pressed danger. Deepens, for the same reason the primary does. */
@@ -197,8 +216,18 @@ export const status = {
    */
   dangerWash: 'rgba(248,113,113,0.06)',
   dangerWashBorder: 'rgba(248,113,113,0.3)',
-  attentionWash: 'rgba(251,191,36,0.08)',
-  attentionWashBorder: 'rgba(251,191,36,0.35)',
+  /*
+    ⚠ The wash follows the ink. It was `rgba(251,191,36,…)` — amber-400, a
+    **third** amber in a family that is supposed to have one — so a chip drew
+    orange type on a yellow tint. The system's own pair is the default hue at
+    0.14 / 0.35, and that is what these are now.
+
+    The solid `attentionFill` / `attentionBorder` above are deliberately *not*
+    re-derived: they are this app's own measured values and the contrast scan
+    already measures white on them. That override is documented and stays.
+  */
+  attentionWash: 'rgba(251,146,60,0.14)',
+  attentionWashBorder: 'rgba(251,146,60,0.35)',
   /** Behind a modal. */
   scrim: 'rgba(0,0,0,0.4)',
 } as const;

@@ -209,3 +209,74 @@ describe('the stored invoice total is what the invoice says', () => {
     expect(parseSource).toMatch(/grand_total\s*>=\s*lineItemsTotal/);
   });
 });
+
+describe('the summary does not assert what nobody checked', () => {
+  /*
+    ⚠ 22 Aug, live run. The tile read "We have not checked this vehicle for
+    recalls yet… This is not a clear result." and the narrative beneath it read
+    "While there are no active recalls, key high-mileage services must be
+    evaluated." Same screen, opposite claims, on a 2003 Accord inside the
+    Takata campaigns.
+
+    The rule itself is unit-tested in `health-claims.test.ts`. What is pinned
+    here is that this generator actually *reaches* for it — the previous fix
+    landed on the component while this function kept its own copy of the
+    question.
+  */
+  const summary = actions.slice(
+    actions.indexOf('export async function generateVehicleHealthSummary'),
+    actions.indexOf('export async function', actions.indexOf('export async function generateVehicleHealthSummary') + 10)
+  );
+
+  it('found the function to scan', () => {
+    // A slice that matched nothing would pass everything below. CLAUDE.md §5.
+    expect(summary.length).toBeGreaterThan(2000);
+    expect(summary).toContain('vehicle_health_summary');
+  });
+
+  it('asks whether the lookup ran, not just what it found', () => {
+    expect(summary).toMatch(/const recallsChecked = Boolean\(nhtsa\)/);
+  });
+
+  it('builds the recall section through the shared rule', () => {
+    /*
+      Not by hand. A second hand-rolled copy is how the tile and the prose came
+      to disagree in the first place.
+    */
+    expect(summary).toMatch(/recallEvidenceForPrompt\(/);
+    expect(summary).toMatch(/checked:\s*recallsChecked/);
+  });
+
+  it('never hands the prompt a bare recall count', () => {
+    /*
+      ⚠ The exact shape of the defect: `nhtsa?.recalls?.length || 0` produces a
+      confident zero for a car nobody looked at, and a prompt told "Active
+      Recalls: 0" writes "there are no active recalls".
+    */
+    const promptStart = summary.indexOf('You are an expert automotive consultant analyzing');
+    const promptEnd = summary.indexOf('Format as valid JSON only', promptStart);
+    expect(promptStart).toBeGreaterThan(-1);
+    expect(promptEnd).toBeGreaterThan(promptStart);
+
+    const prompt = summary.slice(promptStart, promptEnd);
+    expect(prompt).not.toMatch(/Active Recalls: \$\{activeRecalls\}/);
+  });
+
+  it('does not fall back to a clean bill of health', () => {
+    /*
+      The defaults applied when the model's JSON failed to parse, which is when
+      least is known — and they said the car was fine on every axis at once.
+      A fallback is the last place that should sound certain.
+    */
+    const defaults = summary.slice(
+      summary.indexOf('let healthData = {'),
+      summary.indexOf('try {', summary.indexOf('let healthData = {'))
+    );
+
+    expect(defaults.length).toBeGreaterThan(50);
+    expect(defaults).not.toMatch(/'Vehicle is in good condition'/);
+    expect(defaults).not.toMatch(/'Maintenance records up to date'/);
+    expect(defaults).not.toMatch(/'No recalls to date'/);
+    expect(defaults).toMatch(/healthClaim\(/);
+  });
+});

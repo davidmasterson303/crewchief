@@ -226,5 +226,27 @@ const styles = StyleSheet.create({
     one on the way out makes an absent control appear.
   */
   inertGhost: { backgroundColor: 'transparent' },
-  inertLabel: { color: text.disabled },
+  /**
+   * ⚠ `text.muted`, not `text.disabled`, and the two are not interchangeable.
+   *
+   * `text.disabled` is `#6E6B67` — a dark grey that measures **3.31:1** on the
+   * dark `surface.disabled` fill. WCAG 1.4.3 genuinely exempts inactive
+   * controls, so that is not a compliance defect and this docblock used to say
+   * so and stop there.
+   *
+   * It stopped being good enough on 23 Aug, when the add-a-car screen started
+   * opening with a disabled outline button as its **first control**. This
+   * project has already made that call twice — `SignInScreen`'s submit and the
+   * advisor's "Ask" were both fixed as disabled states, on the grounds that a
+   * control nobody can read leaves you unable to tell what the control even is,
+   * and the state a screen *opens in* is the one that matters most.
+   *
+   * `text.muted` composites to 5.23:1 on `surface.disabled` and is still a
+   * clear step down from the `text.primary` these variants use when live, so it
+   * reads as inactive without going unreadable.
+   *
+   * ⚠ It applies to the **dark** variants only. `inverse` is a light fill and
+   * overrides it below: 50% white on `#B8B8B8` would be the opposite mistake.
+   */
+  inertLabel: { color: text.muted },
 });

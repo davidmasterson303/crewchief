@@ -1,5 +1,764 @@
 # CrewChief roadmap — image pipeline, backdrop, cockpit direction, and responsive web
 
+> ### ⚠ START HERE — handoff into the device-testing thread
+>
+> Written at the end of the 22 Aug session. **CrewChief is installed and signed in on
+> David's iPhone**, and he is about to test it by hand and make changes. This block is
+> what that thread needs and nothing else; everything below it is history.
+>
+> ---
+>
+> #### The iteration loop — JS is free, native is not
+>
+> ```
+> cd apps/mobile && npx expo start --dev-client      # Metro, on 192.168.12.171:8081
+> ```
+>
+> Phone and Mac on the same Wi-Fi. The installed build is
+> `f7969888` (profile `device`, cut at `fe84c92`) and it is a **development client**, so
+> every JS change — screens, copy, colours, logic — reloads over Metro with **no rebuild**.
+>
+> ⚠ **That means the phone is already newer than the build.** Commits `9a38827` onward
+> (the mobile recall fix) reach it through Metro. Do not read the build's commit as what the
+> phone is running.
+>
+> **A new EAS build is needed only for a native module.** 5 of ~15 iOS builds used this
+> period; resets 31 Aug. Signing is done and correct — distribution certificate and
+> provisioning profile are on the **personal** team `P4873P8FQ9`, with the iPhone's UDID in
+> the profile.
+>
+> ⚠ Two Apple teams exist on the account and App Store Connect **opens on the employer's**.
+> Anything created there is the employer's asset. Check the active team every session.
+>
+> #### ⛔ Three migrations are pending, and one of them is a live defect
+>
+> ```
+> node scripts/check-migrations.mjs --pending
+> ```
+>
+> | | |
+> |---|---|
+> | `20260729060000` | ⛔ **`modification_details.performance_goal` does not exist.** The write fails `42703` |
+> | `20260821140000` | the mod-detail content cache (`mod_detail_cache`) |
+> | `20260822120000` | the sweep heartbeat (`sweep_runs`) |
+>
+> **`20260729060000` is the one that matters.** `generateModificationDetails` upserts
+> `onConflict: 'vehicle_id,mod_name,performance_goal'` against a table without that column,
+> so **every modification analysis has been billed and then discarded since 29 July** — which
+> is why this one call was 89% of all AI spend. The user sees "Failed to save details".
+>
+> ⚠ **Applying `20260821140000` alone would buy nothing.** Its cache write used to sit behind
+> the failing upsert's early return. `341cf68` reorders it so the paid answer is cached
+> first, but the per-vehicle row still cannot save until `20260729060000` lands.
+>
+> ⚠ Expect to hit "Failed to save details" on the phone when opening a modification. **That
+> is this, not a new bug.**
+>
+> The other two pending (`20260104022655`, `20260314143627`) are older drift — the first is a
+> column whose last reader was deleted 7 Aug and which `app/actions.ts` calls droppable.
+>
+> #### What is deployed where
+>
+> ```
+> crewchief.davidmasterson.co        c0873aea   ← the app's API and the App Store URL
+> crewchief-demo.davidmasterson.co   eef03da    ← 26 commits behind, deliberately
+> main                               341cf68, pushed, clean
+> unpromoted                         4 to web-live, 26 to demo-live
+> ```
+>
+> ⚠ `/api/version` reports the **merge** commit, never the `main` commit named in a promote.
+> This has cost real time twice.
+>
+> ⚠ **Before promoting the demo**, `CREWCHIEF_DEMO_SITE=true` must be set on that Netlify
+> site. It is set today, and `promote-demo` now refuses if it is ever not — but the reason it
+> matters is new: since `39f7f0b` the landing CTA is gated on it, and its default is
+> *product*, so an unset variable turns the recruiter site into a signup funnel.
+>
+> #### Known and deliberate — do not re-report these
+>
+> - **Mod details fail to save** — the migration above.
+> - **`VehicleDetailScreen` shows nothing about recalls when a car has none.** Its banner is
+>   behind `recalls > 0`, so "checked, clean" and "never checked" look identical. A silence
+>   rather than a false claim, and **David's design call** — adding an element to that screen
+>   was not something to decide while he was mid-test.
+> - **`ServiceMilestoneScreen` titles both empty states "Nothing due right now"**, though its
+>   body correctly distinguishes "no schedule yet" from "nothing due soon". Mild; same call.
+> - **`verify:mobile` reports PARTIAL, not green.** `MOBILE_TEST_TOKEN` expired 2 Aug, so the
+>   three credentialed checks cannot run. Refreshing it from a signed-in session restores them.
+>
+> #### What this session learned that is not in the code
+>
+> - **The dossier call is 23–30s and costs $0.03–0.04** (two measurements: 4,901 and 4,731
+>   tokens on `gemini-2.5-pro`). **53% of it is thinking**, at a level nobody set —
+>   `proStructuredConfig` has no thinking config. Largest unexamined cost lever left.
+> - **Research completes even when the browser is told it failed.** The request outlives its
+>   response. `b6d05a8` made `research_status` the verdict and the action's return a hint.
+> - **A timeout in the sweep is permanent**, because it writes `failed` and filter 1 never
+>   offers a failed car again. Budget is now 60s there, 30s interactively.
+>
+> #### Next, in order
+>
+> | # | What | Who |
+> |---|---|---|
+> | **1** | Apply the three migrations — `20260729060000` first | **David · one SQL trip** |
+> | **2** | Test on the phone; feedback as screenshots (video cannot be read here) | **David** |
+> | **3** | Decide the two silences above | **David** |
+> | **4** | Measure a thinking level on the dossier against a corpus | Claude Code · needs a spend nod |
+> | **5** | `expo-iap` + store adapter — the last of E8 | Claude Code · costs a build, blocked on ASC products |
+>
+> ⚠ Also David's, unchanged: the reviewer account password rotation, the Paid Applications
+> agreement clearing, and excluding the EU from availability at launch (declared non-trader).
+>
+> #### ⚠ One thing I could not prove
+>
+> The mod-detail write fails `42703` — confirmed against production with a probe that could
+> not write. What is **not** proven is that all 232 metered calls took that path. **If a
+> modification analysis has ever rendered successfully, there is a path I did not find**, and
+> that is worth saying out loud rather than discovering later.
+>
+> #### Proposed, not done: a line for CLAUDE.md §2
+>
+> §2 already says never to state the schema from a file read. It does not name the tool that
+> now answers it, and today that gap cost a live defect its discovery for three weeks:
+>
+> ```
+> node scripts/check-migrations.mjs        # applied / not applied, against the live database
+> ```
+>
+> CLAUDE.md is curated and short on purpose, so this is a proposal rather than an edit.
+>
+
+> ### 22 Aug — promoted and live; the build was installed. **Superseded by the handoff above**, which carries the migration state and the open questions.
+>
+> **The device build is still the priority and still blocked on the same three minutes.**
+> Re-verified twice on 22 Aug, with the Expo token from `.env` so the CLI authenticates:
+>
+> ```
+> $ eas device:list
+> No Apple teams found for account masterson303.
+> ```
+>
+> `EXPO_TOKEN` in `.env` works and authenticates as `masterson303` — so **everything after
+> the Apple link is Claude Code's**, including `device:create` and the build. Only step 1
+> needs David:
+>
+> ```
+> cd apps/mobile && npx eas-cli credentials
+> ```
+>
+> ---
+>
+> #### ✅ Verified in production today — both 21 Aug fixes work
+>
+> David added a 2003 Accord (`91c9eaae`) through the real user path at 12:31:26. Sixty
+> seconds later: `research_status = completed`, a dossier with 7 known issues and a 9-item
+> maintenance schedule, and **24 NHTSA recalls** including the Takata inflator campaigns.
+>
+> `7a662f3` works. The recall tile correctly refused to claim an all-clear on an unresearched
+> car. **The board's "deployed and UNVERIFIED" line is closed.**
+>
+> ⚠ **A report that research "still fails" was wrong at the data layer, and the distinction
+> is the useful part.** The work completes; the *browser* is told it failed. The request
+> outlives its response, `enrichVehicle` returns no body, and the client reads `.success` off
+> `undefined` — `RESEARCH_STATUS:THREW`. One invocation ran 12:31:26 → 12:32:26 with writes at
+> +30s and +60s, so the function was not killed at 10s or 26s; the gateway gave up on the
+> response while the function ran on. **Netlify's function log for that minute is the one
+> piece of evidence not available from here** — the CLI is not logged in on this machine.
+>
+> So the fix is not to make research faster or split the dossier into stages. It is to stop
+> the browser awaiting a call that already works: the component already receives `status`, and
+> `research_status` reaches `completed` on its own. **Poll it.** ✅ Shipped the same day as
+> `b6d05a8`: `enrichVehicle` still starts the work, because §11 says the work needs a request
+> that owns it, but the record decides the outcome. Only `failed`, or three minutes of
+> `pending`, shows the retry button now.
+>
+> #### 💰 The dossier is measured, for the first time
+>
+> ```
+> gemini-2.5-pro    1,054 in · 1,802 out · 2,045 thinking · 4,901 total · one attempt
+> ```
+>
+> **≈ $0.03–0.04 per vehicle** ($1.25/$10 per M for 2.5 Pro; ≈$0.030 at the flat $1.50/$7.50
+> the older figures use). Against `modification_details` at $0.0087 a call, a dossier is the
+> most expensive single call in the product — about 1.5% of the entire three-week bill, spent
+> once per vehicle added. `lib/vehicle-research.ts:140` says D6 is decided on this number; it
+> now has it.
+>
+> ⚠ **Thinking is 2,045 of 3,847 billed output tokens — 53% of what the call costs.**
+> `proStructuredConfig` sets temperature, topK, topP and `maxOutputTokens` and **no thinking
+> level**. It is the largest unexamined lever left in the bill. Unlike the mod paths this is a
+> research-and-judgment call, so the 21 Aug precedent (consultant and health summary stay at
+> `LOW`) may well apply — but it is now measurable the same way, and the invoice-extraction
+> note in `app/actions.ts` describes the corpus method for settling exactly this.
+>
+> ⚠ **Usage is recorded per attempt, before the parse** (`vehicle-research.ts:137`). A flow
+> that fails downstream still bills, and the retry loop bills up to three times. "No dossier
+> completed" and "a dossier was billed" are both true statements about the same run.
+>
+> #### What shipped 22 Aug
+>
+> | | |
+> |---|---|
+> | `c0ebf9e` | **the prose asserted the all-clear the tile had just refused** — see below |
+> | `bc24206` | a dossier that already exists is never paid for twice |
+> | `a0561b6` | research on activity, notify on devices — and one car is one push |
+> | `9c34b7d` | a VIN somebody else owns sent you to their car, then to nowhere |
+> | `b6d05a8` | **the dossier landed and the browser was told it had failed** — the action's return value is a hint now; `research_status` is the verdict |
+>
+> **⚠ The safety fix is the one to understand.** On the same screen where the tile said "We
+> have not checked this vehicle for recalls yet… This is not a clear result", the generated
+> narrative said **"While there are no active recalls, key high-mileage services must be
+> evaluated."** The 21 Aug fix landed on the component; the generator kept its own copy of the
+> question (`nhtsa?.recalls?.length || 0`), and a model handed "Active Recalls: 0" writes
+> "there are no active recalls", correctly. **Prose is the more dangerous half** — it is what
+> a person reads, and it carries no icon to qualify it.
+>
+> The same function's parse-failure defaults were `'Vehicle is in good condition'`,
+> `'Maintenance records up to date'` and `'No recalls to date'` — a clean bill of health on
+> every axis, applied exactly when least is known. Both are fixed; the rule lives in
+> `health-claims.ts` beside the tile's rule so the halves cannot drift again.
+>
+> **The generation gate was filtering on the wrong thing.** `vehiclesToGenerate` required
+> `hasPushToken`, which is sound about notifications and wrong about dossiers — a dossier
+> feeds the dashboard, the health report and the consultant's context, none of which involve
+> a phone. The reviewer's account has no device, so its Accord was unreachable by design.
+> Now: **research on `last_sign_in_at` within 90 days, notify on device tokens.**
+>
+> #### ⛔ Two migrations written and NOT applied — one SQL trip
+>
+> ```
+> supabase/migrations/20260821140000_the_same_car_should_not_be_researched_twice.sql
+> supabase/migrations/20260822120000_a_sweep_that_did_not_run_looks_like_a_quiet_night.sql
+> ```
+>
+> Both additive-only, one new table each, no drops and no grants touched — the "Potential
+> issue detected" modal should not fire on either. Until they land: the mod-detail cache is
+> inert (full price, nothing broken — the code falls through to generating), and the sweep
+> still has no durable record that it ran.
+>
+> #### ⚠ 24 push notifications are queued for the next real sweep
+>
+> A dry run against production, 22 Aug, before the fix:
+>
+> ```
+> scanned 3 · recallsPlanned 24 · servicesPlanned 1
+> ```
+>
+> The Accord's 24 un-raised campaigns were 24 separate pushes, to one phone, in one evening.
+> `SWEEP_SEND_CAP` is 200 for the whole run and there was no per-vehicle limit.
+> `recallsToRaise` already refuses this shape in the other direction — one recall repeating
+> nightly "ends with notifications disabled and every future recall unheard" — and 24 at once
+> ends the same way. It only happens on the first sweep after a car's recalls are fetched,
+> which means it lands on new users.
+>
+> `digestRecalls` fixes it: **one car is one notification**, headed by the count, with every
+> campaign still deduped. After:
+>
+> ```
+> scanned 3 · recallsPlanned 1 · recallCampaignsRaised 24 · generationPlanned 1
+> ```
+>
+> ⚠ **The fix is on `main`, and nothing deploys from `main`.** Until someone promotes, the
+> nightly sweep runs the old code from `web-live`. Whether it fires at all is unknown — see
+> the heartbeat, which exists precisely because that question has no answer today.
+>
+> #### 🚀 Promoted to `web-live`, 22 Aug — product host only
+>
+> ```
+> crewchief.davidmasterson.co   c0873aea   built 17:06   ← 20 commits
+> crewchief-demo.davidmasterson.co   eef03da   built 20 Aug   ← untouched
+> ```
+>
+> David's call, and the reasoning is worth keeping: the recall-honesty fix is exactly what
+> should be live before Apple looks, the CTA change was already greenlit, and **the demo host
+> has never manifested the recall bug** — all three demo vehicles have NHTSA rows — so it can
+> batch. Credits were past 75% on the 20th, which argues for one promote rather than two.
+>
+> Verified independently of the script: `/api/version` reports `c0873aea`, the landing page
+> serves "Add your vehicle" and "See a sample garage" and no "Enter demo", the demo host still
+> reports `eef03da`, and `verify-mobile-contract` against production passes every check it can
+> run.
+>
+> ⚠ As §8 warns, `/api/version` reports the **merge commit** `c0873aea`, not the `main` commit
+> `88306a9` named in the promote. Checking for the latter and concluding the deploy failed has
+> cost real time twice.
+>
+> ⚠ **`demo-live` is now 22 commits behind.** Nothing there manifests the recall defect, but
+> the CTA gate means a future demo promote needs `CREWCHIEF_DEMO_SITE=true` set on that site
+> or its landing page will start asking recruiters to sign up.
+>
+> #### ✅ THE BUILD IS DONE — install it on the phone
+>
+> ```
+> Build     f7969888-056d-4da3-a9ed-fd893de5afe8   finished, 5 min
+> Profile   device   ·   commit fe84c92
+> Install   https://expo.dev/accounts/masterson303/projects/crewchief/builds/f7969888-056d-4da3-a9ed-fd893de5afe8
+> ```
+>
+> **Open that link on the iPhone and tap Install.** It is an internal-distribution build,
+> so it installs straight from the page — no TestFlight, no App Store.
+>
+> Credentials came out on the right team, which was the whole risk:
+>
+> ```
+> Distribution Certificate  P4873P8FQ9 (DAVID RYAN MASTERSON (Individual))
+> Provisioning Profile      W3YFH8T4QP, active
+> Provisioned devices       iPhone (UDID: 00008140-0001796C2E9B001C)
+> Bundle Identifier         co.davidmasterson.crewchief
+> ```
+>
+> ⚠ **Metro must be running for the app to load anything**, on the same Wi-Fi as the phone:
+>
+> ```
+> cd apps/mobile && npx expo start --dev-client
+> ```
+>
+> ⚠ The device was **already registered** when the Apple link completed — `device:create` was
+> never needed. And only one Apple team appeared on the account, so the two-teams trap could
+> not fire on this build.
+>
+> ⚠ **From here, JS is free.** `developmentClient: true` means every screen, colour and string
+> change reloads over Metro. Only a new native module costs another build — 5 of ~15 used this
+> period, resets 31 Aug.
+>
+> #### ❓ "Was the web health-summary prose fixed, or only the tile?" — **fixed, first commit of the day**
+>
+> `c0ebf9e`. Both halves of it:
+>
+> - the **prompt** no longer hands the model a bare `nhtsa?.recalls?.length || 0`. It builds
+>   the recall section through `recallEvidenceForPrompt`, which for an unchecked car states
+>   that the count is unknown **and forbids the inference** — omission alone is not enough,
+>   because a model given silence fills it with the reassuring reading.
+> - the **parse-failure fallback**, which nobody had seen. It defaulted to
+>   `'Vehicle is in good condition'` / `'Maintenance records up to date'` / `'No recalls to
+>   date'` — a clean bill of health on every axis, applied exactly when the model's JSON could
+>   not be read.
+>
+> Nine guards across `health-claims.test.ts` and `health-sees-filed-invoices.test.ts`, all
+> mutation-verified. The rule lives beside the tile's rule so the two cannot drift, and one
+> test asserts they agree on the same evidence.
+>
+> ⚠ The question was the right one to ask. The tile, the prose and the mobile screen were
+> **three separate places** making the same claim, fixed on three different days, and the only
+> reason the third was found is that somebody asked whether the second had been.
+>
+> #### While David was away — two fixes that need no build
+>
+> ⚠ **Correction to `9a38827`'s commit message.** It says the mobile recall fix "ships with
+> the next build". **That is wrong for a `developmentClient` build.** Metro serves the JS, so
+> installing `f7969888` and connecting it to `expo start --dev-client` picks up every JS
+> commit since — including that fix. No rebuild. That is the whole economics of the dev
+> client and the message understated it; left in history rather than rewritten, corrected
+> here.
+>
+> **`9a38827` — the recall screen told an unchecked car that NHTSA found nothing.** The
+> 21 Aug web defect, one platform over, found by asking what the device build is about to put
+> in David's hand. `RecallDetailScreen` rendered *"NHTSA has no open recalls listed for this
+> vehicle"* whenever `recalls` was empty — including when no `nhtsa_data` row existed and the
+> lookup had never run. The copy carefully refuses to say the car is clear, then asserts the
+> list was consulted. Three states now, using `health-claims.ts` rather than a second copy of
+> the rule, so the platforms cannot drift.
+>
+> ⚠ **Two tests had encoded the defect.** The contrast case passed `nhtsa_data: null` while
+> asserting "No recalls on record" — named for a checked car, supplied an unchecked one.
+>
+> **`39f7f0b` — the product host asks you to use the product.** David's greenlit CTA change:
+> primary **"Add your vehicle"** → `/signup`, secondary **"See a sample garage"**; the
+> recruiter host keeps "Enter demo" unchanged.
+>
+> The blocking detail is solved and worth knowing: `CREWCHIEF_DEMO_SITE` is a **server**
+> variable and both `app/page.tsx` and `LandingHero` are `'use client'`. A browser hostname
+> check is the wrong answer — it does not exist during SSR or hydration, so the primary CTA
+> would visibly flip after first paint. The flag is resolved once in `app/layout.tsx`, where
+> it already was for `DemoBanner`, and published through `SiteRoleProvider`.
+>
+> Verified against real servers, both directions: unset serves "Add your vehicle" and "See a
+> sample garage" and no "Enter demo"; `CREWCHIEF_DEMO_SITE=true` serves only "Enter demo".
+>
+> ⚠ Not included: the *"What a CrewChief garage looks like"* heading from the original
+> proposal. The greenlight names the two CTAs and the gate; the heading has no specified
+> placement and the hero already has an h1.
+>
+> #### ⏱ A 30s budget on a 23–30s call, found by running the sweep for real
+>
+> The sweep selected the reviewer's Accord, spent 32 seconds, and reported
+> `schedulesGenerated: 0`. The database said why: `research_status = 'failed'`, no NHTSA row,
+> and **no `vehicle_dossier` usage row at all** — the response never came back to be metered.
+>
+> `RESEARCH_TIMEOUT_MS` is 30s and the dossier call takes 23–30s. Both faces of that coin
+> turned up the same day.
+>
+> ⚠ **The cost is not one lost night.** A timeout writes `failed`, and `vehiclesToGenerate`
+> filter 1 never offers a `failed` car again — correctly, since retrying a genuine failure
+> nightly is the runaway it exists to prevent. The escape hatch is the retry button, and the
+> sweep's whole purpose is cars whose owner is *not in the app to press it*. One marginal
+> timeout removed a car from research permanently, on exactly the population the feature was
+> built for.
+>
+> Fixed in `eea01d5`: the sweep passes **60s**, the interactive path keeps 30s (its "somebody
+> is watching a spinner" argument does not apply at 3am), and a test asserts the budget times
+> the generation cap stays under the scheduled function's ceiling.
+>
+> **Proven on the same car:** the re-run took 39.7s — longer than 30, inside 60 — and returned
+> `schedulesGenerated: 1`.
+>
+> #### ✅ The reviewer's Accord is researched, and the dossier measurement is stable
+>
+> ```
+> research_status   completed        known_issues 7 · schedule 8 · reliability 6
+> nhtsa_data        24 recalls       the Takata campaigns, real data
+> ```
+>
+> That closes the App Review concern: the account Apple may sign into no longer shows "we
+> cannot say" on recalls. ⚠ Its recalls are **not yet raised as notifications** — `collectRecalls`
+> runs before generation, so the next sweep raises them, as one digest, to an account with no
+> device.
+>
+> Second dossier measurement, against the first:
+>
+> ```
+> 22 Aug 12:31   1,054 in · 1,802 out · 2,045 thinking · 4,901 total
+> 22 Aug 15:23   1,054 in · 1,756 out · 1,921 thinking · 4,731 total
+> ```
+>
+> Stable at **~4,700–4,900 tokens, $0.03–0.04 a vehicle**. The figure is no longer a single
+> observation.
+>
+> #### ✈️ Device build pre-flight — what was checked before spending the build
+>
+> Everything checkable without Apple credentials has been checked, 22 Aug:
+>
+> | | |
+> |---|---|
+> | `eas.json` `device` profile | resolves clean — `developmentClient`, internal, `simulator: false`, `credentialsSource: remote` |
+> | bundle id | `co.davidmasterson.crewchief` ✓ — **must be created on the personal team** |
+> | `extra.apiBaseUrl` | `https://crewchief.davidmasterson.co` ✓ |
+> | mobile tests | 23 suites / 329 passing |
+> | EAS builds used | 4 ever, all simulator; ~15/month, resets 31 Aug |
+> | `expo-doctor` | 19/21 — the two remaining are not new, see below |
+>
+> **One thing was found and fixed** (`df2ac25`): a top-level `splash` key that SDK 57's
+> schema rejects. It arrived in the icon sweep `5a36c2d`, **after** the last successful
+> build, so it had never been through one — inert, never rendered, and a schema error on
+> the one build we get. Keeping it meant installing `expo-splash-screen`, which is **not**
+> already transitive (checked, per §9) and is a native module. It belongs on a later build.
+>
+> The two remaining doctor failures were checked against the last successful build rather
+> than assumed: **duplicate react** (19.2.3 mobile / 18.2.0 root) is byte-identical to
+> `0004ac4` and the three builds before it — the monorepo's shape, not a risk — and six
+> **expo patch mismatches** within SDK 57, left alone deliberately because dependency churn
+> immediately before a scarce build trades a known state for an unknown one.
+>
+> ⚠ `verify:mobile` reports **PARTIAL**, not green, and that is now honest: `MOBILE_TEST_TOKEN`
+> expired 2 Aug, so the three credentialed checks cannot run. It previously reported this as
+> three blocking failures including "a phone cannot load the garage" (`be2194a`).
+>
+> **The blocker is Apple auth and nothing else.** Two ways:
+>
+> ```
+> cd apps/mobile && npx eas-cli credentials      # Apple ID + 2FA, ~3 min
+> ```
+>
+> ⚠⚠ **When it asks which team, choose `DAVID RYAN MASTERSON`.** The employer team
+> "Exclusive Resorts LLC" is the default and this trap has already been hit twice.
+>
+> Or create an **App Store Connect API key** on the personal team (Users and Access →
+> Integrations → Team Keys, `.p8` downloadable once) and future builds need no interactive
+> login at all. `EXPO_TOKEN` already covers the Expo half.
+>
+> Then, without David: `eas device:create` → UDID link on the phone →
+> `eas build --platform ios --profile device` → ~15 min, one build. After that
+> `developmentClient` means **every JS change is free**.
+>
+> #### ⚠ `/api/version` is not cacheable — it was reporting a genuinely old deploy
+>
+> Checked twice against the live hostname, 22 Aug 14:16 UTC:
+>
+> ```
+> cache-status: "Netlify Durable"; fwd=bypass
+> cache-status: "Netlify Edge";    fwd=miss; fwd-status=200
+> cache-control: no-store,no-cache,must-revalidate,max-age=0
+> body: {"commit":"f327898…","branch":"web-live","builtAt":"2026-08-21T15:44:06.940Z"}
+> ```
+>
+> The durable cache is bypassed, the edge missed, and the route already sets
+> `dynamic = 'force-dynamic'`, `revalidate = 0` **and** the `no-store` header. It cannot be
+> more uncached than it is.
+>
+> **The day-old commit was the truth.** `web-live` was last built 21 Aug 15:44 and nothing has
+> been promoted since. The instrument reported a stale *deploy*, was read as a stale *cache*,
+> and was one step from being "fixed" for telling the truth — CLAUDE.md §5's warning, inverted.
+> Do not cache-bust this route.
+>
+> #### 🍎 App Store Connect — status and one trap
+>
+> ⚠ **David's Apple ID is on two teams and App Store Connect opens on the wrong one.**
+> "Exclusive Resorts LLC" is his employer; everything for CrewChief — bundle id
+> `co.davidmasterson.crewchief`, the app record, certificates, provisioning profiles — belongs
+> to **DAVID RYAN MASTERSON** (personal, Individual enrolment). **Hit twice already.** The
+> employer team is the default and nothing on screen says it is wrong. Check the active team
+> before every session that creates anything.
+>
+> | | |
+> |---|---|
+> | W-9 | Active |
+> | Digital Services Act | Active, declared **non-trader** |
+> | Bank account | Added, Processing |
+> | Paid Applications agreement | Pending User Info — Apple's clock, a few days |
+>
+> ⚠ **Non-trader means the EU must be excluded from app availability at launch.** A step
+> someone takes, not an automatic consequence. Trader status is per-app and editable later.
+>
+> ⚠ IAP products can be created now but **cannot be tested** until the agreement is active —
+> StoreKit returns an empty product list, which looks exactly like a configuration mistake.
+>
+> #### The EAS blocker was Expo, not Apple
+>
+> `eas-cli credentials` was failing at **Expo login**: the account (`masterson303`, org
+> `masterson303apps`) had Password "Not configured" and only a Google sign-in. A password is
+> now set. ✅ **`EXPO_TOKEN` is already in `.env` and works** — verified authenticating as
+> `masterson303` twice on 22 Aug — so the recommended token export is already in place and
+> non-interactive builds need nothing further on the Expo side. An App Store Connect API key
+> would do the same for the Apple side.
+>
+> #### KB — decisions staged, not written
+>
+> `p-20260822142329-d9ac`: price, Small Business Program, App Store Connect constraints, the
+> new positioning entry superseding `cc-marketing-0002`, the CTA, and the sweep gate.
+>
+> ⚠ **Approval order matters.** `p-20260802194500-rev5` has been pending since 2 Aug and also
+> edits `cc-marketing-0002`. Approve rev5 first, then `p-20260805-cost`, then this one.
+>
+> ⚠ It also **corrects a figure**: "a heavy user costs ~$0.20/month" omits
+> `modification_details` (89% of measured spend, ~$3.10/month for the heaviest real user) and
+> the dossier (never measured until 22 Aug). $3.99 still works — because of the cost work
+> shipped 21 Aug, not as a property of the product.
+>
+> #### State
+>
+> ```
+> main                 b6d05a8, clean
+> unpromoted           10 to web-live, 12 to demo-live
+> web tests            150 suites / 2737 passing
+> mobile tests          23 suites /  329 passing
+> migrations pending   20260821140000, 20260822120000
+> ```
+>
+> #### Next, in order
+>
+> | # | What | Who |
+> |---|---|---|
+> | **1** | `npx eas-cli credentials` — the Apple link | **David · 3 min** |
+> | **2** | Apply the two migrations | **David / Cowork · one trip** |
+> | **3** | ~~Poll `research_status` instead of awaiting `enrichVehicle`~~ | ✅ **`b6d05a8`** |
+> | **4** | Register the UDID, one EAS build, device QA | Claude Code · after 1 |
+> | **5** | Measure a thinking level on the dossier against a corpus | Claude Code |
+> | **6** | Decide whether a UNIQUE VIN should block a car's new owner | **David** |
+>
+> ⚠ **The `DemoBanner` and CTA decisions below are still David's, and `20260818120000` is
+> done** — the ⛔ on it in the 19 Aug block was stale for three days and is now struck through.
+
+
+> ### 21 Aug — the device build is three minutes of David's time away. **Superseded by the 22 Aug block above; the blocker is unchanged and its research and cost sections are now out of date.**
+>
+> **David's stated priority is getting CrewChief onto his own iPhone.** Everything needed for
+> that is built and committed. It is blocked on exactly one thing, and it is not code.
+>
+> ---
+>
+> #### ⛔ The only blocker: Expo is not linked to the Apple Developer account
+>
+> ```
+> $ eas device:list
+> No Apple teams found for account masterson303.
+> ```
+>
+> Re-verified 21 Aug. The membership is **active** (confirmed by David 19 Aug), but the Expo
+> account has never been connected to the Apple team — so there are no signing certificates, and
+> registering the phone is not even reachable yet.
+>
+> ⚠ **This is not the UDID step.** An earlier note said the blocker was device registration; that
+> was wrong and cost a day. Registration comes *after* the link.
+>
+> | | | |
+> |---|---|---|
+> | **1** | `cd apps/mobile && npx eas-cli credentials` — sign in with Apple ID, complete 2FA | **David · ~3 min** |
+> | **2** | `eas device:create` → register the iPhone's UDID (a link David opens on the phone) | Claude Code + David |
+> | **3** | `eas build --platform ios --profile device` | Claude Code · ~15 min, 1 build |
+>
+> **Claude Code cannot do step 1** — it needs an Apple ID password and a live 2FA code, and
+> handing an agent credentials is refused regardless of capability. Cowork cannot either: the
+> prompt is on the Mac, so iPhone Mirroring does not help.
+>
+> #### What is already done for the device path
+>
+> - **`device` profile exists** in `apps/mobile/eas.json` (`d5cb8fe`) — `developmentClient: true`,
+>   internal distribution, `simulator: false`.
+> - ⚠ **`developmentClient` is the whole economics.** One build, then Metro serves the JS: every
+>   screen, colour and string change is free. A standalone build costs one of ~12 monthly iOS
+>   builds *per string change*. Only a new native module costs another.
+> - **The path is proven.** A simulator build ran end to end 20 Aug (`924a303a`), installed via
+>   `xcrun simctl`, connected to Metro, and reached the sign-in screen. Screenshots in that
+>   session. **4 EAS builds used ever**, all simulator; the period resets 31 Aug.
+>
+> #### Restarting the simulator loop (free, works today, no Apple link needed)
+>
+> ```
+> cd apps/mobile && npx expo start --dev-client
+> ```
+>
+> The app is still installed on the iPhone 16 Pro simulator. ⚠ Metro is **down** — it was killed
+> when the previous session ended, so nothing will reload until this is run.
+>
+> ⚠ **The live simulator panel does not work.** `mcp__Claude_Code_iOS_Simulator__attach` insists
+> Xcode is not selected even though `xcode-select -p` already returns the path it asks for and
+> `simctl` works fine. Its environment resolves differently. The command it wants is
+> `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer` (needs David's password).
+> Until then: `xcrun simctl` for install/launch/screenshot, and **no tapping** — `osascript` is
+> denied assistive access, so Claude Code can reach the sign-in screen and no further.
+>
+> ---
+>
+> #### What shipped 20–21 Aug
+>
+> | | |
+> |---|---|
+> | `dbc35cb` | each site's share card describes that site — the App Store hostname was serving the demo's `og:url`, `og:image` **and** description |
+> | `ad0733b` | the demo masthead is gated behind `CREWCHIEF_DEMO_SITE`, unset meaning product |
+> | `21c514e` | **an unrun check is not an all-clear** — see below |
+> | `7a662f3` | **research never ran for a new vehicle** — see below |
+> | `d5cb8fe` | the `device` build profile |
+>
+> **⚠ The safety fix is the one to understand first.** A 2003 Honda Accord — inside the Takata
+> airbag campaigns — displayed a **green tick and "No active recalls"**, because its NHTSA record
+> had never been fetched and the tile read an empty status as good news. Nothing errored. The
+> check had simply never run, and *absence rendered as an all-clear on a safety claim*.
+> `packages/core/src/health-claims.ts` now has three states, and `unknown` is never green and
+> never a tick. `CLAUDE.md` §6 named this exactly: `null` is never `0`.
+>
+> **⚠ The research bug that caused it.** `enrichVehicle` fetched the vehicle row and then called
+> `generateVehicleDossier(vehicleId)` — no second argument — three lines later. From 27 Jul
+> (`8e9fafd`) to 21 Aug, **every vehicle added got an empty dossier, no NHTSA record, and a retry
+> button that could never work**, because retry called the same broken function. The parameter is
+> required now, so the defect is a build error rather than a 200 carrying `{ success: false }`.
+>
+> #### ⏳ The research fix is deployed and UNVERIFIED
+>
+> Live on `web-live` (`f3278984`), but nobody has loaded the page:
+>
+> ```
+> reviewer last_sign_in_at   2026-08-21T11:53:15   (the sign-up moment; zero sessions since)
+> research_status            pending
+> nhtsa_data rows            0
+> ```
+>
+> ⚠ **`last_sign_in_at` is the instrument that settles this, and it was learned the hard way.**
+> An hour went into theorising about cached bundles and effects not firing, when one query showed
+> nobody had signed in. **Before diagnosing why a page did not do something, check that anyone
+> loaded it.** Readable via `GET {SUPABASE_URL}/auth/v1/admin/users` with `SUPABASE_SECRET_KEY`.
+>
+> Two ways to close it: David signs in and opens the vehicle, **or** Claude Code runs a one-off
+> script calling `researchVehicleDossier` with the service role and the reviewer's `user_id`.
+> ⚠ Do **not** call `enrichVehicle`/`generateVehicleDossier` outside a session — that means going
+> around `authorizeVehicleAccess`, and `vehicle-research-callers.test.ts` keeps that list closed
+> deliberately. The sweep is already an authorized caller of the core; use that path.
+>
+> #### Decisions waiting on David — nothing else is blocked on code
+>
+> | | |
+> |---|---|
+> | **Price** | ✅ **Settled 21 Aug: $3.99/mo · $29.99/yr + 7-day trial.** David's constraint is explicit and worth carrying: *"it's important I don't lose money on this."* The ceiling rider is **done** — `TIERS.paid` is now 1,000,000 (`cb88f87`). ⏳ Still to do in App Store Connect: create the products at that price, add the trial, and **apply for the Small Business Program** — 15% vs 30% is worth more than the price decision itself ($3.39 vs $2.79 a subscriber) |
+> | **Positioning** | *"CrewChief is a product being taken to market through the App Store, not a working demo. The demo remains a sales asset on the product site and a portfolio asset on the recruiter site."* Say yes and propose it to the KB — `cc-marketing-0002` still records "a working demo, not a commercial product" and its own open question was answered by action, never recorded |
+> | **The CTA** | Follows from the positioning. Cowork's proposal: primary "Add your vehicle" → signup, secondary "See a sample garage", heading "What a CrewChief garage looks like". Demo host keeps "Enter demo". Same gate as the masthead. ⚠ `LandingHero` is a client component and cannot read `CREWCHIEF_DEMO_SITE` — needs a server wrapper or a provider |
+> | **LLC** | The genuinely open half of `cc-business-0001`. Personal-liability question, not paperwork. Reversible: Apple converts Individual → Organization without re-enrolment |
+> | **App Store Connect** | ⚠ **Paid Applications agreement FIRST** — StoreKit reportedly returns an empty product list until it is active, and the forms can sit pending for days |
+> | **Rotate the reviewer password** | It is in a transcript. The risk is the portfolio write-up, not the file |
+>
+> #### Real AI economics — measured, not modelled
+>
+> All 292 metered calls, 2–21 Aug, input **and** output at $1.50/$7.50 per M:
+>
+> ```
+> you (75834ade)   235 calls   $2.06   →  $3.10/month at this rate
+> modification_details   232 calls   $2.019   89.4% of all spend
+> consultant              10 calls   $0.068    3.0%
+> ```
+>
+> ⚠ **`modification_details` is 89% of real spend, not the consultant.** Any cost model that omits
+> it — including the "heavy month ≈ $0.20" figure — is optimistic by roughly 15×. The consultant
+> *is* rate limited (`consultant:${vehicleId}`, `ai` tier), so that worry is closed; but the tier
+> is 10/60s, a burst limit rather than a budget. `TIERS.paid` is the real ceiling.
+>
+> ⚠ **The dossier call has never been measured** — no research purpose appears in the table at
+> all, consistent with it never having completed. It is the biggest single call in the product and
+> the only unmeasured one. **Measure it the first time research succeeds.**
+>
+> #### 💸 Cost control — shipped 21 Aug, and the bill is not where anyone assumed
+>
+> Three weeks of metering (`ai_usage_events`, 2–21 Aug): 292 calls, $2.26. Of that,
+> **`modification_details` was 232 calls and $2.02 — 89%.** The consultant, which the cost
+> conversation is always about, was 3%.
+>
+> `cb88f87` does three things:
+>
+> - **A content-keyed cache** (`mod_detail_cache`). That call had **no cache at any level** while
+>   being the most cacheable one in the product — its prompt reads six values and none identifies
+>   a person or a car. Keyed on the *question*, not on `vehicle_id`, so the first owner of a 2018
+>   Accord to open a mod pays and everyone after them does not. ⚠ `performance_mod_cache` does not
+>   already do this: it caches the mod *list* and keys on the vehicle.
+> - **`MINIMAL` thinking on the three mod paths.** Measured, same prompt and model:
+>   `LOW 268 in · 432 out · 544 thinking · $0.00772` versus
+>   `MINIMAL 268 in · 433 out · 0 thinking · $0.00365` — same horsepower figures, costs, brands
+>   and warnings, at 53% the cost and 46% the latency. ⚠ **The consultant and health summary stay
+>   at `LOW` deliberately** (3% and 0.3% of spend; prose and the recall tiles). A test pins that
+>   boundary.
+> - **`TIERS.paid` 2,000,000 → 1,000,000.** At $3.99 with Apple's 15%, net is $3.39, and a 2M
+>   ceiling is ~$15 — **4.4× the revenue it protects.** A ceiling above net revenue is not a
+>   ceiling, it is a maximum loss.
+>
+> Effect on the heaviest real month measured: **$3.10 → well under $0.50**, falling further as the
+> cache warms.
+>
+> ⚠ **Two hazards built against, both silent.** A cache key narrower than the prompt serves one
+> car's answer for another's — so a test reads the prompt itself and asserts every interpolated
+> value is a key field. And only a *clean parse* is cached: `details` starts as placeholder text
+> ("Performance gains will vary"), fine to show once on a parse failure and a thirty-day lie if
+> served to every other owner of that car.
+>
+> ⚠ **The dossier call is still absent from all of these numbers**, because it has never
+> completed. It is the biggest single call in the product. Measure it the first time research
+> succeeds.
+>
+> #### What is left on E8
+>
+> `expo-iap` and the store adapter — the last piece, and it needs App Store Connect products
+> before a purchase can be tested. Everything it plugs into is built, tested and live: the state
+> machine, JWS verification, the pinned Apple root, the envelope parser, the entitlement writer,
+> both routes, the purchase logic and the paywall. ⚠ **`PaywallScreen` is built and tested but
+> nothing routes to it** — wire it when the adapter lands. **E6** (upgrade prompt, ~0.5 ed) is
+> genuinely unblocked the moment IAP ships.
+>
+> #### Housekeeping
+>
+> - **`demo-live` is 2 commits behind** — missing the recall safety fix and the research fix.
+>   Nothing there manifests either bug (all three demo vehicles have NHTSA rows), so it was left
+>   deliberately rather than spending two builds.
+> - ⚠ **Netlify credits passed 75%.** Seven builds on 20 Aug, **four of them avoidable** — the
+>   banner gate was promoted separately from a promote a few hours earlier, doubling both sites.
+>   The lever is batching promotes, not promoting per change.
+>
+> #### Instruments that caught real defects this week — all silent to review
+>
+> - `entitlement-not-user-writable` was satisfied by `getServiceRoleClient` appearing in a
+>   **docblock** while the code used another client. Comments are stripped before the scan now.
+> - The mobile runner's `testMatch` was `*.test.tsx`, so the first mobile test with no JSX **was
+>   collected by nothing** — committed, typechecked, never run, jest green.
+> - The JWS validity loop passed all sixteen tests while checking only the leaf.
+> - `portability.test.ts` rejected a NOT_PORTABLE entry whose reason was a judgment rather than a
+>   technical blocker. It was right to.
+> - `tests-test-real-code.test.ts` refused a new source-scanner until it was allowlisted with a
+>   justification.
+
 > ### ⚠ 19 Aug — E8's server half shipped, and both hostnames are current
 >
 > **Everything below the next block predates this and its sequencing is older still.**
@@ -108,7 +867,7 @@
 >
 > | # | What | Who | Note |
 > |---|---|---|---|
-> | **1** | **Apply `20260818120000`** | **Cowork / David** | ⛔ Additive only — five nullable columns, no drops, no policy or grant touched. The modal should NOT fire. Until this lands the IAP webhook 503s every notification |
+> | **1** | ~~Apply `20260818120000`~~ | — | ✅ **DONE — verified applied 22 Aug.** All five `account_entitlements` columns resolve against the live database (`last_signed_date`, `environment`, `revoked_at`, `auto_renew_status`, `latest_transaction_id`). The IAP webhook no longer 503s. This sat here as a ⛔ CRITICAL for three days after it had landed |
 > | **2** | **App Store Connect setup** | **David** · weekend | Products matching `PRODUCT_TIERS` **exactly**, the notifications URL, a sandbox tester, App Review info. Setup sheet with the verified strings was delivered 18 Aug. ✅ The promote it depended on is already done |
 > | **3** | **D2 — the price** | **David** | Standing recommendation $8.99/mo · $79/yr. Blocks creating the products, not the code: Apple returns a localised price and the app renders that |
 > | **4** | **The `DemoBanner` decision** | **David** | Gate it on an env var (cleanest — the codebase has no site-distinguishing flag yet), gate on hostname, or leave it. Costs a promote |
@@ -169,13 +928,14 @@
 >
 > | | |
 > |---|---|
-> | `main` | ~~`fc96184`~~ → **`8ee6484`**, pushed (19 Aug) |
+> | `main` | → **`cb88f87`**, pushed (21 Aug). ⚠ **2 commits unpromoted to `web-live`, 4 to `demo-live`** — the safety/research fixes are live; the cost work is not |
 > | Web tests | ~~2300~~ → **2616**, green (19 Aug) |
 > | Mobile tests | ~~174~~ → **329**, green (19 Aug). ⚠ 10 of those were collected by nothing until 18 Aug — `testMatch` was `*.test.tsx`, so the first mobile test without JSX existed, typechecked and never ran while jest reported all suites green |
 > | Typechecks | Three, all clean — ⚠ run the mobile one **from inside `apps/mobile`**; the root `tsc` resolves a different config and reports phantom errors |
-> | Migrations | ⛔ **`20260818120000` written and NOT applied** — E8's five columns, all `42703` against live on 19 Aug. **This is the only thing stopping the IAP webhook recording anything.** ~~`20260813020000`~~ applied 16 Aug; ~~`20260815190000`~~ **applied** — re-probed live 19 Aug, `next_service_label` and `next_service_due_on` both present, so the entry below claiming it is outstanding is stale |
+> | Migrations | ⛔ **`20260821140000` (`mod_detail_cache`) WRITTEN, NOT APPLIED** — verified 21 Aug. The cost cache is inert until it runs; the code falls through to generating, so nothing breaks, but every day unapplied is full price. ✅ **`20260818120000` APPLIED 21 Aug by Cowork** and verified — five columns resolve, CHECK validated, `original_transaction_id` still UNIQUE, `authenticated` still SELECT-only. The IAP webhook can record. ~~⛔ written and NOT applied~~ — E8's five columns, all `42703` against live on 19 Aug. **This is the only thing stopping the IAP webhook recording anything.** ~~`20260813020000`~~ applied 16 Aug; ~~`20260815190000`~~ **applied** — re-probed live 19 Aug, `next_service_label` and `next_service_due_on` both present, so the entry below claiming it is outstanding is stale |
 > | `demo-live` | ~~27 commits behind~~ → **current**, `9a32aca2`, promoted 19 Aug |
-> | `web-live` | **current**, `83b7b24e`, promoted 19 Aug. Exists and has since 17 Aug — the note below saying it needs creating is dead |
+> | `web-live` | **current**, `f3278984` (21 Aug). Exists and has since 17 Aug — the note below saying it needs creating is dead |
+> | `demo-live` | `eef03da7` — ⚠ **2 commits behind `main`**, deliberately |
 >
 > ### ⛔ Do not act on these — they are dead instructions below
 >

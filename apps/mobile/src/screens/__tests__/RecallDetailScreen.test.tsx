@@ -69,6 +69,21 @@ function respond(recalls: unknown[], { asArray = false } = {}) {
 }
 
 /**
+ * A vehicle whose NHTSA record has **never been fetched**.
+ *
+ * ⚠ Distinct from `respond([])`, and the distinction is the bug. That fixture
+ * supplies `nhtsa_data: { recalls: [] }` — a lookup that ran and found
+ * nothing. This one omits the row entirely, which is every vehicle between
+ * being added and being researched, and every vehicle whose research failed.
+ * Both reach the screen as an empty array.
+ */
+function respondUnresearched() {
+  request.mockResolvedValue({
+    vehicle: { year: 2003, make: 'Honda', model: 'Accord' },
+  } as never);
+}
+
+/**
  * Async, because `render` is.
  *
  * RNTL 14 returns a Promise — React 19 made mounting concurrent. The first
@@ -194,6 +209,62 @@ describe('when there is nothing to show', () => {
   });
 });
 
+describe('a vehicle nobody has checked yet', () => {
+  /*
+    ⚠ The web's 21 Aug defect, reached on mobile 22 Aug. A 2003 Accord — inside
+    the Takata campaigns — with no NHTSA record was shown "NHTSA has no open
+    recalls listed for this vehicle", which is a claim about a lookup that never
+    ran. Absence rendered as a finding, on a safety claim, on the screen a
+    recall notification opens.
+
+    The existing empty-state case above supplies `nhtsa_data: { recalls: [] }`
+    and is therefore about a *checked* car. Nothing tested the other shape,
+    which is why this survived the web fix.
+  */
+
+  it('does not claim NHTSA listed nothing', async () => {
+    respondUnresearched();
+    const { view } = await mount();
+
+    // The exact sentence that was wrong. It must not appear for this car.
+    expect(view.queryByText(/NHTSA has no open recalls listed/)).toBeNull();
+  });
+
+  it('says the check has not run', async () => {
+    respondUnresearched();
+    const { view } = await mount();
+
+    expect(await view.findByText('Recalls not checked yet')).toBeTruthy();
+    expect(await view.findByText(/have not checked this vehicle for recalls/i)).toBeTruthy();
+  });
+
+  it('refuses the all-clear reading in words', async () => {
+    /*
+      `health-claims.ts` puts "This is not a clear result." in the copy on
+      purpose — an absent panel invites the reader to fill it in with their own
+      optimism. Asserted here so the sentence cannot be trimmed to something
+      that merely sounds neutral.
+    */
+    respondUnresearched();
+    const { view } = await mount();
+
+    expect(await view.findByText(/not a clear result/i)).toBeTruthy();
+  });
+
+  it('still says "No recalls on record" when the lookup did run', async () => {
+    /*
+      ⚠ Anti-vacuous, and the direction that would quietly ruin the common
+      case: a screen that treated every empty list as unchecked would never
+      give anybody the reassuring answer they are entitled to.
+    */
+    respond([]);
+    const { view } = await mount();
+
+    expect(await view.findByText('No recalls on record')).toBeTruthy();
+    expect(view.queryByText('Recalls not checked yet')).toBeNull();
+  });
+});
+
 describe('failure paths', () => {
   it('signs out on a 401', async () => {
     // Arranged before mounting: the screen fetches on mount, so a mock set
@@ -238,5 +309,202 @@ describe('the advisor hand-off', () => {
     const [vehicleId, ask] = props.onAskAdvisor.mock.calls[0];
     expect(vehicleId).toBe('v1');
     expect(String(ask)).toMatch(/FUEL PUMP/i);
+  });
+});
+
+/**
+ * ── Clearing a recall, added 23 Aug ─────────────────────────────────────────
+ *
+ * David's note: *"open recalls — I like the ask advisor function, but we need
+ * some way to clear these too."* He was right, and the reason it matters is a
+ * property of badges rather than of recalls: a count that can never go down
+ * stops being read, so after the second week a permanent red chip is furniture.
+ *
+ * ⚠ The rule every case below is really testing is that **"repaired" stays the
+ * owner's claim**. Recalls match on year/make/model rather than VIN, so nothing
+ * here verifies anything — §10, on the screen where overstating is most
+ * expensive.
+ */
+describe('marking a recall repaired', () => {
+  /**
+   * The marks ride on the vehicle, as `load-vehicle` embeds them.
+   *
+   * ⚠ `recall_actions` is on the **vehicle**, not the root, and it is the
+   * database's snake_case rather than the client's camelCase — the embed is a
+   * row, not a DTO. The first version of these tests fed the marks through a
+   * separate `/recalls` mock, which stopped being how the screen reads them the
+   * moment the embed landed.
+   *
+   * `/recalls` is still mocked, because a mark or an undo refetches through it.
+   */
+  function respondWith(recalls: unknown[], marks: Array<Record<string, unknown>> = []) {
+    request.mockImplementation((path: string, init?: { method?: string }) => {
+      if (path.startsWith('/recalls')) {
+        if (init?.method === 'POST') {
+          return Promise.resolve({
+            addressed: { campaignNumber: '20V123000', addressedAt: '2026-08-23' },
+          } as never);
+        }
+        if (init?.method === 'DELETE') return Promise.resolve({ removed: '20V123000' } as never);
+        return Promise.resolve({
+          addressed: marks.map((m) => ({
+            campaignNumber: m.campaign_number,
+            addressedAt: m.addressed_at,
+          })),
+        } as never);
+      }
+      return Promise.resolve({
+        vehicle: {
+          year: 2018,
+          make: 'Honda',
+          model: 'Accord',
+          nhtsa_data: { recalls },
+          recall_actions: marks,
+        },
+      } as never);
+    });
+  }
+
+  function mount() {
+    return render(
+      <RecallDetailScreen
+        vehicleId="v1"
+        title="2018 Honda Accord"
+        onAskAdvisor={jest.fn()}
+        onSignOut={jest.fn()}
+      />
+    );
+  }
+
+  it('offers the two actions above the explanation', async () => {
+    /*
+      The design system's recall spec puts them before the three sentences:
+      "its job is to drive an action, not to explain a notice." Somebody
+      arriving from a push already knows they have a problem.
+    */
+    respondWith([rawRecall()]);
+    const view = await mount();
+
+    await view.findByText('FUEL PUMP');
+    view.getByLabelText(/Find a dealer/i);
+    view.getByLabelText(/Mark as repaired/i);
+  });
+
+  it('says who said so and when, never just "repaired"', async () => {
+    // ⚠ Nothing verified anything. The strongest true sentence is that the
+    // owner said so, on a date — which is why the record is a date, not a flag.
+    respondWith([rawRecall()], [{ campaign_number: '20V123000', addressed_at: '2026-08-23' }]);
+    const view = await mount();
+
+    await view.findByText(/You marked this repaired on 23 Aug 2026/);
+    expect(view.queryByLabelText(/Mark as repaired/i)).toBeNull();
+  });
+
+  it('counts a marked recall out of the open total without hiding it', async () => {
+    /*
+      Two claims in one case, and the second is the one worth protecting: the
+      count goes down, and the notice **stays on the screen**. A public safety
+      record must not be deleted by one person's claim about one car.
+    */
+    respondWith([rawRecall(), rawRecall({ NHTSACampaignNumber: '21V999000', Component: 'AIR BAG' })],
+      [{ campaign_number: '20V123000', addressed_at: '2026-08-23' }]);
+    const view = await mount();
+
+    await view.findByText('1 open · 1 marked repaired');
+    view.getByText('FUEL PUMP');
+    view.getByText('AIR BAG');
+  });
+
+  it('sends the campaign number and reads the list back', async () => {
+    respondWith([rawRecall()]);
+    const user = userEvent.setup();
+    const view = await mount();
+
+    await view.findByLabelText(/Mark as repaired/i);
+    await user.press(view.getByLabelText(/Mark as repaired/i));
+
+    await waitFor(() => {
+      const posted = request.mock.calls.find(
+        ([path, init]) => path === '/recalls' && init?.method === 'POST'
+      );
+      expect(posted?.[1]?.body).toMatchObject({ vehicleId: 'v1', campaignNumber: '20V123000' });
+    });
+
+    /*
+      ⚠ Refetched rather than patched. The server owns `addressed_at`; a date
+      guessed on the device and then corrected on the next load is a wrong date
+      on a safety record, briefly, for no reason.
+
+      Exactly one GET, and that is the whole shape of this screen's reads: the
+      **initial** marks arrive embedded on the vehicle, so `/recalls` is only
+      ever asked after a mutation. A second one here would mean the embed had
+      stopped being read and the screen had gone back to a request it does not
+      need.
+    */
+    const reads = request.mock.calls.filter(
+      ([path, init]) => path.startsWith('/recalls') && !init?.method
+    );
+    expect(reads).toHaveLength(1);
+  });
+
+  it('lets the mark be taken back', async () => {
+    // A claim somebody can make and cannot unmake is a trap, and this is the
+    // mis-tap most worth being able to undo.
+    respondWith([rawRecall()], [{ campaign_number: '20V123000', addressed_at: '2026-08-23' }]);
+    const user = userEvent.setup();
+    const view = await mount();
+
+    await view.findByLabelText(/Undo marking/i);
+    await user.press(view.getByLabelText(/Undo marking/i));
+
+    await waitFor(() => {
+      expect(
+        request.mock.calls.some(([path, init]) => path.startsWith('/recalls') && init?.method === 'DELETE')
+      ).toBe(true);
+    });
+  });
+
+  it.each([
+    ['absent', undefined],
+    ['null', null],
+    ['not an array', { campaign_number: '20V123000' }],
+    ['a row with no campaign number', [{ addressed_at: '2026-08-23' }]],
+  ])('shows a recall as open when the marks embed is %s', async (_label, marks) => {
+    /*
+      ⚠ The direction that matters, and the reason this is four cases rather
+      than one. A malformed embed must leave a notice **showing** — suppressing
+      an open safety recall because a field did not arrive is the one outcome
+      this screen must never produce, and each shape above is a different way
+      the field can fail to arrive.
+    */
+    request.mockImplementation((path: string) =>
+      Promise.resolve({
+        vehicle: {
+          year: 2018,
+          make: 'Honda',
+          model: 'Accord',
+          nhtsa_data: { recalls: [rawRecall()] },
+          recall_actions: marks,
+        },
+      } as never)
+    );
+
+    const view = await mount();
+
+    await view.findByText('1 open');
+    view.getByLabelText(/Mark as repaired/i);
+  });
+
+  it('does not offer a mark on a recall with no campaign number', async () => {
+    // The mark keys on `(vehicle_id, campaign_number)`. A button that silently
+    // does nothing is worse than one that is not there.
+    respondWith([rawRecall({ NHTSACampaignNumber: undefined })]);
+    const view = await mount();
+
+    await view.findByText('FUEL PUMP');
+    expect(view.queryByLabelText(/Mark as repaired/i)).toBeNull();
+    // Anti-vacuous: the other action is still offered, so this is about the
+    // campaign number rather than about the actions failing to render.
+    view.getByLabelText(/Find a dealer/i);
   });
 });

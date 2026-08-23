@@ -53,6 +53,8 @@
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
+import { demoSignals, siteFraming } from './lib/site-framing.mjs';
+
 const APPLY = process.argv.includes('--apply');
 
 /*
@@ -244,6 +246,72 @@ try {
   ok('verify-demo passed');
 } catch {
   bad('verify-demo failed — run it directly; this is the release blocker');
+}
+
+/* 4b ── the demo site is still configured as the demo ---------------------- */
+console.log('\nSite role (against the live demo)');
+/*
+  ── ⚠ Why this looks at the wrong host on purpose ──────────────────────────
+
+  Every other check here interrogates the **candidate** — the exact build about
+  to become the demo, already live on `web-live`. That is the whole reason this
+  script can verify more than `promote-web` can.
+
+  It is also why it cannot see this one. `CREWCHIEF_DEMO_SITE` is a per-site
+  Netlify variable, and on `web-live` it is deliberately **unset** — that host
+  is the product. So the candidate build, however healthy, tells you nothing
+  about how it will render once it is serving the demo hostname.
+
+  ── What breaks if nobody checks ───────────────────────────────────────────
+
+  Since 22 Aug the landing CTA is gated on that variable, and its default is
+  **product** — chosen so an unset variable can never put demo framing on the
+  App Store listing's URL, which is the failure that actually happened with the
+  masthead. The cost of that safe direction is paid here: if the variable is
+  ever missing on the demo site, the recruiter host does not break, it quietly
+  starts asking recruiters to **sign up**, with no error anywhere.
+
+  Confirmed set on 22 Aug — the masthead and "Enter demo" are both live. This
+  exists so that stops being something anybody has to remember.
+
+  ⚠ Read from the **currently deployed** demo, before the merge. If the
+  variable is missing now, promoting is what makes it visible.
+*/
+try {
+  const html = await fetch(DEMO, { headers: { 'user-agent': 'crewchief-promote' } }).then((r) =>
+    r.text()
+  );
+
+  /*
+    Two independent signals, because either alone is brittle: the masthead is
+    gated directly on the variable, and the CTA is gated on the same value
+    through `SiteRoleProvider`. Copy changes on one should not silently retire
+    the check.
+  */
+  const masthead = html.includes('Shared demo garage');
+  const demoCta = html.includes('Enter demo');
+  const productCta = html.includes('Add your vehicle');
+
+  if (productCta) {
+    bad(
+      'the demo host is serving the PRODUCT call to action — CREWCHIEF_DEMO_SITE is unset on ' +
+        'crewchief-demo. Promoting now points recruiters at a signup.'
+    );
+  } else if (masthead || demoCta) {
+    ok(`demo framing live${masthead && demoCta ? '' : ' (one signal only — check the copy)'}`);
+  } else {
+    bad(
+      'neither the demo masthead nor "Enter demo" found on the demo host — ' +
+        'CREWCHIEF_DEMO_SITE may be unset, or both strings have changed'
+    );
+  }
+} catch (e) {
+  /*
+    Unreachable is a failure, not a skip. §25: a gate that degrades a missing
+    check into a shrug is how the consultant died in production with every
+    other check green.
+  */
+  bad(`could not read the demo host (${e.message}) — cannot confirm its site role`);
 }
 
 /* 5 ── the consultant actually answers ------------------------------------- */

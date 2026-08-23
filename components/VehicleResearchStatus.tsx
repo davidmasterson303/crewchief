@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Loader as Loader2, CircleAlert as AlertCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { enrichVehicle } from '@/app/actions';
+import { enrichVehicle, getResearchStatus } from '@/app/actions';
 import { logger } from '@crewchief/core/logger';
 
 /**
@@ -32,6 +32,18 @@ import { logger } from '@crewchief/core/logger';
  * in development, and without it every dashboard visit would fire two Gemini
  * research calls — the unmetered-spend bug §3 already records once.
  */
+/**
+ * How often to ask, and for how long.
+ *
+ * Four seconds against a measured ~60s of work is about fifteen reads of one
+ * column — cheap enough not to think about, frequent enough that the spinner
+ * does not outlive the dossier by much. Three minutes is the ceiling: research
+ * has three attempts with backoff behind a 30s timeout each, so a run still
+ * going at three minutes is not going to finish.
+ */
+const POLL_EVERY_MS = 4_000;
+const POLL_CEILING_MS = 180_000;
+
 export function VehicleResearchStatus({
   vehicleId,
   status,
@@ -45,7 +57,40 @@ export function VehicleResearchStatus({
   const [running, setRunning] = useState(false);
   const [failed, setFailed] = useState(status === 'failed');
   const startedRef = useRef(false);
+  const liveRef = useRef(true);
 
+  useEffect(() => {
+    liveRef.current = true;
+    return () => {
+      liveRef.current = false;
+    };
+  }, []);
+
+  /**
+   * Start the research, then ask the database how it went.
+   *
+   * ── ⚠ Why the action's return value is no longer the answer ───────────────
+   *
+   * 22 Aug, a real run: a complete dossier and 24 NHTSA recalls were written
+   * in about sixty seconds, and this component showed the failure state with a
+   * retry button. The request outlived its response, `enrichVehicle` came back
+   * with no body, and `result.success` threw on `undefined` —
+   * `RESEARCH_STATUS:THREW`, which is what the log said.
+   *
+   * The work was never the problem. **The answer had nowhere to arrive.**
+   * Awaiting one long response gives the client exactly one chance to hear the
+   * outcome, spent on the leg most likely to be cut — and the outcome is
+   * sitting in `research_status` the entire time.
+   *
+   * So the call still happens, because §11's rule stands: work started and
+   * abandoned on a serverless platform may be frozen with the response, so it
+   * needs a request that owns it. What changed is that its return value is now
+   * a *hint*, and the database is the verdict.
+   *
+   * ⚠ A rejected call is deliberately not a failure any more. The most likely
+   * reason for one is the timeout above, and that happens while the work is
+   * succeeding.
+   */
   async function run() {
     if (startedRef.current) return;
     startedRef.current = true;
@@ -54,22 +99,92 @@ export function VehicleResearchStatus({
 
     try {
       const result = await enrichVehicle(vehicleId);
-      if (!result.success) {
-        setFailed(true);
-        logger.error('RESEARCH_STATUS:FAILED', new Error(result.error || 'enrichment failed'), {
-          vehicleId,
-        });
-      } else {
+
+      if (result?.success) {
         onComplete();
+        return;
       }
+
+      /*
+        A returned failure is real — the server reached the end and said so —
+        but it is still not the last word, because `enrichVehicle` can report
+        failure for a dossier that has since completed. Fall through and ask.
+      */
+      logger.warn('RESEARCH_STATUS:REPORTED_FAILURE', 'Enrichment reported failure; checking the record', {
+        vehicleId,
+        error: result?.error,
+      });
     } catch (error) {
-      setFailed(true);
-      logger.error('RESEARCH_STATUS:THREW', error as Error, { vehicleId });
-    } finally {
-      setRunning(false);
-      // Allow an explicit retry to start again, but not an automatic one.
-      startedRef.current = false;
+      logger.warn('RESEARCH_STATUS:NO_RESPONSE', 'Enrichment returned nothing; checking the record', {
+        vehicleId,
+        error: (error as Error)?.message,
+      });
     }
+
+    await waitForRecord();
+  }
+
+  /**
+   * Poll `research_status` until it settles.
+   *
+   * `completed` finishes, `failed` is the only thing that shows the retry
+   * button, and the ceiling exists so a job that never settles does not leave
+   * a spinner up forever — that would be the §21 problem again, a UI implying
+   * something it cannot support.
+   */
+  async function waitForRecord() {
+    const deadline = Date.now() + POLL_CEILING_MS;
+    let first = true;
+
+    while (Date.now() < deadline) {
+      /*
+        ⚠ Read **before** the first wait. By the time the call above settled,
+        the work it started may already have finished — that is precisely the
+        case this whole mechanism exists for. Sleeping first would sit on a
+        spinner for four seconds with the answer already in the database.
+      */
+      if (!first) {
+        await new Promise((resolve) => setTimeout(resolve, POLL_EVERY_MS));
+      }
+      first = false;
+
+      // The user navigated away. Nothing below should touch state.
+      if (!liveRef.current) return;
+
+      const record = await getResearchStatus(vehicleId);
+      if (!record.success) continue;
+
+      if (record.status === 'completed') {
+        setRunning(false);
+        startedRef.current = false;
+        onComplete();
+        return;
+      }
+
+      if (record.status === 'failed') {
+        setRunning(false);
+        startedRef.current = false;
+        setFailed(true);
+        logger.error('RESEARCH_STATUS:FAILED', new Error('research_status = failed'), { vehicleId });
+        return;
+      }
+    }
+
+    if (!liveRef.current) return;
+
+    /*
+      Still `pending` at the ceiling. Reported as failed because that is what
+      the user can act on — the retry button — and the guard in
+      `researchVehicleDossier` means pressing it costs nothing if the dossier
+      turned up in the meantime.
+    */
+    setRunning(false);
+    startedRef.current = false;
+    setFailed(true);
+    logger.error('RESEARCH_STATUS:NEVER_SETTLED', new Error('research_status still pending'), {
+      vehicleId,
+      waitedMs: POLL_CEILING_MS,
+    });
   }
 
   useEffect(() => {

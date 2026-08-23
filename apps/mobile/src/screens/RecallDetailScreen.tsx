@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
+  Linking,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -9,16 +9,25 @@ import {
   View,
 } from 'react-native';
 
+import AlertBanner from '../components/AlertBanner';
+import Button from '../components/Button';
 import Card from '../components/Card';
 import { apiRequest, ApiRequestError } from '../api/client';
+import {
+  fetchAddressedRecalls,
+  markRecallAddressed,
+  unmarkRecallAddressed,
+  type AddressedRecall,
+} from '../api/recalls';
 import { Skeleton, SkeletonCard } from '../components/Skeleton';
-import { radius, status, surface, text } from '../theme';
+import { border, radius, space, status, surface, text, type } from '../theme';
 import {
   hasRemedy,
   normaliseRecalls,
   type NormalisedRecall,
   type RecallSeverity,
 } from '@crewchief/core/recalls';
+import { healthClaim } from '@crewchief/core/health-claims';
 import { interFace } from '../theme/fonts';
 
 /**
@@ -60,7 +69,33 @@ type State =
   | { kind: 'loading' }
   | { kind: 'error'; message: string }
   | { kind: 'gone' }
-  | { kind: 'loaded'; name: string; recalls: NormalisedRecall[] };
+  | {
+      kind: 'loaded';
+      name: string;
+      /** The marque alone — all "find a dealer" is allowed to know. */
+      make: string | null;
+      recalls: NormalisedRecall[];
+      /**
+       * Whether an NHTSA lookup has ever run for this vehicle.
+       *
+       * ⚠ Separate from `recalls.length === 0`, and that is the entire point.
+       * An empty list means "checked, nothing found". A missing `nhtsa_data`
+       * row means "never checked". They arrive here as the same empty array
+       * and they are not the same statement — see the render.
+       */
+      checked: boolean;
+      /**
+       * What this owner has already marked.
+       *
+       * ⚠ An empty array means "nothing marked", and a malformed embed means
+       * the same thing. There is deliberately no "we could not check" state:
+       * the marks arrive with the vehicle, so they cannot fail on their own,
+       * and a missing field must leave a recall **showing** rather than hidden.
+       * Suppressing an open safety notice because a field did not arrive is the
+       * one outcome this screen must never produce.
+       */
+      addressed: AddressedRecall[];
+    };
 
 interface VehicleResponse {
   vehicle?: {
@@ -68,7 +103,33 @@ interface VehicleResponse {
     make?: string | null;
     model?: string | null;
     nhtsa_data?: { recalls?: unknown } | { recalls?: unknown }[] | null;
+    /** Embedded by `load-vehicle`. A to-many embed, so always an array. */
+    recall_actions?: Array<{ campaign_number?: unknown; addressed_at?: unknown }> | null;
   };
+}
+
+/**
+ * The embed, read into the shape the screen uses.
+ *
+ * Trusts nothing: this is a third-party-shaped payload as far as the device is
+ * concerned, and a row with no campaign number cannot be matched to a recall
+ * anyway, so it is dropped rather than carried as a mark that matches nothing.
+ */
+function readMarks(
+  rows: Array<{ campaign_number?: unknown; addressed_at?: unknown }> | null | undefined
+): AddressedRecall[] {
+  if (!Array.isArray(rows)) return [];
+
+  return rows.flatMap((row) =>
+    typeof row?.campaign_number === 'string'
+      ? [
+          {
+            campaignNumber: row.campaign_number,
+            addressedAt: typeof row.addressed_at === 'string' ? row.addressed_at : '',
+          },
+        ]
+      : []
+  );
 }
 
 function first<T>(value: T | T[] | null | undefined): T | undefined {
@@ -91,9 +152,40 @@ const SEVERITY_BANNER: Record<Exclude<RecallSeverity, 'standard'>, { title: stri
   },
 };
 
+/**
+ * `YYYY-MM-DD` as a person writes it, without the off-by-one.
+ *
+ * ⚠ **`formatCurrency`'s neighbour `formatDate` is wrong for this input**, and
+ * quietly. It does `new Date('2026-08-23')`, which the spec parses as **UTC
+ * midnight**, and then renders it in the device's local zone — so every user
+ * west of Greenwich reads a date-only value as the day before. On "you marked
+ * this repaired on…" that is a wrong date on a safety record, and it never
+ * throws.
+ *
+ * Split on the hyphens instead. There is no timezone in a calendar date, so the
+ * fix is to not involve one.
+ */
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function calendarDate(value: string): string {
+  const [year, month, day] = value.split('-').map(Number);
+  if (!year || !month || !day || month < 1 || month > 12) return value;
+  return `${day} ${MONTHS[month - 1]} ${year}`;
+}
+
 export function RecallDetailScreen({ vehicleId, title, onAskAdvisor, onSignOut }: Props) {
   const [state, setState] = useState<State>({ kind: 'loading' });
   const [refreshing, setRefreshing] = useState(false);
+
+  /*
+    Which campaign is mid-write, and what went wrong if one did.
+
+    Keyed by campaign number rather than a single boolean for the reason the
+    garage keys its photo upload by vehicle id: this screen is a list, and a
+    flag would put the spinner on every card at once.
+  */
+  const [busyCampaign, setBusyCampaign] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -106,6 +198,13 @@ export function RecallDetailScreen({ vehicleId, title, onAskAdvisor, onSignOut }
           full path produces `/api/v1/api/v1/…` and a 404 that looks like a
           missing vehicle rather than a bad URL.
         */
+        /*
+          One request. The marks ride on the vehicle payload as an embedded
+          `recall_actions`, so there is no second lookup to fail and no "we
+          could not check what you have marked" state to word — the first draft
+          of this screen had both, and removing a failure mode beats handling
+          one. `load-vehicle`'s column list carries why the embed is there.
+        */
         const data = await apiRequest<VehicleResponse>(
           `/load-vehicle?vehicleId=${encodeURIComponent(vehicleId)}`
         );
@@ -116,10 +215,20 @@ export function RecallDetailScreen({ vehicleId, title, onAskAdvisor, onSignOut }
           title ||
           'this vehicle';
 
+        /*
+          The row itself, not its contents. `first(...)` is undefined when no
+          NHTSA record exists for this vehicle, and that is the only evidence
+          in the payload that separates "we looked" from "we have not".
+        */
+        const nhtsa = first(vehicle?.nhtsa_data);
+
         setState({
           kind: 'loaded',
           name,
-          recalls: normaliseRecalls(first(vehicle?.nhtsa_data)?.recalls),
+          make: vehicle?.make ?? null,
+          recalls: normaliseRecalls(nhtsa?.recalls),
+          checked: Boolean(nhtsa),
+          addressed: readMarks(vehicle?.recall_actions),
         });
       } catch (error) {
         if (error instanceof ApiRequestError && error.status === 401) {
@@ -144,6 +253,58 @@ export function RecallDetailScreen({ vehicleId, title, onAskAdvisor, onSignOut }
   useEffect(() => {
     void load();
   }, [load]);
+
+  /**
+   * Record — or withdraw — the owner's claim that this campaign was seen to.
+   *
+   * ⚠ **The list is refetched rather than patched in place.** The same rule the
+   * garage follows for a photo upload: the server owns `addressed_at`, this
+   * screen would have to guess it, and a guessed date on a safety record that
+   * then corrects itself on the next refresh is worse than a moment's wait.
+   */
+  const setAddressed = useCallback(
+    async (campaignNumber: string, marked: boolean) => {
+      setActionError(null);
+      setBusyCampaign(campaignNumber);
+
+      try {
+        if (marked) await markRecallAddressed(vehicleId, campaignNumber);
+        else await unmarkRecallAddressed(vehicleId, campaignNumber);
+
+        const addressed = await fetchAddressedRecalls(vehicleId);
+        setState((held) => (held.kind === 'loaded' ? { ...held, addressed } : held));
+      } catch (error) {
+        if (error instanceof ApiRequestError && error.status === 401) {
+          onSignOut();
+          return;
+        }
+        setActionError(
+          error instanceof Error ? error.message : 'That could not be saved. Try again.'
+        );
+      } finally {
+        setBusyCampaign(null);
+      }
+    },
+    [vehicleId, onSignOut]
+  );
+
+  /**
+   * Dealers for this marque, in the phone's own maps app.
+   *
+   * ⚠ **The marque and nothing else.** No VIN, no campaign number, no vehicle
+   * id — a maps query is a URL that leaves this app, gets logged by whatever
+   * handles it, and can end up in a search history. The make is enough to find
+   * a franchised dealer, which is the whole task, and it is the least this can
+   * carry and still work.
+   *
+   * A failure is silent on purpose. The one thing that can go wrong is that no
+   * app claims the URL, and an error box saying so is noise on a screen whose
+   * next line already tells you the repair is free at a franchised dealer.
+   */
+  const findDealer = useCallback((make: string | null) => {
+    const query = encodeURIComponent(make ? `${make} dealer` : 'car dealer');
+    void Linking.openURL(`https://maps.apple.com/?q=${query}`).catch(() => {});
+  }, []);
 
   if (state.kind === 'loading') {
     /*
@@ -180,7 +341,36 @@ export function RecallDetailScreen({ vehicleId, title, onAskAdvisor, onSignOut }
     );
   }
 
-  const worst = state.recalls[0]?.severity;
+  /*
+    ── What "open" means on this screen ──────────────────────────────────────
+
+    A recall the owner has marked is still a recall. It is not deleted, not
+    hidden and not filtered out — it sinks to the bottom of the list and
+    restyles, because the notice is a public safety record and this product's
+    mark is one person's claim about one car. Hiding the first behind the
+    second would be the app quietly agreeing that the claim settled the matter.
+
+    ⚠ A malformed or absent embed reads as **nothing marked**. Erring the other
+    way would suppress an open recall on the strength of a field that did not
+    arrive.
+  */
+  const marks = new Map(state.addressed.map((m) => [m.campaignNumber, m.addressedAt]));
+  const markOf = (recall: NormalisedRecall) =>
+    recall.campaignNumber ? (marks.get(recall.campaignNumber) ?? null) : null;
+
+  const ordered = [...state.recalls].sort(
+    (a, b) => Number(Boolean(markOf(a))) - Number(Boolean(markOf(b)))
+  );
+  const openCount = ordered.filter((recall) => !markOf(recall)).length;
+  const markedCount = ordered.length - openCount;
+
+  /*
+    The banner reads the worst **open** severity, not the worst on record. A
+    do-not-drive instruction on a campaign whose owner has already had the work
+    done is an instruction about a car that is fine, and this banner's whole
+    value is that it is never routine.
+  */
+  const worst = ordered.find((recall) => !markOf(recall))?.severity;
   const banner = worst && worst !== 'standard' ? SEVERITY_BANNER[worst] : null;
 
   return (
@@ -210,27 +400,137 @@ export function RecallDetailScreen({ vehicleId, title, onAskAdvisor, onSignOut }
 
       <Text style={styles.name}>{state.name}</Text>
       <Text style={styles.count}>
-        {state.recalls.length === 0
-          ? 'No recalls on record'
-          : `${state.recalls.length} ${state.recalls.length === 1 ? 'recall' : 'recalls'} on record`}
+        {state.recalls.length > 0
+          ? [
+              `${openCount} open`,
+              markedCount > 0 ? `${markedCount} marked repaired` : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')
+          : state.checked
+            ? 'No recalls on record'
+            : 'Recalls not checked yet'}
       </Text>
+
+      {actionError && (
+        <AlertBanner tone="critical" headline="That was not saved" body={actionError} />
+      )}
 
       {state.recalls.length === 0 && (
         <Card style={styles.cardGap}>
-          {/*
-            Not "you have no recalls". This app reads NHTSA's list, and an
-            empty list is a statement about that list rather than about the car.
-          */}
-          <Text style={styles.body14}>
-            NHTSA has no open recalls listed for this vehicle. That is their record, not a
-            guarantee — a dealer can check against the VIN.
-          </Text>
+          {state.checked ? (
+            /*
+              Not "you have no recalls". This app reads NHTSA's list, and an
+              empty list is a statement about that list rather than about the car.
+            */
+            <Text style={styles.body14}>
+              NHTSA has no open recalls listed for this vehicle. That is their record, not a
+              guarantee — a dealer can check against the VIN.
+            </Text>
+          ) : (
+            /*
+              ⚠ The web's 21 Aug defect, reached on mobile. Until now both
+              branches rendered the sentence above — so a car whose NHTSA record
+              had never been fetched was told "NHTSA has no open recalls listed
+              for this vehicle", which is a claim about a lookup that never ran.
+
+              The web copy was careful in one direction (an empty list is not a
+              guarantee about the car) and silent in the other (an empty list
+              might not be a list at all). `health-claims.ts` fixed that on the
+              web with three states; this is the same fix, one platform over,
+              on the screen a recall notification opens.
+            */
+            <Text style={styles.body14}>
+              {healthClaim('recall', '', false).text} We fetch it from NHTSA shortly after a
+              vehicle is added — open this screen again in a minute.
+            </Text>
+          )}
         </Card>
       )}
 
-      {state.recalls.map((recall, index) => (
-        <Card key={recall.campaignNumber ?? `recall-${index}`} style={styles.cardGap}>
+      {ordered.map((recall, index) => {
+        const markedOn = markOf(recall);
+        const working = busyCampaign !== null && busyCampaign === recall.campaignNumber;
+
+        return (
+        <Card
+          key={recall.campaignNumber ?? `recall-${index}`}
+          style={[styles.cardGap, markedOn ? styles.cardMarked : null]}
+        >
           {recall.component && <Text style={styles.component}>{recall.component}</Text>}
+
+          {/*
+            ── The two actions, above the explanation ──────────────────────────
+
+            The design system's recall spec is explicit that they come *before*
+            the three sentences: "its job is to drive an action, not to explain
+            a notice." Somebody arriving from a push already knows they have a
+            problem — what they do not have is anywhere to go with it, which is
+            what this screen shipped without until 23 Aug.
+
+            ⚠ Neither is `.btn-primary`. Both are outline controls, because a
+            filled cyan button here would be the second filled primary in the
+            stack behind this screen and would also read as *the* recommended
+            action — and this product does not know whether an owner should be
+            booking a dealer or recording work they have already had done.
+          */}
+          {markedOn ? (
+            /*
+              The claim, in the owner's own terms, with the way back beside it.
+
+              ⚠ Not "Repaired". Nothing here verified anything: NHTSA matches
+              recalls on year/make/model rather than VIN, so the strongest true
+              sentence is that *you said so, on this date*. §10, on the screen
+              where overstating is most expensive.
+            */
+            <View style={styles.markedRow}>
+              <Text style={styles.markedText}>
+                You marked this repaired on {calendarDate(markedOn)}
+              </Text>
+              {/*
+                ⚠ `Button`, not a hand-rolled `Pressable` that swaps its label
+                for a spinner. That pattern loses the control's accessible name
+                at the exact moment something is happening — RN derives the name
+                from the `<Text>` descendants, so a busy control announces as
+                bare "button". `mobile-busy-controls-named.test.ts` caught this
+                one on its first draft; the primitive keeps the name and sets
+                `accessibilityState.busy` alongside it.
+              */}
+              <Button
+                label="Undo"
+                variant="outline"
+                busy={working}
+                accessibilityLabel={`Undo marking the ${recall.component ?? 'recall'} repaired`}
+                onPress={() =>
+                  recall.campaignNumber && void setAddressed(recall.campaignNumber, false)
+                }
+              />
+            </View>
+          ) : (
+            <View style={styles.actions}>
+              <Button
+                label="Find a dealer"
+                variant="outline"
+                onPress={() => findDealer(state.make)}
+                style={styles.action}
+              />
+              {/*
+                Only offered when the campaign has a number. The mark is stored
+                against `(vehicle_id, campaign_number)`, so a recall that
+                arrived without one has nothing to key on — and a button that
+                silently does nothing is worse than one that is not there.
+              */}
+              {recall.campaignNumber ? (
+                <Button
+                  label="Mark as repaired"
+                  variant="outline"
+                  busy={working}
+                  onPress={() => void setAddressed(recall.campaignNumber!, true)}
+                  style={styles.action}
+                />
+              ) : null}
+            </View>
+          )}
 
           {recall.summary && <Text style={styles.summary}>{recall.summary}</Text>}
 
@@ -256,7 +556,10 @@ export function RecallDetailScreen({ vehicleId, title, onAskAdvisor, onSignOut }
             {recall.campaignNumber && (
               <Text style={styles.meta}>Campaign {recall.campaignNumber}</Text>
             )}
-            {recall.reportedOn && <Text style={styles.meta}>Issued {recall.reportedOn}</Text>}
+            {recall.reportedOn && (
+              /* "Issued 14 Mar 2024", per the spec — not the raw ISO string. */
+              <Text style={styles.meta}>Issued {calendarDate(recall.reportedOn)}</Text>
+            )}
           </View>
 
           {/*
@@ -278,7 +581,8 @@ export function RecallDetailScreen({ vehicleId, title, onAskAdvisor, onSignOut }
             <Text style={styles.askCtaText}>Ask the advisor about this</Text>
           </Pressable>
         </Card>
-      ))}
+        );
+      })}
 
       {state.recalls.length > 0 && (
         <Text style={styles.footnote}>
@@ -291,6 +595,29 @@ export function RecallDetailScreen({ vehicleId, title, onAskAdvisor, onSignOut }
 }
 
 const styles = StyleSheet.create({
+  /*
+    ── The two actions, and the marked state ─────────────────────────────────
+
+    Side by side and equal, because the product does not know which one an
+    owner needs — booking the work and recording work already done are the same
+    size of decision from here.
+  */
+  actions: { flexDirection: 'row', gap: space.sm },
+  action: { flex: 1 },
+  /*
+    A marked card keeps its border and loses its emphasis. Not hidden and not
+    collapsed: the recall is still a public safety record, and the owner's mark
+    is a claim about their own car — see the sort comment in the render.
+  */
+  cardMarked: { borderColor: border.panel, backgroundColor: surface.nav },
+  markedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: space.md,
+  },
+  markedText: { ...type.value, color: text.secondary, flex: 1 },
+
   body: { padding: 20, gap: 16, paddingBottom: 40 },
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 10 },
 

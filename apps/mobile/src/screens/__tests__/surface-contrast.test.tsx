@@ -1,6 +1,7 @@
 import { render } from '@testing-library/react-native';
 
 import BayRoom from '../../components/BayRoom';
+import Suggest from '../../components/Suggest';
 import ClusterGauge from '../../components/ClusterGauge';
 import HealthDrivers from '../../components/HealthDrivers';
 import Plinth from '../../components/Plinth';
@@ -102,6 +103,38 @@ describe('surfaces that are not the page', () => {
     );
 
     expect(belowFloor(auditText(view, surface.card))).toEqual([]);
+  });
+
+  it('keeps a suggestion legible on the panel it is offered from', async () => {
+    /*
+      The panel is `surface.card`, a step **above** the field's well it hangs
+      under — so ink measured against the page reads better here than it
+      renders, which is the same over-optimism this whole file exists to catch.
+
+      ⚠ `contrast.test.tsx` mounts `AddVehicleScreen` and does reach this
+      component, but only ever with an empty list: `fetchModels` cannot resolve
+      in a Jest process, so what it measures is the quiet note. The rows
+      themselves — the ink somebody actually reads to choose their car — are
+      measured here and nowhere else.
+    */
+    const view = await render(
+      <Suggest
+        label="Make"
+        value="su"
+        onChangeText={jest.fn()}
+        onPick={jest.fn()}
+        suggestions={['Subaru', 'Suzuki']}
+        open
+        onOpen={jest.fn()}
+      />
+    );
+
+    const audits = auditText(view, surface.card);
+
+    // The label, the two rows — a walker that found only the label would pass
+    // every assertion about rows it never reached.
+    expect(audits.length).toBeGreaterThan(2);
+    expect(belowFloor(audits)).toEqual([]);
   });
 
   it('keeps the dial s readout legible on the plinth', async () => {

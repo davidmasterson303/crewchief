@@ -42,7 +42,18 @@ const request = apiRequest as jest.MockedFunction<typeof apiRequest>;
  */
 function respond(over: Record<string, unknown> = {}, { asArray = false } = {}) {
   const health = { health_score: 61, summary: 'Fair.' };
-  const nhtsa = { recalls: [{ id: 1 }, { id: 2 }] };
+  /*
+    ⚠ Real NHTSA field names. The fixture was `[{ id: 1 }, { id: 2 }]`, which
+    `normaliseRecall` drops for having neither a component nor a summary — it
+    stood in for a shape NHTSA cannot return, and it only ever passed because
+    the banner counted the raw array rather than what the recall screen draws.
+  */
+  const nhtsa = {
+    recalls: [
+      { NHTSACampaignNumber: '23V-441', Component: 'FUEL SYSTEM', Summary: 'Pump may fail.' },
+      { NHTSACampaignNumber: '21V-100', Component: 'AIR BAGS', Summary: 'Inflator may rupture.' },
+    ],
+  };
 
   request.mockResolvedValue({
     vehicle: {
@@ -68,6 +79,9 @@ async function mount() {
     onViewRecalls: jest.fn(),
     onOpenWishlist: jest.fn(),
     onOpenHistory: jest.fn(),
+    onOpenHealth: jest.fn(),
+    onOpenBuild: jest.fn(),
+    onOpenMilestone: jest.fn(),
   };
   return { props, view: await render(<VehicleDetailScreen {...props} />) };
 }
@@ -127,7 +141,7 @@ describe('recalls', () => {
   it('pluralises the label correctly', async () => {
     // Read aloud by a screen reader, so "1 open recalls" is a real defect
     // rather than a typo.
-    respond({ nhtsa_data: { recalls: [{ id: 1 }] } });
+    respond({ nhtsa_data: { recalls: [{ NHTSACampaignNumber: '23V-441', Component: 'FUEL SYSTEM' }] } });
     const { view } = await mount();
 
     expect(await view.findByLabelText(/View 1 open recall$/)).toBeTruthy();
@@ -290,15 +304,22 @@ describe('what this screen leads to stays reachable', () => {
     const at = (needle: string) =>
       order.findIndex((line) => line.toLowerCase().includes(needle.toLowerCase()));
 
-    expect(at('Health')).toBeGreaterThan(-1);
+    /*
+      ⚠ Rewritten 23 Aug with the hub. The claim is the same one — the verb this
+      screen exists to lead to must not sit under a stack of instruments — but
+      the instruments are no longer on this screen at all, so the landmarks
+      changed. `Health` and `Build` are now rows in the hub rather than section
+      headings over dials, and the drivers and the chart are a route away.
+    */
+    expect(at('This car')).toBeGreaterThan(-1);
     expect(at('Ask the advisor')).toBeGreaterThan(-1);
-    expect(at('Build')).toBeGreaterThan(-1);
 
-    // Health first, then what to do about it, then the reference instruments.
-    expect(at('Health')).toBeLessThan(at('Wishlist'));
+    // The reading, then the places to go, then the one thing to do, then the
+    // answers the owner gave when they added the car.
+    expect(at('Fair')).toBeLessThan(at('This car'));
+    expect(at('This car')).toBeLessThan(at('Wishlist'));
     expect(at('Wishlist')).toBeLessThan(at('Ask the advisor'));
-    expect(at('Ask the advisor')).toBeLessThan(at('Build'));
-    expect(at('Ask the advisor')).toBeLessThan(at('Details'));
+    expect(at('Ask the advisor')).toBeLessThan(at('What you told us'));
   });
 
   it('shows one dial on this screen, and it is not the hero', async () => {

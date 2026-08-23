@@ -115,6 +115,9 @@ describe('the health score colour — never checked by the source scan', () => {
         onViewRecalls={jest.fn()}
         onOpenWishlist={jest.fn()}
       onOpenHistory={jest.fn()}
+      onOpenHealth={jest.fn()}
+      onOpenBuild={jest.fn()}
+      onOpenMilestone={jest.fn()}
       />
     );
 
@@ -202,6 +205,9 @@ describe('failure states, which are where sub-floor text hides', () => {
         onViewRecalls={jest.fn()}
         onOpenWishlist={jest.fn()}
       onOpenHistory={jest.fn()}
+      onOpenHealth={jest.fn()}
+      onOpenBuild={jest.fn()}
+      onOpenMilestone={jest.fn()}
       />
     );
 
@@ -239,6 +245,9 @@ describe('the advisor CTA, which is dark text on white', () => {
         onViewRecalls={jest.fn()}
         onOpenWishlist={jest.fn()}
       onOpenHistory={jest.fn()}
+      onOpenHealth={jest.fn()}
+      onOpenBuild={jest.fn()}
+      onOpenMilestone={jest.fn()}
       />
     );
 
@@ -407,7 +416,16 @@ describe('the recall screen and its severity banners', () => {
   });
 
   it('reads at AA with no recalls on record', async () => {
-    request.mockResolvedValue({ vehicle: { year: 2015, make: 'BMW', model: 'M235i', nhtsa_data: null } });
+    /*
+      ⚠ `{ recalls: [] }`, not `null`. This fixture used to pass `nhtsa_data:
+      null` while asserting "No recalls on record" — it was named for a checked
+      car and supplied an unchecked one, which is precisely the conflation the
+      screen had. The two states now render different copy, so the fixture has
+      to say which one it means.
+    */
+    request.mockResolvedValue({
+      vehicle: { year: 2015, make: 'BMW', model: 'M235i', nhtsa_data: { recalls: [] } },
+    });
 
     const view = await render(
       <RecallDetailScreen
@@ -418,6 +436,26 @@ describe('the recall screen and its severity banners', () => {
     );
 
     await view.findByText('No recalls on record');
+    expect(belowFloor(auditText(view))).toEqual([]);
+  });
+
+  it('reads at AA when the recall check has not run', async () => {
+    /*
+      New copy needs auditing like any other. This is the branch a car reaches
+      between being added and being researched — and the one an unresearched
+      car sits in indefinitely, so it is not a transient screen nobody sees.
+    */
+    request.mockResolvedValue({ vehicle: { year: 2003, make: 'Honda', model: 'Accord' } });
+
+    const view = await render(
+      <RecallDetailScreen
+        vehicleId="743bdd65-4b9f-4ca1-8b90-9eae9a22ab02"
+        onSignOut={jest.fn()}
+        onAskAdvisor={jest.fn()}
+      />
+    );
+
+    await view.findByText('Recalls not checked yet');
     expect(belowFloor(auditText(view))).toEqual([]);
   });
 

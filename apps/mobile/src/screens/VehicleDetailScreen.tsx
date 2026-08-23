@@ -15,18 +15,17 @@ import { uploadVehiclePhoto } from '../api/photos';
 import type { InvoiceFile } from '../api/documents';
 import type { HealthDriver } from '@crewchief/core/health-drivers';
 import { buildPosition } from '@crewchief/core/build-progress';
-import { nextRungs, showsModifications } from '@crewchief/core/mod-progression';
+import { showsModifications } from '@crewchief/core/mod-progression';
+import { UNKNOWN_TIMING, describeNextService, localToday } from '@crewchief/core/garage-next-service';
+import { normaliseRecalls } from '@crewchief/core/recalls';
 import AlertBanner from '../components/AlertBanner';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import ClusterGauge, { CARD_SIZE } from '../components/ClusterGauge';
-import HealthDrivers from '../components/HealthDrivers';
-import HealthHistory, { type HealthReading } from '../components/HealthHistory';
-import BuildGauge from '../components/BuildGauge';
-import ProgressionLadder from '../components/ProgressionLadder';
+import { type HealthReading } from '../components/HealthHistory';
 import Plinth from '../components/Plinth';
 import VehiclePlate from '../components/VehiclePlate';
-import ListRow from '../components/ListRow';
+import NavRow from '../components/NavRow';
 import SectionHeader from '../components/SectionHeader';
 import { space, text, type } from '../theme';
 import { getHealthBandJudgement } from '@crewchief/core/health-band';
@@ -115,6 +114,62 @@ interface Vehicle {
   /* Both embedded shapes accepted, for the reason GarageScreen sets out. */
   vehicle_health_summary?: HealthSummary | HealthSummary[] | null;
   nhtsa_data?: { recalls?: unknown[] | null } | { recalls?: unknown[] | null }[] | null;
+  /**
+   * The stored next-service columns, written by the nightly sweep.
+   *
+   * ⚠ These are **applied in the live database** and were simply not in
+   * `VEHICLE_COLUMNS` until 23 Aug, so the schedule row rendered its unknown
+   * branch on every car in the product. `GarageBay` still carried a docblock
+   * saying the migration had not been applied. §1: verify against the artefact.
+   *
+   * Still optional at the type level, because the sweep has not written a row
+   * for every car — an absent value is "we have not worked it out", which
+   * `describeNextService` words rather than hides.
+   */
+  next_service_label?: string | null;
+  next_service_at_miles?: number | null;
+  next_service_due_on?: string | null;
+  /**
+   * Campaigns this owner has marked repaired, embedded by the route.
+   *
+   * ⚠ It rides on the vehicle rather than coming from `/api/v1/recalls`, and
+   * that is a deliberate simplification of the first draft. A separate request
+   * meant a fourth round trip **and** a fourth failure mode — a "could not
+   * check the marks" state this screen had to word and could not avoid. The
+   * embed costs nothing extra: `vehicle-detail-not-poorer.test.ts` requires
+   * this route to ask for everything the garage list asks for, so the join was
+   * already being paid for.
+   */
+  recall_actions?: Array<{ campaign_number?: string | null }> | null;
+}
+
+/**
+ * The wishlist row: how many, and what they add up to.
+ *
+ * ⚠ **The total and the count must come from the same array**, and that is a
+ * rule with a history — `specs/native-wishlist.spec.html` records this system
+ * shipping "Wishlist · 4 items" over three rows, and says why it matters: *"a
+ * count that disagrees with what is on screen is the fastest way to lose a
+ * user's trust in every other number."*
+ *
+ * Parts and labour are summed because that is what the wishlist screen totals.
+ * A row with neither contributes 0 to the money and 1 to the count, which is
+ * honest: it is a real item whose price nobody has estimated yet.
+ */
+function summariseWishlist(
+  items: Array<Record<string, unknown>> | undefined
+): { count: number; total: number } | null {
+  if (!Array.isArray(items)) return null;
+
+  const money = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : 0);
+
+  return {
+    count: items.length,
+    total: items.reduce(
+      (sum, item) => sum + money(item.estimated_cost_parts) + money(item.estimated_cost_labor),
+      0
+    ),
+  };
 }
 
 function first<T>(value: T | T[] | null | undefined): T | undefined {
@@ -123,6 +178,20 @@ function first<T>(value: T | T[] | null | undefined): T | undefined {
 }
 
 const miles = new Intl.NumberFormat('en-US');
+
+/**
+ * Whole dollars, for the wishlist total on the hub row.
+ *
+ * No cents: these are estimates built from estimates, and rendering
+ * "$4,980.00" against a number the product itself calls a range would be
+ * inventing two digits of precision. `advice-range.ts` carries the standing
+ * argument; this is the smallest place it applies.
+ */
+const money = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  maximumFractionDigits: 0,
+});
 
 /** `daily_driver` → `Daily Driver`. Same reason as the garage: it shipped raw once. */
 function humanise(value: string): string {
@@ -144,6 +213,26 @@ interface Knowledge {
   common_mods?: Array<{ name: string; purpose?: string; difficulty?: string }> | null;
 }
 
+/**
+ * What the hub's rows say is behind them.
+ *
+ * ── ⚠ Every field is nullable, and `null` means "we could not ask" ──────────
+ *
+ * Not zero. `NavRow` renders nothing for a missing count and *something* for a
+ * present one, and the difference is a claim: "Wishlist" with nothing beside it
+ * is a place, "Wishlist 0" says the place is empty. A failed request must never
+ * be able to make the second statement.
+ *
+ * The three come from three separate endpoints alongside the vehicle itself,
+ * fetched with `allSettled`, so any one of them failing costs its own count and
+ * nothing else. A hub that will not draw because a wishlist total timed out is
+ * a worse screen than one with a row that does not carry a number.
+ */
+interface HubCounts {
+  services: number | null;
+  wishlist: { count: number; total: number } | null;
+}
+
 type State =
   | { status: 'loading' }
   | {
@@ -152,6 +241,7 @@ type State =
       drivers: HealthDriver[];
       history: HealthReading[];
       knowledge: Knowledge | null;
+      counts: HubCounts;
     }
   | { status: 'missing' }
   | { status: 'error'; message: string; unauthorized: boolean };
@@ -165,6 +255,9 @@ export function VehicleDetailScreen({
   onViewRecalls,
   onOpenWishlist,
   onOpenHistory,
+  onOpenHealth,
+  onOpenBuild,
+  onOpenMilestone,
   pickPhoto,
 }: {
   vehicleId: string;
@@ -180,6 +273,21 @@ export function VehicleDetailScreen({
   onScanInvoice: () => void;
   onViewRecalls: () => void;
   onOpenWishlist: () => void;
+  /*
+    ── The three routes this screen gained on 23 Aug ────────────────────────
+
+    Callbacks, like every other destination here, for the reason the header
+    gives: this screen does not know react-navigation exists.
+
+    `onOpenHealth` and `onOpenBuild` are where two instruments went. They were
+    cards on this screen — a dial with three drivers and a chart, and a second
+    dial with a five-rung ladder — and between them they were most of why the
+    IA read as cluttered. `onOpenMilestone` was already a route and simply had
+    no way in from here; it took a notification to reach it.
+  */
+  onOpenHealth: () => void;
+  onOpenBuild: () => void;
+  onOpenMilestone: () => void;
   /**
    * The picker seam — this screen never imports `expo-image-picker`.
    *
@@ -214,16 +322,52 @@ export function VehicleDetailScreen({
           something else routes here with a value that is not a uuid, a raw
           interpolation is a query-string injection rather than a 400.
         */
-        const body = await apiRequest<{
-          vehicle?: Vehicle;
-          health_drivers?: HealthDriver[];
-          health_history?: HealthReading[];
-          knowledge?: Knowledge | null;
-        }>(`/load-vehicle?vehicleId=${encodeURIComponent(vehicleId)}`);
+        /*
+          ── Four requests, one of which may fail the screen ──────────────────
+
+          The vehicle is the screen. The other three fill in the numbers beside
+          the hub's rows, and `allSettled` is what keeps them subordinate: a
+          wishlist total that times out costs the wishlist row its count and
+          nothing else. `all` would reject the set and blank a car because a
+          count was slow, which is the inversion this screen exists to avoid.
+
+          They run together rather than in sequence, so the wait is the slowest
+          one rather than the sum of four.
+        */
+        const [vehicleResult, servicesResult, wishlistResult] = await Promise.allSettled([
+          apiRequest<{
+            vehicle?: Vehicle;
+            health_drivers?: HealthDriver[];
+            health_history?: HealthReading[];
+            knowledge?: Knowledge | null;
+          }>(`/load-vehicle?vehicleId=${encodeURIComponent(vehicleId)}`),
+          apiRequest<{ maintenanceLineItems?: unknown[] }>(
+            `/load-maintenance-data?vehicleId=${encodeURIComponent(vehicleId)}`
+          ),
+          apiRequest<{ wishlistItems?: Array<Record<string, unknown>> }>(
+            `/wishlist?vehicleId=${encodeURIComponent(vehicleId)}`
+          ),
+        ]);
+
+        if (vehicleResult.status === 'rejected') throw vehicleResult.reason;
+        const body = vehicleResult.value;
+
         if (!body.vehicle) {
           setState({ status: 'missing' });
           return;
         }
+
+        const counts: HubCounts = {
+          services:
+            servicesResult.status === 'fulfilled' &&
+            Array.isArray(servicesResult.value.maintenanceLineItems)
+              ? servicesResult.value.maintenanceLineItems.length
+              : null,
+          wishlist:
+            wishlistResult.status === 'fulfilled'
+              ? summariseWishlist(wishlistResult.value.wishlistItems)
+              : null,
+        };
         /*
           `health_drivers` is top level rather than folded into `vehicle`,
           because they are derived and the vehicle object is the row — mixing
@@ -239,6 +383,7 @@ export function VehicleDetailScreen({
           drivers: Array.isArray(body.health_drivers) ? body.health_drivers : [],
           history: Array.isArray(body.health_history) ? body.health_history : [],
           knowledge: body.knowledge ?? null,
+          counts,
         });
       } catch (error) {
         const apiError = error as ApiRequestError;
@@ -344,34 +489,115 @@ export function VehicleDetailScreen({
     );
   }
 
-  const { vehicle, drivers, history, knowledge } = state;
+  const { vehicle, counts } = state;
 
-  /*
-    ── The build dial and the ladder, from the knowledge base ─────────────────
-
-    ⚠ `completed` is empty, and it is empty **everywhere**: `modification_tracking`
-    holds no rows across the entire product — re-confirmed against the live
-    database on 15 Aug. So every car reads Stock with the ladder on its first
-    rung, and that is the honest state rather than a placeholder.
-
-    `mod-progression.ts` makes the same argument for the ladder: with no
-    history, the first step genuinely is the first step. The dial says the same
-    thing in glass — a needle at rest is a car nobody has recorded work on, not
-    a car in poor condition, which is why it never borrows the health ramp.
-  */
-  const completed: string[] = [];
-  const build = buildPosition([]);
-  const rungs = showsModifications(vehicle.performance_mindedness)
-    ? nextRungs({
-        mods: Array.isArray(knowledge?.common_mods) ? knowledge.common_mods : [],
-        completed,
-        mindedness: vehicle.performance_mindedness,
-      })
-    : [];
   const health = first(vehicle.vehicle_health_summary);
   const score = typeof health?.health_score === 'number' ? health.health_score : null;
   const band = score === null ? null : getHealthBandJudgement(score);
-  const recalls = first(vehicle.nhtsa_data)?.recalls?.length ?? 0;
+
+  /*
+    ── The identity line, which is where the odometer belongs ────────────────
+
+    The spec writes it "61,240 mi · xDrive". Mileage first because it is the
+    number an owner checks, and it spent this screen's whole life five rows down
+    in a "Details" card under two instruments.
+  */
+  const subtitle = [
+    typeof vehicle.current_mileage === 'number'
+      ? `${miles.format(vehicle.current_mileage)} mi`
+      : null,
+    vehicle.trim,
+    vehicle.vehicle_status ? humanise(vehicle.vehicle_status) : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
+  /*
+    ── Open recalls, which is not the same number as recalls ─────────────────
+
+    A campaign the owner has marked repaired is no longer counted here, and that
+    is the point of the whole recall change: a badge that can never go down
+    stops being read.
+
+    ⚠ A missing or malformed `recall_actions` embed means **nothing is treated
+    as marked**. Erring the other way would hide an open safety notice on the
+    strength of a field that failed to arrive.
+  */
+  const allRecalls = normaliseRecalls(first(vehicle.nhtsa_data)?.recalls);
+  const marked = new Set(
+    (vehicle.recall_actions ?? []).flatMap((action) =>
+      typeof action?.campaign_number === 'string' ? [action.campaign_number] : []
+    )
+  );
+  const open = allRecalls.filter(
+    (recall) => !recall.campaignNumber || !marked.has(recall.campaignNumber)
+  );
+  const openRecalls = open.length;
+
+  /*
+    The banner names the defect rather than describing itself.
+
+    The spec's line is "One is a fuel pump that can cut power" — a banner that
+    says "what it means, and what to do about it" is furniture, and one that
+    names the worst open component is information. `component` is NHTSA's own
+    short field; the summary would be a paragraph.
+  */
+  const worstRecall = open[0]?.component
+    ? openRecalls === 1
+      ? `${open[0].component}. Free to fix at a franchised dealer.`
+      : `Worst: ${open[0].component}. Free to fix at a franchised dealer.`
+    : null;
+
+  /*
+    ── Next service ──────────────────────────────────────────────────────────
+
+    ⚠ The three `next_service_*` columns reached this payload on 23 Aug, and the
+    reason they were absent is worth carrying: they were **applied in the
+    database and missing from the route's column list**, so every car in the
+    product rendered the honest-unknown branch. `GarageBay`'s docblock said the
+    migration had not been applied; the live database said otherwise. §1.
+
+    `describeNextService` is shared with the garage bay so the two cannot word
+    the same schedule differently, and `localToday()` is read at render rather
+    than held — "overdue since" and "due now" turn on exactly one day.
+  */
+  const nextService = describeNextService(
+    {
+      label: vehicle.next_service_label ?? null,
+      atMiles: vehicle.next_service_at_miles ?? null,
+      dueOn: vehicle.next_service_due_on ?? null,
+    },
+    vehicle.current_mileage ?? null,
+    localToday()
+  );
+
+  /*
+    ⚠ `completed` is empty and it is empty everywhere — `modification_tracking`
+    holds no rows across the product, re-confirmed against the live database on
+    23 Aug. So every car reads Stock. That is the honest state, and `BuildScreen`
+    is where it is explained rather than merely displayed.
+  */
+  const buildLabel = buildPosition([]).label;
+
+  /*
+    ── What each row says is behind it ───────────────────────────────────────
+
+    ⚠ `null` where the count could not be fetched, and `NavRow` renders nothing
+    for it. Never "0": a row reading "Wishlist 0" claims the list is empty,
+    which is a statement a failed request has not earned. See `HubCounts`.
+  */
+  const serviceDue =
+    nextService.kind === 'known' ? `${nextService.service} · ${nextService.timing}` : UNKNOWN_TIMING;
+
+  const historyCount =
+    counts.services === null ? null : `${counts.services}`;
+
+  const wishlistCount =
+    counts.wishlist === null
+      ? null
+      : counts.wishlist.total > 0
+        ? `${counts.wishlist.count} · ${money.format(counts.wishlist.total)}`
+        : `${counts.wishlist.count}`;
 
   return (
     <ScrollView
@@ -418,162 +644,129 @@ export function VehicleDetailScreen({
         <Text style={styles.name}>
           {[vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ')}
         </Text>
-        {(vehicle.trim || vehicle.color) && (
-          <Text style={styles.trim}>
-            {[vehicle.trim, vehicle.color].filter(Boolean).join(' · ')}
-          </Text>
-        )}
+        {/*
+          ⚠ The spec's subtitle: **"61,240 mi · xDrive"** — the odometer first.
+
+          Mileage used to live five rows down in a "Details" card, which put the
+          single most-checked number about a car below two instruments and a
+          list of links. It is identity, not detail: it is how an owner knows
+          which car they are looking at and roughly what state it is in.
+        */}
+        {subtitle ? <Text style={styles.trim}>{subtitle}</Text> : null}
       </View>
 
       {/*
-        ── The recall, first and as a banner ──────────────────────────────────
+        ── The reading, and one way in to the account of it ────────────────────
 
-        It was a card at the very bottom of the screen, under five rows of
-        read-only detail. A recall is the one thing here that can be
-        time-critical, and burying it under the mileage inverted the screen's
-        priorities. `AlertBanner` is opaque and measured, which a wash over an
-        unknown backdrop is not.
+        The 104pt **card** dial, not the hero. The board is explicit — *"Hero ·
+        184pt … Garage bay and nothing else — one dial per screen"* — and a
+        second hero here plus a sweep pushed everything this screen exists to
+        lead to below the fold.
+
+        What left this card on 23 Aug: the three drivers and the history chart.
+        They are the *account* of the score rather than the score, they need
+        room to explain themselves, and they were two of the reasons this screen
+        read as a stack of instruments. `HealthScreen` is one tap down.
       */}
-      {recalls > 0 && (
-        <Pressable
-          onPress={onViewRecalls}
-          accessibilityRole="button"
-          accessibilityLabel={`View ${recalls} open ${recalls === 1 ? 'recall' : 'recalls'}`}
-        >
-          <AlertBanner
-            tone="critical"
-            headline={`${recalls} open ${recalls === 1 ? 'recall' : 'recalls'}`}
-            body="What it means, and what to do about it"
-          />
-        </Pressable>
-      )}
-
       {score !== null && band && (
         <Card>
-          <SectionHeader title="Health" />
-          {/*
-            ⚠ The **card** dial at 104, not the hero — corrected 15 Aug.
-
-            The board is explicit and I read it wrong the first time: *"Hero ·
-            184pt … Garage bay and nothing else — one dial per screen"*, and
-            *"Card · 104pt … deliberately still. **The plinth on vehicle
-            detail**."* A second hero here is a second screen claiming the one
-            dial, and at 184 plus a sweep it pushed everything this screen
-            exists to lead to below the fold.
-
-            The plinth is what makes it an object rather than a picture of one.
-          */}
           <Plinth>
             <ClusterGauge score={score} variant="card" size={CARD_SIZE} />
           </Plinth>
           {health?.summary ? <Text style={styles.summary}>{health.summary}</Text> : null}
-
-          {/*
-            The three score drivers — the endpoint gained them on 15 Aug.
-
-            ⚠ Below the summary rather than beside the dial, and that placement
-            is the honest one: they explain the subject without adding up to the
-            reading above them. Putting three numbers next to a total invites
-            arithmetic that does not hold — `health_score` comes from the model
-            and these are computed from the schedule, the recall list and
-            mileage against age.
-          */}
-          <HealthDrivers drivers={drivers} />
+          <NavRow label="What is driving this score" onPress={onOpenHealth} last />
         </Card>
       )}
 
+      {/*
+        ── The recall ─────────────────────────────────────────────────────────
 
+        ⚠ **Below the dial, which is the design system's order and not the one
+        that shipped.** `specs/native-vehicle-detail.spec.html` reads score,
+        then "2 open recalls", then the hub. The shipped screen put it first on
+        the argument that a recall is the one time-critical thing here — a good
+        argument, and it is above the fold either way, so this follows the spec
+        and the disagreement is written down for Design rather than settled
+        unilaterally. See `docs/design-system-drift.md`.
 
+        The body names the **worst open recall** instead of saying "what it
+        means, and what to do about it". The spec's own line is *"One is a fuel
+        pump that can cut power"*, and it is right: a banner that describes
+        itself is furniture, and a banner that names the defect is information.
+      */}
+      {openRecalls > 0 && (
+        <Pressable
+          onPress={onViewRecalls}
+          accessibilityRole="button"
+          accessibilityLabel={`View ${openRecalls} open ${openRecalls === 1 ? 'recall' : 'recalls'}`}
+        >
+          <AlertBanner
+            tone="critical"
+            headline={`${openRecalls} open ${openRecalls === 1 ? 'recall' : 'recalls'}`}
+            body={worstRecall ?? 'Free to fix at a franchised dealer, whatever the age.'}
+          />
+        </Pressable>
+      )}
 
       {/*
-        ── Three destinations, as rows rather than as cards ───────────────────
+        ── The hub ────────────────────────────────────────────────────────────
 
-        These were three full-width bordered cards, each with a title and a
-        hint, stacked above the health summary — four boxes competing to be the
-        thing you press, on a screen whose actual job is to tell you about a
-        car. As rows they read as what they are: places to go.
+        Six places to go, as `NavRow`s rather than as `ListRow`s with an empty
+        value. That swap is the whole of David's *"it's not clear that these are
+        buttons I could tap"* — `NavRow`'s docblock carries the three signals
+        that were pointing the wrong way.
+
+        Each row carries what is behind it where the screen knows: 18 services,
+        a wishlist total, the next service. Where it does not know, it carries
+        **nothing** — never a zero, which would claim the place is empty.
       */}
       <Card>
         <SectionHeader title="This car" />
-        <ListRow label="Service history" onPress={onOpenHistory} value="" />
-        <ListRow
-          label="Wishlist"
-          detail="What it needs, so the advisor can price it"
-          onPress={onOpenWishlist}
-          value=""
-        />
-        <ListRow
+        <NavRow label="Service due" count={serviceDue} onPress={onOpenMilestone} />
+        <NavRow label="Service history" count={historyCount} onPress={onOpenHistory} />
+        <NavRow label="Wishlist" count={wishlistCount} onPress={onOpenWishlist} />
+        {/*
+          The build, now a route. It was a dial reading Stock and a five-rung
+          scale with a marker on it, and nothing on that card could be pressed —
+          `BuildScreen` carries what was wrong with it and what it does instead.
+
+          Shown only when the owner has not answered "stock". `showsModifications`
+          is the one genuine off switch, and it is "not now" rather than "never".
+        */}
+        {showsModifications(vehicle.performance_mindedness) && (
+          <NavRow label="Build" count={buildLabel} onPress={onOpenBuild} />
+        )}
+        <NavRow
           label="Scan an invoice"
           detail="Photograph a bill and its lines are filed here"
           onPress={onScanInvoice}
-          value=""
+          last
         />
       </Card>
+
       {/*
         ── The one filled primary ─────────────────────────────────────────────
 
-        The advisor is the verb this screen exists to lead to, and it is now the
-        only filled control on it. Everything above is either information or a
-        destination.
-
-        It keeps its place near the bottom rather than the top: the earlier
-        version put it first to answer guideline 4.2, but 4.2 is answered by the
-        app *having* the flow, not by where the button sits — and a primary
-        above the health summary asked the question before showing the reason
-        to ask it.
+        The advisor is the verb this screen exists to lead to, and it is the only
+        filled control on it — the spec says so directly: *"one filled primary
+        per screen, and it is this one; the recall banner is a card affordance,
+        not a second CTA."*
       */}
       <Button label="Ask the advisor" onPress={onAskAdvisor} style={styles.primaryAction} />
 
       {/*
-        ── Below the fold, and that is the board's order ───────────────────────
+        ── What the owner told us ─────────────────────────────────────────────
 
-        Screen 02 is the car and what to do about it; **screen 03 is "vehicle
-        detail, scrolled"** and carries "the two instruments web has and mobile
-        does not: health over time, and the build dial with its redline".
+        `ListRow`, not `NavRow`, and the difference is the point of having both:
+        these are **facts** the product holds about the car, so the label is the
+        caption and the value is the payload. Nothing here goes anywhere.
 
-        ⚠ They were above the destinations until 15 Aug and it was wrong. Two
-        full-height instruments between the health summary and the advisor put
-        the verb this screen exists to lead to — and the wishlist with it —
-        below everything. The instruments are reference; you scroll to them.
+        ⚠ Mileage is deliberately absent — it moved into the identity line at the
+        top of the screen. Repeating it here would be the card duplication this
+        screen was cleaned up to remove.
       */}
-      <HealthHistoryCard history={history} />
-      {/*
-        ── The build, and why it is a second card rather than a second dial ────
-
-        The board's screen 03 names these as "the two instruments web has and
-        mobile does not". They are siblings, not variants: the health gauge is
-        hardwired to health semantics and **a low build reading is stock, not a
-        fault** — reusing it would render an unmodified car as a critical
-        failure and announce it as one.
-
-        Shown only when the owner has not said "stock". `showsModifications` is
-        the one genuine off switch, and it is "not now" rather than "never".
-      */}
-      {showsModifications(vehicle.performance_mindedness) && (
-        <Card>
-          <SectionHeader title="Build" />
-          <View style={styles.buildDial}>
-            <BuildGauge position={build} />
-          </View>
-
-          {/*
-            The ladder answers the question the dial does not: why this next,
-            and not the turbo. A recommendation with no visible reasoning is a
-            black box, and this product's whole argument is that it is not one.
-          */}
-          {rungs.length > 0 && <ProgressionLadder next={rungs[0].role} />}
-        </Card>
-      )}
       <Card>
-        <SectionHeader title="Details" />
-        <Row
-          label="Mileage"
-          value={
-            typeof vehicle.current_mileage === 'number'
-              ? `${miles.format(vehicle.current_mileage)} mi`
-              : null
-          }
-        />
+        <SectionHeader title="What you told us" />
         <Row
           label="Average per month"
           value={
@@ -593,29 +786,6 @@ export function VehicleDetailScreen({
         />
       </Card>
     </ScrollView>
-  );
-}
-
-/**
- * Score over time, in its own card — and nothing at all when there is no chart.
- *
- * `HealthHistory` declines to draw from fewer than two readings, which is
- * right: a one-point chart is a dot. But a `Card` wrapped round it would still
- * render its heading, so the screen would carry a "Health over time" title with
- * an empty panel under it — the shape that reads as a loading failure.
- *
- * ⚠ **That is the state this account is in today.** There is exactly one
- * recorded reading for the real car, so this renders nothing until the sweep
- * has run twice.
- */
-function HealthHistoryCard({ history }: { history: HealthReading[] }) {
-  if (history.length < 2) return null;
-
-  return (
-    <Card>
-      <SectionHeader title="Health over time" />
-      <HealthHistory history={history} />
-    </Card>
   );
 }
 

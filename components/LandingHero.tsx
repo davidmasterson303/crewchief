@@ -7,6 +7,7 @@ import Link from 'next/link';
 import FeaturesDrawer from './FeaturesDrawer';
 import Logo from '@/components/brand/Logo';
 import { AppStoreCTA } from './AppStoreCTA';
+import { useIsDemoSite } from '@/components/SiteRoleProvider';
 
 /**
  * The pitch that sits on the garage door. Content only.
@@ -42,6 +43,22 @@ interface LandingHeroProps {
 
 export default function LandingHero({ onEnter }: LandingHeroProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  /*
+    ── Which site is asking, decided 22 Aug ──────────────────────────────────
+
+    The two hostnames want different things from a visitor, and until now they
+    asked for the same one. A recruiter arriving at the portfolio piece should
+    be shown the product working; somebody arriving at the product should be
+    asked to use it. "Enter demo" as the primary action on the product host
+    said "this is a demo" more loudly than any tagline could — the CTA *is* the
+    positioning.
+
+    ⚠ The demo does not disappear from the product host, it demotes. "See a
+    sample garage" is a real and useful thing to offer somebody deciding
+    whether to sign up, and removing it would leave the page asking for a
+    commitment with nothing to show first.
+  */
+  const isDemoSite = useIsDemoSite();
 
   return (
     <>
@@ -132,22 +149,61 @@ export default function LandingHero({ onEnter }: LandingHeroProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.25, duration: 0.42, ease: 'easeOut' }}
         >
-          <button
-            onClick={onEnter}
-            className="enter-garage-btn group relative flex items-center justify-center gap-2 h-14 px-9 text-base font-semibold text-black rounded-xl overflow-hidden transition-all duration-300 hover:glow-cyan focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
-            style={{
-              background: 'linear-gradient(105deg, #22d3ee 0%, #38bdf8 50%, #3b82f6 100%)',
-              minWidth: '200px',
-            }}
-          >
-            <span className="shimmer-layer absolute inset-0 pointer-events-none" aria-hidden="true" />
-            <span className="relative z-10 flex items-center gap-2">
-              Enter demo
-              <ArrowRight className="h-5 w-5 transition-transform duration-300 group-hover:translate-x-1.5" />
-            </span>
-          </button>
+          {isDemoSite ? (
+            /*
+              The recruiter host, unchanged. Somebody sent here to look at
+              David's work should land in the working product in one tap, and
+              asking them to create an account first would be asking the wrong
+              person for the wrong thing.
+            */
+            <button
+              onClick={onEnter}
+              className="enter-garage-btn group relative flex items-center justify-center gap-2 h-14 px-9 text-base font-semibold text-black rounded-xl overflow-hidden transition-all duration-300 hover:glow-cyan focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+              style={{
+                background: 'linear-gradient(105deg, #22d3ee 0%, #38bdf8 50%, #3b82f6 100%)',
+                minWidth: '200px',
+              }}
+            >
+              <span className="shimmer-layer absolute inset-0 pointer-events-none" aria-hidden="true" />
+              <span className="relative z-10 flex items-center gap-2">
+                Enter demo
+                <ArrowRight className="h-5 w-5 transition-transform duration-300 group-hover:translate-x-1.5" />
+              </span>
+            </button>
+          ) : (
+            <Link
+              href="/signup"
+              className="enter-garage-btn group relative flex items-center justify-center gap-2 h-14 px-9 text-base font-semibold text-black rounded-xl overflow-hidden transition-all duration-300 hover:glow-cyan focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+              style={{
+                background: 'linear-gradient(105deg, #22d3ee 0%, #38bdf8 50%, #3b82f6 100%)',
+                minWidth: '200px',
+              }}
+            >
+              <span className="shimmer-layer absolute inset-0 pointer-events-none" aria-hidden="true" />
+              <span className="relative z-10 flex items-center gap-2">
+                Add your vehicle
+                <ArrowRight className="h-5 w-5 transition-transform duration-300 group-hover:translate-x-1.5" />
+              </span>
+            </Link>
+          )}
 
           <AppStoreCTA variant="hero" />
+
+          {!isDemoSite && (
+            /*
+              The demo, demoted to a secondary. Same action as the recruiter
+              host's primary — it opens the door — and deliberately worded as
+              what it is rather than as a mode you enter. "See a sample garage"
+              tells somebody who has not signed up what they are about to look
+              at; "Enter demo" tells them what the site is.
+            */
+            <button
+              onClick={onEnter}
+              className="flex items-center justify-center h-14 px-7 text-base font-medium text-white/70 hover:text-white rounded-xl border border-white/[0.14] bg-transparent hover:bg-white/[0.06] transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+            >
+              See a sample garage
+            </button>
+          )}
 
           <Link
             href="/login"
