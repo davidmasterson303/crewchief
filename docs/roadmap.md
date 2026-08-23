@@ -1,6 +1,134 @@
 # CrewChief roadmap — image pipeline, backdrop, cockpit direction, and responsive web
 
-> ### ✅ 22 Aug — START HERE. **Promoted and live.** Install the build; two migrations still waiting.
+> ### ⚠ START HERE — handoff into the device-testing thread
+>
+> Written at the end of the 22 Aug session. **CrewChief is installed and signed in on
+> David's iPhone**, and he is about to test it by hand and make changes. This block is
+> what that thread needs and nothing else; everything below it is history.
+>
+> ---
+>
+> #### The iteration loop — JS is free, native is not
+>
+> ```
+> cd apps/mobile && npx expo start --dev-client      # Metro, on 192.168.12.171:8081
+> ```
+>
+> Phone and Mac on the same Wi-Fi. The installed build is
+> `f7969888` (profile `device`, cut at `fe84c92`) and it is a **development client**, so
+> every JS change — screens, copy, colours, logic — reloads over Metro with **no rebuild**.
+>
+> ⚠ **That means the phone is already newer than the build.** Commits `9a38827` onward
+> (the mobile recall fix) reach it through Metro. Do not read the build's commit as what the
+> phone is running.
+>
+> **A new EAS build is needed only for a native module.** 5 of ~15 iOS builds used this
+> period; resets 31 Aug. Signing is done and correct — distribution certificate and
+> provisioning profile are on the **personal** team `P4873P8FQ9`, with the iPhone's UDID in
+> the profile.
+>
+> ⚠ Two Apple teams exist on the account and App Store Connect **opens on the employer's**.
+> Anything created there is the employer's asset. Check the active team every session.
+>
+> #### ⛔ Three migrations are pending, and one of them is a live defect
+>
+> ```
+> node scripts/check-migrations.mjs --pending
+> ```
+>
+> | | |
+> |---|---|
+> | `20260729060000` | ⛔ **`modification_details.performance_goal` does not exist.** The write fails `42703` |
+> | `20260821140000` | the mod-detail content cache (`mod_detail_cache`) |
+> | `20260822120000` | the sweep heartbeat (`sweep_runs`) |
+>
+> **`20260729060000` is the one that matters.** `generateModificationDetails` upserts
+> `onConflict: 'vehicle_id,mod_name,performance_goal'` against a table without that column,
+> so **every modification analysis has been billed and then discarded since 29 July** — which
+> is why this one call was 89% of all AI spend. The user sees "Failed to save details".
+>
+> ⚠ **Applying `20260821140000` alone would buy nothing.** Its cache write used to sit behind
+> the failing upsert's early return. `341cf68` reorders it so the paid answer is cached
+> first, but the per-vehicle row still cannot save until `20260729060000` lands.
+>
+> ⚠ Expect to hit "Failed to save details" on the phone when opening a modification. **That
+> is this, not a new bug.**
+>
+> The other two pending (`20260104022655`, `20260314143627`) are older drift — the first is a
+> column whose last reader was deleted 7 Aug and which `app/actions.ts` calls droppable.
+>
+> #### What is deployed where
+>
+> ```
+> crewchief.davidmasterson.co        c0873aea   ← the app's API and the App Store URL
+> crewchief-demo.davidmasterson.co   eef03da    ← 26 commits behind, deliberately
+> main                               341cf68, pushed, clean
+> unpromoted                         4 to web-live, 26 to demo-live
+> ```
+>
+> ⚠ `/api/version` reports the **merge** commit, never the `main` commit named in a promote.
+> This has cost real time twice.
+>
+> ⚠ **Before promoting the demo**, `CREWCHIEF_DEMO_SITE=true` must be set on that Netlify
+> site. It is set today, and `promote-demo` now refuses if it is ever not — but the reason it
+> matters is new: since `39f7f0b` the landing CTA is gated on it, and its default is
+> *product*, so an unset variable turns the recruiter site into a signup funnel.
+>
+> #### Known and deliberate — do not re-report these
+>
+> - **Mod details fail to save** — the migration above.
+> - **`VehicleDetailScreen` shows nothing about recalls when a car has none.** Its banner is
+>   behind `recalls > 0`, so "checked, clean" and "never checked" look identical. A silence
+>   rather than a false claim, and **David's design call** — adding an element to that screen
+>   was not something to decide while he was mid-test.
+> - **`ServiceMilestoneScreen` titles both empty states "Nothing due right now"**, though its
+>   body correctly distinguishes "no schedule yet" from "nothing due soon". Mild; same call.
+> - **`verify:mobile` reports PARTIAL, not green.** `MOBILE_TEST_TOKEN` expired 2 Aug, so the
+>   three credentialed checks cannot run. Refreshing it from a signed-in session restores them.
+>
+> #### What this session learned that is not in the code
+>
+> - **The dossier call is 23–30s and costs $0.03–0.04** (two measurements: 4,901 and 4,731
+>   tokens on `gemini-2.5-pro`). **53% of it is thinking**, at a level nobody set —
+>   `proStructuredConfig` has no thinking config. Largest unexamined cost lever left.
+> - **Research completes even when the browser is told it failed.** The request outlives its
+>   response. `b6d05a8` made `research_status` the verdict and the action's return a hint.
+> - **A timeout in the sweep is permanent**, because it writes `failed` and filter 1 never
+>   offers a failed car again. Budget is now 60s there, 30s interactively.
+>
+> #### Next, in order
+>
+> | # | What | Who |
+> |---|---|---|
+> | **1** | Apply the three migrations — `20260729060000` first | **David · one SQL trip** |
+> | **2** | Test on the phone; feedback as screenshots (video cannot be read here) | **David** |
+> | **3** | Decide the two silences above | **David** |
+> | **4** | Measure a thinking level on the dossier against a corpus | Claude Code · needs a spend nod |
+> | **5** | `expo-iap` + store adapter — the last of E8 | Claude Code · costs a build, blocked on ASC products |
+>
+> ⚠ Also David's, unchanged: the reviewer account password rotation, the Paid Applications
+> agreement clearing, and excluding the EU from availability at launch (declared non-trader).
+>
+> #### ⚠ One thing I could not prove
+>
+> The mod-detail write fails `42703` — confirmed against production with a probe that could
+> not write. What is **not** proven is that all 232 metered calls took that path. **If a
+> modification analysis has ever rendered successfully, there is a path I did not find**, and
+> that is worth saying out loud rather than discovering later.
+>
+> #### Proposed, not done: a line for CLAUDE.md §2
+>
+> §2 already says never to state the schema from a file read. It does not name the tool that
+> now answers it, and today that gap cost a live defect its discovery for three weeks:
+>
+> ```
+> node scripts/check-migrations.mjs        # applied / not applied, against the live database
+> ```
+>
+> CLAUDE.md is curated and short on purpose, so this is a proposal rather than an edit.
+>
+
+> ### 22 Aug — promoted and live; the build was installed. **Superseded by the handoff above**, which carries the migration state and the open questions.
 >
 > **The device build is still the priority and still blocked on the same three minutes.**
 > Re-verified twice on 22 Aug, with the Expo token from `.env` so the CLI authenticates:
