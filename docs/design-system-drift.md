@@ -1,7 +1,13 @@
 # Design system ↔ build: drift register
 
-**Raised:** 23 Aug 2026, against the `CrewChief Design System` export (readme v8,
-`tokens.json` v6.0.0 generated 8 Aug).
+**Raised:** 23 Aug 2026 · **last updated:** 23 Aug, after Design's rulings.
+
+**⚠ Before reading a value out of any export, check `$meta.version`.** Design
+added `$meta.$selfCheck` — six identifying values — for exactly this, because a
+stale copy is otherwise invisible: a v2 file says `#0B0E12` where v8 says
+`#100F0D`. The copy this repository was last shown stamps **6.0.0**; Design has
+shipped **8.1.0**. Anything below marked ⬜ was not verifiable against that
+newer file.
 
 This file exists because of a standing instruction from David:
 
@@ -9,10 +15,11 @@ This file exists because of a standing instruction from David:
 > we're intentionally overriding, in which case we need to inform Design to
 > update design system (ie need build and design system to avoid drift)
 
-So: **§1 is for Design to resolve** — places the export contradicts *itself*, which
-the build cannot settle unilaterally. **§2** is what the build changed to match the
-system. **§3** is where the build knowingly differs, with the reason, for Design
-to either bless or overrule. **§4** is the state of the export's own lint rules.
+So: **§1** is the three conflicts and how each was settled — one fixed in the
+export, one fixed in the app, one accepted with its reasoning written down.
+**§2** is what the build changed to match the specs. **§3** is where the build
+knowingly differs, with the reason, for Design to bless or overrule. **§4** is
+the state of the export's own lint rules.
 
 Every claim below was checked against the artefact — the spec file, the token
 file, or the live database — rather than read off a summary. Where something was
@@ -20,64 +27,87 @@ not checkable, it says so.
 
 ---
 
-## 1. The export contradicts itself — Design's call
+## 1. The three conflicts — resolved 23 Aug
 
-These are not build decisions. In each case two files in the same export give
-different answers, and an implementer reaching for the obvious one gets the
-wrong value.
+Design's rulings came back the same day. Two were the export's to fix, one was
+mine to fix, and one was accepted rather than fixed.
 
-### 1.1 The filled primary. `tokens.json` is two versions stale — ⚠ highest impact
+⚠ **The export in this machine's Downloads still stamps `$meta.version` 6.0.0.**
+Design has shipped 8.1.0. So §1.1 and the wording changes in §1.2 are recorded
+here **as reported, not as verified** — checking them needs the new zip. This is
+the first use of the rule Design added for exactly this: check `$meta.version`
+before copying anything out of a token file. It took two seconds and stopped a
+stale copy being read as current.
 
-| Source | Fill | Ink | Stated ratio |
+### 1.1 The filled primary — fixed in the export ⬜ not yet verified here
+
+`tokens.json` never received the pairing the readme's override table decided. It
+kept `#0891B2` and the stale `$rule` justifying it, so **the file that calls
+itself the real token layer was arguing against the readme.**
+
+Now `button: #0E7490` / `onBrandFill: #F2FBFD`, carrying a `$pairing` note
+stating that the fill and the ink move together or not at all, and a `$citation`
+recording that 5.36 was measured against pure white.
+
+The app already shipped that pair, so there is nothing to change here — the
+error was that an implementer importing the token file would have got the
+failing one.
+
+### 1.2 The collision was real, and it was in the **app**, not the export ✅ fixed
+
+I reported this as a conflict between the export and the app. Design's read is
+sharper and correct: **the export never had them equal.** `semantic.attention`
+has always been `#FB923C` and the health ramp's `warn` has always been
+`#E0A468`. What collides in the *system* is the **word** — the `warn` band
+abbreviates to "Attention", so a reviewer meets that word twice in two different
+ambers and reasonably reads one as a bug. Both families now carry an
+anti-collision note naming both hexes.
+
+**What that leaves is a real defect in this repository**, and it was worse than
+one token:
+
+| Token | Was | Is | Note |
 |---|---|---|---|
-| `tokens.json` → `color.brand.button` | `#0891B2` | `#06181C` | — |
-| `readme.md` → Overrides table | **`#0E7490`** | **`#F2FBFD`** | 5.36:1 |
-| Shipped in `apps/mobile/src/theme` | `#0E7490` | `#F2FBFD` | 5.10:1 measured |
+| `status.attention` | `#E0A468` | **`#FB923C`** | `#E0A468` *is* the health ramp's `warn`. Live in eight places. |
+| `status.critical` | `#E08882` | **deleted** | `#E08882` *is* the ramp's `bad`. **Zero call sites** — the critical chip reads `dangerText` (`#F87171`, already the system's value). |
+| `status.attentionWash` | `rgba(251,191,36,…)` | `rgba(251,146,60,0.14)` | amber-400 was a **third** amber in the family; chips drew orange type on a yellow tint. |
+| `status.attentionWashBorder` | `rgba(251,191,36,0.35)` | `rgba(251,146,60,0.35)` | follows the ink. |
 
-`tokens.json` carries a `$rule` explaining that white on `#0891B2` measures
-3.68:1 and fails AA — so it is aware of the problem and still ships the failing
-fill as the token. The readme's override table supersedes it and the app
-implements the readme.
+The docblock above those tokens said they *"happen to share hues with two
+bands"*. They did not share hues — they were the same hex, and the sentence
+asserting otherwise sat directly above the values. That is the shape §5 of
+`CLAUDE.md` is about: a claim that stops the next reader checking.
 
-**Why this one matters more than the others:** `tokens.json` describes itself as
-*"the real RN-consumable token layer, with adoption rules"*, and the readme says
-it *"shipped for real — claimed since v2, never present"*. It is the file an
-implementer is told to import. It is also the only file in the export a build
-could consume mechanically, and it is the one that is wrong.
+Design's reason is the argument for fixing it rather than documenting it: *a
+gauge reading and a status chip are different claims, and sharing a colour makes
+a 61 look like something you can dismiss.* The garage bay had it live — a dial
+reading in warn amber, with a recall chip beside it in the same amber the dial
+uses for Critical.
 
-**Ask:** regenerate `tokens.json` at v8, or mark it superseded in the index.
+`status.critical` was **deleted rather than recoloured**. A dead token holding a
+colliding hex is how a collision comes back.
 
-### 1.2 `semantic.attention` has collided with the health ramp
+⚠ **Now guarded.** `lib/__tests__/status-ramps-distinct.test.ts` fails if any
+status ink equals any health band hex, and separately if the attention wash
+drifts off the attention ink's hue. It samples the ramp through `healthBandHex`
+rather than a private table, and carries its own anti-vacuous case. Mutation-
+tested: restoring `#E0A468` fails it with *"status.attention (#E0A468) is the
+health ramp's warn"*.
 
-| Source | Value |
-|---|---|
-| `tokens.json` → `color.semantic.attention.default` | `#FB923C` |
-| Shipped `status.attention` | `#E0A468` |
+The solid banner pair (`attentionFill` `#4A3308` / `attentionBorder` `#854D0E`)
+is deliberately exempt and stays — this app's own measured values, with white
+already measured on them, documented at the token.
 
-`#E0A468` is **the health band's `warn` hex**, from `color.health.bands` in the
-same token file. So the shipped app uses one value for two things the system
-explicitly separates — `$rules.semanticsAreNotShared` is in `tokens.json` and
-says the ramps are separate on purpose.
+### 1.3 The text ramp — accepted, not fixed ✅ closed
 
-**Ask:** which is the attention colour? If it is `#FB923C`, the app has a real
-fix to make. If the collision is intended, the rule needs an exception written
-into it, because as stated the code is violating it.
+Design's ruling, and it is better than the fix I proposed. Every step below
+primary is `#F5F3F0` at an alpha, so **hue holds at ~36° but chroma collapses
+under 2%**: quiet text composites to neutral grey, not warm. Now documented in
+the export with the composited values.
 
-### 1.3 The text ramp is built on a different white
-
-| Token | `tokens.json` | Shipped |
-|---|---|---|
-| `text.primary` | `#F5F3F0` | `#F5F3F0` ✅ |
-| `text.secondary` | `rgba(245,243,240,0.72)` | `rgba(255,255,255,0.72)` |
-| `text.muted` | `rgba(245,243,240,0.5)` | `rgba(255,255,255,0.5)` |
-
-The app's primary ink is the warm off-white and its secondary and muted inks are
-pure white at the same alphas — so the ramp changes hue as it gets quieter. The
-token file is self-consistent; the app is not.
-
-**Ask:** confirm the warm base, and this becomes a two-line change plus a
-re-measure. Both directions still clear AA, so nothing is failing today — it is
-a coherence defect, which is exactly the class the token layer exists to close.
+The reason not to substitute a solid warm hex is the one that already made
+`border.field` translucent: a hex sampled against one surface goes wrong on the
+other four. Nothing to change in the app.
 
 ---
 
