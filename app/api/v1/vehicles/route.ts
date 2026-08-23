@@ -23,11 +23,50 @@ export const dynamic = 'force-dynamic';
  * storage path into a private bucket, not a URL. It is resolved into
  * `photo_url` and stripped.
  */
+/*
+  ⚠ **`recall_actions` is embedded here as of 23 Aug, and it is what lets the
+  recall chip go down.**
+
+  The bay's chip counted every row in `nhtsa_data.recalls`. Once an owner can
+  mark a campaign repaired, a chip that cannot go down is a chip that stops
+  being read — which is the whole failure mode a permanent red badge has, and
+  the reason `/api/v1/recalls` exists at all.
+
+  An embed rather than a second request: the garage draws N cars, and a
+  per-vehicle call for a list of campaign numbers would be N round trips for
+  something PostgREST returns in the same query. Verified against the live
+  database — `recall_actions.vehicle_id` references `vehicles(id)`, so the
+  relationship resolves and a car with no marks comes back as `[]`.
+
+  ⚠ Keep the comment **outside** the concatenation.
+  `vehicle-detail-not-poorer.test.ts` reads this declaration whole and strips
+  quotes and whitespace, so a block comment between the literals becomes six
+  imaginary column names. It caught exactly that on the first draft of this
+  change.
+
+  ⚠ **The three `next_service_*` columns were missing here until 23 Aug, and
+  that is why every bay read "No schedule yet".**
+
+  `GarageBay` has drawn a next-service row since it was built, with a docblock
+  saying the migration that adds these columns was "written and **not
+  applied**, verified against the live database". That was true when it was
+  written and had stopped being true: the columns exist, and the M235i carries
+  `next_service_label: 'Engine Oil and Filter Change'` at 170,000 miles. Checked
+  against PostgREST rather than against the migrations folder, per §2.
+
+  So the data was there, the component was there, and the **column list was the
+  gap** — the honest-unknown branch was rendering on every car in the product
+  because this string never asked for the answer. Exactly the failure §1 is
+  about: the board said the migration was the blocker, and the artefact said
+  otherwise.
+*/
 const GARAGE_COLUMNS =
   'id,year,make,model,trim,color,current_mileage,image_url,custom_image_url,' +
   'performance_mindedness,ownership_objective,created_at,' +
   'vehicle_status,avg_miles_per_month,focal_point_x,focal_point_y,' +
+  'next_service_label,next_service_at_miles,next_service_due_on,' +
   'nhtsa_data(recalls),' +
+  'recall_actions(campaign_number,addressed_at),' +
   'vehicle_health_summary(health_score,summary,red_flags)';
 
 interface GarageRow {

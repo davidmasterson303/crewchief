@@ -491,8 +491,13 @@ describe('the VIN, which fills the form and never gates it', () => {
     confidence: 'clean' as const,
   };
 
-  async function openVin(user: ReturnType<typeof userEvent.setup>, resolved: Awaited<ReturnType<typeof render>>) {
-    await user.press(resolved.getByLabelText('Fill this in from the VIN'));
+  /*
+    ⚠ No "open the VIN block" step any more. It was a collapsed row until
+    23 Aug; `specs/native-add-vehicle.spec.html` puts the VIN **first**, with
+    year/make/model as a visible fallback under an "or", so the field is on
+    screen from the moment the form is.
+  */
+  async function useVin(user: ReturnType<typeof userEvent.setup>, resolved: Awaited<ReturnType<typeof render>>) {
     await user.type(resolved.getByLabelText('VIN, 17 characters'), 'WBA1J7C51FV253855');
     await user.press(resolved.getByLabelText('Read the car off it'));
   }
@@ -503,7 +508,7 @@ describe('the VIN, which fills the form and never gates it', () => {
 
     const { view } = mount();
     const resolved = await view;
-    await openVin(user, resolved);
+    await useVin(user, resolved);
 
     expect(resolved.getByLabelText('Model year').props.value).toBe('2015');
     expect(resolved.getByLabelText('Make').props.value).toBe('BMW');
@@ -525,7 +530,7 @@ describe('the VIN, which fills the form and never gates it', () => {
     const resolved = await view;
 
     await user.type(resolved.getByLabelText('Model'), 'M235i xDrive');
-    await openVin(user, resolved);
+    await useVin(user, resolved);
 
     expect(resolved.getByLabelText('Model').props.value).toBe('M235i xDrive');
     // Anti-vacuous: the fields it *was* allowed to fill were filled.
@@ -543,7 +548,7 @@ describe('the VIN, which fills the form and never gates it', () => {
 
     const { view } = mount();
     const resolved = await view;
-    await openVin(user, resolved);
+    await useVin(user, resolved);
 
     expect(resolved.getByLabelText('Make').props.value).toBe('BMW');
     expect(JSON.stringify(resolved.toJSON())).toMatch(/check digit does not match/);
@@ -557,7 +562,7 @@ describe('the VIN, which fills the form and never gates it', () => {
 
     const { view } = mount();
     const resolved = await view;
-    await openVin(user, resolved);
+    await useVin(user, resolved);
 
     expect(JSON.stringify(resolved.toJSON())).toMatch(/could not read that VIN/);
     expect(resolved.getByLabelText('Make').props.value).toBe('');
@@ -578,7 +583,6 @@ describe('the VIN, which fills the form and never gates it', () => {
     const { view } = mount();
     const resolved = await view;
 
-    await user.press(resolved.getByLabelText('Fill this in from the VIN'));
     await user.type(resolved.getByLabelText('VIN, 17 characters'), 'WBA1J7C51');
     await user.press(resolved.getByLabelText('Read the car off it'));
 
@@ -593,7 +597,6 @@ describe('the VIN, which fills the form and never gates it', () => {
     const { view } = mount();
     const resolved = await view;
 
-    await user.press(resolved.getByLabelText('Fill this in from the VIN'));
     await user.type(resolved.getByLabelText('VIN, 17 characters'), 'WBA1J7C51FV25385O');
 
     expect(JSON.stringify(resolved.toJSON())).toMatch(/I, O or Q/);

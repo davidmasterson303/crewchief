@@ -176,7 +176,6 @@ export function AddVehicleScreen({ onAdded, onSignOut }: Props) {
     NHTSA flagged still filled the form in, and it is worth saying so without
     painting the screen red about a car that is now correctly described.
   */
-  const [vinOpen, setVinOpen] = useState(false);
   const [vin, setVin] = useState('');
   const [vinBusy, setVinBusy] = useState(false);
   const [vinNote, setVinNote] = useState<{ tone: 'good' | 'warn'; body: string } | null>(null);
@@ -389,11 +388,46 @@ export function AddVehicleScreen({ onAdded, onSignOut }: Props) {
           never opens it — which is the point, because the VIN plate is under
           the windscreen and the person filling this in may be on a sofa.
         */}
-        {vinOpen ? (
-          <View style={styles.vinBlock}>
+        {/*
+          ── The VIN leads, and the fallback is visible under it ──────────────
+
+          ⚠ **This was a collapsed "Have the VIN?" row until 23 Aug**, with
+          year/make/model as the primary form. That inverted
+          `specs/native-add-vehicle.spec.html`, which puts the VIN first and
+          calls year/make/model *"the genuine fallback"* that *"reads as one:
+          no label, just 'or'"*.
+
+          The two arguments looked like they conflicted and do not. This
+          screen's own rule is that **a flow demanding a VIN before showing
+          anything is a flow people abandon** — and the spec never demands one:
+          every field is on one screen, nothing is gated, and the "or" is there
+          precisely so somebody standing away from their car is not stuck. What
+          the spec asks for is *priority*, not a step. Leading with the VIN and
+          keeping the fallback in view satisfies both.
+
+          Still missing against the spec: **"Scan an invoice instead"**, which
+          it places beside the VIN field on the reasoning that a typed VIN and a
+          scanned one are the same fidelity, and the scan returns the service
+          record in the same pass. That needs vehicle extraction with no vehicle
+          to attach to — a new route, and therefore a `web-live` promote (§8).
+          Recorded in `docs/design-system-drift.md` rather than left implicit.
+        */}
+        <Text style={styles.vinLead}>
+          A VIN gets the exact build — engine, trim, factory options, and every recall filed
+          against it.
+        </Text>
+
+        <View style={styles.vinBlock}>
             <Field
               label="VIN"
               hint={`${VIN_LENGTH} characters`}
+              /*
+                The spec's own words, and they are worth keeping verbatim: most
+                people do not know where a VIN is printed, and "enter your VIN"
+                with no answer to that is a dead end for anyone not already
+                holding their insurance card.
+              */
+              placeholder="On the door jamb, the windscreen, or your insurance card"
               value={vin}
               /*
                 Normalised on the way in, so a VIN read aloud in groups — or
@@ -428,17 +462,18 @@ export function AddVehicleScreen({ onAdded, onSignOut }: Props) {
                 {vinNote.body}
               </Text>
             ) : null}
-          </View>
-        ) : (
-          <Pressable
-            onPress={() => setVinOpen(true)}
-            accessibilityRole="button"
-            accessibilityLabel="Fill this in from the VIN"
-            style={({ pressed }) => [styles.vinOffer, pressed && styles.vinOfferPressed]}
-          >
-            <Text style={styles.vinOfferText}>Have the VIN? Fill this in from it</Text>
-          </Pressable>
-        )}
+        </View>
+
+        {/*
+          The fallback, and the spec is specific that it "reads as one: no
+          label, just 'or'". A heading here — "Or enter the details" — would
+          make it a second form rather than the same form's other end.
+        */}
+        <View style={styles.orRow}>
+          <View style={styles.orRule} />
+          <Text style={styles.orText}>or</Text>
+          <View style={styles.orRule} />
+        </View>
 
         {/*
           `Field`, and the visible labels are the upgrade.
@@ -684,17 +719,6 @@ const styles = StyleSheet.create({
     section of it. The collapsed offer is deliberately quiet: it is worth
     finding and it is not the thing this screen is asking for.
   */
-  vinOffer: {
-    minHeight: TARGET_MIN,
-    justifyContent: 'center',
-    paddingHorizontal: space.md,
-    borderRadius: radius.button,
-    borderWidth: 1,
-    borderColor: border.field,
-    backgroundColor: surface.well,
-  },
-  vinOfferPressed: { backgroundColor: surface.raised },
-  vinOfferText: { ...type.uiStrong, color: text.secondary },
   vinBlock: {
     gap: space.md,
     padding: space.md,
@@ -712,6 +736,14 @@ const styles = StyleSheet.create({
     like a failure. Only the warn tone changes colour, because only it is
     asking for something.
   */
+  vinLead: { ...type.body, color: text.secondary },
+  /*
+    A rule, a word, a rule. `border.panel` rather than `border.field`: this
+    separates two halves of one form, it is not the edge of a control.
+  */
+  orRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginVertical: space.sm },
+  orRule: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: border.panel },
+  orText: { ...type.label, letterSpacing: 0, color: text.muted },
   vinNote: { ...type.value, color: text.secondary, lineHeight: 18 },
   vinNoteWarn: { color: status.attention },
 

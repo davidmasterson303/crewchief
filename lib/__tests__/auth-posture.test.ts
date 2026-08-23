@@ -186,6 +186,18 @@ const ROUTE_POSTURE: Record<
   'app/api/internal/apple-notifications/route.ts': 'signature-gated',
   'app/api/v1/vehicles/route.ts': 'session',
   /*
+    Recall marking, 23 Aug. 'vehicle-scoped' — every handler resolves through
+    `authorizeVehicleAccess`, and the two mutations ask for `intent: 'write'`
+    specifically so a demo vehicle is refused rather than silently written to.
+
+    It is the one route in the product where a write is a claim about a **safety
+    defect**, which is why the posture matters more here than the shape of the
+    row: an unscoped write would let one account clear a recall on another
+    account's car. `recall-marking.test.ts` asserts the order — authorization
+    runs before the body is read.
+  */
+  'app/api/v1/recalls/route.ts': 'vehicle-scoped',
+  /*
     Account deletion, App Store 5.1.1(v). 'session' rather than
     'vehicle-scoped': the resource is the caller themselves, so there is no
     vehicle to authorize and `requireSession` inside `deleteAccount` is the

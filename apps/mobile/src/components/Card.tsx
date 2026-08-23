@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, type ViewStyle } from 'react-native';
+import { View, Text, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 
 import { border, radius, space, surface, text, type } from '../theme';
 
@@ -30,7 +30,15 @@ export default function Card({
   footnote?: string;
   /** Use inside another panel, where the base surface would vanish. */
   elevated?: boolean;
-  style?: ViewStyle;
+  /**
+   * ⚠ `StyleProp<ViewStyle>`, not `ViewStyle`.
+   *
+   * Widened 23 Aug so a caller can pass `[base, conditional && extra]`, which is
+   * how every other component in this app expresses a conditional style. The
+   * narrow type forced call sites to pre-flatten, and a call site that flattens
+   * by hand is one merge order away from a style that silently loses.
+   */
+  style?: StyleProp<ViewStyle>;
   children?: React.ReactNode;
 }) {
   return (

@@ -66,11 +66,20 @@ export interface BayVehicle {
   /**
    * The three stored next-service columns, when the sweep has written them.
    *
-   * ⚠ Optional at the type level and absent in the product today: the migration
-   * that adds these columns is written and **not applied**, verified against the
-   * live database rather than read off the folder. Until it lands and a sweep
-   * runs, every car takes the unknown branch — which is exactly why that branch
-   * had to be designed before the row shipped rather than discovered after.
+   * ⚠ **This docblock was wrong until 23 Aug, and the way it was wrong is the
+   * reason §1 exists.** It said the migration was "written and **not applied**,
+   * verified against the live database" — true when written, and false by the
+   * time anyone read it. The columns are applied and carry data.
+   *
+   * What was actually missing was the **route's column list**: neither
+   * `GARAGE_COLUMNS` nor `VEHICLE_COLUMNS` selected them, so the payload never
+   * carried an answer and every car in the product rendered the unknown branch.
+   * A note naming the wrong blocker is worse than no note — it sends the next
+   * reader to write a migration that already ran.
+   *
+   * Still optional, and the unknown branch still matters: the sweep has not
+   * written a row for every car, and "we have not worked it out" is a real
+   * answer that must not render as "nothing is due".
    */
   next_service_label?: string | null;
   next_service_at_miles?: number | null;
