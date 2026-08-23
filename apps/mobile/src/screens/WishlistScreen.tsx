@@ -323,12 +323,17 @@ export function WishlistScreen({ vehicleId, onSignOut, onAdd }: Props) {
           one thing on a screen with nothing on it — which reads as indecision
           rather than helpfulness.
         */
+        /*
+          ⚠ No action here, and that is the fix rather than an omission.
+
+          It carried a "See suggestions" button while the nav bar's + does the
+          same thing two inches above it — David's "redundant CTA". The spec is
+          explicit that Add lives in the nav bar, so the button is the one that
+          goes, and the copy names the control that stays.
+        */
         <EmptyState
           headline="Nothing on the list yet"
-          body="Tap + to see what we already know this car needs — its known issues, its schedule, and the usual modifications. You can add anything of your own too."
-          actionLabel="See suggestions"
-          actionAccessibilityLabel="See what this car needs"
-          onAction={onAdd}
+          body="Tap + above to see what we already know this car needs — its known issues, its schedule, and the usual modifications. You can add anything of your own too."
         />
       ) : (
         state.items.map((item, index) => (

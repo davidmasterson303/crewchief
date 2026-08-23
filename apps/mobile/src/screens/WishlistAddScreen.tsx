@@ -250,11 +250,24 @@ export function WishlistAddScreen({ vehicleId, title, onSignOut, onAskAdvisor, o
   const exactMatch = shown.some((s) => s.name.toLowerCase() === typed.toLowerCase());
 
   return (
-    <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+    /*
+      ── ⚠ The filter stays put ────────────────────────────────────────────────
+
+      It scrolled away with the list, which is backwards for a control whose
+      whole job is to shorten that list: by the time you have scrolled far
+      enough to want it, it is off screen, and you scroll back up to reach the
+      thing that would have saved you the scrolling.
+
+      Outside the scroller rather than `stickyHeaderIndices`, deliberately.
+      Sticky headers on a `ScrollView` with `keyboardShouldPersistTaps` behave
+      inconsistently on Android when the keyboard resizes the frame, and this
+      control is a text input — the one case where that matters most.
+    */
+    <View style={styles.screen}>
       {problem && <AlertBanner tone="critical" headline="That was not added" body={problem} />}
 
       {/* The filter. It is also the free-text field — see the header. */}
-      <View style={styles.search}>
+      <View style={[styles.search, styles.searchPinned]}>
         <Icon name="search" size={17} />
         <TextInput
           style={styles.input}
@@ -278,6 +291,7 @@ export function WishlistAddScreen({ vehicleId, title, onSignOut, onAskAdvisor, o
         )}
       </View>
 
+      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
       {state.suggestions.length === 0 ? (
         /*
           Nothing known, rather than nothing to suggest. The knowledge base
@@ -383,12 +397,20 @@ export function WishlistAddScreen({ vehicleId, title, onSignOut, onAskAdvisor, o
           it above.
         </Text>
       )}
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: surface.page },
   body: { padding: space.lg, gap: space.lg, paddingBottom: space.h2 },
+  /* Pinned above the scroller, on the page's own surface so nothing shows through. */
+  searchPinned: {
+    marginHorizontal: space.lg,
+    marginTop: space.lg,
+    marginBottom: space.sm,
+  },
   centre: {
     flex: 1,
     alignItems: 'center',

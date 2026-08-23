@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import Icon, { type IconName } from './Icon';
-import { TABULAR, TARGET_MIN, border, space, surface, text, type } from '../theme';
+import { TABULAR, border, space, surface, text, type } from '../theme';
 
 /**
  * A place to go, in a list of places to go.
@@ -63,7 +63,7 @@ export default function NavRow({
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
     >
       <View style={styles.glyph}>
-        <Icon name={icon} size={17} />
+        <Icon name={icon} size={19} color={text.secondary} />
       </View>
 
       {/*
@@ -86,32 +86,42 @@ export default function NavRow({
         </View>
 
         {count ? (
-          <Text style={styles.count} numberOfLines={1}>
+          <Text style={styles.count} numberOfLines={1} ellipsizeMode="tail">
             {count}
           </Text>
         ) : null}
 
-        <Icon name="chevron-right" size={16} color={text.nonText} />
+        <Icon name="chevron-right" size={18} color={text.secondary} />
       </View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  /*
-    No vertical padding here and no divider — both belong to `body`, so the
-    pressed fill covers the whole row including the glyph column while the rule
-    stays inset. `minHeight` still clears the 44pt floor on the row itself.
-  */
+  /**
+   * No vertical padding and no divider here — both belong to `body`, so the
+   * pressed fill covers the whole row including the glyph column while the rule
+   * stays inset.
+   *
+   * ⚠ 56, not 44.
+   *
+   * The floor is 44 and these were sitting on it, next to a 52pt filled
+   * primary. David, 23 Aug: *"why are these buttons so much smaller than 'ask
+   * the advisor'… 'ask the advisor' looks like a cta, the others don't by
+   * comparison."* He is right, and the comparison is the point — a row that
+   * clears the minimum is not the same as a row that looks like somewhere to
+   * go. The spec draws these compact; on a real device against a real CTA they
+   * read as caption text. Logged in `docs/design-system-drift.md`.
+   */
   row: {
-    minHeight: TARGET_MIN,
+    minHeight: 56,
     flexDirection: 'row',
     alignItems: 'stretch',
-    paddingLeft: space.md,
+    paddingLeft: space.lg,
   },
   pressed: { backgroundColor: surface.well },
   /** Fixed width so every label in the group starts on the same x. */
-  glyph: { width: 30, justifyContent: 'center' },
+  glyph: { width: 32, justifyContent: 'center' },
   body: {
     flex: 1,
     flexDirection: 'row',
@@ -124,19 +134,31 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: border.panel,
   },
-  labelBlock: { flex: 1, gap: 2 },
   /**
-   * ⚠ `type.ui` at primary, not `type.bodyStrong`.
+   * ⚠ `flexShrink: 0` — the label never gives up its width.
    *
-   * The first version set these at 16/600, which is a heading weight — five of
-   * them stacked read as five headings rather than as a list. The spec's rows
-   * are the 14pt control step, and the ink alone carries that they are live.
+   * "Service due" rendered as **"Se…"** on the device, because the count beside
+   * it was the whole next-service sentence and both were free to shrink. The
+   * label is the destination's name; it is the one thing on the row that must
+   * survive. The count is supplementary and truncates instead.
    */
-  label: { ...type.uiStrong, color: text.primary },
+  labelBlock: { flexShrink: 0, gap: 2 },
+  /**
+   * ⚠ 16/600, and this went round twice.
+   *
+   * It shipped at 16 first, was dropped to the spec's 14pt control step on the
+   * reasoning that five 16pt rows read as five headings, and came back to 16 on
+   * 23 Aug — because on a device, beside a filled primary, 14pt read as caption
+   * text rather than as somewhere to go. The "five headings" worry was real and
+   * is answered by the row height and the icon column instead, which give the
+   * group structure the type no longer has to supply.
+   */
+  label: { ...type.bodyStrong, color: text.primary },
   detail: { ...type.value, color: text.muted },
   /*
     Tabular, because these are counts and money and they must not reflow as
     their digits change — the same rule the mileage row follows.
   */
-  count: { ...type.value, ...TABULAR, color: text.muted, textAlign: 'right' },
+  /* Takes the slack and truncates, so the label never has to. */
+  count: { ...type.value, ...TABULAR, color: text.muted, textAlign: 'right', flex: 1 },
 });

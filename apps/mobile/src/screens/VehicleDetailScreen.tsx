@@ -50,8 +50,8 @@ import {
   heroBands,
   identityBlockHeight,
 } from '../theme/hero-motion';
-import { border, brand, hero, plinth, radius, space, surface, text, type } from '../theme';
-import { getHealthBandJudgement } from '@crewchief/core/health-band';
+import { TABULAR, border, brand, hero, plinth, radius, space, surface, text, type } from '../theme';
+import { getHealthBandJudgement, healthBandHex } from '@crewchief/core/health-band';
 
 /*
   ⚠ `PHOTO_HERO = 196` is gone. The hero is no longer a band with a number on
@@ -638,8 +638,15 @@ export function VehicleDetailScreen({
     for it. Never "0": a row reading "Wishlist 0" claims the list is empty,
     which is a statement a failed request has not earned. See `HubCounts`.
   */
-  const serviceDue =
-    nextService.kind === 'known' ? `${nextService.service} · ${nextService.timing}` : UNKNOWN_TIMING;
+  /*
+    ⚠ The **timing** only, not the service name.
+
+    It read "Engine Oil & Filter Change · in 4,000 mi", which is a sentence in a
+    slot sized for a number — it squeezed the row's own label down to "Se…".
+    The service is named on the screen this row opens; what belongs here is
+    when.
+  */
+  const serviceDue = nextService.kind === 'known' ? nextService.timing : UNKNOWN_TIMING;
 
   const historyCount =
     counts.services === null ? null : `${counts.services}`;
@@ -867,8 +874,33 @@ export function VehicleDetailScreen({
         account of it; a second copy of the reading on the same screen would be
         the duplication the hero exists to remove.
       */}
-      {score !== null && band && (health?.summary || true) && (
+      {score !== null && band && (
         <Card>
+          {/*
+            ── ⚠ The card carries the score it is explaining ──────────────────
+
+            David, 23 Aug: *"I don't like that driving score details are still
+            visible after the user can no longer see the actual score — on
+            scroll, the score exits the viewport well earlier than the
+            description."*
+
+            The dial is on the hero and the chip is in the nav, so the number
+            never technically leaves — but neither is *beside the sentence about
+            it* by the time the sentence is on screen. A paragraph explaining a
+            reading you have to look away to find is a paragraph about nothing.
+
+            So the reading is repeated here at the value size, in the band
+            colour, with the verdict beside it. Three appearances of one number
+            sounds like a lot and is not: only two are ever visible at once, at
+            different scales and doing different jobs — the dial is the
+            instrument, the chip is chrome, and this is the subject of the
+            paragraph under it.
+          */}
+          <View style={styles.scoreHead}>
+            <Text style={[styles.scoreValue, { color: healthBandHex(band) }]}>{score}</Text>
+            <Text style={[styles.scoreBand, { color: healthBandHex(band) }]}>{band.label}</Text>
+          </View>
+
           {health?.summary ? <Text style={styles.summary}>{health.summary}</Text> : null}
           <NavRow icon="gauge" label="What is driving this score" onPress={onOpenHealth} last />
         </Card>
@@ -1178,6 +1210,14 @@ const styles = StyleSheet.create({
   dial: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   verdict: { ...type.label, color: text.muted, marginTop: space.xs, textAlign: 'center' },
   dialChip: { position: 'absolute', right: space.lg, alignItems: 'flex-end' },
+
+  /*
+    The reading, at the value size rather than the instrument's. Tabular so it
+    does not shift as the score moves between sweeps.
+  */
+  scoreHead: { flexDirection: 'row', alignItems: 'baseline', gap: space.sm },
+  scoreValue: { ...type.editorial, fontSize: 30, lineHeight: 34, ...TABULAR },
+  scoreBand: { ...type.label, color: text.muted },
 
   body: { padding: space.lg, gap: space.md },
 

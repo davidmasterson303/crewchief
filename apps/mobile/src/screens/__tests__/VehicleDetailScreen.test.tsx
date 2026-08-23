@@ -416,8 +416,21 @@ describe('what this screen leads to stays reachable', () => {
       and the chip it hands off to are both mounted the whole way, staggered by
       opacity. Two drawings, one crossfade — never a morph.
     */
+    /*
+      ⚠ **Three**, and each does a different job at a different scale — the
+      instrument, the chrome, and the subject of a paragraph.
+
+      The card's header was added on 23 Aug because the score's *explanation*
+      outlived the score on screen: by the time the summary is readable the dial
+      has drifted and only the chip remains, and a paragraph about a reading you
+      have to look away to find is a paragraph about nothing.
+
+      Only two are ever visible at once — the dial and the card at rest, the
+      chip and the card once scrolled — which is why this is not the duplication
+      the hero was built to remove.
+    */
     const readouts = await view.findAllByText('61');
-    expect(readouts).toHaveLength(2);
+    expect(readouts).toHaveLength(3);
 
     /*
       ⚠ The readout's size is derived from the variant and the width inside
@@ -430,7 +443,8 @@ describe('what this screen leads to stays reachable', () => {
       nodes, which `getByText` never matches — so it passed for both variants
       and proved nothing. §5's own rule, found in this file.
     */
-    expect(readoutSizes(readouts).sort((a, b) => a - b)).toEqual([16, 20]);
+    // chip 16 · hero dial at 132 gives 20 · the card's own header 30.
+    expect(readoutSizes(readouts).sort((a, b) => a - b)).toEqual([16, 20, 30]);
   });
 
   it('takes the compact branch on the shortest display', async () => {
@@ -440,7 +454,7 @@ describe('what this screen leads to stays reachable', () => {
     await view.findAllByText(/2018 Honda Accord/);
     // 104 at the card variant gives a 36pt readout, against the hero's 20.
     const readouts = await view.findAllByText('61');
-    expect(readoutSizes(readouts).sort((a, b) => a - b)).toEqual([16, 36]);
+    expect(readoutSizes(readouts).sort((a, b) => a - b)).toEqual([16, 30, 36]);
   });
 });
 

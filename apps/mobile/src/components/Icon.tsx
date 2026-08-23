@@ -191,8 +191,14 @@ export default function Icon({
       importantForAccessibility="no-hide-descendants"
     >
       {ICONS[name].map((element, index) => {
+        /*
+          ⚠ `key` is passed explicitly below, never through this spread. React
+          19 warns — "a props object containing a `key` prop is being spread
+          into JSX" — and it is right to: a spread `key` is not read as a key,
+          so the whole icon silently loses its reconciliation identity. It was
+          on screen in the 23 Aug device build.
+        */
         const common = {
-          key: index,
           stroke: color,
           strokeWidth: stroke,
           strokeLinecap: 'round' as const,
@@ -201,11 +207,12 @@ export default function Icon({
         };
 
         if (element.tag === 'circle') {
-          return <Circle {...common} cx={element.cx} cy={element.cy} r={element.r} />;
+          return <Circle key={index} {...common} cx={element.cx} cy={element.cy} r={element.r} />;
         }
         if (element.tag === 'rect') {
           return (
             <Rect
+              key={index}
               {...common}
               x={element.x}
               y={element.y}
@@ -216,9 +223,9 @@ export default function Icon({
           );
         }
         if (element.tag === 'polyline') {
-          return <Polyline {...common} points={element.points} />;
+          return <Polyline key={index} {...common} points={element.points} />;
         }
-        return <Path {...common} d={element.d} />;
+        return <Path key={index} {...common} d={element.d} />;
       })}
     </Svg>
   );

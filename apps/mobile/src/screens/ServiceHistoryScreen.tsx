@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 
@@ -23,7 +24,8 @@ import {
   type ServiceRecord,
 } from '@crewchief/core/service-record';
 import { formatCurrency } from '@crewchief/core/formatting-utils';
-import { border, radius, status, surface, text } from '../theme';
+import Icon from '../components/Icon';
+import { FIELD_FONT_MIN, TARGET_MIN, border, radius, space, status, surface, text, type } from '../theme';
 import { interFace } from '../theme/fonts';
 
 /**
@@ -79,6 +81,7 @@ type State =
 export function ServiceHistoryScreen({ vehicleId, onSignOut }: Props) {
   const [state, setState] = useState<State>({ kind: 'loading' });
   const [refreshing, setRefreshing] = useState(false);
+  const [filter, setFilter] = useState('');
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -209,13 +212,78 @@ export function ServiceHistoryScreen({ vehicleId, onSignOut }: Props) {
 
   const { total, counted } = totalRecorded(state.records);
 
+  /*
+    ── ⚠ Filtered here, not on the server ────────────────────────────────────
+
+    A service history is tens of rows, already on the device, and the whole
+    list is in memory the moment the screen loads. A round trip per keystroke
+    would be latency bought for nothing — the same argument the wishlist's
+    catalogue makes, and the opposite of the add-a-car screen's model list,
+    which genuinely lives at NHTSA.
+
+    It matches the shop and the date as well as the description, because "what
+    did that garage do" and "what happened in March" are the two questions
+    somebody actually opens this screen with.
+  */
+  const query = filter.trim().toLowerCase();
+  const shown = query
+    ? state.records.filter((record) =>
+        [record.item_description, record.shop_name, record.service_date]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+          .includes(query)
+      )
+    : state.records;
+
+  /*
+    How many rows came off each scanned invoice.
+
+    ⚠ This is what the payload can honestly say about a document. The invoice
+    itself is a stored file behind a signed URL, and reaching it needs a route
+    this app does not have — so the row says which invoice it came from and how
+    much else came with it, rather than offering to open something it cannot.
+  */
+  const perDocument = new Map<string, number>();
+  for (const record of state.records) {
+    const id = record.source_document_id;
+    if (id) perDocument.set(id, (perDocument.get(id) ?? 0) + 1);
+  }
+
   return (
     <ScrollView
       contentContainerStyle={styles.body}
+      keyboardShouldPersistTaps="handled"
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} tintColor={text.muted} />
       }
     >
+      {state.records.length > 0 && (
+        <View style={styles.search}>
+          <Icon name="search" size={17} />
+          <TextInput
+            style={styles.searchInput}
+            value={filter}
+            onChangeText={setFilter}
+            placeholder="Search by job, shop or date"
+            placeholderTextColor={text.muted}
+            accessibilityLabel="Search this service history"
+            autoCorrect={false}
+            returnKeyType="search"
+          />
+          {filter.length > 0 && (
+            <Pressable
+              onPress={() => setFilter('')}
+              accessibilityRole="button"
+              accessibilityLabel="Clear the search"
+              style={styles.searchClear}
+            >
+              <Icon name="x" size={16} />
+            </Pressable>
+          )}
+        </View>
+      )}
+
       {state.records.length === 0 ? (
         /*
           No action: this screen has no navigation callbacks — only a vehicle
@@ -231,7 +299,9 @@ export function ServiceHistoryScreen({ vehicleId, onSignOut }: Props) {
         <>
           <View style={styles.summary}>
             <Text style={styles.summaryCount}>
-              {state.records.length} {state.records.length === 1 ? 'service' : 'services'}
+              {query
+                ? `${shown.length} of ${state.records.length}`
+                : `${state.records.length} ${state.records.length === 1 ? 'service' : 'services'}`}
             </Text>
             {counted > 0 && (
               <Text style={styles.summaryCost}>
@@ -250,9 +320,30 @@ export function ServiceHistoryScreen({ vehicleId, onSignOut }: Props) {
             )}
           </View>
 
-          {state.records.map((record, index) => {
+          {shown.length === 0 && (
+            <Text style={styles.noMatch}>
+              Nothing matches “{filter.trim()}”. Clear the search to see all{' '}
+              {state.records.length}.
+            </Text>
+          )}
+
+          {shown.map((record, index) => {
             const provenance = recordSourceLabel(record.source);
             const meta = describeRecord(record);
+
+            /*
+              ⚠ How many rows came off the same invoice — not a link to it.
+
+              The document is a stored file behind a signed URL and there is no
+              route on this app that mints one, so offering to "view the
+              invoice" would be a control that cannot work. What the payload
+              genuinely knows is which scan a row came from and what else came
+              with it, and that is what it says. Opening the file itself needs a
+              route, and a route needs a promote.
+            */
+            const siblings = record.source_document_id
+              ? (perDocument.get(record.source_document_id) ?? 1)
+              : 0;
 
             return (
               <Card key={record.id ?? `${record.item_description}-${index}`} style={styles.cardGap}>
@@ -274,6 +365,7 @@ export function ServiceHistoryScreen({ vehicleId, onSignOut }: Props) {
                       ]}
                     >
                       {provenance}
+                      {siblings > 1 ? ` · 1 of ${siblings} from that invoice` : ''}
                     </Text>
                   ) : (
                     <View />
@@ -305,6 +397,25 @@ export function ServiceHistoryScreen({ vehicleId, onSignOut }: Props) {
   the provenance line — which is the one a reader most needs to be able to read.
 */
 const styles = StyleSheet.create({
+  noMatch: { ...type.body, color: text.secondary, paddingVertical: space.md },
+  /* Pinned nothing — it scrolls with the list, which is short. See the filter's note. */
+  search: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    minHeight: TARGET_MIN,
+    paddingHorizontal: space.md,
+    borderRadius: radius.well,
+    borderWidth: 1,
+    borderColor: border.field,
+    backgroundColor: surface.well,
+    marginBottom: space.sm,
+  },
+  /** Pinned at the field floor: under 16px iOS zooms on focus and never back. */
+  searchInput: { flex: 1, color: text.primary, fontSize: FIELD_FONT_MIN, paddingVertical: space.sm },
+  searchClear: { minHeight: TARGET_MIN, justifyContent: 'center', paddingLeft: space.xs },
+  /** How many other rows came off the same scanned invoice. */
+  fromInvoice: { ...type.label, letterSpacing: 0, color: text.muted },
   body: { padding: 20, gap: 12, paddingBottom: 40 },
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 10 },
 
