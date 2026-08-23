@@ -1,7 +1,8 @@
-import { render, userEvent } from '@testing-library/react-native';
+import { act, render, userEvent } from '@testing-library/react-native';
 
 import { AddVehicleScreen } from '../AddVehicleScreen';
 import { apiRequest, ApiRequestError } from '../../api/client';
+import { decodeVin, fetchModels } from '../../api/vpic';
 
 /**
  * What the first-run screen actually sends.
@@ -49,7 +50,22 @@ jest.mock('../../api/client', () => {
   return { ...actual, apiRequest: jest.fn() };
 });
 
+/*
+  vPIC is a third party over a network, and this suite is about what the screen
+  does with what it says. Stubbed at the module that owns the two calls —
+  `api/vpic.ts` — rather than at `fetch`, so these cases assert the screen's
+  behaviour and `vehicle-catalog.test.ts` asserts the parsing. Splitting them
+  is what keeps a change to NHTSA's JSON shape from failing fifteen tests about
+  something else.
+*/
+jest.mock('../../api/vpic', () => ({
+  decodeVin: jest.fn().mockResolvedValue(null),
+  fetchModels: jest.fn().mockResolvedValue([]),
+}));
+
 const mockApi = apiRequest as jest.MockedFunction<typeof apiRequest>;
+const mockDecode = decodeVin as jest.MockedFunction<typeof decodeVin>;
+const mockModels = fetchModels as jest.MockedFunction<typeof fetchModels>;
 
 function mount(overrides: Partial<Parameters<typeof AddVehicleScreen>[0]> = {}) {
   const props = { onAdded: jest.fn(), onSignOut: jest.fn(), ...overrides };
@@ -70,6 +86,8 @@ async function fillTheCar(
 
 beforeEach(() => {
   mockApi.mockReset();
+  mockDecode.mockReset().mockResolvedValue(null);
+  mockModels.mockReset().mockResolvedValue([]);
 });
 
 describe('adding a car', () => {
@@ -330,5 +348,255 @@ describe('when the request fails', () => {
 
     expect(props.onAdded).not.toHaveBeenCalled();
     expect(JSON.stringify((await view).toJSON())).toMatch(/not saved/i);
+  });
+});
+
+/**
+ * ── The catalogue, added 23 Aug ─────────────────────────────────────────────
+ *
+ * Everything above this line was already true of three free-text cells. These
+ * cases are about the defect those cells could not see: a value that is
+ * *accepted* and *wrong*, which produces a car with no recalls, no dossier and
+ * no schedule and looks like a product that knows nothing rather than a typo.
+ */
+describe('naming the car', () => {
+  it('sends the catalogue spelling, not the one that was typed', async () => {
+    /*
+      ⚠ The whole reason the catalogue exists. "bmw" is a different make from
+      "BMW" to every join downstream, and the old form sent it verbatim.
+    */
+    const user = userEvent.setup();
+    mockApi.mockResolvedValue({ vehicle: { id: 'v9' } } as never);
+
+    const { props, view } = mount();
+    const resolved = await view;
+
+    await user.type(resolved.getByLabelText('Model year'), '2015');
+    await user.type(resolved.getByLabelText('Make'), 'bmw');
+    await user.type(resolved.getByLabelText('Model'), 'M235i');
+    await user.type(resolved.getByLabelText('Current mileage'), '66000');
+    await user.press(resolved.getByLabelText('Add to my garage'));
+
+    expect(mockApi.mock.calls[0][1]?.body).toMatchObject({ year: 2015, make: 'BMW' });
+    // And into the title the garage shows while the detail screen loads.
+    expect(props.onAdded).toHaveBeenCalledWith('v9', '2015 BMW M235i');
+  });
+
+  it('leaves a make it has never heard of exactly as it was typed', async () => {
+    /*
+      The pair to the case above, and the one that makes it a catalogue rather
+      than a gate — §10. A form that only accepted its own list would refuse
+      every grey import and kit car on the road.
+    */
+    const user = userEvent.setup();
+    mockApi.mockResolvedValue({ vehicle: { id: 'v10' } } as never);
+
+    const { view } = mount();
+    const resolved = await view;
+
+    await user.type(resolved.getByLabelText('Model year'), '1994');
+    await user.type(resolved.getByLabelText('Make'), 'Koenigsegg');
+    await user.type(resolved.getByLabelText('Model'), 'CC');
+    await user.type(resolved.getByLabelText('Current mileage'), '4200');
+    await user.press(resolved.getByLabelText('Add to my garage'));
+
+    expect(mockApi.mock.calls[0][1]?.body).toMatchObject({ make: 'Koenigsegg', model: 'CC' });
+  });
+
+  it('offers makes as they are typed, and taking one clears the model under it', async () => {
+    /*
+      A model belongs to a make. An Accord left sitting under Subaru because the
+      make was corrected is the one state this form must never submit: it
+      typechecks, it looks filled in, and it creates a car that does not exist.
+    */
+    const user = userEvent.setup();
+    const { view } = mount();
+    const resolved = await view;
+
+    await user.type(resolved.getByLabelText('Model'), 'Accord');
+    await user.type(resolved.getByLabelText('Make'), 'suba');
+    await user.press(resolved.getByLabelText('Subaru, use as make'));
+
+    expect(resolved.getByLabelText('Make').props.value).toBe('Subaru');
+    expect(resolved.getByLabelText('Model').props.value).toBe('');
+  });
+
+  it('says what a model year can be, and will not send one that cannot', async () => {
+    // "205" and "20155" both passed the old four-character check, and the
+    // second one only because it was truncated.
+    const user = userEvent.setup();
+    const { view } = mount();
+    const resolved = await view;
+
+    await user.type(resolved.getByLabelText('Model year'), '2055');
+    await user.type(resolved.getByLabelText('Make'), 'Honda');
+    await user.type(resolved.getByLabelText('Model'), 'Accord');
+
+    expect(JSON.stringify(resolved.toJSON())).toMatch(/Model years run from 1981/);
+
+    await user.press(resolved.getByLabelText('Add to my garage'));
+    expect(mockApi).not.toHaveBeenCalled();
+  });
+
+  it('asks vPIC for models once a year and a make are both settled', async () => {
+    /*
+      Both, not either. vPIC's model list is keyed on the pair, and asking with
+      one of them missing is a request that can only answer nothing.
+    */
+    jest.useFakeTimers();
+    try {
+      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      mockModels.mockResolvedValue(['M235i', 'X5']);
+
+      const { view } = mount();
+      const resolved = await view;
+
+      await user.type(resolved.getByLabelText('Make'), 'BMW');
+      // A make on its own is not enough to ask about.
+      expect(mockModels).not.toHaveBeenCalled();
+
+      await user.type(resolved.getByLabelText('Model year'), '2015');
+      await act(async () => {
+        jest.advanceTimersByTime(400);
+      });
+
+      expect(mockModels).toHaveBeenCalledWith('BMW', 2015, expect.anything());
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('says why a model list is empty rather than sitting blank', async () => {
+    /*
+      Three causes an owner can tell apart, and only one is a dead end. ⚠ And
+      the dead end still claims nothing about the car — NHTSA not listing a
+      model is a fact about NHTSA.
+    */
+    const user = userEvent.setup();
+    const { view } = mount();
+    const resolved = await view;
+
+    await user.type(resolved.getByLabelText('Model'), 'W');
+    expect(JSON.stringify(resolved.toJSON())).toMatch(/Pick a model year and a make/);
+  });
+});
+
+describe('the VIN, which fills the form and never gates it', () => {
+  /** A clean decode, as `parseVpicDecode` returns one. */
+  const M235I = {
+    year: 2015,
+    make: 'BMW',
+    model: 'M235i',
+    trim: null,
+    confidence: 'clean' as const,
+  };
+
+  async function openVin(user: ReturnType<typeof userEvent.setup>, resolved: Awaited<ReturnType<typeof render>>) {
+    await user.press(resolved.getByLabelText('Fill this in from the VIN'));
+    await user.type(resolved.getByLabelText('VIN, 17 characters'), 'WBA1J7C51FV253855');
+    await user.press(resolved.getByLabelText('Read the car off it'));
+  }
+
+  it('fills the empty fields and says where the values came from', async () => {
+    const user = userEvent.setup();
+    mockDecode.mockResolvedValue(M235I);
+
+    const { view } = mount();
+    const resolved = await view;
+    await openVin(user, resolved);
+
+    expect(resolved.getByLabelText('Model year').props.value).toBe('2015');
+    expect(resolved.getByLabelText('Make').props.value).toBe('BMW');
+    expect(resolved.getByLabelText('Model').props.value).toBe('M235i');
+    expect(JSON.stringify(resolved.toJSON())).toMatch(/Filled in from the VIN: 2015 BMW M235i/);
+  });
+
+  it('never overwrites an answer the owner already gave', async () => {
+    /*
+      ⚠ The decode is additive. Somebody who typed the trim and then remembered
+      the VIN must not watch their own answer replaced — and vPIC returns an
+      empty `Trim` far more often than not, so an unconditional write would
+      blank it.
+    */
+    const user = userEvent.setup();
+    mockDecode.mockResolvedValue({ ...M235I, model: 'M2' });
+
+    const { view } = mount();
+    const resolved = await view;
+
+    await user.type(resolved.getByLabelText('Model'), 'M235i xDrive');
+    await openVin(user, resolved);
+
+    expect(resolved.getByLabelText('Model').props.value).toBe('M235i xDrive');
+    // Anti-vacuous: the fields it *was* allowed to fill were filled.
+    expect(resolved.getByLabelText('Make').props.value).toBe('BMW');
+  });
+
+  it('keeps a decode NHTSA complained about, and repeats the complaint', async () => {
+    /*
+      Position 9 is only mandatory for North American builds, so a genuine
+      import can fail it — and NHTSA decodes the car regardless. Refusing the
+      answer would be this client being stricter than the authority it asked.
+    */
+    const user = userEvent.setup();
+    mockDecode.mockResolvedValue({ ...M235I, confidence: 'suspect' });
+
+    const { view } = mount();
+    const resolved = await view;
+    await openVin(user, resolved);
+
+    expect(resolved.getByLabelText('Make').props.value).toBe('BMW');
+    expect(JSON.stringify(resolved.toJSON())).toMatch(/check digit does not match/);
+  });
+
+  it('sends nobody down a dead end when the decode fails', async () => {
+    // The form below is complete and usable, and the sentence says so rather
+    // than leaving somebody staring at a VIN field that will not work.
+    const user = userEvent.setup();
+    mockDecode.mockResolvedValue(null);
+
+    const { view } = mount();
+    const resolved = await view;
+    await openVin(user, resolved);
+
+    expect(JSON.stringify(resolved.toJSON())).toMatch(/could not read that VIN/);
+    expect(resolved.getByLabelText('Make').props.value).toBe('');
+
+    // And the form still works. An absence is only evidence beside a presence.
+    await user.type(resolved.getByLabelText('Model year'), '2018');
+    await user.type(resolved.getByLabelText('Make'), 'Honda');
+    await user.type(resolved.getByLabelText('Model'), 'Accord');
+    await user.type(resolved.getByLabelText('Current mileage'), '94800');
+    mockApi.mockResolvedValue({ vehicle: { id: 'v11' } } as never);
+    await user.press(resolved.getByLabelText('Add to my garage'));
+
+    expect(mockApi).toHaveBeenCalled();
+  });
+
+  it('refuses to look up something that is not a VIN yet', async () => {
+    const user = userEvent.setup();
+    const { view } = mount();
+    const resolved = await view;
+
+    await user.press(resolved.getByLabelText('Fill this in from the VIN'));
+    await user.type(resolved.getByLabelText('VIN, 17 characters'), 'WBA1J7C51');
+    await user.press(resolved.getByLabelText('Read the car off it'));
+
+    expect(mockDecode).not.toHaveBeenCalled();
+    expect(JSON.stringify(resolved.toJSON())).toMatch(/8 to go/);
+  });
+
+  it('names the three characters a VIN cannot contain', async () => {
+    // I, O and Q are the ones an owner is most likely to type, because they are
+    // the ones that look like 1 and 0 on a stamped plate.
+    const user = userEvent.setup();
+    const { view } = mount();
+    const resolved = await view;
+
+    await user.press(resolved.getByLabelText('Fill this in from the VIN'));
+    await user.type(resolved.getByLabelText('VIN, 17 characters'), 'WBA1J7C51FV25385O');
+
+    expect(JSON.stringify(resolved.toJSON())).toMatch(/I, O or Q/);
+    expect(mockDecode).not.toHaveBeenCalled();
   });
 });

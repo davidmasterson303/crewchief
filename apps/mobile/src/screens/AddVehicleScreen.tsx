@@ -1,25 +1,36 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 
 import Button from '../components/Button';
 import Field from '../components/Field';
+import Suggest from '../components/Suggest';
 import { apiRequest, ApiRequestError } from '../api/client';
+import { decodeVin, fetchModels } from '../api/vpic';
 import { validateMileageUpdate } from '@crewchief/core/mileage-tracking';
-import { radius, status, surface, text } from '../theme';
+import { TARGET_MIN, border, radius, space, status, surface, text, type } from '../theme';
 import {
   BASELINE_AGE_OPTIONS,
   type BaselineAge,
 } from '@crewchief/core/onboarding-baseline';
+import {
+  COMMON_MAKES,
+  VIN_LENGTH,
+  canonicalName,
+  isPlausibleModelYear,
+  modelYears,
+  normaliseVin,
+  suggestNames,
+  vinCheckDigitMatches,
+  vinProblem,
+} from '@crewchief/core/vehicle-catalog';
 import { interFace } from '../theme/fonts';
 
 /**
@@ -90,12 +101,58 @@ import { interFace } from '../theme/fonts';
  * later — the dossier carries a "turn them on" control for anyone who says no,
  * which is what lets this be a single yes/no rather than something that has to
  * be got right first time.
+ *
+ * ── 23 Aug: three free-text cells became a catalogue ────────────────────────
+ *
+ * Year, make and model were bare `TextInput`s with a four-character check on
+ * the year and nothing at all on the other two. The failure is silent, which is
+ * this codebase's §6 exactly: `"bmw"`, `"BMW"` and `"B.M.W."` are one car to
+ * the person holding it and three to every join downstream, so a typo does not
+ * produce an error — it produces a car whose recalls, dossier and service
+ * schedule all come back empty, looking like a product that knows nothing.
+ *
+ * `@crewchief/core/vehicle-catalog` carries the lists and the judgements;
+ * `api/vpic.ts` carries the two network calls. What is decided *here* is the
+ * shape of the form:
+ *
+ *   - **The VIN block is collapsed, above the fields, and optional.** The
+ *     docblock above still holds — *"a first-run flow that demands a VIN before
+ *     showing anything is a first-run flow people abandon"* — so the fields are
+ *     never hidden behind it and it never becomes a step. It fills them in.
+ *   - **Model suggestions depend on year and make**, because vPIC's model list
+ *     is keyed on both. Asked before either is settled it would offer nothing,
+ *     which is why the panel says what it is waiting for rather than sitting
+ *     empty.
+ *   - **Nothing here can block a submit.** Every list is an accelerator over a
+ *     field that still accepts free text — see `Suggest` for the argument, and
+ *     §10 for why a picker would be the wrong control for data this shape.
+ *
+ * ⚠ **The VIN is decoded and not stored.** `POST /api/v1/vehicles` builds its
+ * insert from year, make, model, trim and mileage, and has no `vin` field, so
+ * a car added here carries no VIN in the database — the decode is a typing aid.
+ * Giving that column a value is a route change, and a route change is a
+ * `web-live` promote before any build that depends on it. `api/vpic.ts` carries
+ * the full reasoning; it is repeated here because this is the screen where
+ * somebody will reasonably expect the VIN to have been saved.
  */
 
 interface Props {
   onAdded: (vehicleId: string, title: string) => void;
   onSignOut: () => void;
 }
+
+/** Which suggestion panel is showing. See `Suggest` for why the form owns it. */
+type OpenField = 'year' | 'make' | 'model' | null;
+
+/**
+ * How long a settled make and year have to sit still before vPIC is asked.
+ *
+ * The make field is free text, so every keystroke of "Subaru" is a candidate
+ * make and six requests for a word nobody has finished typing is six requests
+ * wasted on somebody else's API. Long enough to skip the intermediate states,
+ * short enough that a chosen suggestion feels immediate.
+ */
+const MODEL_LOOKUP_DEBOUNCE_MS = 350;
 
 export function AddVehicleScreen({ onAdded, onSignOut }: Props) {
   const [year, setYear] = useState('');
@@ -109,11 +166,150 @@ export function AddVehicleScreen({ onAdded, onSignOut }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit =
-    year.trim().length === 4 && make.trim().length > 0 && model.trim().length > 0 && !busy;
+  const [openField, setOpenField] = useState<OpenField>(null);
+
+  /*
+    ── The VIN block ────────────────────────────────────────────────────────
+
+    Collapsed by default, and `vinNote` is what it said last. A note rather
+    than an error because two of its three outcomes are not failures: a decode
+    NHTSA flagged still filled the form in, and it is worth saying so without
+    painting the screen red about a car that is now correctly described.
+  */
+  const [vinOpen, setVinOpen] = useState(false);
+  const [vin, setVin] = useState('');
+  const [vinBusy, setVinBusy] = useState(false);
+  const [vinNote, setVinNote] = useState<{ tone: 'good' | 'warn'; body: string } | null>(null);
+
+  const [models, setModels] = useState<string[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(false);
+
+  /*
+    Built once. `modelYears` walks from next year back to 1981 — 47 strings,
+    rebuilt on every keystroke of every field if this were inline.
+
+    ⚠ The clock is read here rather than inside `modelYears`, which takes a
+    `Date` for the reason everything in this codebase does: a function with its
+    own clock cannot be tested on 1 January, and this list changes on 1 January.
+  */
+  const years = useMemo(() => modelYears(new Date()).map(String), []);
+
+  const yearNumber = Number(year.trim());
+  const yearReady = isPlausibleModelYear(yearNumber, new Date());
+  const makeReady = make.trim().length > 0;
+
+  /*
+    ── Models, when there is a make and a year to ask about ─────────────────
+
+    ⚠ Aborted **and** flagged. `cancelled` guards the state write and the
+    `AbortController` stops the three requests actually in flight; dropping
+    either one produces the classic typeahead bug where an early, slow response
+    lands after a later, fast one and the list snaps back to the wrong make.
+  */
+  useEffect(() => {
+    if (!yearReady || !makeReady) {
+      setModels([]);
+      setModelsLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    let cancelled = false;
+
+    setModelsLoading(true);
+
+    const timer = setTimeout(() => {
+      void fetchModels(make.trim(), yearNumber, controller.signal).then((found) => {
+        if (cancelled) return;
+        setModels(found);
+        setModelsLoading(false);
+      });
+    }, MODEL_LOOKUP_DEBOUNCE_MS);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [make, yearNumber, yearReady, makeReady]);
+
+  /**
+   * Read the car off its VIN.
+   *
+   * ⚠ **Fills empty fields and never overwrites a full one.** Somebody who
+   * typed the make and then remembered the VIN should not watch their own
+   * answer be replaced — and vPIC's `Trim` is empty far more often than not, so
+   * an unconditional write would blank a trim the owner had already given. The
+   * decode is additive; the owner stays the authority on anything they said.
+   */
+  async function lookUpVin() {
+    const number = normaliseVin(vin);
+    if (number.length !== VIN_LENGTH || vinBusy) return;
+
+    setVinBusy(true);
+    setVinNote(null);
+
+    const decoded = await decodeVin(number);
+    setVinBusy(false);
+
+    if (!decoded) {
+      setVinNote({
+        tone: 'warn',
+        /*
+          Two causes, one sentence, because the next move is the same for both:
+          NHTSA could not place the number, or the phone could not reach NHTSA.
+          Splitting them would offer a distinction the owner cannot act on
+          differently — and the fields below are right there either way.
+        */
+        body: 'We could not read that VIN. Fill the car in below instead — nothing here needs it.',
+      });
+      return;
+    }
+
+    if (decoded.year && !year.trim()) setYear(String(decoded.year));
+    if (decoded.make && !make.trim()) setMake(decoded.make);
+    if (decoded.model && !model.trim()) setModel(decoded.model);
+    if (decoded.trim && !trim.trim()) setTrim(decoded.trim);
+
+    const named = [decoded.year, decoded.make, decoded.model].filter(Boolean).join(' ');
+
+    setVinNote(
+      decoded.confidence === 'suspect' || !vinCheckDigitMatches(number)
+        ? {
+            tone: 'warn',
+            /*
+              Said, not enforced. Position 9 is only mandatory for North
+              American builds, so a genuine import can fail it — and NHTSA
+              decoded the car anyway, which is why the answer is above this
+              sentence rather than withheld behind it.
+            */
+            body: `Filled in from the VIN: ${named}. Its check digit does not match, so read it over — and correct anything below that is wrong.`,
+          }
+        : { tone: 'good', body: `Filled in from the VIN: ${named}. Correct anything that is off.` }
+    );
+  }
+
+  const canSubmit = yearReady && makeReady && model.trim().length > 0 && !busy;
 
   async function submit() {
     if (!canSubmit) return;
+
+    /*
+      ⚠ The catalogue's spelling wins, and it is applied **here** rather than as
+      the owner types.
+
+      This is the fix for the defect at the top of the file: "bmw" typed into a
+      free-text cell is a different make from "BMW" to every downstream join, so
+      the car it creates has no recalls, no dossier and no schedule — and looks
+      like a product that knows nothing rather than like a typo.
+
+      On submit, not on keystroke, because a field that rewrites itself under
+      the finger — "bmw" becoming "BMW" as the W lands — feels like the form
+      arguing with the person filling it in. `canonicalName` returns an unlisted
+      make untouched, which is what keeps this a catalogue and not a gate.
+    */
+    const chosenMake = canonicalName(make, COMMON_MAKES);
+    const chosenModel = models.length > 0 ? canonicalName(model, models) : model.trim();
 
     const reading = Number(mileage.replace(/[^0-9]/g, '') || '0');
 
@@ -136,9 +332,9 @@ export function AddVehicleScreen({ onAdded, onSignOut }: Props) {
       const body = await apiRequest<{ vehicle?: { id: string } }>('/vehicles', {
         method: 'POST',
         body: {
-          year: Number(year),
-          make: make.trim(),
-          model: model.trim(),
+          year: yearNumber,
+          make: chosenMake,
+          model: chosenModel,
           trim: trim.trim(),
           currentMileage: reading,
           wantsModifications: wantsMods,
@@ -161,7 +357,7 @@ export function AddVehicleScreen({ onAdded, onSignOut }: Props) {
         return;
       }
 
-      onAdded(body.vehicle.id, [year, make.trim(), model.trim()].filter(Boolean).join(' '));
+      onAdded(body.vehicle.id, [year, chosenMake, chosenModel].filter(Boolean).join(' '));
     } catch (err) {
       const apiError = err as ApiRequestError;
       if (apiError.status === 401) {
@@ -185,6 +381,66 @@ export function AddVehicleScreen({ onAdded, onSignOut }: Props) {
         </Text>
 
         {/*
+          ── The VIN, offered and never demanded ──────────────────────────────
+
+          Collapsed to one line, above the fields it fills rather than in front
+          of them. The docblock's rule is intact: this is not a step, nothing
+          waits on it, and the form below is complete and usable by somebody who
+          never opens it — which is the point, because the VIN plate is under
+          the windscreen and the person filling this in may be on a sofa.
+        */}
+        {vinOpen ? (
+          <View style={styles.vinBlock}>
+            <Field
+              label="VIN"
+              hint={`${VIN_LENGTH} characters`}
+              value={vin}
+              /*
+                Normalised on the way in, so a VIN read aloud in groups — or
+                pasted out of an insurance email with a stray space — becomes
+                the thing NHTSA can be asked about. Lower case is upper cased
+                for the same reason.
+              */
+              onChangeText={(next) => setVin(normaliseVin(next))}
+              problem={vinProblem(vin) ?? undefined}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              maxLength={VIN_LENGTH}
+              editable={!busy && !vinBusy}
+            />
+            <Button
+              label="Read the car off it"
+              variant="outline"
+              onPress={() => void lookUpVin()}
+              disabled={vin.length !== VIN_LENGTH || busy}
+              busy={vinBusy}
+            />
+            {vinNote ? (
+              /*
+                `accessibilityLiveRegion`, because the fields below have just
+                changed and a screen-reader user has no other way to know it
+                happened — the same reason `Field` announces its own problem.
+              */
+              <Text
+                accessibilityLiveRegion="polite"
+                style={[styles.vinNote, vinNote.tone === 'warn' && styles.vinNoteWarn]}
+              >
+                {vinNote.body}
+              </Text>
+            ) : null}
+          </View>
+        ) : (
+          <Pressable
+            onPress={() => setVinOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Fill this in from the VIN"
+            style={({ pressed }) => [styles.vinOffer, pressed && styles.vinOfferPressed]}
+          >
+            <Text style={styles.vinOfferText}>Have the VIN? Fill this in from it</Text>
+          </Pressable>
+        )}
+
+        {/*
           `Field`, and the visible labels are the upgrade.
 
           This form asked for six values through placeholders alone, so every
@@ -193,35 +449,92 @@ export function AddVehicleScreen({ onAdded, onSignOut }: Props) {
           takes the label it speaks, and `hint` now carries "optional" into that
           name rather than showing it only to people who can see it.
 
-          The two-column row wraps each field rather than styling it: `Field`'s
-          `style` reaches the input, and it is the **wrapper** that has to flex.
+          ⚠ The two-column year/make row is **gone**, and that is what the
+          suggestions cost. A panel under a 96pt column would be 96pt wide, and
+          one under the make would open beside the year rather than beneath the
+          form. Stacked, each field owns the full width its list needs. The
+          labels and therefore the accessible names are unchanged.
         */}
-        <View style={styles.row}>
-          <View style={styles.year}>
-            <Field
-              label="Model year"
-              value={year}
-              onChangeText={setYear}
-              keyboardType="number-pad"
-              maxLength={4}
-              editable={!busy}
-            />
-          </View>
-          <View style={styles.grow}>
-            <Field
-              label="Make"
-              value={make}
-              onChangeText={setMake}
-              autoCapitalize="words"
-              editable={!busy}
-            />
-          </View>
-        </View>
+        <Suggest
+          label="Model year"
+          value={year}
+          onChangeText={setYear}
+          onPick={(picked) => {
+            setYear(picked);
+            setOpenField(null);
+          }}
+          /*
+            Filtered by what has been typed, so "201" narrows to that decade.
+            Six rather than eight: a year is four characters and somebody who
+            has typed three of them is one row away from the answer.
+          */
+          suggestions={suggestNames(year, years, 6)}
+          open={openField === 'year'}
+          onOpen={() => setOpenField('year')}
+          problem={
+            /*
+              Only once four characters are in. Complaining at "20" would be
+              the form telling somebody they are wrong while they are still
+              typing, which is the fastest way to teach people to ignore it.
+            */
+            year.trim().length >= 4 && !yearReady
+              ? `Model years run from ${years[years.length - 1]} to ${years[0]}.`
+              : undefined
+          }
+          keyboardType="number-pad"
+          maxLength={4}
+          editable={!busy}
+        />
 
-        <Field
+        <Suggest
+          label="Make"
+          value={make}
+          onChangeText={setMake}
+          onPick={(picked) => {
+            setMake(picked);
+            /*
+              The model is cleared, not kept. A model belongs to a make, and an
+              Accord left sitting under Subaru is the one state this form must
+              never submit — it typechecks, it looks filled in, and it creates a
+              car that does not exist.
+            */
+            setModel('');
+            setOpenField(null);
+          }}
+          suggestions={suggestNames(make, COMMON_MAKES)}
+          open={openField === 'make'}
+          onOpen={() => setOpenField('make')}
+          autoCapitalize="words"
+          editable={!busy}
+        />
+
+        <Suggest
           label="Model"
           value={model}
           onChangeText={setModel}
+          onPick={(picked) => {
+            setModel(picked);
+            setOpenField(null);
+          }}
+          suggestions={suggestNames(model, models)}
+          loading={modelsLoading}
+          /*
+            The panel says what it is waiting for rather than sitting empty. An
+            empty list has three causes an owner can tell apart — no year yet,
+            no make yet, and NHTSA having nothing for that pair — and only the
+            third is a dead end. A silent panel makes all three look broken.
+
+            ⚠ The third sentence claims nothing about the car. NHTSA not listing
+            a model is a fact about NHTSA, and this product does not turn that
+            into "your car does not exist".
+          */
+          quiet={
+            !yearReady || !makeReady
+              ? 'Pick a model year and a make and we will list what was built.'
+              : `We have no models listed for a ${yearNumber} ${make.trim()}. Type it in — it will still work.`
+          }
+          open={openField === 'model'}
+          onOpen={() => setOpenField('model')}
           autoCapitalize="words"
           editable={!busy}
         />
@@ -363,8 +676,44 @@ const styles = StyleSheet.create({
   subtitle: { color: text.secondary, fontSize: 14, marginBottom: 6 },
 
   row: { flexDirection: 'row', gap: 10 },
-  grow: { flex: 1 },
-  year: { width: 96 },
+
+  /*
+    ── The VIN block ────────────────────────────────────────────────────────
+
+    A well rather than a card, because it is a tool inside the form and not a
+    section of it. The collapsed offer is deliberately quiet: it is worth
+    finding and it is not the thing this screen is asking for.
+  */
+  vinOffer: {
+    minHeight: TARGET_MIN,
+    justifyContent: 'center',
+    paddingHorizontal: space.md,
+    borderRadius: radius.button,
+    borderWidth: 1,
+    borderColor: border.field,
+    backgroundColor: surface.well,
+  },
+  vinOfferPressed: { backgroundColor: surface.raised },
+  vinOfferText: { ...type.uiStrong, color: text.secondary },
+  vinBlock: {
+    gap: space.md,
+    padding: space.md,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: border.field,
+    backgroundColor: surface.well,
+  },
+  /*
+    ⚠ `text.secondary`, not the confirm green, for the good case.
+
+    A decode that worked is not a success message — it is a sentence saying
+    where the values below came from, and painting it green would make an
+    ordinary step feel like an achievement while leaving the warn case looking
+    like a failure. Only the warn tone changes colour, because only it is
+    asking for something.
+  */
+  vinNote: { ...type.value, color: text.secondary, lineHeight: 18 },
+  vinNoteWarn: { color: status.attention },
 
 
   modsBlock: { gap: 8, marginTop: 8 },
