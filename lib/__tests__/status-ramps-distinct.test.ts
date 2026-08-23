@@ -83,18 +83,20 @@ describe('the status family and the health ramp', () => {
     */
     expect(ramp.size).toBeGreaterThanOrEqual(4);
     expect(STATUS_INKS.length).toBeGreaterThan(4);
-    for (const hex of ramp.values()) expect(hex).toMatch(/^#[0-9A-F]{6}$/);
+    for (const hex of Array.from(ramp.values())) expect(hex).toMatch(/^#[0-9A-F]{6}$/);
   });
 
   it('shares no value between them', () => {
-    const rampValues = new Set([...ramp.values()].map((h) => h.toUpperCase()));
+    const rampValues = new Set(Array.from(ramp.values(), (h) => h.toUpperCase()));
 
     const collisions = STATUS_INKS.filter((token) => {
       const value = status[token];
       return typeof value === 'string' && rampValues.has(value.toUpperCase());
     }).map((token) => {
       const value = status[token] as string;
-      const band = [...ramp.entries()].find(([, hex]) => hex.toUpperCase() === value.toUpperCase());
+      const band = Array.from(ramp.entries()).find(
+        ([, hex]) => hex.toUpperCase() === value.toUpperCase()
+      );
       return `status.${token} (${value}) is the health ramp's "${band?.[0]}"`;
     });
 
@@ -107,7 +109,7 @@ describe('the status family and the health ramp', () => {
       of this repo's rules: every scanner carries a case proving it can still
       fail, because three guards here have shipped green while checking nothing.
     */
-    const rampValues = new Set([...ramp.values()].map((h) => h.toUpperCase()));
+    const rampValues = new Set(Array.from(ramp.values(), (h) => h.toUpperCase()));
     const planted = healthBandHex(getHealthBandJudgement(45)); // `warn` — the historic collision
 
     expect(rampValues.has(planted.toUpperCase())).toBe(true);
