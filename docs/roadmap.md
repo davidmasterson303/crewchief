@@ -62,9 +62,15 @@
 > ```
 > crewchief.davidmasterson.co        02b36c6e   ← the app's API and the App Store URL
 > crewchief-demo.davidmasterson.co   9b789a87   ← same commit, promoted 23 Aug
-> main                               ff1fad82, pushed, clean
-> unpromoted                         nothing — both hosts are at main
+> main                               ahead by docs commits only
+> unpromoted                         no code — see below
 > ```
+>
+> ⚠ `main` will normally sit a commit or two ahead of both hosts, because the note recording
+> a promote is written *after* it. **That is not drift and must not be promoted for.** A
+> Netlify build costs real money here — 111 of them were 99% of a $34 bill — and publishing a
+> markdown file would spend two. Check `git diff --stat web-live..main`: if it is `docs/`
+> only, both hosts are current.
 >
 > Updated 23 Aug. **Both hostnames are level with `main` for the first time since the
 > release branches were introduced** — the demo was 26 commits behind and is not any more.
