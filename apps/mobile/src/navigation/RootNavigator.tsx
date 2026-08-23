@@ -263,9 +263,6 @@ const linking: LinkingOptions<RootStackParamList> = {
   },
 };
 
-/** What the header shows before the vehicle has loaded, or when a link brought us here. */
-const UNTITLED = 'Vehicle';
-
 const screenOptions = {
   headerStyle: { backgroundColor: surface.page },
   headerTintColor: text.primary,
@@ -372,10 +369,23 @@ export function RootNavigator({
             A deep link has no name to pass, so it falls back rather than
             rendering "undefined" in the header.
           */
-          options={({ route }) => ({ title: route.params.title || UNTITLED })}
+          /*
+            ⚠ `headerShown: false` as of 23 Aug. The hero pullback pins a
+            photograph at 62% of the display and the screen draws its **own**
+            nav — floating pills over the car at rest, resolving into a solid
+            plate once the sheet reaches them at 300pt of scroll. A stack header
+            above that would be a second bar over a hero designed to run under
+            the status bar.
+
+            `title` still travels: the screen uses it for the nav title during
+            the fetch, so the car is named before the payload lands. It stops
+            being a navigator concern and starts being a prop.
+          */
+          options={{ headerShown: false }}
         >
           {({ route, navigation }) => (
             <VehicleDetailScreen
+              title={route.params.title}
               vehicleId={route.params.vehicleId}
               onSignOut={onSignOut}
               onBack={() => navigation.goBack()}

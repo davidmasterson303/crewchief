@@ -1,13 +1,16 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { apiRequest, ApiRequestError } from '../api/client';
 import { Skeleton, SkeletonCard } from '../components/Skeleton';
@@ -21,18 +24,40 @@ import { normaliseRecalls } from '@crewchief/core/recalls';
 import AlertBanner from '../components/AlertBanner';
 import Button from '../components/Button';
 import Card from '../components/Card';
-import ClusterGauge, { CARD_SIZE } from '../components/ClusterGauge';
+import ClusterGauge from '../components/ClusterGauge';
+import DialChip, { DIAL_CHIP_SLOT } from '../components/DialChip';
+import { HeroBed, HeroEmpty } from '../components/HeroBed';
 import { type HealthReading } from '../components/HealthHistory';
+import Icon from '../components/Icon';
 import Plinth from '../components/Plinth';
-import VehiclePlate from '../components/VehiclePlate';
 import ListGroup from '../components/ListGroup';
 import NavRow from '../components/NavRow';
 import SectionHeader from '../components/SectionHeader';
-import { space, text, type } from '../theme';
+import {
+  HERO_DIAL_DOCK_SCALE,
+  HERO_DIM_MAX,
+  HERO_DIM_REST,
+  HERO_DIM_SPAN,
+  HERO_IMAGE_BLEED,
+  HERO_NAV_FADE_SPAN,
+  HERO_NAV_FADE_START,
+  HERO_PARALLAX_RATE,
+  HERO_SCALE_GAIN,
+  HERO_SHEET_OVERLAP,
+  HERO_TITLE_FADE_SPAN,
+  detailHeroHeight,
+  dialFlight,
+  heroBands,
+  identityBlockHeight,
+} from '../theme/hero-motion';
+import { border, brand, hero, plinth, radius, space, surface, text, type } from '../theme';
 import { getHealthBandJudgement } from '@crewchief/core/health-band';
 
-/** The board's hero height for the photograph on this screen. */
-const PHOTO_HERO = 196;
+/*
+  ⚠ `PHOTO_HERO = 196` is gone. The hero is no longer a band with a number on
+  it — `detailHeroHeight` clamps 62% of the display, and `heroBands` decides
+  which of the two layouts that height gets. See `theme/hero-motion.ts`.
+*/
 
 /**
  * Phase 3.2, second half — the detail behind a garage row.
@@ -249,6 +274,7 @@ type State =
 
 export function VehicleDetailScreen({
   vehicleId,
+  title,
   onBack,
   onSignOut,
   onAskAdvisor,
@@ -262,6 +288,8 @@ export function VehicleDetailScreen({
   pickPhoto,
 }: {
   vehicleId: string;
+  /** The car's name from the row that opened this, so the nav is right during the fetch. */
+  title?: string;
   onBack: () => void;
   onSignOut: () => void;
   /*
@@ -306,6 +334,29 @@ export function VehicleDetailScreen({
 
   const [uploading, setUploading] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
+
+  /*
+    ── The scroll driver ─────────────────────────────────────────────────────
+
+    One `Animated.Value`, one `Animated.event`, `useNativeDriver: true`, and an
+    `interpolate` for every derived value. Everything in this feature is
+    **scroll-linked** — there is no `Animated.timing` anywhere in it, because
+    the thumb is the clock.
+
+    ⚠ Every interpolation below must feed a `transform` or an `opacity`. Those
+    are exactly what the native driver supports; a `height`, a `top` or a colour
+    silently forces the JS driver and the whole hero starts dropping frames
+    under a finger. `VehicleDetailScreen.test.tsx` asserts it, because it is not
+    visible in a screenshot and not visible on a fast simulator either.
+  */
+  const scrollY = useRef(new Animated.Value(0)).current;
+
+  const { height: windowHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+
+  const heroH = detailHeroHeight(windowHeight);
+  const bands = heroBands(heroH);
+  const flight = dialFlight(heroH, insets.top);
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -600,80 +651,224 @@ export function VehicleDetailScreen({
         ? `${counts.wishlist.count} · ${money.format(counts.wishlist.total)}`
         : `${counts.wishlist.count}`;
 
+  const name = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ') || title || '';
+
+  /*
+    ── The interpolations ────────────────────────────────────────────────────
+
+    Every one is driven by `scrollY` and lands on a transform or an opacity.
+    The formulas are the handoff's §3 table verbatim; the only translation is
+    that a value the handoff expresses through `k` is expressed here through the
+    scroll offset that produces that `k` — see `dialFlight`, which does that
+    conversion once and has tests on it.
+  */
+  const dim = scrollY.interpolate({
+    inputRange: [0, HERO_DIM_SPAN],
+    outputRange: [HERO_DIM_REST, HERO_DIM_MAX],
+    extrapolate: 'clamp',
+  });
+
+  /* The hero's contents drift, and the frame does not. Two planes, two rates. */
+  const heroDrift = scrollY.interpolate({
+    inputRange: [0, 1000],
+    outputRange: [0, -1000 * HERO_PARALLAX_RATE],
+    extrapolate: 'clamp',
+  });
+
+  const photoScale = scrollY.interpolate({
+    inputRange: [0, HERO_DIM_SPAN],
+    outputRange: [1, 1 + HERO_SCALE_GAIN],
+    extrapolate: 'clamp',
+  });
+
+  /* Gone before the nav title arrives — see `HERO_TITLE_FADE_SPAN`. */
+  const identityFade = scrollY.interpolate({
+    inputRange: [0, HERO_TITLE_FADE_SPAN],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
+  const navFade = scrollY.interpolate({
+    inputRange: [HERO_NAV_FADE_START, HERO_NAV_FADE_START + HERO_NAV_FADE_SPAN],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+
+  /*
+    ⚠ The dial climbs at `HERO_DIAL_RATE`, not the hero's rate. That is the
+    layering fix, and it is the rate rather than the z-index: the dial is chrome,
+    not scenery, and that is why it does not share the hero's parallax rate.
+  */
+  const dialRise = scrollY.interpolate({
+    inputRange: [0, flight.dockAt],
+    outputRange: [0, -(flight.restY - flight.dockY)],
+    extrapolate: 'clamp',
+  });
+
+  const dialScale = scrollY.interpolate({
+    inputRange: [flight.fullAt, flight.dockAt],
+    outputRange: [1, HERO_DIAL_DOCK_SCALE],
+    extrapolate: 'clamp',
+  });
+
+  const dialFade = scrollY.interpolate({
+    inputRange: [flight.fadeFrom, flight.fadeTo],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
+  const verdictFade = scrollY.interpolate({
+    inputRange: [flight.verdictFrom, flight.verdictTo],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
+  /* Two drawings, one crossfade — never a morph. See `DialChip`. */
+  const chipFade = scrollY.interpolate({
+    inputRange: [flight.chipFrom, flight.dockAt],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+
+  const sheetShadow = scrollY.interpolate({
+    inputRange: [0, HERO_DIM_SPAN],
+    outputRange: [0.28, 0.7],
+    extrapolate: 'clamp',
+  });
+
   return (
-    <ScrollView
-      contentContainerStyle={styles.body}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => void load(true)}
-          tintColor={text.muted}
-        />
-      }
-    >
-      {/*
-        The 196pt photo hero — no longer deferred.
+    /*
+      ── The four planes, in render order ──────────────────────────────────────
 
-        Three things changed on 15 Aug and all three were prerequisites:
-        `photo_url` turned out to have been on this payload since `2eb172a`;
-        `VehiclePlate` moved the timeout and the fallback into one component, so
-        showing a photo here reuses that net rather than doubling it; and
-        `/api/v1/upload-photo` means a car that lands on the plate can be given
-        a picture from this screen instead of being stuck there.
+      Hero, then the sheet, then the nav, then the dial and its chip — all
+      siblings of the screen root.
 
-        ⚠ It will show the plate on this account until the M235i's 2.3 MB
-        original is replaced — that file has never decoded on a device. That is
-        the fallback working, not the hero failing, and the control to fix it is
-        on the plate itself.
-      */}
-      {photoError && (
-        <AlertBanner tone="critical" headline="That photo was not saved" body={photoError} />
-      )}
+      ⚠ **This is render order, not `zIndex`.** The handoff is explicit and the
+      reason is Android: `zIndex` interacts with `elevation` there in ways that
+      cost an afternoon. If the order is right no `zIndex` is needed, and there
+      is none in this file.
+    */
+    <View style={styles.screen}>
+      {/* ── z0 · HERO — pinned. Only its contents move. ─────────────────────── */}
+      <View style={[styles.hero, { height: heroH }]} pointerEvents="box-none">
+        {vehicle.photo_url ? (
+          <Animated.Image
+            source={{ uri: vehicle.photo_url }}
+            /*
+              ⚠ Over-rendered by `HERO_IMAGE_BLEED` top and bottom. RN scales
+              about the centre, so at `HERO_SCALE_GAIN` the image grows ~7% each
+              way — without the bleed the photograph's top edge walks into frame
+              at the end of the drift.
 
-      <VehiclePlate
-        photo={vehicle.photo_url}
-        year={vehicle.year}
-        make={vehicle.make}
-        model={vehicle.model}
-        trim={vehicle.trim}
-        height={PHOTO_HERO}
-        onAddPhoto={pickPhoto ? () => void onAddPhoto() : undefined}
-        busy={uploading}
-      />
+              `cover`, focal point high. **Not** `contain`, no letterbox, no
+              side gutters: that geometry is the bug being removed — at 150pt a
+              3:4 phone snapshot letterboxed into purple bars.
+            */
+            style={[
+              styles.heroImage,
+              { transform: [{ translateY: heroDrift }, { scale: photoScale }] },
+            ]}
+            resizeMode="cover"
+            accessibilityRole="image"
+            accessibilityLabel={name ? `${name} photo` : 'Vehicle photo'}
+          />
+        ) : (
+          <HeroEmpty />
+        )}
 
-      <View style={styles.headerBlock}>
-        <Text style={styles.name}>
-          {[vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ')}
-        </Text>
+        {/* The bay light going down as the floor comes up — shadow, not chrome. */}
+        <Animated.View style={[StyleSheet.absoluteFill, styles.dim, { opacity: dim }]} />
+
+        {/* Fixed. The contrast floor the name sits on. Never animates. */}
+        <HeroBed />
+
+        <Animated.View
+          style={[
+            styles.identity,
+            { bottom: bands.titleAnchor, opacity: identityFade, transform: [{ translateY: heroDrift }] },
+          ]}
+          pointerEvents="none"
+        >
+          <Text style={[styles.name, { fontSize: bands.titleSize, lineHeight: bands.titleSize * 1.05 }]} numberOfLines={2}>
+            {name}
+          </Text>
+          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+        </Animated.View>
+
         {/*
-          ⚠ The spec's subtitle: **"61,240 mi · xDrive"** — the odometer first.
-
-          Mileage used to live five rows down in a "Details" card, which put the
-          single most-checked number about a car below two instruments and a
-          list of links. It is identity, not detail: it is how an owner knows
-          which car they are looking at and roughly what state it is in.
+          The photo control, kept. It was on `VehiclePlate`, which this hero
+          replaces — and it is the only way to give a car a picture from this
+          screen. It rides the identity's fade so it is gone by the time the
+          sheet reaches it.
         */}
-        {subtitle ? <Text style={styles.trim}>{subtitle}</Text> : null}
+        {pickPhoto && (
+          <Animated.View style={[styles.photoAction, { opacity: identityFade }]}>
+            {/*
+              ⚠ `Button`, not a hand-rolled `Pressable` that swaps its label for
+              a spinner. RN derives a control's name from its `<Text>` children,
+              so that pattern goes anonymous at exactly the moment something is
+              happening — `mobile-busy-controls-named` holds the app at zero of
+              them, and it caught this one.
+
+              It wears the hero's pill fill because it floats over a photograph;
+              the busy behaviour is the primitive's.
+            */}
+            <Button
+              label={vehicle.photo_url ? 'Change photo' : 'Add photo'}
+              variant="ghost"
+              size="small"
+              busy={uploading}
+              onPress={() => void onAddPhoto()}
+              style={styles.pill}
+            />
+          </Animated.View>
+        )}
       </View>
 
+      {/* ── z2 · SHEET — the only thing that travels. ───────────────────────── */}
+      <Animated.ScrollView
+        style={styles.scroller}
+        contentContainerStyle={styles.scrollBody}
+        showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+          useNativeDriver: true,
+        })}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void load(true)}
+            tintColor={text.muted}
+            progressViewOffset={insets.top + 44}
+          />
+        }
+      >
+        {/*
+          The gap the hero shows through. `HERO_SHEET_OVERLAP` is how far the
+          sheet already rests **onto** the car at zero scroll — the floor is
+          never fully down.
+        */}
+        <View style={{ height: heroH - HERO_SHEET_OVERLAP }} pointerEvents="none" />
+
+        <Animated.View style={[styles.sheet, { shadowOpacity: sheetShadow }]}>
+          {/*
+            The batten's lit hairline on the leading edge. This is a floor
+            arriving, not an iOS modal — square top corners, no rounded card.
+          */}
+          <View style={styles.sheetEdge} pointerEvents="none" />
+
+          <View style={styles.body}>
+            {photoError && (
+              <AlertBanner tone="critical" headline="That photo was not saved" body={photoError} />
+            )}
       {/*
-        ── The reading, and one way in to the account of it ────────────────────
-
-        The 104pt **card** dial, not the hero. The board is explicit — *"Hero ·
-        184pt … Garage bay and nothing else — one dial per screen"* — and a
-        second hero here plus a sweep pushed everything this screen exists to
-        lead to below the fold.
-
-        What left this card on 23 Aug: the three drivers and the history chart.
-        They are the *account* of the score rather than the score, they need
-        room to explain themselves, and they were two of the reasons this screen
-        read as a stack of instruments. `HealthScreen` is one tap down.
+        ⚠ The dial is **not** here any more — it is in the hero, on the plane
+        above this sheet. What stays is the sentence and the way in to the
+        account of it; a second copy of the reading on the same screen would be
+        the duplication the hero exists to remove.
       */}
-      {score !== null && band && (
+      {score !== null && band && (health?.summary || true) && (
         <Card>
-          <Plinth>
-            <ClusterGauge score={score} variant="card" size={CARD_SIZE} />
-          </Plinth>
           {health?.summary ? <Text style={styles.summary}>{health.summary}</Text> : null}
           <NavRow icon="gauge" label="What is driving this score" onPress={onOpenHealth} last />
         </Card>
@@ -785,7 +980,82 @@ export function VehicleDetailScreen({
           value={vehicle.ownership_objective ? humanise(vehicle.ownership_objective) : null}
         />
       </Card>
-    </ScrollView>
+          </View>
+        </Animated.View>
+      </Animated.ScrollView>
+
+      {/* ── z6 · NAV — pills at rest, a solid plate once the sheet arrives. ─── */}
+      <Animated.View
+        style={[styles.navPlate, { height: insets.top + 44, opacity: navFade }]}
+        pointerEvents="none"
+      />
+
+      <View style={[styles.navRow, { top: insets.top }]} pointerEvents="box-none">
+        <Pressable
+          onPress={onBack}
+          accessibilityRole="button"
+          accessibilityLabel="Back to the garage"
+          style={({ pressed }) => [styles.pill, styles.backPill, pressed && styles.pillPressed]}
+        >
+          <Icon name="chevron-left" size={16} color={brand.accent} />
+          <Text style={styles.backLabel}>Garage</Text>
+        </Pressable>
+
+        {/*
+          ⚠ The title is laid out in the flow, not absolutely centred.
+
+          Centred across the full width, "2015 BMW M235i" sits under the chip by
+          8pt and "2019 Mercedes-AMG C63 S" runs under both it and the controls
+          to its right. The title is the only thing keeping the car from being
+          anonymous once the hero is covered, so it does not share space with
+          chrome — it takes the slack and truncates.
+        */}
+        <Animated.Text style={[styles.navTitle, { opacity: navFade }]} numberOfLines={1}>
+          {name}
+        </Animated.Text>
+
+        {/* The slot the chip occupies. Reserved in the flow so the title clears it. */}
+        <View style={styles.navChipSlot} pointerEvents="none" />
+      </View>
+
+      {/* ── z7 · DIAL — belongs to neither plane, and sits above both. ──────── */}
+      {score !== null && band && (
+        <>
+          <Animated.View
+            style={[
+              styles.dial,
+              {
+                top: flight.restY - bands.plinthHeight / 2,
+                opacity: dialFade,
+                transform: [{ translateY: dialRise }, { scale: dialScale }],
+              },
+            ]}
+            pointerEvents="none"
+          >
+            {/*
+              ⚠ On a `Plinth`, always. The hero numeral never sits on raw
+              photography — the score is the most important thing on this screen
+              and must not take its contrast from whatever pixels happen to be
+              behind it. The bed gradient does not cover this: it only bites at
+              52% from the bottom and the dial is above that line.
+            */}
+            <Plinth style={{ height: bands.plinthHeight }}>
+              <ClusterGauge score={score} variant={bands.dialVariant} size={bands.dialSize} />
+            </Plinth>
+            <Animated.Text style={[styles.verdict, { opacity: verdictFade }]}>
+              {band.short}
+            </Animated.Text>
+          </Animated.View>
+
+          <Animated.View
+            style={[styles.dialChip, { top: insets.top + 6, opacity: chipFade }]}
+            pointerEvents="none"
+          >
+            <DialChip score={score} />
+          </Animated.View>
+        </>
+      )}
+    </View>
   );
 }
 
@@ -804,16 +1074,114 @@ function Row({ label, value }: { label: string; value: string | null }) {
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: surface.page },
+
+  /* ── z0 · the pinned hero ─────────────────────────────────────────────── */
+  /**
+   * Absolutely positioned and **never moves**. Only its contents drift.
+   *
+   * `overflow: hidden` is what makes the bleed and the pull-back legal: the
+   * image is `heroH + 120` tall and grows another 7% each way, and all of that
+   * has to be clipped to this frame.
+   */
+  hero: { position: 'absolute', left: 0, right: 0, top: 0, overflow: 'hidden' },
+  heroImage: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: -HERO_IMAGE_BLEED,
+    bottom: -HERO_IMAGE_BLEED,
+    width: '100%',
+  },
+  /** Flat, not a gradient. The room going dark, driven by scroll. */
+  dim: { backgroundColor: hero.shadow },
+  identity: { position: 'absolute', left: space.xl, right: space.xl },
+  /**
+   * The display face, on the photograph.
+   *
+   * ⚠ Legal here because of `HeroBed`'s guaranteed floor, not in spite of the
+   * photograph — see that component for the argument. The size comes from
+   * `heroBands`, because the compact branch drops it to 28.
+   */
+  name: { ...type.editorial, color: text.primary, letterSpacing: -0.5 },
+  subtitle: { ...type.body, fontSize: 15, color: text.secondary, marginTop: 4 },
+
+  photoAction: { position: 'absolute', right: space.lg, bottom: space.lg },
+  /**
+   * The floating controls over the photograph.
+   *
+   * ⚠ **No `BlurView`.** There is no glassmorphism anywhere in this product —
+   * `plinth`'s own note carries the case that already tried it and the 1.09:1
+   * defect it produced. A solid fill at 0.78 is measurable; a blur over an
+   * unknown photograph is not.
+   */
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.xs,
+    minHeight: 36,
+    paddingHorizontal: space.md,
+    borderRadius: radius.pill,
+    backgroundColor: hero.pill,
+    justifyContent: 'center',
+  },
+  pillPressed: { backgroundColor: surface.raised },
+  pillLabel: { ...type.label, color: text.primary },
+  backPill: { paddingLeft: space.sm },
+  backLabel: { ...type.uiStrong, color: brand.accent },
+
+  /* ── z2 · the sheet ───────────────────────────────────────────────────── */
+  scroller: { flex: 1 },
+  scrollBody: { paddingBottom: space.h2 },
+  /**
+   * Opaque, **square** top corners.
+   *
+   * This is a floor arriving, not an iOS modal — a rounded card top would make
+   * it a sheet you can dismiss, which is the wrong affordance for something
+   * that is simply the rest of the page.
+   */
+  sheet: {
+    backgroundColor: surface.page,
+    shadowColor: hero.sheetShadow,
+    shadowOffset: { width: 0, height: -18 },
+    shadowRadius: 22,
+    /* `shadowOpacity` is animated; elevation is Android's own and is static. */
+    elevation: 12,
+  },
+  /** The batten's lit hairline, on the leading edge. `environment.css`'s gradient. */
+  sheetEdge: { height: 1, backgroundColor: brand.accent, opacity: 0.55 },
+
+  /* ── z6 · the nav ─────────────────────────────────────────────────────── */
+  navPlate: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    backgroundColor: surface.nav,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: border.panel,
+  },
+  navRow: {
+    position: 'absolute',
+    left: space.lg,
+    right: space.lg,
+    height: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+  },
+  /** `flex: 1` and it truncates — see the ⚠ at the call site. */
+  navTitle: { ...type.uiStrong, color: text.primary, flex: 1, textAlign: 'center' },
+  navChipSlot: { width: DIAL_CHIP_SLOT },
+
+  /* ── z7 · the dial ────────────────────────────────────────────────────── */
+  dial: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+  verdict: { ...type.label, color: text.muted, marginTop: space.xs, textAlign: 'center' },
+  dialChip: { position: 'absolute', right: space.lg, alignItems: 'flex-end' },
+
   body: { padding: space.lg, gap: space.md },
 
   headerBlock: { gap: 2 },
-  name: {
-    ...type.editorial,
-    fontSize: 26,
-    lineHeight: 32,
-    color: text.primary,
-    letterSpacing: -0.5,
-  },
   trim: { ...type.body, color: text.muted },
 
   /* The same real surface step the garage cards now use — not a 5% wash. */

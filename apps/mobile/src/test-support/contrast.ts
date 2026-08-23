@@ -223,7 +223,26 @@ function walk(
     if (parsed) surface = composite({ ...parsed, alpha: parsed.alpha * effective }, backdrop);
   }
 
-  if (node.type === 'Text') found.push({ node, backdrop: surface, opacity: effective });
+  /*
+    ⚠ **Fully transparent text is skipped, not measured as 1.00:1.**
+
+    Added 23 Aug with the hero pullback, which is the first screen in this app
+    to mount a string it deliberately does not show yet: the nav title and the
+    docked score chip are both at opacity 0 at rest and fade in as the sheet
+    covers the car. Composited at zero, a text colour *equals* its backdrop, so
+    the ratio comes out at exactly 1.00 — and the report filled with failures
+    for elements nobody can see, which is how a real one gets lost in the noise.
+
+    ⚠ What this costs, stated rather than discovered: an element that is
+    invisible at rest is **not measured at all** here. The harness renders one
+    frame and cannot scroll to the offset where it appears. The nav title and
+    the chip are therefore measured explicitly, against the plate they actually
+    arrive on, in `contrast.test.tsx` — passing the backdrop rather than
+    deriving it. Anything else that fades in needs the same treatment.
+  */
+  if (node.type === 'Text' && effective > 0.01) {
+    found.push({ node, backdrop: surface, opacity: effective });
+  }
   for (const child of node.children ?? []) walk(child, surface, effective, found);
 
   return found;

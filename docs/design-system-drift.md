@@ -130,6 +130,8 @@ reinterpreted.
 | `icons` — *"real Lucide icons only"* | `Icon.tsx` ports the export's own path map to `react-native-svg`. Geometry copied unaltered, per that component's rule: *"do not redraw or approximate."* |
 | `native-wishlist` — the whole screen | Was a free-text box. Now the summary line, divided rows with neutral-unless-urgent chips, and Add in the nav bar. |
 | `native-wishlist` — suggestions | New `WishlistAddScreen`: the three knowledge-base sources as a filterable catalogue with Add and Learn more per row. |
+| `native-hero-pullback` — the whole screen | The vehicle hero is pinned at 62% of the display with the sheet rising over it. Four planes in render order (never `zIndex`), the dial climbing at 1.6× so it docks before the sheet edge arrives, and a crossfade to a nav chip rather than a shrink. Constants mirrored into `theme/hero-motion.ts` from `tokens/hero.css`. |
+| `native-hero-pullback` §4.4 — the compact branch | Below a 500pt hero the dial drops to `card` @104 in a 124pt plinth and the title to 28pt. Only the 4.7″ display takes it; the mini clears by 3pt. |
 
 ---
 
@@ -240,7 +242,50 @@ idiom is the pill.
 **Ask:** confirm the map should carry a native exception, or that the native
 specs should be redrawn at `md`.
 
-### 3.9 No spec exists for the typeahead
+### 3.10 The docked chip's arc — `variant="row"` differs between the two systems ⚠ Design
+
+`HERO_PULLBACK_PROMPT.md` §4.4 specifies the docked chip as *"a 26pt arc
+(`variant="row"` geometry, no needle, no readout) plus the numeral at 16pt"*,
+and §6 says not to change `ClusterGauge`'s internals because *"you need
+`variant="hero"` at a custom `size` and `variant="row"`; both already exist."*
+
+They exist, but this repo's `row` is **text only** — a 30pt numeral over a 12pt
+verdict, no arc at all. It is that way because of `DIAL_MIN`: *"below this a
+dial stops being a dial. Under ~88pt the ticks stop resolving and the instrument
+is decoration."* A 26pt `ClusterGauge` resolves to `row` and returns two lines
+of text at the wrong size for a nav bar.
+
+The build draws the arc in `DialChip` from `@crewchief/core/cluster-geometry` —
+the same `TRACK` path and viewBox the real dial uses, so it cannot drift — and
+does not touch `ClusterGauge`. `DIAL_MIN` is not being dodged: that floor
+governs a dial somebody reads a value *from*, and this arc has no needle, no
+ticks and no readout by design, with the numeral beside it carrying the value.
+
+**Ask:** either the design system's `row` variant should be reconciled with this
+one, or the chip's spec should stop naming `row` and describe the mark directly.
+
+### 3.11 The hero's settings control has no destination ⚠ Design
+
+`native-hero-pullback` and `native-vehicle-detail` both draw a settings gear at
+the hero's top right, and §4.6 lays the nav row out around it — *"left of the
+settings control, at `right: 56`"*.
+
+There is no vehicle-settings screen in the app and nothing for that control to
+open. The build ships the back pill and the score chip and leaves the slot out
+rather than shipping a gear that does nothing.
+
+**Ask:** what does it open? If it is the account surface, that already lives one
+tap from the garage and duplicating it here needs an argument; if it is
+per-vehicle settings, that is a screen nobody has specified.
+
+### 3.12 Buttons on native are pills, and the hero made that visible
+
+Already logged at §3.8 and repeated here only because the hero pullback is where
+it shows: every native spec draws the full-width primary as a pill, and the
+system's radius map assigns `md` to buttons. `Button` is `radius.pill` on
+native.
+
+### 3.13 No spec exists for the typeahead
 
 `Suggest` — a text field with an inline suggestion panel — was added on 23 Aug
 for make/model/year on the add-a-car screen. There is no spec for it.

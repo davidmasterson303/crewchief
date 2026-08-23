@@ -9,6 +9,9 @@ import { everHadVehicle } from '../../onboarding/first-run-storage';
 
 import { GarageScreen } from '../GarageScreen';
 import { VehicleDetailScreen } from '../VehicleDetailScreen';
+import { withSafeArea } from '../../test-support/safe-area';
+import DialChip from '../../components/DialChip';
+import { surface } from '../../theme';
 import { InvoiceScanScreen } from '../InvoiceScanScreen';
 import { RecallDetailScreen } from '../RecallDetailScreen';
 import { WishlistScreen } from '../WishlistScreen';
@@ -93,7 +96,8 @@ describe('the health score colour — never checked by the source scan', () => {
       />
     );
 
-    await view.findByText('2015 BMW M235i');
+    // Twice now — the hero's own title and the nav's, staggered by opacity.
+    await view.findAllByText('2015 BMW M235i');
 
     /*
       No backdrop passed: the helper derives each text's true surface from the
@@ -106,8 +110,7 @@ describe('the health score colour — never checked by the source scan', () => {
   it.each(SCORES)('reads at AA on the vehicle detail card at score %i', async (score) => {
     request.mockResolvedValue({ vehicle: VEHICLE(score) });
 
-    const view = await render(
-      <VehicleDetailScreen
+    const view = await render(withSafeArea(<VehicleDetailScreen
         vehicleId="db143cdc-e68c-46f0-849e-69f7a1873f58"
         onBack={jest.fn()}
         onSignOut={jest.fn()}
@@ -119,12 +122,66 @@ describe('the health score colour — never checked by the source scan', () => {
       onOpenHealth={jest.fn()}
       onOpenBuild={jest.fn()}
       onOpenMilestone={jest.fn()}
-      />
-    );
+      />));
 
-    await view.findByText('2015 BMW M235i');
+    // Twice now — the hero's own title and the nav's, staggered by opacity.
+    await view.findAllByText('2015 BMW M235i');
 
     expect(belowFloor(auditText(view))).toEqual([]);
+  });
+});
+
+describe('the hero pullback fades two strings in, and the walker cannot reach them', () => {
+  /*
+    ⚠ `auditText` skips text at opacity 0 — see the note in `contrast.ts`. The
+    nav title and the docked score chip are both invisible at rest and arrive
+    once the sheet covers the car, so the walker measures neither.
+
+    They are measured here instead, against the surface they actually appear
+    on, by passing the backdrop rather than deriving it. Without these two cases
+    the skip would be a hole rather than a correction.
+  */
+  it('reads at AA on the nav plate once it arrives', async () => {
+    request.mockResolvedValue({ vehicle: VEHICLE(61) });
+
+    const view = await render(
+      withSafeArea(
+        <VehicleDetailScreen
+          vehicleId="db143cdc-e68c-46f0-849e-69f7a1873f58"
+          onBack={jest.fn()}
+          onSignOut={jest.fn()}
+          onAskAdvisor={jest.fn()}
+          onScanInvoice={jest.fn()}
+          onViewRecalls={jest.fn()}
+          onOpenWishlist={jest.fn()}
+          onOpenHistory={jest.fn()}
+          onOpenHealth={jest.fn()}
+          onOpenBuild={jest.fn()}
+          onOpenMilestone={jest.fn()}
+        />
+      )
+    );
+
+    await view.findAllByText('2015 BMW M235i');
+
+    /*
+      `surface.nav` is the plate's own fill, and it is the darkest step on the
+      ladder — so this is the real backdrop rather than a conservative stand-in.
+    */
+    const audits = auditText(view, surface.nav);
+    expect(audits.length).toBeGreaterThan(1);
+    expect(belowFloor(audits)).toEqual([]);
+  });
+
+  it.each(SCORES)('reads at AA on the docked chip at score %i', async (score) => {
+    /*
+      The chip's numeral is `healthBandHex`, so every band has to clear the
+      floor on `surface.card` — the pill's own fill. This is the colour a source
+      scan cannot see, on a surface that is not the page.
+    */
+    const view = await render(<DialChip score={score} />);
+
+    expect(belowFloor(auditText(view, surface.card))).toEqual([]);
   });
 });
 
@@ -196,8 +253,7 @@ describe('failure states, which are where sub-floor text hides', () => {
   it('the vehicle that is no longer there', async () => {
     request.mockRejectedValue(new ApiRequestError({ status: 404, message: 'Vehicle not found' }));
 
-    const view = await render(
-      <VehicleDetailScreen
+    const view = await render(withSafeArea(<VehicleDetailScreen
         vehicleId="db143cdc-e68c-46f0-849e-69f7a1873f58"
         onBack={jest.fn()}
         onSignOut={jest.fn()}
@@ -209,8 +265,7 @@ describe('failure states, which are where sub-floor text hides', () => {
       onOpenHealth={jest.fn()}
       onOpenBuild={jest.fn()}
       onOpenMilestone={jest.fn()}
-      />
-    );
+      />));
 
     await view.findByText('This vehicle is no longer here');
     expect(belowFloor(auditText(view))).toEqual([]);
@@ -236,8 +291,7 @@ describe('the advisor CTA, which is dark text on white', () => {
   it('is measured against its own surface, not the screen', async () => {
     request.mockResolvedValue({ vehicle: VEHICLE(74) });
 
-    const view = await render(
-      <VehicleDetailScreen
+    const view = await render(withSafeArea(<VehicleDetailScreen
         vehicleId="db143cdc-e68c-46f0-849e-69f7a1873f58"
         onBack={jest.fn()}
         onSignOut={jest.fn()}
@@ -249,8 +303,7 @@ describe('the advisor CTA, which is dark text on white', () => {
       onOpenHealth={jest.fn()}
       onOpenBuild={jest.fn()}
       onOpenMilestone={jest.fn()}
-      />
-    );
+      />));
 
     await view.findByText('Ask the advisor');
 
@@ -315,7 +368,8 @@ describe('the measurement itself', () => {
       />
     );
 
-    await view.findByText('2015 BMW M235i');
+    // Twice now — the hero's own title and the nav's, staggered by opacity.
+    await view.findAllByText('2015 BMW M235i');
     expect(auditText(view).length).toBeGreaterThan(4);
   });
 

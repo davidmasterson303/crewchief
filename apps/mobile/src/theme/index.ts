@@ -255,6 +255,49 @@ export const bay = {
 } as const;
 
 /**
+ * ── The vehicle hero ────────────────────────────────────────────────────────
+ *
+ * The pinned photograph on the vehicle screen, and the two layers that make
+ * type over it legal. Mirrored from `tokens/hero.css`; the motion constants
+ * live beside them in `theme/hero-motion.ts`.
+ *
+ * ⚠ `shadow` is **not** `bay.roomFar` and not `surface.nav`. It is the design's
+ * own `#08090B` — a colder, deeper black than anything on the surface ladder,
+ * chosen because it is going *over* a photograph rather than sitting beside
+ * other surfaces. Reaching for `surface.nav` here would tint the dim warm and
+ * make a dark car look brown as the floor comes up.
+ */
+export const hero = {
+  /**
+   * The dim, and the bed gradient's darkest stop.
+   *
+   * ⚠ The bed's floor is this at **0.95**, and that figure is load-bearing
+   * beyond the visual: it is what `contrast.test.tsx` samples the hero's name
+   * and mileage against, rather than the photograph. See `HeroBed`.
+   */
+  shadow: '#08090B',
+  /**
+   * The floating back and settings pills, at rest over the photograph.
+   *
+   * A solid fill, never a blur. There is no glassmorphism anywhere in this
+   * product — `plinth` carries the case that already tried it.
+   */
+  pill: 'rgba(22,21,19,0.78)',
+  /**
+   * The shadow the sheet casts up onto the car as the floor arrives.
+   *
+   * Pure black, not `hero.shadow` — this is a cast shadow rather than a dim,
+   * so it must not carry the dim's slight blue. `tokens/hero.css` writes it as
+   * `rgb(0 0 0 / …)` and the opacity is the animated part.
+   *
+   * ⚠ It is a token rather than a literal because `$rules.colorLiterals` admits
+   * no exception for shadows, and it is right not to: a shadow colour is the
+   * kind of thing that gets nudged to "#111" on one screen and stays.
+   */
+  sheetShadow: '#000000',
+} as const;
+
+/**
  * ── The plinth ──────────────────────────────────────────────────────────────
  *
  * The block the hero dial stands on. It is the page colour at 92% — `fill` is
@@ -408,6 +451,7 @@ export const DIAL_MIN = 88;
 
 export const theme = {
   surface,
+  hero,
   border,
   text,
   brand,
