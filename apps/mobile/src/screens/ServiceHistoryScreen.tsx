@@ -237,17 +237,42 @@ export function ServiceHistoryScreen({ vehicleId, onSignOut }: Props) {
     : state.records;
 
   /*
-    How many rows came off each scanned invoice.
+    ── What each scanned invoice actually was ────────────────────────────────
 
-    ⚠ This is what the payload can honestly say about a document. The invoice
-    itself is a stored file behind a signed URL, and reaching it needs a route
-    this app does not have — so the row says which invoice it came from and how
-    much else came with it, rather than offering to open something it cannot.
+    Every row that came off a scan carries `source_document_id`, and the rows
+    sharing one *are* that invoice — so the shop, the date, the line count and
+    the total are all derivable from what is already on the payload. No route,
+    no join, no second request.
+
+    ⚠ This is metadata **about the invoice**, not a link to it. The document is
+    a stored file behind a signed URL and nothing in this app mints one, so a
+    "view invoice" control could not work. Saying what the invoice was is the
+    honest half, and it is most of the value: "was this the £600 visit in March
+    or the other one" is the question people actually have.
+
+    Reduced from the whole list rather than the filtered one, so a search does
+    not make an invoice look smaller than it is.
   */
-  const perDocument = new Map<string, number>();
+  const invoices = new Map<
+    string,
+    { items: number; total: number; shop: string | null; date: string | null }
+  >();
   for (const record of state.records) {
     const id = record.source_document_id;
-    if (id) perDocument.set(id, (perDocument.get(id) ?? 0) + 1);
+    if (!id) continue;
+
+    const held = invoices.get(id) ?? { items: 0, total: 0, shop: null, date: null };
+    invoices.set(id, {
+      items: held.items + 1,
+      total: held.total + (typeof record.total_cost === 'number' ? record.total_cost : 0),
+      /*
+        First non-empty wins. Every line off one invoice should carry the same
+        shop and date; taking the first rather than the last means a row with a
+        blank field cannot erase what a sibling knew.
+      */
+      shop: held.shop ?? record.shop_name ?? null,
+      date: held.date ?? record.service_date ?? null,
+    });
   }
 
   return (
@@ -331,19 +356,10 @@ export function ServiceHistoryScreen({ vehicleId, onSignOut }: Props) {
             const provenance = recordSourceLabel(record.source);
             const meta = describeRecord(record);
 
-            /*
-              ⚠ How many rows came off the same invoice — not a link to it.
-
-              The document is a stored file behind a signed URL and there is no
-              route on this app that mints one, so offering to "view the
-              invoice" would be a control that cannot work. What the payload
-              genuinely knows is which scan a row came from and what else came
-              with it, and that is what it says. Opening the file itself needs a
-              route, and a route needs a promote.
-            */
-            const siblings = record.source_document_id
-              ? (perDocument.get(record.source_document_id) ?? 1)
-              : 0;
+            /* The scan this row came off, summarised. See `invoices` above. */
+            const invoice = record.source_document_id
+              ? (invoices.get(record.source_document_id) ?? null)
+              : null;
 
             return (
               <Card key={record.id ?? `${record.item_description}-${index}`} style={styles.cardGap}>
@@ -356,6 +372,22 @@ export function ServiceHistoryScreen({ vehicleId, onSignOut }: Props) {
 
                 {meta ? <Text style={styles.meta}>{meta}</Text> : null}
 
+                {/*
+                  What that scan was. Only when it covered more than this row —
+                  a one-line invoice adds nothing the row does not already say.
+                */}
+                {invoice && invoice.items > 1 ? (
+                  <Text style={styles.fromInvoice}>
+                    {[
+                      `From a scan of ${invoice.items} lines`,
+                      invoice.shop,
+                      invoice.total > 0 ? `${formatCurrency(invoice.total)} total` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </Text>
+                ) : null}
+
                 <View style={styles.foot}>
                   {provenance ? (
                     <Text
@@ -365,7 +397,6 @@ export function ServiceHistoryScreen({ vehicleId, onSignOut }: Props) {
                       ]}
                     >
                       {provenance}
-                      {siblings > 1 ? ` · 1 of ${siblings} from that invoice` : ''}
                     </Text>
                   ) : (
                     <View />

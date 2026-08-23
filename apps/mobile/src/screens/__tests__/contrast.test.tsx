@@ -122,6 +122,7 @@ describe('the health score colour — never checked by the source scan', () => {
       onOpenHealth={jest.fn()}
       onOpenBuild={jest.fn()}
       onOpenMilestone={jest.fn()}
+      onOpenProfile={jest.fn()}
       />));
 
     // Twice now — the hero's own title and the nav's, staggered by opacity.
@@ -158,6 +159,7 @@ describe('the hero pullback fades two strings in, and the walker cannot reach th
           onOpenHealth={jest.fn()}
           onOpenBuild={jest.fn()}
           onOpenMilestone={jest.fn()}
+          onOpenProfile={jest.fn()}
         />
       )
     );
@@ -265,6 +267,7 @@ describe('failure states, which are where sub-floor text hides', () => {
       onOpenHealth={jest.fn()}
       onOpenBuild={jest.fn()}
       onOpenMilestone={jest.fn()}
+      onOpenProfile={jest.fn()}
       />));
 
     await view.findByText('This vehicle is no longer here');
@@ -303,6 +306,7 @@ describe('the advisor CTA, which is dark text on white', () => {
       onOpenHealth={jest.fn()}
       onOpenBuild={jest.fn()}
       onOpenMilestone={jest.fn()}
+      onOpenProfile={jest.fn()}
       />));
 
     await view.findByText('Ask the advisor');

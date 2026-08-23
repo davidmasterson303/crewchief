@@ -24,6 +24,7 @@ import { pickInvoiceImage, pickVehiclePhoto } from '../media/pick-image';
 import { GarageScreen } from '../screens/GarageScreen';
 import { AddVehicleScreen } from '../screens/AddVehicleScreen';
 import { VehicleDetailScreen } from '../screens/VehicleDetailScreen';
+import { VehicleProfileScreen } from '../screens/VehicleProfileScreen';
 import Icon from '../components/Icon';
 import { surface, text } from '../theme';
 
@@ -168,6 +169,12 @@ export type RootStackParamList = {
     who did not mean to open it.
   */
   WishlistAdd: { vehicleId: string; title?: string };
+  /*
+    The owner's four onboarding answers, editable. Not deep-linkable for the
+    same reason `AddVehicle` is not: a URL that opens a form which writes rows
+    is a URL that can be put in front of someone who did not mean to open it.
+  */
+  VehicleProfile: { vehicleId: string; title?: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -444,6 +451,12 @@ export function RootNavigator({
                   title: route.params.title,
                 })
               }
+              onOpenProfile={() =>
+                navigation.navigate('VehicleProfile', {
+                  vehicleId: route.params.vehicleId,
+                  title: route.params.title,
+                })
+              }
               // The same seam as the garage's. See `pick-image.ts`.
               pickPhoto={() => pickVehiclePhoto('library')}
             />
@@ -570,6 +583,21 @@ export function RootNavigator({
                 that makes them tap in five times.
               */
               onAdded={() => {}}
+            />
+          )}
+        </Stack.Screen>
+
+        <Stack.Screen name="VehicleProfile" options={{ title: 'What you told us' }}>
+          {({ route, navigation }) => (
+            <VehicleProfileScreen
+              vehicleId={route.params.vehicleId}
+              onSignOut={onSignOut}
+              /*
+                Back to the car, which refetches on focus — so a changed answer
+                shows up where it matters. `goBack` rather than a navigate, so
+                the stack does not grow a second copy of the screen behind.
+              */
+              onSaved={() => navigation.goBack()}
             />
           )}
         </Stack.Screen>

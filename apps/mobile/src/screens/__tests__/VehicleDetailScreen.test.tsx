@@ -153,6 +153,7 @@ async function mount(metrics = REFERENCE) {
     onOpenHealth: jest.fn(),
     onOpenBuild: jest.fn(),
     onOpenMilestone: jest.fn(),
+    onOpenProfile: jest.fn(),
   };
   return { props, view: await render(withSafeArea(<VehicleDetailScreen {...props} />, metrics)) };
 }

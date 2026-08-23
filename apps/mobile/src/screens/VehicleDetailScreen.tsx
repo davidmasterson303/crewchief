@@ -285,6 +285,7 @@ export function VehicleDetailScreen({
   onOpenHealth,
   onOpenBuild,
   onOpenMilestone,
+  onOpenProfile,
   pickPhoto,
 }: {
   vehicleId: string;
@@ -317,6 +318,8 @@ export function VehicleDetailScreen({
   onOpenHealth: () => void;
   onOpenBuild: () => void;
   onOpenMilestone: () => void;
+  /** The owner's four onboarding answers, editable. */
+  onOpenProfile: () => void;
   /**
    * The picker seam — this screen never imports `expo-image-picker`.
    *
@@ -984,34 +987,25 @@ export function VehicleDetailScreen({
       {/*
         ── What the owner told us ─────────────────────────────────────────────
 
-        `ListRow`, not `NavRow`, and the difference is the point of having both:
-        these are **facts** the product holds about the car, so the label is the
-        caption and the value is the payload. Nothing here goes anywhere.
+        ⚠ A **destination**, not a read-only card. It was four `ListRow`s with
+        no way to change any of them — David's *"why are we showing these
+        details with no option to update? all should be editable."* The honest
+        answer was that nothing in the product could write them:
+        `PATCH /api/v1/vehicles` took a mileage reading and nothing else.
 
-        ⚠ Mileage is deliberately absent — it moved into the identity line at the
-        top of the screen. Repeating it here would be the card duplication this
-        screen was cleaned up to remove.
+        A row rather than inline editing, because one of these answers turns a
+        whole surface on and off — `stock` hides the Build route — and that
+        deserves a deliberate save rather than happening under a finger.
       */}
-      <Card>
-        <SectionHeader title="What you told us" />
-        <Row
-          label="Average per month"
-          value={
-            typeof vehicle.avg_miles_per_month === 'number'
-              ? `${miles.format(vehicle.avg_miles_per_month)} mi`
-              : null
-          }
+      <ListGroup label="What you told us">
+        <NavRow
+          icon="sliders"
+          label="How you use this car"
+          count={vehicle.vehicle_status ? humanise(vehicle.vehicle_status) : null}
+          onPress={onOpenProfile}
+          last
         />
-        <Row label="Use" value={vehicle.vehicle_status ? humanise(vehicle.vehicle_status) : null} />
-        <Row
-          label="Goal"
-          value={vehicle.performance_mindedness ? humanise(vehicle.performance_mindedness) : null}
-        />
-        <Row
-          label="Objective"
-          value={vehicle.ownership_objective ? humanise(vehicle.ownership_objective) : null}
-        />
-      </Card>
+      </ListGroup>
           </View>
         </Animated.View>
       </Animated.ScrollView>

@@ -4,6 +4,7 @@ import type { ApiResponse } from '@crewchief/core/types';
 import { checkRateLimit, getClientIdentifier, rateLimitResponse } from '@/lib/rate-limit';
 import { authorizeVehicleAccess, requireCaller } from '@/lib/api-auth';
 import { validateMileageUpdate } from '@crewchief/core/mileage-tracking';
+import { validateProfileUpdate } from '@crewchief/core/vehicle-profile';
 import { buildBaselineRow, isBaselineAge } from '@crewchief/core/onboarding-baseline';
 import { getServiceRoleClient } from '@/lib/supabase';
 import { resolveVehiclePhotos } from '@/lib/vehicle-photo';
@@ -202,7 +203,7 @@ export async function PATCH(request: NextRequest): Promise<Response> {
     return rateLimitResponse(rateLimit);
   }
 
-  let body: { vehicleId?: unknown; currentMileage?: unknown; isCorrection?: unknown };
+  let body: Record<string, unknown>;
   try {
     body = await request.json();
   } catch {
@@ -227,6 +228,59 @@ export async function PATCH(request: NextRequest): Promise<Response> {
   */
   const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
   if (!access.ok) return access.response;
+
+  /*
+    ── ⚠ Two updates through one verb, and the split is deliberate ────────────
+
+    A mileage reading and the owner's four onboarding answers are both a PATCH
+    on the same resource, so they share a route — and share nothing else. The
+    mileage path has its own rule (`validateMileageUpdate`), its own 422
+    semantics and a `last_mileage_update_date` side effect; the profile path has
+    a different rule and no side effect.
+
+    Branching on **which fields arrived** rather than on a mode flag: a flag is
+    a second thing a caller can get wrong, and the body already says what it
+    means. `currentMileage` present means a reading; anything else means the
+    profile.
+
+    Added 23 Aug because the vehicle screen rendered four answers with **no
+    write path at any layer** — David's *"why are we showing these details with
+    no option to update?"* The honest answer was that nothing could.
+  */
+  if (body.currentMileage === undefined) {
+    const decision = validateProfileUpdate(body);
+
+    if (!decision.ok) {
+      /*
+        422, matching the mileage path: the request is well-formed and the
+        caller is authorized, and what failed is a rule about a value. The
+        message is written to be shown to the person who typed it.
+      */
+      return Response.json({ success: false, error: decision.message } as ApiResponse, {
+        status: 422,
+      });
+    }
+
+    const { error: profileError } = await access.client
+      .from('vehicles')
+      .update(decision.changes!)
+      .eq('id', vehicleId);
+
+    if (profileError) {
+      logger.error('API:PATCH_VEHICLE', new Error(profileError.message), { vehicleId });
+      return Response.json({ success: false, error: 'Could not save that' } as ApiResponse, {
+        status: 500,
+      });
+    }
+
+    logger.info('API:PATCH_VEHICLE', 'Vehicle profile updated', {
+      vehicleId,
+      // The field names, never their values — an objective is the owner's prose.
+      fields: Object.keys(decision.changes!),
+    });
+
+    return Response.json({ success: true, updated: Object.keys(decision.changes!) } as ApiResponse);
+  }
 
   const { data: vehicle, error: readError } = await access.client
     .from('vehicles')
