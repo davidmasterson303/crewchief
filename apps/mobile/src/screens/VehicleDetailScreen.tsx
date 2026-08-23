@@ -24,17 +24,14 @@ import { normaliseRecalls } from '@crewchief/core/recalls';
 import AlertBanner from '../components/AlertBanner';
 import Button from '../components/Button';
 import Card from '../components/Card';
-import ClusterGauge from '../components/ClusterGauge';
 import DialChip, { DIAL_CHIP_SLOT } from '../components/DialChip';
 import { HeroBed, HeroEmpty } from '../components/HeroBed';
 import { type HealthReading } from '../components/HealthHistory';
 import Icon from '../components/Icon';
-import Plinth from '../components/Plinth';
 import ListGroup from '../components/ListGroup';
 import NavRow from '../components/NavRow';
 import SectionHeader from '../components/SectionHeader';
 import {
-  HERO_DIAL_DOCK_SCALE,
   HERO_DIM_MAX,
   HERO_DIM_REST,
   HERO_DIM_SPAN,
@@ -46,9 +43,7 @@ import {
   HERO_SHEET_OVERLAP,
   HERO_TITLE_FADE_SPAN,
   detailHeroHeight,
-  dialFlight,
   heroBands,
-  identityBlockHeight,
 } from '../theme/hero-motion';
 import { TABULAR, border, brand, hero, plinth, radius, space, surface, text, type } from '../theme';
 import { getHealthBandJudgement, healthBandHex } from '@crewchief/core/health-band';
@@ -359,7 +354,6 @@ export function VehicleDetailScreen({
 
   const heroH = detailHeroHeight(windowHeight);
   const bands = heroBands(heroH);
-  const flight = dialFlight(heroH, insets.top);
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -704,42 +698,6 @@ export function VehicleDetailScreen({
     extrapolate: 'clamp',
   });
 
-  /*
-    ⚠ The dial climbs at `HERO_DIAL_RATE`, not the hero's rate. That is the
-    layering fix, and it is the rate rather than the z-index: the dial is chrome,
-    not scenery, and that is why it does not share the hero's parallax rate.
-  */
-  const dialRise = scrollY.interpolate({
-    inputRange: [0, flight.dockAt],
-    outputRange: [0, -(flight.restY - flight.dockY)],
-    extrapolate: 'clamp',
-  });
-
-  const dialScale = scrollY.interpolate({
-    inputRange: [flight.fullAt, flight.dockAt],
-    outputRange: [1, HERO_DIAL_DOCK_SCALE],
-    extrapolate: 'clamp',
-  });
-
-  const dialFade = scrollY.interpolate({
-    inputRange: [flight.fadeFrom, flight.fadeTo],
-    outputRange: [1, 0],
-    extrapolate: 'clamp',
-  });
-
-  const verdictFade = scrollY.interpolate({
-    inputRange: [flight.verdictFrom, flight.verdictTo],
-    outputRange: [1, 0],
-    extrapolate: 'clamp',
-  });
-
-  /* Two drawings, one crossfade — never a morph. See `DialChip`. */
-  const chipFade = scrollY.interpolate({
-    inputRange: [flight.chipFrom, flight.dockAt],
-    outputRange: [0, 1],
-    extrapolate: 'clamp',
-  });
-
   const sheetShadow = scrollY.interpolate({
     inputRange: [0, HERO_DIM_SPAN],
     outputRange: [0.28, 0.7],
@@ -1044,42 +1002,35 @@ export function VehicleDetailScreen({
         <View style={styles.navChipSlot} pointerEvents="none" />
       </View>
 
-      {/* ── z7 · DIAL — belongs to neither plane, and sits above both. ──────── */}
-      {score !== null && band && (
-        <>
-          <Animated.View
-            style={[
-              styles.dial,
-              {
-                top: flight.restY - bands.plinthHeight / 2,
-                opacity: dialFade,
-                transform: [{ translateY: dialRise }, { scale: dialScale }],
-              },
-            ]}
-            pointerEvents="none"
-          >
-            {/*
-              ⚠ On a `Plinth`, always. The hero numeral never sits on raw
-              photography — the score is the most important thing on this screen
-              and must not take its contrast from whatever pixels happen to be
-              behind it. The bed gradient does not cover this: it only bites at
-              52% from the bottom and the dial is above that line.
-            */}
-            <Plinth style={{ height: bands.plinthHeight }}>
-              <ClusterGauge score={score} variant={bands.dialVariant} size={bands.dialSize} />
-            </Plinth>
-            <Animated.Text style={[styles.verdict, { opacity: verdictFade }]}>
-              {band.short}
-            </Animated.Text>
-          </Animated.View>
+      {/*
+        ── z7 · THE SCORE, in the nav ──────────────────────────────────────────
 
-          <Animated.View
-            style={[styles.dialChip, { top: insets.top + 6, opacity: chipFade }]}
-            pointerEvents="none"
-          >
-            <DialChip score={score} />
-          </Animated.View>
-        </>
+        ⚠ **The hero dial is gone, and this is what replaced it.** David,
+        23 Aug: *"we can lose the dial with health score overlaying car image.
+        The animation is fun but info is redundant and it might cover an
+        important part of the car image people care about."*
+
+        Both halves are right, and the second is the one that settles it. The
+        photograph is the only place in the product an owner sees their own car,
+        and a 160pt plinth sat in the middle of it — over the roofline on most
+        3:4 phone snapshots. An instrument that obscures the subject it is
+        reporting on has its priorities inverted.
+
+        The redundancy was real too, and self-inflicted: the health card gained
+        its own reading earlier the same day, so by then the score appeared
+        three times. Two remain, and they do different jobs — this is chrome
+        that persists, and the card's is the subject of the paragraph under it.
+
+        What went with it: `dialFlight`, the 1.6× climb, the crossfade, and the
+        layering invariant that was the hardest part of the design. There is no
+        travelling instrument left to collide with the sheet, so the rule that
+        governed it has nothing to govern. That is a real simplification rather
+        than a deletion — logged for Design in `docs/design-system-drift.md`.
+      */}
+      {score !== null && band && (
+        <View style={[styles.dialChip, { top: insets.top + 6 }]} pointerEvents="none">
+          <DialChip score={score} />
+        </View>
       )}
     </View>
   );
@@ -1200,9 +1151,7 @@ const styles = StyleSheet.create({
   navTitle: { ...type.uiStrong, color: text.primary, flex: 1, textAlign: 'center' },
   navChipSlot: { width: DIAL_CHIP_SLOT },
 
-  /* ── z7 · the dial ────────────────────────────────────────────────────── */
-  dial: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
-  verdict: { ...type.label, color: text.muted, marginTop: space.xs, textAlign: 'center' },
+  /* ── z7 · the score chip ──────────────────────────────────────────────── */
   dialChip: { position: 'absolute', right: space.lg, alignItems: 'flex-end' },
 
   /*

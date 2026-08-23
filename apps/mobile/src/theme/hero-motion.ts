@@ -14,20 +14,27 @@
  * fade start, and the dial's rate is chosen against the sheet's overlap. Change
  * one in isolation and the design stops holding without anything failing.
  *
- * ── The one rule to read before touching the dial ───────────────────────────
+ * ── ⚠ The dial is gone, and so is the rule that governed it ────────────────
  *
- * ⚠ **The dial is chrome, not scenery, and that is why it does not share the
- * hero's parallax rate.** It belongs to neither plane: it starts over the
- * photograph and ends in the nav bar, so it sits above the sheet the whole way.
- * Two failure modes, both live in the exploration build:
+ * This module opened with a long argument about the health dial's flight: it
+ * belonged to neither plane, climbed at 1.6× so it docked before the sheet edge
+ * arrived, and crossfaded into a nav chip. That was the hardest part of the
+ * design and it worked.
  *
- *   - hero's rate + above the sheet → it floats over the first content card
- *     like a sticker.
- *   - hero's depth → the sheet swallows it mid-flight.
+ * It was removed on 23 Aug on David's call: *"the animation is fun but info is
+ * redundant and it might cover an important part of the car image people care
+ * about."* The photograph is the only place an owner sees their own car, and a
+ * 160pt plinth sat over the roofline of most 3:4 phone snapshots.
  *
- * The fix is the **rate**, not the z-index: at `HERO_DIAL_RATE` it climbs about
- * five times faster than the hero drifts, so it is docked and out of the way
- * long before the sheet edge arrives.
+ * So `HERO_DIAL_RATE`, `dialFlight`, `dialClearsSheet` and the layering
+ * invariant are all deleted rather than left dormant. **There is no travelling
+ * instrument left to collide with the sheet**, so a guard about that collision
+ * would be a test with nothing to fail on — the kind that stays green forever
+ * and gets mistaken for coverage. The score lives in the nav chip, which does
+ * not move.
+ *
+ * What remains is the pullback itself: a pinned hero whose contents drift at a
+ * third of scroll speed under a sheet that rises over them.
  */
 
 /* ── Rates and spans ──────────────────────────────────────────────────────── */
@@ -46,13 +53,6 @@ export const HERO_SCALE_GAIN = 0.14;
 export const HERO_IMAGE_BLEED = 60;
 /** How far the sheet rests **onto** the hero at zero scroll. */
 export const HERO_SHEET_OVERLAP = 48;
-
-/** See the ⚠ in the header. Five times the hero's drift, and deliberately so. */
-export const HERO_DIAL_RATE = 1.6;
-/** The dial's scale once docked. It crossfades to a chip rather than reaching 0. */
-export const HERO_DIAL_DOCK_SCALE = 0.34;
-/** Travel over which the dial hands off to the chip. */
-export const HERO_DIAL_FADE_SPAN = 180;
 
 export const HERO_DIM_REST = 0.06;
 export const HERO_DIM_MAX = 0.78;
@@ -92,11 +92,6 @@ export function detailHeroHeight(windowHeight: number): number {
 export interface HeroBands {
   /** `true` on a display too short for the full-size plinth and title. */
   compact: boolean;
-  dialVariant: 'hero' | 'card';
-  dialSize: number;
-  plinthHeight: number;
-  /** Plinth centre as a fraction of the hero's height. */
-  dialStart: number;
   titleSize: number;
   /** Distance from the hero's bottom edge to the identity block's baseline box. */
   titleAnchor: number;
@@ -126,137 +121,14 @@ export function heroBands(heroHeight: number): HeroBands {
   return compact
     ? {
         compact,
-        dialVariant: 'card',
-        dialSize: 104,
-        plinthHeight: 124,
-        dialStart: 0.43,
         titleSize: 28,
         titleAnchor: 66,
       }
     : {
         compact,
-        /*
-          132, not `HERO_SIZE` (184). One dial per screen is the hero, and on
-          this screen the hero is the photograph — the same argument
-          `GarageBay.tsx` already makes for 164 rather than 184 there.
-        */
-        dialVariant: 'hero',
-        dialSize: 132,
-        plinthHeight: 160,
-        dialStart: 0.46,
         titleSize: 36,
         titleAnchor: 86,
       };
-}
-
-/**
- * How tall the identity block is, so a caller can ask where its top edge lands.
- *
- * Two lines of title plus the mileage line and the gap between them. Two lines
- * rather than one because that is the case the compact branch exists for — a
- * name that wraps is the one that collides with the plinth, and sizing this
- * against the single-line case would make the clearance test pass on the names
- * that were never the problem.
- */
-export function identityBlockHeight(bands: HeroBands): number {
-  const titleLine = bands.titleSize * 1.05;
-  const mileageLine = 20;
-  const gap = 8;
-  return Math.round(titleLine * 2 + mileageLine + gap);
-}
-
-/* ── The dial's flight ────────────────────────────────────────────────────── */
-
-export interface DialFlight {
-  /** Where the plinth's centre sits at rest, from the hero's top edge. */
-  restY: number;
-  /** Where it comes to rest in the nav row. */
-  dockY: number;
-  /** Scroll offset at which it arrives. Everything after this is the chip. */
-  dockAt: number;
-  /** Scroll offsets for `k` = 1 and `k` = 0 — the handoff's fade parameter. */
-  fullAt: number;
-  /** Scroll offsets where the dial's own opacity leaves 1 and reaches 0. */
-  fadeFrom: number;
-  fadeTo: number;
-  /** Where the verdict label under the numeral gives up. */
-  verdictFrom: number;
-  verdictTo: number;
-  /** Where the docked chip starts appearing. */
-  chipFrom: number;
-}
-
-/**
- * The dial's whole journey, as scroll offsets.
- *
- * ── Why this is a function and not a pile of `interpolate` calls ────────────
- *
- * The handoff expresses the dial in terms of `k`, a fade parameter derived from
- * the dial's own position: `k = clamp((cy - dockY) / 180, 0, 1)`. That is the
- * right way to *describe* it and the wrong way to *drive* it, because RN's
- * native driver interpolates from one `Animated.Value` — the scroll offset —
- * and cannot chain a clamp through a second derived value.
- *
- * So every threshold is converted back into the scroll offset that produces it.
- * The formulas are unchanged; only the variable they are expressed in is. That
- * conversion is exactly the kind of arithmetic that is wrong silently, which is
- * why it lives here with tests on it rather than inline in a `style` prop.
- */
-export function dialFlight(heroHeight: number, safeTop: number): DialFlight {
-  const bands = heroBands(heroHeight);
-
-  const restY = heroHeight * bands.dialStart;
-  const dockY = safeTop + 22;
-
-  /** Total travel, and the distance `k` is measured over. */
-  const travel = Math.max(0, restY - dockY);
-
-  /** The scroll offset at which the dial's centre reaches a given `k`. */
-  const atK = (k: number) => Math.max(0, (travel - k * HERO_DIAL_FADE_SPAN) / HERO_DIAL_RATE);
-
-  return {
-    restY,
-    dockY,
-    dockAt: atK(0),
-    fullAt: atK(1),
-    // opacity = clamp(3k - 0.15, 0, 1): full at k = 0.3833, gone at k = 0.05.
-    fadeFrom: atK(1 / 3 + 0.05),
-    fadeTo: atK(0.05),
-    // verdict = clamp(2.4k - 1.1, 0, 1): full at k = 0.875, gone at k = 0.4583.
-    verdictFrom: atK(0.875),
-    verdictTo: atK(1.1 / 2.4),
-    // chip = clamp(1 - 3k, 0, 1): starts at k = 1/3, full at k = 0.
-    chipFrom: atK(1 / 3),
-  };
-}
-
-/**
- * Where the sheet's leading edge sits at a given scroll offset.
- *
- * The sheet is the only thing that travels, so this is simply its rest position
- * less the scroll — but naming it means the layering invariant can be asserted
- * against the same expression the screen lays out from.
- */
-export function sheetEdgeAt(heroHeight: number, y: number): number {
-  return heroHeight - HERO_SHEET_OVERLAP - y;
-}
-
-/**
- * ⚠ **The regression that matters.** True when the dial has finished docking
- * before the sheet's edge reaches its lower boundary.
- *
- * This was wrong twice in the design's own exploration, in both directions, and
- * it is not visible in a screenshot — it only appears mid-scroll, on one device
- * size, with the right content height. `VehicleDetailScreen.test.tsx` holds it
- * at the shortest and tallest supported windows.
- */
-export function dialClearsSheet(windowHeight: number, safeTop: number): boolean {
-  const heroHeight = detailHeroHeight(windowHeight);
-  const bands = heroBands(heroHeight);
-  const flight = dialFlight(heroHeight, safeTop);
-
-  const dialBottomAtDock = flight.dockY + bands.plinthHeight / 2;
-  return sheetEdgeAt(heroHeight, flight.dockAt) > dialBottomAtDock;
 }
 
 /**

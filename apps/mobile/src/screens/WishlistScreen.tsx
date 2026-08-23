@@ -78,12 +78,25 @@ interface Props {
   /**
    * Opens the suggestions catalogue.
    *
-   * ⚠ A route, not a sheet on this screen, and the nav bar is where it is
-   * offered from. `native-wishlist.spec.html`: *"Add is in the nav bar, not a
-   * floating action button. A FAB covers the last row and belongs to a
-   * different design language."*
+   * ⚠ A route, not a sheet on this screen. `native-wishlist.spec.html`: *"Add
+   * is in the nav bar, not a floating action button. A FAB covers the last row
+   * and belongs to a different design language."*
    */
   onAdd: () => void;
+  /**
+   * Told when the list turns out to be empty, so the nav bar can drop its `+`.
+   *
+   * ⚠ The redundancy David flagged was two controls doing one job on a screen
+   * with nothing on it. I removed the wrong one first — a filled button is the
+   * affordance on an empty screen, and a corner glyph is not. So the button
+   * stays and the `+` stands down until there is a list to add to.
+   *
+   * Reported upward rather than decided in the navigator, because only this
+   * screen knows whether the fetch came back empty — and it must not be
+   * confused with "still loading", which is why it fires on the loaded state
+   * rather than on `items.length` at any moment.
+   */
+  onEmptyChange?: (empty: boolean) => void;
 }
 
 interface WishlistItem {
@@ -156,7 +169,7 @@ function isUrgent(item: WishlistItem): boolean {
   return item.item_type === 'issue';
 }
 
-export function WishlistScreen({ vehicleId, onSignOut, onAdd }: Props) {
+export function WishlistScreen({ vehicleId, onSignOut, onAdd, onEmptyChange }: Props) {
   const [state, setState] = useState<State>({ kind: 'loading' });
   const [refreshing, setRefreshing] = useState(false);
   const [doneItem, setDoneItem] = useState<WishlistItem | null>(null);
@@ -189,6 +202,14 @@ export function WishlistScreen({ vehicleId, onSignOut, onAdd }: Props) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  /*
+    Only ever from the loaded state. "Loading" is not "empty", and reporting it
+    as such would flash the nav bar's `+` out and back on every refresh.
+  */
+  useEffect(() => {
+    if (state.kind === 'loaded') onEmptyChange?.(state.items.length === 0);
+  }, [state, onEmptyChange]);
 
   const remove = useCallback(
     (item: WishlistItem) => {
@@ -324,16 +345,20 @@ export function WishlistScreen({ vehicleId, onSignOut, onAdd }: Props) {
           rather than helpfulness.
         */
         /*
-          ⚠ No action here, and that is the fix rather than an omission.
+          ⚠ The big CTA stays, and the **nav bar's `+` is what goes** — see the
+          header's note. I resolved the redundancy the wrong way round first.
 
-          It carried a "See suggestions" button while the nav bar's + does the
-          same thing two inches above it — David's "redundant CTA". The spec is
-          explicit that Add lives in the nav bar, so the button is the one that
-          goes, and the copy names the control that stays.
+          On an empty screen a filled button is the affordance and a 22pt glyph
+          in the corner is a rounding error; once there are rows the `+` is
+          right and there is no empty state to compete with it. One control per
+          state, rather than one control per screen.
         */
         <EmptyState
           headline="Nothing on the list yet"
-          body="Tap + above to see what we already know this car needs — its known issues, its schedule, and the usual modifications. You can add anything of your own too."
+          body="See what we already know this car needs — its known issues, its schedule, and the usual modifications. You can add anything of your own too."
+          actionLabel="See suggestions"
+          actionAccessibilityLabel="See what this car needs"
+          onAction={onAdd}
         />
       ) : (
         state.items.map((item, index) => (

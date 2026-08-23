@@ -522,24 +522,7 @@ export function RootNavigator({
             `GarageScreen`'s conditional returns. A person whose wishlist failed
             to load can still add to it.
           */
-          options={({ route, navigation }) => ({
-            title: 'Wishlist',
-            headerRight: () => (
-              <Pressable
-                onPress={() =>
-                  navigation.navigate('WishlistAdd', {
-                    vehicleId: route.params.vehicleId,
-                    title: route.params.title,
-                  })
-                }
-                accessibilityRole="button"
-                accessibilityLabel="Add to the wishlist"
-                hitSlop={12}
-              >
-                <Icon name="plus" size={22} color={text.primary} />
-              </Pressable>
-            ),
-          })}
+          options={{ title: 'Wishlist' }}
         >
           {({ route, navigation }) => (
             <WishlistScreen
@@ -549,6 +532,39 @@ export function RootNavigator({
                 navigation.navigate('WishlistAdd', {
                   vehicleId: route.params.vehicleId,
                   title: route.params.title,
+                })
+              }
+              /*
+                ⚠ The `+` stands down while the list is empty.
+
+                Two controls doing one job on a screen with nothing on it was
+                the redundancy — and the empty state's filled button is the one
+                worth keeping, because a 22pt glyph in the corner is not an
+                affordance on an otherwise blank screen. Once there are rows the
+                `+` is the only way in and there is no empty state competing.
+
+                `setOptions` from the screen's own render, because only the
+                screen knows whether the fetch came back empty.
+              */
+              onEmptyChange={(empty) =>
+                navigation.setOptions({
+                  headerRight: empty
+                    ? undefined
+                    : () => (
+                        <Pressable
+                          onPress={() =>
+                            navigation.navigate('WishlistAdd', {
+                              vehicleId: route.params.vehicleId,
+                              title: route.params.title,
+                            })
+                          }
+                          accessibilityRole="button"
+                          accessibilityLabel="Add to the wishlist"
+                          hitSlop={12}
+                        >
+                          <Icon name="plus" size={22} color={text.primary} />
+                        </Pressable>
+                      ),
                 })
               }
             />

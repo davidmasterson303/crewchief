@@ -3,17 +3,11 @@ import { render, userEvent, waitFor } from '@testing-library/react-native';
 import { VehicleDetailScreen } from '../VehicleDetailScreen';
 import { REFERENCE, SHORTEST, withSafeArea } from '../../test-support/safe-area';
 import {
-  HERO_DIAL_RATE,
   HERO_NAV_FADE_START,
-  HERO_PARALLAX_RATE,
   HERO_TITLE_FADE_SPAN,
   detailHeroHeight,
-  dialClearsSheet,
-  dialFlight,
   heroBands,
   heroTitleClearsNavTitle,
-  identityBlockHeight,
-  sheetEdgeAt,
 } from '../../theme/hero-motion';
 import * as RN from 'react-native';
 import { StyleSheet } from 'react-native';
@@ -396,66 +390,44 @@ describe('what this screen leads to stays reachable', () => {
     expect(at('Ask the advisor')).toBeLessThan(at('What you told us'));
   });
 
-  it('draws the hero dial at 132, and the compact branch at 104', async () => {
+  it('shows the score twice, and never over the car', async () => {
     /*
-      ⚠ This claim changed on 23 Aug and the old one is worth recording. It used
-      to assert the **card** variant here — "one dial per screen is the hero, and
-      the hero is the garage bay". The hero-pullback design keeps that rule and
-      moves the dial: on this screen the hero is now the photograph, so the dial
-      is `variant="hero"` at **132**, not `HERO_SIZE` 184 — the same argument
-      `GarageBay` already makes for 164 rather than 184 there.
+      ⚠ Rewritten 23 Aug when the hero dial was removed. It used to assert the
+      dial's readout size — 20 at hero/132, 36 at card/104 — which is now a
+      component that does not exist.
 
-      Below `HERO_COMPACT_BELOW` it drops to the card variant at 104, because a
-      160pt plinth and a two-line 36pt title do not both fit in a 414pt frame.
+      What replaced the claim: the score appears **twice**, and neither is on
+      the photograph. The nav chip persists as chrome; the health card's own
+      reading is the subject of the paragraph under it. Three copies existed for
+      part of a day and the dial was the one that went, because it covered the
+      car.
     */
     respond();
     const { view } = await mount(REFERENCE);
 
     await view.findAllByText(/2018 Honda Accord/);
-    /*
-      Two readings, and that is the crossfade rather than a duplicate: the dial
-      and the chip it hands off to are both mounted the whole way, staggered by
-      opacity. Two drawings, one crossfade — never a morph.
-    */
-    /*
-      ⚠ **Three**, and each does a different job at a different scale — the
-      instrument, the chrome, and the subject of a paragraph.
 
-      The card's header was added on 23 Aug because the score's *explanation*
-      outlived the score on screen: by the time the summary is readable the dial
-      has drifted and only the chip remains, and a paragraph about a reading you
-      have to look away to find is a paragraph about nothing.
-
-      Only two are ever visible at once — the dial and the card at rest, the
-      chip and the card once scrolled — which is why this is not the duplication
-      the hero was built to remove.
-    */
     const readouts = await view.findAllByText('61');
-    expect(readouts).toHaveLength(3);
-
-    /*
-      ⚠ The readout's size is derived from the variant and the width inside
-      `ClusterGauge` — `width * (isCard ? 60/172 : 30/200)` — so it is the one
-      rendered property that proves which branch ran. 132 at the hero variant
-      gives 20; the chip's own numeral is a fixed 16.
-
-      The assertion this replaced checked `queryByText('20')` was null, meaning
-      to catch the hero's numbered majors. Those are `react-native-svg` text
-      nodes, which `getByText` never matches — so it passed for both variants
-      and proved nothing. §5's own rule, found in this file.
-    */
-    // chip 16 · hero dial at 132 gives 20 · the card's own header 30.
-    expect(readoutSizes(readouts).sort((a, b) => a - b)).toEqual([16, 20, 30]);
+    expect(readouts).toHaveLength(2);
+    // The chip's fixed 16, and the card's own 30. No instrument readout.
+    expect(readoutSizes(readouts).sort((a, b) => a - b)).toEqual([16, 30]);
   });
 
-  it('takes the compact branch on the shortest display', async () => {
+  it('sizes the hero title down on the shortest display', async () => {
+    /*
+      The compact branch outlived the dial it was written for. A two-line 36pt
+      name is too much for a 414pt hero whether or not there is an instrument
+      beside it, so the threshold still sizes the title — 36 above it, 28 below.
+    */
     respond();
-    const { view } = await mount(SHORTEST);
 
-    await view.findAllByText(/2018 Honda Accord/);
-    // 104 at the card variant gives a 36pt readout, against the hero's 20.
-    const readouts = await view.findAllByText('61');
-    expect(readoutSizes(readouts).sort((a, b) => a - b)).toEqual([16, 30, 36]);
+    const tall = await mount(REFERENCE);
+    const tallTitle = (await tall.view.findAllByText(/2018 Honda Accord/))[0];
+    expect(readoutSizes([tallTitle])).toEqual([36]);
+
+    const short = await mount(SHORTEST);
+    const shortTitle = (await short.view.findAllByText(/2018 Honda Accord/))[0];
+    expect(readoutSizes([shortTitle])).toEqual([28]);
   });
 });
 
@@ -491,49 +463,20 @@ describe('the first load stands in for the dossier', () => {
  * standing still.
  */
 describe('the hero pullback', () => {
-  it('keeps the dial clear of the sheet, on the shortest and tallest displays', () => {
-    /*
-      ⚠ **The regression that matters** — the bug that was in this design twice,
-      in both directions. Give the dial the hero's rate and it floats over the
-      first content card like a sticker; give it the hero's depth and the sheet
-      swallows it mid-flight. The fix is the rate, and this is what holds it.
-    */
-    expect(dialClearsSheet(667, 20)).toBe(true);
-    expect(dialClearsSheet(932, 59)).toBe(true);
-  });
+  /*
+    ⚠ Three cases were deleted here on 23 Aug, and what they were is worth
+    recording: the layering invariant (the dial docking clear of the sheet
+    edge), its anti-vacuous pair, and the rest-state clearance between the
+    plinth and the title. All three guarded the travelling health dial, and all
+    three were the hardest-won assertions in this file — the invariant caught
+    the bug the design itself had twice.
 
-  it('can still detect a dial that does not clear, so the case above is not vacuous', () => {
-    /*
-      §5 of `CLAUDE.md`: every guard here carries a case proving it can fail.
-      Drop the dial's rate to the hero's and the clearance disappears — which is
-      precisely failure mode one from the handoff.
-    */
-    const heroH = detailHeroHeight(932);
-    const flight = dialFlight(heroH, 59);
-    const bands = heroBands(heroH);
-
-    // At the hero's own rate the dial would still be mid-flight this late.
-    const slowDockAt = flight.dockAt * (HERO_DIAL_RATE / HERO_PARALLAX_RATE);
-    expect(sheetEdgeAt(heroH, slowDockAt)).toBeLessThan(flight.dockY + bands.plinthHeight / 2);
-  });
-
-  it('keeps the dial band and the title band apart at rest', () => {
-    /*
-      The other bug this design already had once: the "Fair" caption landing on
-      the model name's line. Checked once on each side of the compact threshold,
-      because the two layouts solve it with different numbers.
-    */
-    for (const windowHeight of [667, 932]) {
-      const heroH = detailHeroHeight(windowHeight);
-      const bands = heroBands(heroH);
-
-      const plinthBottom = heroH * bands.dialStart + bands.plinthHeight / 2;
-      const nameTop = heroH - bands.titleAnchor - identityBlockHeight(bands);
-
-      expect(plinthBottom).toBeLessThan(nameTop);
-    }
-  });
-
+    The dial was removed because it covered the car. **There is nothing left to
+    collide**, so keeping those tests would leave three guards that can never
+    fail — which is worse than none, because they read as coverage. The rule
+    they enforced now lives in the design's history, not in an assertion about
+    a component that does not exist.
+  */
   it('clamps the hero height at both ends', () => {
     // 62% of a 6.7" display is a generous hero; 62% of a 4.7" is not enough.
     expect(detailHeroHeight(667)).toBe(414);
@@ -548,6 +491,10 @@ describe('the hero pullback', () => {
       ⚠ In practice only the 4.7″ display takes it — the mini (812pt → 503)
       clears by 3pt. Worth a test because that margin is what makes the clamp
       dangerous to edit.
+
+      The branch survives the dial's removal because it still sizes the title:
+      a two-line 36pt name is too much for a 414pt hero whether or not there is
+      an instrument beside it.
     */
     expect(heroBands(detailHeroHeight(667)).compact).toBe(true);
     expect(heroBands(detailHeroHeight(812)).compact).toBe(false);

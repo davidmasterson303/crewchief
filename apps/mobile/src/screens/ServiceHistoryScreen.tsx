@@ -276,15 +276,22 @@ export function ServiceHistoryScreen({ vehicleId, onSignOut }: Props) {
   }
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.body}
-      keyboardShouldPersistTaps="handled"
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} tintColor={text.muted} />
-      }
-    >
+    /*
+      ── ⚠ The search is pinned, not scrolled ──────────────────────────────────
+
+      Same fix as the wishlist's filter, for the same reason: a control whose
+      job is to shorten a list must not scroll away with the list. By the time
+      you have scrolled far enough to want it, it is off screen — so you scroll
+      back up to reach the thing that would have saved you the scrolling.
+
+      Outside the scroller rather than `stickyHeaderIndices`, because sticky
+      headers on a `ScrollView` with `keyboardShouldPersistTaps` behave
+      inconsistently on Android once the keyboard resizes the frame, and this is
+      a text input.
+    */
+    <View style={styles.screen}>
       {state.records.length > 0 && (
-        <View style={styles.search}>
+        <View style={[styles.search, styles.searchPinned]}>
           <Icon name="search" size={17} />
           <TextInput
             style={styles.searchInput}
@@ -309,6 +316,13 @@ export function ServiceHistoryScreen({ vehicleId, onSignOut }: Props) {
         </View>
       )}
 
+      <ScrollView
+        contentContainerStyle={styles.body}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} tintColor={text.muted} />
+        }
+      >
       {state.records.length === 0 ? (
         /*
           No action: this screen has no navigation callbacks — only a vehicle
@@ -418,7 +432,8 @@ export function ServiceHistoryScreen({ vehicleId, onSignOut }: Props) {
           })}
         </>
       )}
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -428,8 +443,10 @@ export function ServiceHistoryScreen({ vehicleId, onSignOut }: Props) {
   the provenance line — which is the one a reader most needs to be able to read.
 */
 const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: surface.page },
+  /* Pinned above the scroller, on the page's own surface so nothing shows through. */
+  searchPinned: { marginHorizontal: space.lg, marginTop: space.lg, marginBottom: 0 },
   noMatch: { ...type.body, color: text.secondary, paddingVertical: space.md },
-  /* Pinned nothing — it scrolls with the list, which is short. See the filter's note. */
   search: {
     flexDirection: 'row',
     alignItems: 'center',

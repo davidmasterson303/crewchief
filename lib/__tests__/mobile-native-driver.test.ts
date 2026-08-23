@@ -32,10 +32,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-import {
-  HERO_DIAL_RATE,
-  HERO_PARALLAX_RATE,
-} from '../../apps/mobile/src/theme/hero-motion';
+import { HERO_PARALLAX_RATE } from '../../apps/mobile/src/theme/hero-motion';
 
 const MOBILE_SRC = join(__dirname, '..', '..', 'apps', 'mobile', 'src');
 
@@ -175,9 +172,13 @@ describe('scroll-linked values are native-driver safe', () => {
     const screen = files.find((f) => f.rel.includes('VehicleDetailScreen'))!;
 
     expect(screen.code).toMatch(/from '\.\.\/theme\/hero-motion'/);
-    // The rates are real numbers and genuinely different — the layering fix.
-    expect(HERO_DIAL_RATE).toBeGreaterThan(HERO_PARALLAX_RATE * 4);
-    // And neither appears spelled out in the screen.
+    /*
+      ⚠ `HERO_DIAL_RATE` used to be asserted here too — the 1.6× climb against
+      the hero's 0.35 drift, which was the layering fix. The dial was removed on
+      23 Aug because it covered the car, so there is one rate left and the
+      claim is now simply that it is not spelled out at the call site.
+    */
+    expect(HERO_PARALLAX_RATE).toBeGreaterThan(0);
     expect(screen.code).not.toMatch(new RegExp(`\\b${HERO_PARALLAX_RATE}\\b`));
   });
 

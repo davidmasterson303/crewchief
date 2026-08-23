@@ -285,7 +285,54 @@ it shows: every native spec draws the full-width primary as a pill, and the
 system's radius map assigns `md` to buttons. `Button` is `radius.pill` on
 native.
 
-### 3.13 No spec exists for the typeahead
+### 3.14 The hero dial is removed ⚠ Design — this is a real departure
+
+`native-hero-pullback.spec.html` is built around the health dial's flight: it
+belongs to neither plane, climbs at 1.6× so it docks before the sheet edge
+arrives, and crossfades to a nav chip. That is the spec's hardest idea and the
+one the exploration got wrong twice.
+
+**It is gone.** David, 23 Aug, after using it on a device:
+
+> we can lose the dial with health score overlaying car image. The animation is
+> fun but info is redundant and it might cover important part of car image
+> people care about.
+
+Both halves hold. The redundancy was partly self-inflicted — the health card
+gained its own reading earlier the same day, so the score appeared three times —
+but the covering is the deciding argument: the photograph is the only place in
+the product an owner sees their own car, and a 160pt plinth sat over the
+roofline of most 3:4 phone snapshots. An instrument that obscures the subject it
+reports on has its priorities inverted.
+
+What went with it: `HERO_DIAL_RATE`, `dialFlight`, `dialClearsSheet`, the
+crossfade, and **the layering invariant** — the regression test that caught the
+bug the design itself had twice. There is no travelling instrument left to
+collide with the sheet, so those guards would be assertions that can never fail,
+which reads as coverage and is not.
+
+What remains is the pullback: a pinned hero drifting at a third of scroll speed
+under a rising sheet, the score persisting as the nav chip.
+
+**Ask:** the spec should either drop the dial's flight or state where a score
+belongs when the photograph is the hero. The compact branch survives on its own
+merits — it still sizes the title — but its dial half is dead.
+
+### 3.15 The wishlist's Add lives in two places, by state
+
+`native-wishlist.spec.html`: *"Add is in the nav bar, not a floating action
+button."* On an **empty** list that leaves a 22pt glyph in the corner as the only
+way in, which David flagged as the wrong resolution of a redundancy I had fixed
+backwards.
+
+Now: empty list → the empty state's filled button, and the nav `+` stands down.
+Populated list → the `+`, and no empty state to compete. One control per state
+rather than one per screen.
+
+**Ask:** the spec does not cover the empty state. Worth adding, since "Add is in
+the nav bar" reads as absolute and is wrong on a blank screen.
+
+### 3.16 No spec exists for the typeahead
 
 `Suggest` — a text field with an inline suggestion panel — was added on 23 Aug
 for make/model/year on the add-a-car screen. There is no spec for it.
