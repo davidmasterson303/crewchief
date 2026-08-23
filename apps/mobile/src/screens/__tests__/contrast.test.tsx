@@ -12,6 +12,7 @@ import { VehicleDetailScreen } from '../VehicleDetailScreen';
 import { InvoiceScanScreen } from '../InvoiceScanScreen';
 import { RecallDetailScreen } from '../RecallDetailScreen';
 import { WishlistScreen } from '../WishlistScreen';
+import { WishlistAddScreen } from '../WishlistAddScreen';
 import { ServiceMilestoneScreen } from '../ServiceMilestoneScreen';
 import { SignInScreen } from '../SignInScreen';
 import { AddVehicleScreen } from '../AddVehicleScreen';
@@ -524,7 +525,7 @@ describe('the wishlist', () => {
     });
 
     const view = await render(
-      <WishlistScreen vehicleId="db143cdc-e68c-46f0-849e-69f7a1873f58" onSignOut={jest.fn()} />
+      <WishlistScreen vehicleId="db143cdc-e68c-46f0-849e-69f7a1873f58" onSignOut={jest.fn()} onAdd={jest.fn()} />
     );
 
     await view.findByText('CVT fluid flush');
@@ -535,31 +536,57 @@ describe('the wishlist', () => {
     request.mockResolvedValue({ wishlistItems: [] });
 
     const view = await render(
-      <WishlistScreen vehicleId="db143cdc-e68c-46f0-849e-69f7a1873f58" onSignOut={jest.fn()} />
+      <WishlistScreen vehicleId="db143cdc-e68c-46f0-849e-69f7a1873f58" onSignOut={jest.fn()} onAdd={jest.fn()} />
     );
 
     await view.findByText('Nothing on the list yet');
     expect(belowFloor(auditText(view))).toEqual([]);
   });
 
-  it('reads at AA with the add button disabled', async () => {
+  it('reads at AA on the suggestions catalogue, chips and all', async () => {
     /*
-      The composer is behind a control now, so it has to be opened before the
-      disabled CTA exists to audit. Worth keeping rather than deleting: this
-      assertion only means anything because the disabled state is an explicit
-      fill rather than an `opacity` — a parent alpha never reaches `auditText`'s
-      comparison, so an opacity-greyed button would pass while being unreadable.
-    */
-    request.mockResolvedValue({ wishlistItems: [] });
+      ⚠ Repointed 23 Aug. This used to open `WishlistScreen`'s composer and
+      audit its disabled CTA; adding is a route now, and the composer is gone.
 
-    const user = userEvent.setup();
-    const view = await render(
-      <WishlistScreen vehicleId="db143cdc-e68c-46f0-849e-69f7a1873f58" onSignOut={jest.fn()} />
+      The claim is worth keeping and is bigger here than it was there. This
+      screen carries the most colour of any list in the app — a chip per row in
+      two tones, a search field, ghost and outline buttons side by side, and a
+      quiet third line — and the amber chip in particular is a tone `status`
+      only just stopped sharing with the health ramp.
+    */
+    request.mockImplementation((path: string) =>
+      path.startsWith('/wishlist')
+        ? Promise.resolve({ wishlistItems: [] } as never)
+        : Promise.resolve({
+            vehicle: { year: 2018, make: 'Honda', model: 'Accord' },
+            knowledge: {
+              known_issues: [
+                { part: 'Fuel injector seals', severity: 'High', description: 'Seals weep.' },
+                { part: 'CVT fluid', severity: 'Medium', description: 'Degrades and hunts.' },
+              ],
+              maintenance_schedule: [
+                { service: 'Engine oil', priority: 'Normal', description: 'Every 5,000 mi.' },
+              ],
+              common_mods: [{ name: 'Air filter', purpose: 'Reusable.', difficulty: 'Easy' }],
+            },
+          } as never)
     );
 
-    await user.press(await view.findByLabelText('Add something to the wishlist'));
+    const view = await render(
+      <WishlistAddScreen
+        vehicleId="db143cdc-e68c-46f0-849e-69f7a1873f58"
+        title="2018 Honda Accord"
+        onSignOut={jest.fn()}
+        onAskAdvisor={jest.fn()}
+        onAdded={jest.fn()}
+      />
+    );
 
-    await view.findByLabelText('Add to wishlist');
+    await view.findByText('Fuel injector seals');
+    // Both chip tones on screen at once, which is the case worth measuring.
+    view.getByText('Do first');
+    view.getByText('Modification');
+
     expect(belowFloor(auditText(view))).toEqual([]);
   });
 
@@ -575,7 +602,7 @@ describe('the wishlist', () => {
 
     const user = userEvent.setup();
     const view = await render(
-      <WishlistScreen vehicleId="db143cdc-e68c-46f0-849e-69f7a1873f58" onSignOut={jest.fn()} />
+      <WishlistScreen vehicleId="db143cdc-e68c-46f0-849e-69f7a1873f58" onSignOut={jest.fn()} onAdd={jest.fn()} />
     );
 
     await user.press(await view.findByLabelText('Mark Front brake pads done'));
@@ -588,7 +615,7 @@ describe('the wishlist', () => {
     request.mockRejectedValue(new ApiRequestError({ status: 500, message: 'Upstream is down' }));
 
     const view = await render(
-      <WishlistScreen vehicleId="db143cdc-e68c-46f0-849e-69f7a1873f58" onSignOut={jest.fn()} />
+      <WishlistScreen vehicleId="db143cdc-e68c-46f0-849e-69f7a1873f58" onSignOut={jest.fn()} onAdd={jest.fn()} />
     );
 
     await view.findByText('Could not load the wishlist');

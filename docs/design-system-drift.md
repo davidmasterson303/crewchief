@@ -126,6 +126,10 @@ reinterpreted.
 | `progression-ladder` — rows with role, difficulty and the sentence | The ladder now renders `nextRungs`' full output. It was rendering `rungs[0].role` and discarding name, purpose, difficulty and rationale. |
 | `native-wishlist` — *"a count that disagrees with what is on screen…"* | The recall chip counts what the recall screen will actually draw, minus what the owner has marked. |
 | `native-add-vehicle` — VIN leads, year/make/model under an *"or"* | Was a collapsed "Have the VIN?" row above a primary year/make/model form. Now inverted to match. |
+| `native-vehicle-detail` — the hub's **rows** | ⚠ Rebuilt 23 Aug after David's *"still really bad UI and UX, ugly and uninviting"*. The first attempt fixed the ink ramp and shipped no icons. Reading the **rendered** spec rather than its text: every row carries a Lucide mark, the group is an inset block with the label *outside* it, and the dividers are inset to the label column. All three now match. |
+| `icons` — *"real Lucide icons only"* | `Icon.tsx` ports the export's own path map to `react-native-svg`. Geometry copied unaltered, per that component's rule: *"do not redraw or approximate."* |
+| `native-wishlist` — the whole screen | Was a free-text box. Now the summary line, divided rows with neutral-unless-urgent chips, and Add in the nav bar. |
+| `native-wishlist` — suggestions | New `WishlistAddScreen`: the three knowledge-base sources as a filterable catalogue with Add and Learn more per row. |
 
 ---
 
@@ -200,7 +204,43 @@ Complies in geometry, not in dependency. When a second icon is needed,
 `Chevron.tsx` becomes `Icon.tsx` with a path map, which is the point at which
 adding the package should be reconsidered.
 
-### 3.7 No spec exists for the typeahead
+### 3.7 The wishlist spec's own render disagrees with its own note ⚠ Design
+
+Not a build decision — a defect **inside** `native-wishlist.spec.html`, and it
+is the one the spec's own note warns about.
+
+The note reads: *"The total sums to $4,980 and the four rows are all four rows.
+Stated because this system has shipped 'Wishlist · 4 items' over three rows
+before; a count that disagrees with what is on screen is the fastest way to lose
+a user's trust in every other number."*
+
+The render above it shows **three rows**, headed **`4 ITEMS · ESTIMATED $4,180`**.
+The three visible prices sum to $4,660. The note is right — $1,140 + $2,200 +
+$1,320 + $320 is $4,980 with the Charge pipe row included — so the render is
+missing a row *and* carries a total that matches neither count.
+
+The build follows the note, not the render: the count and the total are derived
+from the same array in one pass, which is the only version where they cannot
+disagree.
+
+**Ask:** re-render the spec. It is a small thing, and it is the exact failure the
+spec exists to prevent, in the spec.
+
+### 3.8 Buttons are pills on native, not `radius.md`
+
+The system's five-step radius map assigns `full` to chips, filter pills, status
+badges and avatars, and `md` to buttons. **Every native spec draws a full-width
+primary as a pill** — the vehicle hub's "Ask the advisor", the recall screen's
+two actions, the wishlist's add.
+
+The build now follows the native specs, so `Button` is `radius.pill`. A 12pt
+corner on a 52pt-tall full-bleed control reads as a web form submit; the phone's
+idiom is the pill.
+
+**Ask:** confirm the map should carry a native exception, or that the native
+specs should be redrawn at `md`.
+
+### 3.9 No spec exists for the typeahead
 
 `Suggest` — a text field with an inline suggestion panel — was added on 23 Aug
 for make/model/year on the add-a-car screen. There is no spec for it.

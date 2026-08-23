@@ -25,6 +25,7 @@ import ClusterGauge, { CARD_SIZE } from '../components/ClusterGauge';
 import { type HealthReading } from '../components/HealthHistory';
 import Plinth from '../components/Plinth';
 import VehiclePlate from '../components/VehiclePlate';
+import ListGroup from '../components/ListGroup';
 import NavRow from '../components/NavRow';
 import SectionHeader from '../components/SectionHeader';
 import { space, text, type } from '../theme';
@@ -674,7 +675,7 @@ export function VehicleDetailScreen({
             <ClusterGauge score={score} variant="card" size={CARD_SIZE} />
           </Plinth>
           {health?.summary ? <Text style={styles.summary}>{health.summary}</Text> : null}
-          <NavRow label="What is driving this score" onPress={onOpenHealth} last />
+          <NavRow icon="gauge" label="What is driving this score" onPress={onOpenHealth} last />
         </Card>
       )}
 
@@ -720,11 +721,10 @@ export function VehicleDetailScreen({
         a wishlist total, the next service. Where it does not know, it carries
         **nothing** — never a zero, which would claim the place is empty.
       */}
-      <Card>
-        <SectionHeader title="This car" />
-        <NavRow label="Service due" count={serviceDue} onPress={onOpenMilestone} />
-        <NavRow label="Service history" count={historyCount} onPress={onOpenHistory} />
-        <NavRow label="Wishlist" count={wishlistCount} onPress={onOpenWishlist} />
+      <ListGroup label="This car">
+        <NavRow icon="clock" label="Service due" count={serviceDue} onPress={onOpenMilestone} />
+        <NavRow icon="wrench" label="Service history" count={historyCount} onPress={onOpenHistory} />
+        <NavRow icon="heart" label="Wishlist" count={wishlistCount} onPress={onOpenWishlist} />
         {/*
           The build, now a route. It was a dial reading Stock and a five-rung
           scale with a marker on it, and nothing on that card could be pressed —
@@ -734,15 +734,15 @@ export function VehicleDetailScreen({
           is the one genuine off switch, and it is "not now" rather than "never".
         */}
         {showsModifications(vehicle.performance_mindedness) && (
-          <NavRow label="Build" count={buildLabel} onPress={onOpenBuild} />
+          <NavRow icon="sliders" label="Build" count={buildLabel} onPress={onOpenBuild} />
         )}
-        <NavRow
-          label="Scan an invoice"
-          detail="Photograph a bill and its lines are filed here"
-          onPress={onScanInvoice}
-          last
-        />
-      </Card>
+        {/*
+          No `detail` line any more. The spec's rows are one line each, and a
+          two-line row in a group of one-liners is the row that looks broken —
+          "Scan an invoice" already says what it does.
+        */}
+        <NavRow icon="file-text" label="Scan an invoice" onPress={onScanInvoice} last />
+      </ListGroup>
 
       {/*
         ── The one filled primary ─────────────────────────────────────────────

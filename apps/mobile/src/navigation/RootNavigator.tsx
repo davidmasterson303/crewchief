@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Linking } from 'react-native';
+import { Linking, Pressable } from 'react-native';
 import { NavigationContainer, type LinkingOptions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
@@ -17,12 +17,14 @@ import { HealthScreen } from '../screens/HealthScreen';
 import { InvoiceScanScreen } from '../screens/InvoiceScanScreen';
 import { RecallDetailScreen } from '../screens/RecallDetailScreen';
 import { WishlistScreen } from '../screens/WishlistScreen';
+import { WishlistAddScreen } from '../screens/WishlistAddScreen';
 import { ServiceHistoryScreen } from '../screens/ServiceHistoryScreen';
 import { ServiceMilestoneScreen } from '../screens/ServiceMilestoneScreen';
 import { pickInvoiceImage, pickVehiclePhoto } from '../media/pick-image';
 import { GarageScreen } from '../screens/GarageScreen';
 import { AddVehicleScreen } from '../screens/AddVehicleScreen';
 import { VehicleDetailScreen } from '../screens/VehicleDetailScreen';
+import Icon from '../components/Icon';
 import { surface, text } from '../theme';
 
 /**
@@ -154,6 +156,18 @@ export type RootStackParamList = {
   */
   Build: { vehicleId: string; title?: string };
   Health: { vehicleId: string; title?: string };
+  /*
+    The wishlist's catalogue — `native-wishlist.spec.html` puts Add in the nav
+    bar, and a nav-bar `+` implies a destination rather than a sheet. The
+    content earns one: a filter field, a scrolling list of everything the
+    research found, and two controls per row do not belong stacked above the
+    list they add to.
+
+    ⚠ Not deep-linkable, for the same reason `AddVehicle` is not: a URL that
+    opens a form which writes rows is a URL that can be put in front of someone
+    who did not mean to open it.
+  */
+  WishlistAdd: { vehicleId: string; title?: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -470,9 +484,51 @@ export function RootNavigator({
           )}
         </Stack.Screen>
 
-        <Stack.Screen name="Wishlist" options={{ title: 'Wishlist' }}>
-          {({ route }) => (
-            <WishlistScreen vehicleId={route.params.vehicleId} onSignOut={onSignOut} />
+        <Stack.Screen
+          name="Wishlist"
+          /*
+            ── The `+` lives here, in the nav bar ────────────────────────────
+
+            `native-wishlist.spec.html` is specific about it, and about what it
+            is not: *"Add is in the nav bar, not a floating action button. A FAB
+            covers the last row and belongs to a different design language."*
+
+            `headerRight` is set from the navigator rather than by the screen
+            calling `setOptions`, so the control exists in the screen's loading
+            and error states too — the same rule that keeps Account out of
+            `GarageScreen`'s conditional returns. A person whose wishlist failed
+            to load can still add to it.
+          */
+          options={({ route, navigation }) => ({
+            title: 'Wishlist',
+            headerRight: () => (
+              <Pressable
+                onPress={() =>
+                  navigation.navigate('WishlistAdd', {
+                    vehicleId: route.params.vehicleId,
+                    title: route.params.title,
+                  })
+                }
+                accessibilityRole="button"
+                accessibilityLabel="Add to the wishlist"
+                hitSlop={12}
+              >
+                <Icon name="plus" size={22} color={text.primary} />
+              </Pressable>
+            ),
+          })}
+        >
+          {({ route, navigation }) => (
+            <WishlistScreen
+              vehicleId={route.params.vehicleId}
+              onSignOut={onSignOut}
+              onAdd={() =>
+                navigation.navigate('WishlistAdd', {
+                  vehicleId: route.params.vehicleId,
+                  title: route.params.title,
+                })
+              }
+            />
           )}
         </Stack.Screen>
 
@@ -485,6 +541,26 @@ export function RootNavigator({
         <Stack.Screen name="ServiceMilestone" options={{ title: 'Service due' }}>
           {({ route }) => (
             <ServiceMilestoneScreen vehicleId={route.params.vehicleId} onSignOut={onSignOut} />
+          )}
+        </Stack.Screen>
+
+        <Stack.Screen name="WishlistAdd" options={{ title: 'What this car needs' }}>
+          {({ route, navigation }) => (
+            <WishlistAddScreen
+              vehicleId={route.params.vehicleId}
+              title={route.params.title}
+              onSignOut={onSignOut}
+              onAskAdvisor={(vehicleId, ask) =>
+                navigation.navigate('Advisor', { vehicleId, title: route.params.title, ask })
+              }
+              /*
+                The list behind this refetches on focus, so adding does not pop
+                back: somebody working through a catalogue usually adds more
+                than one thing, and bouncing them out after each is the version
+                that makes them tap in five times.
+              */
+              onAdded={() => {}}
+            />
           )}
         </Stack.Screen>
 

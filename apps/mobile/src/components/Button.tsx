@@ -146,7 +146,22 @@ const SPINNER: Partial<Record<ButtonVariant, string>> = {
 
 const styles = StyleSheet.create({
   base: {
-    borderRadius: radius.button,
+    /**
+     * ⚠ `radius.pill`, not `radius.button`, as of 23 Aug.
+     *
+     * The native specs draw every full-width primary as a pill — the vehicle
+     * hub's "Ask the advisor", the recall screen's two actions, the wishlist's
+     * add. `radius.button` (12) is the web control step, and it reached mobile
+     * with the token layer rather than by anyone looking at a native screen.
+     *
+     * The five-step radius map in the design system assigns `full` to chips,
+     * filter pills, status badges and avatars, and `md` to buttons — so this is
+     * a **deliberate override of that map for native**, logged in
+     * `docs/design-system-drift.md` rather than made quietly. A 12pt corner on
+     * a 52pt-tall full-bleed control reads as a web form submit; the phone's
+     * own idiom is the pill, and every native spec draws it that way.
+     */
+    borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',

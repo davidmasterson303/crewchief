@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import Chevron from './Chevron';
+import Icon, { type IconName } from './Icon';
 import { TABULAR, TARGET_MIN, border, space, surface, text, type } from '../theme';
 
 /**
@@ -12,56 +12,41 @@ import { TABULAR, TARGET_MIN, border, space, surface, text, type } from '../them
  * value it currently holds. Its ink ramp says so — the label is `text.muted`
  * and the value is `text.primary`, because on a data row the value is the
  * payload and the label is the caption for it. That is right for "Mileage ·
- * 66,000 mi".
+ * 66,000 mi" and exactly backwards for a destination.
  *
- * It is exactly backwards for a destination, and the vehicle screen shipped it
- * that way. "This car" was three `ListRow`s with `value=""` — so *Service
- * history*, *Wishlist* and *Scan an invoice* rendered as muted grey captions,
- * against no value, with no chevron and no trailing anything. David's note on
- * 23 Aug was **"it's not clear that these are buttons I could tap"**, and it was
- * not clear because every signal the row had was pointed the other way.
+ * ⚠ `value=""` also defeated `ListRow`'s em-dash rule, which reads `value ?? '—'`
+ * — an **empty string is not nullish**, so the row rendered nothing where the
+ * dash should have been. Passing `""` to mean "no value" is a use `ListRow`
+ * cannot express, which is why this is a separate component rather than a
+ * fourth branch inside it.
  *
- * ⚠ `value=""` also defeated `ListRow`'s own em-dash rule. That rule reads
- * `value ?? '—'`, and an **empty string is not nullish** — so instead of the
- * honest "we have no reading" dash, the row rendered nothing at all, which is
- * the state that docblock exists to prevent. Passing `""` to say "this row has
- * no value" is a use `ListRow` cannot express, and the fix is a different
- * component rather than a fourth branch inside it.
+ * ── ⚠ The icon is not decoration, and this row shipped without one ──────────
  *
- * So: label in primary ink at the body weight, count in the quiet ramp, chevron
- * on the end. Three signals, all agreeing that this row goes somewhere.
+ * The first version of this had the ink ramp right and no glyph, and David's
+ * verdict was that the section was still *"ugly and uninviting to engage
+ * with"*. He was right, and the rendered spec says why: every row in
+ * `native-vehicle-detail` carries a Lucide mark. Four left-aligned words in a
+ * box give the eye nothing to land on, so a hub of five destinations reads as a
+ * paragraph rather than as five things.
  *
- * ── The count is optional and is never invented ─────────────────────────────
- *
- * The spec shows *Service history · 18*, *Wishlist · 4 · $4,980*,
- * *Service due · 60k*. Where a screen knows the number it passes it, and where
- * it does not it passes nothing — and nothing renders **nothing**, not a zero
- * and not a dash. A destination with no count beside it reads as a place; a
- * destination showing "0" claims the place is empty, which is a different and
- * usually unearned statement. Same rule as the dial: `null` is not `0`.
+ * `icon` is therefore **required**. An optional one would be omitted under
+ * deadline on exactly the screen that needs it, which is what happened.
  */
 export default function NavRow({
+  icon,
   label,
   count,
   detail,
   onPress,
-  tone = 'default',
   last = false,
 }: {
+  icon: IconName;
   label: string;
   /** What is behind the row — "18", "4 · $4,980". Omit when unknown. */
   count?: string | null;
   /** One quiet line under the label, for a destination that needs explaining. */
   detail?: string;
   onPress: () => void;
-  /**
-   * `quiet` drops the label to the secondary ramp.
-   *
-   * For a row that is a real destination but not one of this screen's
-   * headlines — the details a car has rather than the things to do with it.
-   * It keeps the chevron: it is still a place, just not a priority.
-   */
-  tone?: 'default' | 'quiet';
   /** The last row in a group draws no divider under itself. */
   last?: boolean;
 }) {
@@ -71,69 +56,87 @@ export default function NavRow({
       accessibilityRole="button"
       /*
         One utterance. A row read out as "Wishlist", "4 · $4,980", "button"
-        makes the reader assemble the sentence; the chevron is hidden from the
-        tree entirely because "button" has already been said.
+        makes the reader assemble the sentence; the icon and the chevron are
+        both hidden from the tree because "button" has already been said.
       */
       accessibilityLabel={[label, count, detail].filter(Boolean).join(', ')}
-      style={({ pressed }) => [styles.row, last && styles.last, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.row, pressed && styles.pressed]}
     >
-      <View style={styles.labelBlock}>
-        <Text style={[styles.label, tone === 'quiet' && styles.labelQuiet]} numberOfLines={1}>
-          {label}
-        </Text>
-        {detail ? (
-          <Text style={styles.detail} numberOfLines={2}>
-            {detail}
-          </Text>
-        ) : null}
+      <View style={styles.glyph}>
+        <Icon name={icon} size={17} />
       </View>
 
-      {count ? (
-        <Text style={styles.count} numberOfLines={1}>
-          {count}
-        </Text>
-      ) : null}
+      {/*
+        ⚠ The divider lives on this inner view, not on the row, so it starts at
+        the label column and stops at the row's right inset. A rule that runs
+        edge to edge cuts the group into slices; an inset one reads as a seam
+        between rows of one object. It is the iOS grouped-table convention and
+        the spec draws it that way.
+      */}
+      <View style={[styles.body, !last && styles.divided]}>
+        <View style={styles.labelBlock}>
+          <Text style={styles.label} numberOfLines={1}>
+            {label}
+          </Text>
+          {detail ? (
+            <Text style={styles.detail} numberOfLines={2}>
+              {detail}
+            </Text>
+          ) : null}
+        </View>
 
-      <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-        <Chevron />
+        {count ? (
+          <Text style={styles.count} numberOfLines={1}>
+            {count}
+          </Text>
+        ) : null}
+
+        <Icon name="chevron-right" size={16} color={text.nonText} />
       </View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
+  /*
+    No vertical padding here and no divider — both belong to `body`, so the
+    pressed fill covers the whole row including the glyph column while the rule
+    stays inset. `minHeight` still clears the 44pt floor on the row itself.
+  */
   row: {
     minHeight: TARGET_MIN,
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    paddingLeft: space.md,
+  },
+  pressed: { backgroundColor: surface.well },
+  /** Fixed width so every label in the group starts on the same x. */
+  glyph: { width: 30, justifyContent: 'center' },
+  body: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.md,
     paddingVertical: space.md,
+    paddingRight: space.md,
+  },
+  divided: {
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: border.panel,
   },
-  /*
-    The group's last row keeps its padding and loses its rule. A divider under
-    the final item draws a line to nothing, which reads as a row that failed to
-    render.
-  */
-  last: { borderBottomWidth: 0 },
-  /* A fill swap, never a fade — the ink keeps full strength. See `ListRow`. */
-  pressed: { backgroundColor: surface.raised },
   labelBlock: { flex: 1, gap: 2 },
   /**
-   * ⚠ Primary ink at the body weight, which is the whole fix.
+   * ⚠ `type.ui` at primary, not `type.bodyStrong`.
    *
-   * `ListRow`'s label is `type.ui` in `text.muted` — 14px at the quietest step
-   * the system allows a string to be. On a fact that is correct and on a
-   * destination it is why these read as captions.
+   * The first version set these at 16/600, which is a heading weight — five of
+   * them stacked read as five headings rather than as a list. The spec's rows
+   * are the 14pt control step, and the ink alone carries that they are live.
    */
-  label: { ...type.bodyStrong, color: text.primary },
-  labelQuiet: { color: text.secondary },
+  label: { ...type.uiStrong, color: text.primary },
   detail: { ...type.value, color: text.muted },
   /*
     Tabular, because these are counts and money and they must not reflow as
-    their digits change — the same rule the mileage row follows, for the same
-    reason.
+    their digits change — the same rule the mileage row follows.
   */
   count: { ...type.value, ...TABULAR, color: text.muted, textAlign: 'right' },
 });
