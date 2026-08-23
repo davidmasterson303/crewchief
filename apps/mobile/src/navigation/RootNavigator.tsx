@@ -12,6 +12,8 @@ import { currentPushPermission, registerForPush } from '../notifications/registe
 import { shouldRegisterSilently } from '@crewchief/core/push-priming';
 
 import { AdvisorScreen } from '../screens/AdvisorScreen';
+import { BuildScreen } from '../screens/BuildScreen';
+import { HealthScreen } from '../screens/HealthScreen';
 import { InvoiceScanScreen } from '../screens/InvoiceScanScreen';
 import { RecallDetailScreen } from '../screens/RecallDetailScreen';
 import { WishlistScreen } from '../screens/WishlistScreen';
@@ -134,6 +136,24 @@ export type RootStackParamList = {
     wishlist.
   */
   ServiceMilestone: { vehicleId: string; title?: string };
+  /*
+    ── 23 Aug: two instruments became two destinations ──────────────────────
+
+    Both were cards on `VehicleDetailScreen`, and between them they were most of
+    why David's read of that screen was *"unclear, cluttered, uninspired and
+    confusing"*. The design system's native vehicle spec is **"a hub, not
+    tabs"**: the vehicle screen names a car and lists places to go, and every
+    section is a real pushed route with the platform's own back gesture.
+
+    `Build` is the sharper case. Its card rendered a dial reading Stock and the
+    five-rung ladder with a marker on one rung — while `nextRungs` was handing
+    it three named parts, each with a difficulty and a sentence explaining why
+    it comes before the others. Nothing on the card could be pressed. The route
+    exists so those three suggestions can be read, added to the wishlist, or
+    declined, which is what a plan is.
+  */
+  Build: { vehicleId: string; title?: string };
+  Health: { vehicleId: string; title?: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -193,6 +213,8 @@ const linking: LinkingOptions<RootStackParamList> = {
       Wishlist: 'vehicle/:vehicleId/wishlist',
       ServiceHistory: 'vehicle/:vehicleId/history',
       ServiceMilestone: 'vehicle/:vehicleId/service',
+      Build: 'vehicle/:vehicleId/build',
+      Health: 'vehicle/:vehicleId/health',
     },
   },
 
@@ -373,6 +395,31 @@ export function RootNavigator({
                   title: route.params.title,
                 })
               }
+              onOpenHealth={() =>
+                navigation.navigate('Health', {
+                  vehicleId: route.params.vehicleId,
+                  title: route.params.title,
+                })
+              }
+              onOpenBuild={() =>
+                navigation.navigate('Build', {
+                  vehicleId: route.params.vehicleId,
+                  title: route.params.title,
+                })
+              }
+              /*
+                ⚠ This route existed and had **no way in from the app**. It was
+                reachable only from a service-due notification and a deep link,
+                so anyone who dismissed the alert — or never got one — could not
+                reach the screen that confirms an odometer and offers the jobs.
+                The hub's "Service due" row is that way in.
+              */
+              onOpenMilestone={() =>
+                navigation.navigate('ServiceMilestone', {
+                  vehicleId: route.params.vehicleId,
+                  title: route.params.title,
+                })
+              }
               // The same seam as the garage's. See `pick-image.ts`.
               pickPhoto={() => pickVehiclePhoto('library')}
             />
@@ -438,6 +485,39 @@ export function RootNavigator({
         <Stack.Screen name="ServiceMilestone" options={{ title: 'Service due' }}>
           {({ route }) => (
             <ServiceMilestoneScreen vehicleId={route.params.vehicleId} onSignOut={onSignOut} />
+          )}
+        </Stack.Screen>
+
+        <Stack.Screen name="Health" options={{ title: 'Health' }}>
+          {({ route }) => (
+            <HealthScreen
+              vehicleId={route.params.vehicleId}
+              title={route.params.title}
+              onSignOut={onSignOut}
+            />
+          )}
+        </Stack.Screen>
+
+        <Stack.Screen name="Build" options={{ title: 'Build' }}>
+          {({ route, navigation }) => (
+            <BuildScreen
+              vehicleId={route.params.vehicleId}
+              title={route.params.title}
+              onSignOut={onSignOut}
+              /*
+                A suggestion that has been added goes somewhere, and the
+                somewhere is the list it was added to. `navigate` rather than
+                `push`: coming back from the wishlist should return here, and a
+                second copy of a screen already in the stack is how a back
+                gesture stops meaning anything.
+              */
+              onOpenWishlist={() =>
+                navigation.navigate('Wishlist', {
+                  vehicleId: route.params.vehicleId,
+                  title: route.params.title,
+                })
+              }
+            />
           )}
         </Stack.Screen>
 

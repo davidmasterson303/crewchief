@@ -115,6 +115,9 @@ describe('the health score colour — never checked by the source scan', () => {
         onViewRecalls={jest.fn()}
         onOpenWishlist={jest.fn()}
       onOpenHistory={jest.fn()}
+      onOpenHealth={jest.fn()}
+      onOpenBuild={jest.fn()}
+      onOpenMilestone={jest.fn()}
       />
     );
 
@@ -202,6 +205,9 @@ describe('failure states, which are where sub-floor text hides', () => {
         onViewRecalls={jest.fn()}
         onOpenWishlist={jest.fn()}
       onOpenHistory={jest.fn()}
+      onOpenHealth={jest.fn()}
+      onOpenBuild={jest.fn()}
+      onOpenMilestone={jest.fn()}
       />
     );
 
@@ -239,6 +245,9 @@ describe('the advisor CTA, which is dark text on white', () => {
         onViewRecalls={jest.fn()}
         onOpenWishlist={jest.fn()}
       onOpenHistory={jest.fn()}
+      onOpenHealth={jest.fn()}
+      onOpenBuild={jest.fn()}
+      onOpenMilestone={jest.fn()}
       />
     );
 

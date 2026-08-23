@@ -1,5 +1,6 @@
 'use client';
 
+import { healthClaim } from '@crewchief/core/health-claims';
 import IssueCard from '@/components/IssueCard';
 
 interface Issue {
@@ -23,6 +24,20 @@ interface IssuesTabProps {
   onMarkFixed: (issueId: string, issueName: string) => void;
   onNotApplicable: (issueIdentifier: string, status: 'pending' | 'completed' | 'not_interested') => Promise<void>;
   onWishlistToggleComplete: () => Promise<void>;
+  /**
+   * Whether research reached `completed` for this vehicle.
+   *
+   * ⚠ Required rather than defaulted, and that is the point of adding it.
+   * `VehicleInsights` returns early for `pending`, `failed` and `unsupported`,
+   * so this component only ever rendered for a researched car — and "No known
+   * issues for this vehicle" was therefore true. **By an upstream coupling
+   * nothing here stated.** Move this tab, render it from a second place, or
+   * relax that early return, and an unresearched car is told it has no known
+   * issues, which is absence reported as a finding.
+   *
+   * Passing the evidence makes the guarantee explicit instead of ambient.
+   */
+  researchComplete: boolean;
 }
 
 function getSeverityColor(severity: string) {
@@ -43,12 +58,22 @@ export default function IssuesTab({
   onMarkFixed,
   onNotApplicable,
   onWishlistToggleComplete,
+  researchComplete,
 }: IssuesTabProps) {
   const getIssueStatus = (issueIdentifier: string) =>
     issueTracking.find(t => t.issue_identifier === issueIdentifier);
 
   if (issues.length === 0) {
-    return <p className="text-sm text-white/60 text-center py-8">No known issues for this vehicle.</p>;
+    /*
+      The copy comes from `health-claims.ts` rather than from this file, so the
+      three states stay one decision. `issues` empty means "researched and
+      found none" only when research actually completed.
+    */
+    return (
+      <p className="text-sm text-white/60 text-center py-8">
+        {healthClaim('issues', '', researchComplete).text}
+      </p>
+    );
   }
 
   return (

@@ -555,6 +555,13 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
               <TabsContent value="issues">
                 <IssuesTab
                   issues={knownIssues}
+                  /*
+                    Always true here — the early returns above send `pending`,
+                    `failed` and `unsupported` elsewhere. Passed anyway so the
+                    guarantee is stated rather than assumed by a component that
+                    cannot see this file.
+                  */
+                  researchComplete={knowledge.research_status === 'completed'}
                   vehicleId={vehicle.id}
                   issueTracking={issueTracking}
                   savedItemNames={savedItemNames}

@@ -1,14 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Animated,
+  Easing,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { getHealthBandJudgement } from '@crewchief/core/health-band';
 
-import BayRoom, { BAY_ROOM_HEIGHT, BayLightPool } from './BayRoom';
+import BayRoom, { BayLightPool, bayHeroHeight } from './BayRoom';
 import ClusterGauge from './ClusterGauge';
 import {
   UNKNOWN_TIMING,
   describeNextService,
 } from '@crewchief/core/garage-next-service';
-import { TABULAR, bay, radius, space, surface, text, type } from '../theme';
+import { TABULAR, bay, space, surface, text, type } from '../theme';
 import { useReducedMotion } from '../motion/reduced-motion';
 import { interFace } from '../theme/fonts';
 
@@ -38,13 +46,13 @@ const BAY_DIAL = 164;
 /** Door lift, then lights, then the needle. The order is the sentence. */
 const DOOR_MS = 460;
 
-/**
- * How far the shutter travels — the room's own height, from `BayRoom`.
- *
- * Imported rather than repeated: a shutter that travels 112 over a room of 120
- * leaves a visible band of door at the top for the rest of the session.
- */
-const ROOM_HEIGHT = BAY_ROOM_HEIGHT;
+/*
+  ⚠ The shutter's travel is no longer a constant, because the room's height is
+  no longer one — `bayHeroHeight` reads the window. It is resolved once per
+  render and used for both, in that order: a shutter that travels 112 over a
+  room of 240 leaves a visible band of door at the top for the rest of the
+  session, and that is exactly the bug a second literal would reintroduce.
+*/
 
 export interface BayVehicle {
   id: string;
@@ -58,11 +66,20 @@ export interface BayVehicle {
   /**
    * The three stored next-service columns, when the sweep has written them.
    *
-   * ⚠ Optional at the type level and absent in the product today: the migration
-   * that adds these columns is written and **not applied**, verified against the
-   * live database rather than read off the folder. Until it lands and a sweep
-   * runs, every car takes the unknown branch — which is exactly why that branch
-   * had to be designed before the row shipped rather than discovered after.
+   * ⚠ **This docblock was wrong until 23 Aug, and the way it was wrong is the
+   * reason §1 exists.** It said the migration was "written and **not applied**,
+   * verified against the live database" — true when written, and false by the
+   * time anyone read it. The columns are applied and carry data.
+   *
+   * What was actually missing was the **route's column list**: neither
+   * `GARAGE_COLUMNS` nor `VEHICLE_COLUMNS` selected them, so the payload never
+   * carried an answer and every car in the product rendered the unknown branch.
+   * A note naming the wrong blocker is worse than no note — it sends the next
+   * reader to write a migration that already ran.
+   *
+   * Still optional, and the unknown branch still matters: the sweep has not
+   * written a row for every car, and "we have not worked it out" is a real
+   * answer that must not render as "nothing is due".
    */
   next_service_label?: string | null;
   next_service_at_miles?: number | null;
@@ -117,6 +134,18 @@ export default function GarageBay({
   const reduced = useReducedMotion();
   const [open, setOpen] = useState(false);
   const door = useRef(new Animated.Value(0)).current;
+
+  /*
+    The hero's height, and the shutter's travel, from one call.
+
+    ⚠ Read from `useWindowDimensions` rather than a constant because the room
+    is now tall enough to push the dial off a short phone — see `bayHeroHeight`
+    for the arithmetic. It is deliberately *not* held in state or memoised: the
+    hook already re-renders on rotation, and a cached height is how a bay ends
+    up with a door that no longer matches its room.
+  */
+  const { height: windowHeight } = useWindowDimensions();
+  const heroHeight = bayHeroHeight(windowHeight);
 
   /*
     ── The door ───────────────────────────────────────────────────────────────
@@ -221,6 +250,7 @@ export default function GarageBay({
             make={vehicle.make}
             onAddPhoto={onAddPhoto}
             busy={uploading}
+            height={heroHeight}
           />
 
           {/*
@@ -241,7 +271,7 @@ export default function GarageBay({
                     {
                       translateY: door.interpolate({
                         inputRange: [0, 1],
-                        outputRange: [0, -ROOM_HEIGHT],
+                        outputRange: [0, -heroHeight],
                       }),
                     },
                   ],
@@ -330,7 +360,7 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
     justifyContent: 'space-between',
     gap: space.md,
-    paddingHorizontal: space.md,
+    paddingHorizontal: space.lg,
     paddingTop: space.sm,
   },
   /** 12/600 at 0.6 tracking — the label role, and the floor. Never smaller. */
@@ -346,10 +376,28 @@ const styles = StyleSheet.create({
     is a real answer to the question, not an apology for one.
   */
   nextServiceUnknown: { ...type.ui, color: text.muted, flex: 1, textAlign: 'right' },
-  bay: { gap: space.md, paddingHorizontal: space.lg },
+  /**
+   * ⚠ **No horizontal padding, as of 23 Aug.**
+   *
+   * It used to inset the whole stack, which is what forced the room to be a
+   * card floating in the page. The hero bleeds to both edges now, so the inset
+   * moved down onto the rows that still want one — the batten, the lockup, the
+   * next-service row — and each of them names it.
+   *
+   * That move also fixed a double inset nobody had noticed: `GarageScreen`'s
+   * `bayFooter` carries `space.lg` of its own, so the recall chip was sitting
+   * 32pt in while everything above it sat at 16. Visible in any screenshot with
+   * a recall on it, and invisible in every one without.
+   */
+  bay: { gap: space.md },
   target: { gap: space.md },
 
-  batten: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  batten: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: space.lg,
+  },
   /**
    * The bay number, lit.
    *
@@ -366,9 +414,24 @@ const styles = StyleSheet.create({
   },
   position: { ...type.label, fontFamily: interFace('500'), fontWeight: '500', letterSpacing: 0, color: text.muted, ...TABULAR },
 
-  shutter: { backgroundColor: surface.nav, borderRadius: radius.hero },
+  /*
+    Square, since 23 Aug. It covers a room that runs to both edges of the
+    screen, and a rounded shutter over a square room shows four lit corners
+    through it for the length of the lift.
+  */
+  shutter: { backgroundColor: surface.nav },
 
-  identity: { gap: 3 },
+  /**
+   * The lockup, where the room lands.
+   *
+   * `marginTop` cancels exactly the gap `target` puts between the room and
+   * this, so the name butts against the fade's last row instead of floating
+   * below it. Flush, **not overlapping**: the fade reaches `surface.page` at
+   * full opacity right at that edge, so the lockup reads as continuous with the
+   * hero while every pixel behind it is the page. That is the difference
+   * between this and a scrim, and `HERO_FADE` carries why it matters.
+   */
+  identity: { gap: 3, paddingHorizontal: space.lg, marginTop: -space.md },
   /**
    * The one editorial role on this screen.
    *

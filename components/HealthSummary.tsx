@@ -383,6 +383,13 @@ export default function HealthSummary({
 
           <RecallHistoryModal
             recalls={recalls}
+            /*
+              The same evidence the tile above is rendered from. Passing the
+              array alone left the modal unable to tell "checked, none found"
+              from "never checked" — so the honest tile opened a dialog saying
+              "This vehicle has a clean safety record".
+            */
+            checked={recallsChecked}
             trigger={
               <div className={`p-4 rounded-xl border cursor-pointer transition-all group ${
                 mayReassure(recallClaim)

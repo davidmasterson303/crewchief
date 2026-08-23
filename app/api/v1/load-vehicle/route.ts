@@ -56,11 +56,26 @@ function embedded<T>(value: unknown): T | undefined {
   embedded select is exactly where RLS would bite: the demo Accord returns
   `health_score: 74` and `recalls: []`.
 */
+/*
+  ⚠ `recall_actions` and `next_service_*` both added 23 Aug, and both are the
+  rule directly above this line
+  doing its job: the detail view of a thing must not know less about it than the
+  list did. The garage bay names the next service, so the screen you reach by
+  tapping that bay has to be able to name it too — and `vehicles/route.ts`
+  carries why the three columns were absent from both.
+
+  The recall marks travel because this screen counts **open** recalls — total
+  minus what the owner has marked repaired — and a detail view that could not
+  subtract them would show a number the garage row it was opened from does not.
+  That is the failure this whole file's rule is named after.
+*/
 const VEHICLE_COLUMNS =
   'id,year,make,model,trim,color,vin,current_mileage,avg_miles_per_month,' +
   'image_url,custom_image_url,performance_mindedness,ownership_objective,' +
   'vehicle_status,focal_point_x,focal_point_y,created_at,updated_at,' +
+  'next_service_label,next_service_at_miles,next_service_due_on,' +
   'nhtsa_data(recalls),' +
+  'recall_actions(campaign_number,addressed_at),' +
   'vehicle_health_summary(health_score,summary,red_flags)';
 
 /**

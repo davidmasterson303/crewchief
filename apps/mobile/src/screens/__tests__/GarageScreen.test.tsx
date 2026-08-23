@@ -75,7 +75,21 @@ const M235I = {
   current_mileage: 66000,
   vehicle_status: 'daily_driver',
   vehicle_health_summary: { health_score: 70, summary: 'Fair.' },
-  nhtsa_data: { recalls: [{ id: 1 }, { id: 2 }] },
+  /*
+    ⚠ Real NHTSA field names, not `{ id: 1 }`.
+
+    The old fixture was two bare objects, which `normaliseRecall` drops — "an
+    entry rendering as a blank card is not information". That went unnoticed
+    while the chip counted the raw array; once it counts what the recall screen
+    would actually draw, a fixture NHTSA could never return stops standing in
+    for one it could.
+  */
+  nhtsa_data: {
+    recalls: [
+      { NHTSACampaignNumber: '23V-441', Component: 'FUEL SYSTEM', Summary: 'Pump may fail.' },
+      { NHTSACampaignNumber: '21V-100', Component: 'AIR BAGS', Summary: 'Inflator may rupture.' },
+    ],
+  },
 };
 
 /**
@@ -109,6 +123,82 @@ function renderGarage(
 }
 
 beforeEach(() => jest.clearAllMocks());
+
+describe('the recall chip counts what is still open', () => {
+  /*
+    ── Two corrections, and both are silent ────────────────────────────────
+
+    The chip was `nhtsa_data.recalls.length` off the raw payload, which counted
+    rows the recall screen refuses to draw **and** campaigns the owner had
+    already dealt with. The second was not even a bug until 23 Aug, because
+    there was no way to mark one — and a badge that can never go down stops
+    being read, which is the whole reason `/api/v1/recalls` exists.
+  */
+  it('does not count a record with nothing to say', async () => {
+    request.mockResolvedValue({
+      vehicles: [
+        {
+          ...M235I,
+          nhtsa_data: {
+            recalls: [
+              { NHTSACampaignNumber: '23V-441', Component: 'FUEL SYSTEM', Summary: 'Pump.' },
+              // No component and no summary: `normaliseRecall` drops it, so the
+              // recall screen would show one card. The chip must agree.
+              { NHTSACampaignNumber: '00V-000' },
+            ],
+          },
+        },
+      ],
+    });
+
+    const view = await renderGarage();
+    await view.findByText('2015 BMW M235i');
+
+    expect(view.getByText('1 recall')).toBeTruthy();
+  });
+
+  it('subtracts what the owner has marked repaired', async () => {
+    request.mockResolvedValue({
+      vehicles: [{ ...M235I, recall_actions: [{ campaign_number: '23V-441' }] }],
+    });
+
+    const view = await renderGarage();
+    await view.findByText('2015 BMW M235i');
+
+    // Two on record, one marked — and the chip is the count of what is left.
+    expect(view.getByText('1 recall')).toBeTruthy();
+  });
+
+  it('shows no chip once every recall has been marked', async () => {
+    request.mockResolvedValue({
+      vehicles: [
+        {
+          ...M235I,
+          recall_actions: [{ campaign_number: '23V-441' }, { campaign_number: '21V-100' }],
+        },
+      ],
+    });
+
+    const view = await renderGarage();
+    await view.findByText('2015 BMW M235i');
+
+    expect(view.queryByText(/recall/)).toBeNull();
+  });
+
+  it('treats unreadable marks as nothing marked, never as everything', async () => {
+    /*
+      ⚠ The direction that matters. A missing or malformed `recall_actions`
+      embed must leave a recall **showing**, not hide it — erring the other way
+      suppresses an open safety notice on the strength of a failed read.
+    */
+    request.mockResolvedValue({ vehicles: [{ ...M235I, recall_actions: null }] });
+
+    const view = await renderGarage();
+    await view.findByText('2015 BMW M235i');
+
+    expect(view.getByText('2 recalls')).toBeTruthy();
+  });
+});
 
 describe('the garage', () => {
   it('draws a vehicle the API returned', async () => {

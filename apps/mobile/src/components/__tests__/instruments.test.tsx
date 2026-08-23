@@ -1,5 +1,5 @@
 import { act, render, userEvent, waitFor } from '@testing-library/react-native';
-import { AccessibilityInfo, processColor } from 'react-native';
+import { AccessibilityInfo, Dimensions, StyleSheet, processColor } from 'react-native';
 import { R } from '@crewchief/core/cluster-geometry';
 import { getHealthBandJudgement, healthBandHex } from '@crewchief/core/health-band';
 import { REDLINE_FROM, buildPosition } from '@crewchief/core/build-progress';
@@ -11,6 +11,7 @@ import HealthHistory from '../HealthHistory';
 import ProgressionLadder from '../ProgressionLadder';
 import VehiclePlate from '../VehiclePlate';
 import GarageBay from '../GarageBay';
+import { BAY_HERO_MAX, BAY_HERO_MIN, bayHeroHeight } from '../BayRoom';
 import HealthDrivers from '../HealthDrivers';
 import Plinth from '../Plinth';
 import type { HealthDriver } from '@crewchief/core/health-drivers';
@@ -584,6 +585,127 @@ describe('GarageBay', () => {
 
     view.getByText('No score yet');
     expect(view.queryByText('0')).toBeNull();
+  });
+
+  /**
+   * ── The hero, and the three ways it can quietly stop being one ────────────
+   *
+   * The room was a 112pt inset strip until 23 Aug, with the photograph
+   * contained inside it — roughly 149 × 112 of actual car on a 393pt screen.
+   * Every case below guards one of the reasons that happened, because all three
+   * are silent: a hero that shrinks back, a photograph that fills its box by
+   * cropping, and type creeping back on top of one.
+   */
+  const PHOTO = 'https://storage.example.test/wrx.jpg?token=abc';
+
+  /** Every rendered `Image` pointed at `uri`, flattened the way RN merges. */
+  function photoLayers(root: unknown, uri: string) {
+    return hostNodes(root, 'Image')
+      .filter((props) => (props.source as { uri?: string } | undefined)?.uri === uri)
+      .map((props) => ({
+        props,
+        style: (StyleSheet.flatten(props.style as never) ?? {}) as Record<string, unknown>,
+      }));
+  }
+
+  it('sizes the room to what this window earns, which is what the door travels', async () => {
+    /*
+      ⚠ The shutter lifts by exactly this number. A literal in either place is
+      the bug the constant was removed to prevent — a door that travels 112 over
+      a room of 240 leaves a band of door on screen for the rest of the session.
+
+      This asserts the room half against `bayHeroHeight` and the live window,
+      rather than against a number written here, so it cannot agree with drift
+      in the way a hard-coded 240 would.
+
+      ⚠ What it does **not** cover: the interpolation's output range, which is
+      an `AnimatedInterpolation` with no public read of its config. The two are
+      one `heroHeight` const in one render today, and the docblock in
+      `GarageBay` is what stands between that and a second literal.
+    */
+    const view = await render(
+      <GarageBay vehicle={WRX} today={TODAY} score={70} index={0} total={1} active={false} />
+    );
+
+    const rooms = hostNodes(view.root, 'View')
+      .map((props) => (StyleSheet.flatten(props.style as never) ?? {}) as Record<string, unknown>)
+      .filter((style) => style.overflow === 'hidden' && typeof style.height === 'number');
+
+    // Found one at all — a walker that matches nothing passes every assertion
+    // about what it did not find.
+    expect(rooms).toHaveLength(1);
+    expect(rooms[0].height).toBe(bayHeroHeight(Dimensions.get('window').height));
+  });
+
+  it('clamps the room between a strip and a hero', () => {
+    expect(bayHeroHeight(1200)).toBe(BAY_HERO_MAX);
+    expect(bayHeroHeight(400)).toBe(BAY_HERO_MIN);
+
+    /*
+      Anti-vacuous. A function that returned a bound for every input would pass
+      both cases above, and it is exactly what a stray `Math.min` would produce.
+    */
+    const between = bayHeroHeight(700);
+    expect(between).toBeGreaterThan(BAY_HERO_MIN);
+    expect(between).toBeLessThan(BAY_HERO_MAX);
+  });
+
+  it('paints the car contained over a blurred copy of itself, never cropped', async () => {
+    /*
+      CC-142's decision, carried onto the phone. `cover` on a 3:4 phone
+      photograph — the overwhelmingly common upload — enlarges it ~3× and keeps
+      a horizontal band through the vertical middle, which is sky or ceiling.
+      The sharp layer must therefore stay `contain`; only the fill behind it may
+      crop, because nothing in it is meant to be legible.
+    */
+    const view = await render(
+      <GarageBay
+        vehicle={{ ...WRX, photo_url: PHOTO }}
+        today={TODAY}
+        score={70}
+        index={0}
+        total={1}
+        active={false}
+      />
+    );
+
+    const layers = photoLayers(view.root, PHOTO);
+    expect(layers).toHaveLength(2);
+
+    const blurred = layers.filter((l) => typeof l.props.blurRadius === 'number');
+    expect(blurred).toHaveLength(1);
+    expect(blurred[0].props.resizeMode).toBe('cover');
+
+    const sharp = layers.filter((l) => l.props.blurRadius === undefined);
+    expect(sharp).toHaveLength(1);
+    expect(sharp[0].props.resizeMode).toBe('contain');
+
+    // One car, announced once. Two layers of the same photograph read out
+    // twice is worse than the blur going unmentioned.
+    expect(view.getAllByLabelText('Subaru photo')).toHaveLength(1);
+  });
+
+  it('prints nothing over the photograph', async () => {
+    /*
+      The rule `DiagnosticHero` arrived at on web after measuring ~1.7%
+      passthrough through six compositing layers: when a photo renders, the
+      wordmark does not, and the car's name lives in the lockup beneath the
+      fade rather than on the image. The no-photo case above is this one's
+      anti-vacuous pair — it proves the wordmark can still appear at all.
+    */
+    const view = await render(
+      <GarageBay
+        vehicle={{ ...WRX, photo_url: PHOTO }}
+        today={TODAY}
+        score={70}
+        index={0}
+        total={1}
+        active={false}
+      />
+    );
+
+    expect(view.queryByText('SUBARU')).toBeNull();
+    view.getByText('2018 Subaru WRX');
   });
 
   it('makes the car the target and leaves the dial alone', async () => {

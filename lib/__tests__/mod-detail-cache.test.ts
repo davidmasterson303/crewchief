@@ -175,6 +175,32 @@ describe('the call site uses it, and does not cache a failure', () => {
     expect(`readBeforeCall:${read < call}`).toBe('readBeforeCall:true');
   });
 
+  it('writes the shared cache before the per-vehicle row', () => {
+    /*
+      ⚠ Found 22 Aug, and it is why the cost fix would have shipped inert.
+
+      `modification_details` has no `performance_goal` column on the live
+      database — migration 20260729060000, written 29 Jul, never applied — so
+      its upsert fails with 42703 and `generateModificationDetails` returns
+      early. With the cache write ordered after it, applying 20260821140000
+      alone would have bought nothing, and the cache would have looked broken
+      rather than unreachable.
+
+      The answer is already paid for by the time either write happens.
+      Discarding it because a different table's write failed is a priority
+      inversion.
+    */
+    const fn = actions.slice(
+      actions.indexOf('export async function generateModificationDetails')
+    );
+    const cacheWrite = fn.indexOf("from('mod_detail_cache')", fn.indexOf('parsedCleanly'));
+    const vehicleRow = fn.indexOf("from('modification_details')");
+
+    expect(cacheWrite).toBeGreaterThan(-1);
+    expect(vehicleRow).toBeGreaterThan(-1);
+    expect(`cacheBeforeRow:${cacheWrite < vehicleRow}`).toBe('cacheBeforeRow:true');
+  });
+
   it('only writes the cache on a clean parse', () => {
     /*
       ⚠ `details` starts as generic placeholder text — "Performance gains will

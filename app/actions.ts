@@ -2077,6 +2077,16 @@ Format as valid JSON only, no markdown.`;
       console.warn('Failed to parse health data, using defaults');
     }
 
+    /*
+      The goal is part of the row's identity, not metadata on it.
+
+      Every field below is written *from* `performanceGoal` — the prompt above
+      says so in as many words, and `alignment_with_goals` is about nothing
+      else. Keying on `(vehicle_id, mod_name)` alone gave four different answers
+      one cache slot, so whichever goal ran last won and the rest read its text.
+      See migration 20260729060000 for why this only became observable once the
+      owner's real choice started reaching the prompt.
+    */
     const { error: upsertError } = await client
       .from('vehicle_health_summary')
       .upsert({
@@ -2377,15 +2387,48 @@ Format as valid JSON only, no markdown or explanations.`;
     }
 
     /*
-      The goal is part of the row's identity, not metadata on it.
+      The content cache — the shared answer that stops the next owner of the
+      same car paying for this again.
 
-      Every field below is written *from* `performanceGoal` — the prompt above
-      says so in as many words, and `alignment_with_goals` is about nothing
-      else. Keying on `(vehicle_id, mod_name)` alone gave four different answers
-      one cache slot, so whichever goal ran last won and the rest read its text.
-      See migration 20260729060000 for why this only became observable once the
-      owner's real choice started reaching the prompt.
+      ⚠ **Written BEFORE the per-vehicle row, and the order is the fix.** It
+      used to sit after, which reads sensibly: `modification_details` is this
+      owner's record and what the screen shows, so recording that first looked
+      like the right priority.
+
+      It meant one unapplied migration silently disabled another one's entire
+      purpose. `modification_details` has **no `performance_goal` column on the
+      live database** — migration `20260729060000`, written 29 Jul, never
+      applied — so the upsert below fails with `42703` and returns early,
+      before this ever ran. Applying `20260821140000` on its own would have
+      bought nothing, and the cache would have looked broken rather than
+      unreachable.
+
+      The answer above is already paid for. Discarding it because a *different
+      table's* write failed is the priority inversion this block's own comment
+      warns about, pointing the other way.
+
+      Fire-and-forget and failure-tolerant, and only on a clean parse — see
+      `parsedCleanly`.
     */
+    if (parsedCleanly) {
+      void client
+        .from('mod_detail_cache')
+        .upsert(
+          {
+            cache_key: cacheKey,
+            details,
+            year: typeof vehicle.year === 'number' ? vehicle.year : Number(vehicle.year) || null,
+            make: vehicle.make ?? null,
+            model: vehicle.model ?? null,
+            mod_name: modName,
+            performance_goal: performanceGoal,
+            cached_at: new Date().toISOString(),
+          },
+          { onConflict: 'cache_key' }
+        )
+        .then(() => undefined, () => undefined);
+    }
+
     const { error: upsertError } = await client
       .from('modification_details')
       .upsert({
@@ -2406,35 +2449,6 @@ Format as valid JSON only, no markdown or explanations.`;
     if (upsertError) {
       console.error('Failed to save modification details:', upsertError);
       return { success: false, error: 'Failed to save details' };
-    }
-
-    /*
-      The content cache, written after the per-vehicle row rather than instead
-      of it. `modification_details` is this owner's record and is what the
-      screen reads; this is the shared answer that stops the next owner of the
-      same car paying for it again.
-
-      Fire-and-forget and failure-tolerant: a cache that can fail the request it
-      is accelerating has the priorities backwards. And only on a clean parse —
-      see `parsedCleanly`.
-    */
-    if (parsedCleanly) {
-      void client
-        .from('mod_detail_cache')
-        .upsert(
-          {
-            cache_key: cacheKey,
-            details,
-            year: typeof vehicle.year === 'number' ? vehicle.year : Number(vehicle.year) || null,
-            make: vehicle.make ?? null,
-            model: vehicle.model ?? null,
-            mod_name: modName,
-            performance_goal: performanceGoal,
-            cached_at: new Date().toISOString(),
-          },
-          { onConflict: 'cache_key' }
-        )
-        .then(() => undefined, () => undefined);
     }
 
     return { success: true, data: { ...details, performance_goal: performanceGoal } };
