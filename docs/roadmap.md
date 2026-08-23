@@ -60,11 +60,16 @@
 > #### What is deployed where
 >
 > ```
-> crewchief.davidmasterson.co        c0873aea   ← the app's API and the App Store URL
-> crewchief-demo.davidmasterson.co   eef03da    ← 26 commits behind, deliberately
-> main                               341cf68, pushed, clean
-> unpromoted                         4 to web-live, 26 to demo-live
+> crewchief.davidmasterson.co        02b36c6e   ← the app's API and the App Store URL
+> crewchief-demo.davidmasterson.co   9b789a87   ← same commit, promoted 23 Aug
+> main                               ff1fad82, pushed, clean
+> unpromoted                         nothing — both hosts are at main
 > ```
+>
+> Updated 23 Aug. **Both hostnames are level with `main` for the first time since the
+> release branches were introduced** — the demo was 26 commits behind and is not any more.
+> The two merge commits are `02b36c6e` (web-live) and `9b789a87` (demo-live); both were
+> confirmed by reading `/api/version` off the hostname rather than by trusting the push.
 >
 > ⚠ `/api/version` reports the **merge** commit, never the `main` commit named in a promote.
 > This has cost real time twice.
@@ -261,6 +266,38 @@
 > ⚠ **The fix is on `main`, and nothing deploys from `main`.** Until someone promotes, the
 > nightly sweep runs the old code from `web-live`. Whether it fires at all is unknown — see
 > the heartbeat, which exists precisely because that question has no answer today.
+>
+> #### 🚀 Promoted to both hosts, 23 Aug — the demo caught up
+>
+> ```
+> crewchief.davidmasterson.co        02b36c6e   built 16:58   ← 9 commits
+> crewchief-demo.davidmasterson.co   9b789a87   built 17:01   ← 32 commits
+> ```
+>
+> Ordered, as §8 requires: `main → web-live → (verify) → demo-live`. The demo gate's whole
+> method is to interrogate the exact build about to become the demo, which it can only do
+> once that commit is live on `web-live`.
+>
+> **The web promote was not optional this time.** The mobile client talks to
+> `crewchief.davidmasterson.co`, and this batch adds `/api/v1/recalls` plus three column-list
+> changes the rebuilt vehicle screen reads. Testing on the phone against the old build would
+> have produced a 404 on a path that works perfectly on `main` — the shape §8 calls the most
+> confusing a bug can take.
+>
+> Verified rather than assumed, on the live hostnames:
+>
+> - `/api/v1/recalls` returns **401, not 404** — the route deployed and is authorizing.
+> - `load-vehicle` on the demo returns `recall_actions: []` and the three `next_service_*`
+>   fields **anonymously**. That was the real risk in this batch: an embed RLS blocks does not
+>   return an empty array, it fails the whole select, and the demo reads as anon.
+> - `verify-demo` passes. Its two warnings — the garage and dashboard shells not carrying
+>   vehicle names in the initial HTML — are structural and predate this: the page is a client
+>   component, and the raw response is a `__next_f` stream.
+>
+> ⚠ The gate caught a real defect before either host moved: `npm run typecheck` failed on a
+> `Map` iterator spread in a new test (root tsconfig targets es5). `tsc -p tsconfig.json` had
+> been run before the file existed and `jest` after, so the one command that would have seen
+> it never ran against the finished state. Fixed in `ff1fad82`.
 >
 > #### 🚀 Promoted to `web-live`, 22 Aug — product host only
 >
