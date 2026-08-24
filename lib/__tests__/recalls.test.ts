@@ -25,6 +25,7 @@
 
 import {
   hasRemedy,
+  inferDateOrder,
   normaliseRecall,
   normaliseRecalls,
   parseRecallDate,
@@ -87,18 +88,62 @@ describe('severityOf', () => {
 });
 
 describe('parseRecallDate', () => {
-  it('reads NHTSA’s MM/DD/YYYY without letting the runtime guess', () => {
-    // `new Date("06/15/2020")` is locale-dependent in exactly the way that
-    // turns 6 June into 15 June, and the date is how the list is ordered.
+  /*
+    ── ⚠ The stored corpus holds **both** date orders ─────────────────────────
+
+    Counted across the live `nhtsa_data` rows on 23 Aug: of 29 dates in
+    `d/d/YYYY` form, 17 can only be day-first, 3 can only be month-first, and 9
+    are ambiguous. So a fixed reading is wrong for part of the data whichever
+    one is chosen — which is how the M235i's card came to render
+    `Issued 2025-17-12`, a month that does not exist, from `17/12/2025`.
+  */
+
+  it('reads a date that can only be month-first', () => {
+    // 15 is not a month. `new Date("06/15/2020")` is also locale-dependent in
+    // exactly the way that turns 6 June into 15 June, so it is parsed here.
     expect(parseRecallDate('06/15/2020')).toBe('2020-06-15');
   });
 
-  it('pads a single-digit month and day', () => {
-    expect(parseRecallDate('3/2/2019')).toBe('2019-03-02');
+  it('reads a date that can only be day-first — the M235i case', () => {
+    expect(parseRecallDate('17/12/2025')).toBe('2025-12-17');
+    expect(parseRecallDate('24/04/2024')).toBe('2024-04-24');
+  });
+
+  it('refuses an ambiguous date rather than flipping a coin', () => {
+    /*
+      §10. Both fields under 13 and no batch to learn from: this date is
+      readable two ways and we cannot say which. A missing "Issued" line costs
+      an owner nothing; a transposed one tells them a 2019 campaign was issued
+      last month.
+    */
+    expect(parseRecallDate('3/2/2019')).toBeNull();
+    expect(parseRecallDate('01/01/2026')).toBeNull();
+  });
+
+  it('takes the order from its batch when it cannot tell alone', () => {
+    expect(parseRecallDate('3/2/2019', 'day-first')).toBe('2019-02-03');
+    expect(parseRecallDate('3/2/2019', 'month-first')).toBe('2019-03-02');
+  });
+
+  it('lets a record overrule the batch when it can only read one way', () => {
+    // A 17 in the first field is a day whatever the rest of the batch said.
+    expect(parseRecallDate('17/12/2025', 'month-first')).toBe('2025-12-17');
   });
 
   it('passes an ISO date through', () => {
     expect(parseRecallDate('2020-06-15T00:00:00Z')).toBe('2020-06-15');
+  });
+
+  it('rejects a date that is not a day, however it was assembled', () => {
+    /*
+      ⚠ Round-tripped rather than range-checked, and this is the assertion that
+      would have stopped `2025-17-12` leaving this file at all. Every layer
+      downstream rendered that string faithfully; none of them could have
+      caught it.
+    */
+    expect(parseRecallDate('2025-17-12')).toBeNull();
+    expect(parseRecallDate('2025-02-31')).toBeNull();
+    expect(parseRecallDate('31/02/2025', 'day-first')).toBeNull();
   });
 
   it.each([['nonsense', 'sometime in 2020'], ['empty', ''], ['a number', 20200615], ['null', null]])(
@@ -107,6 +152,27 @@ describe('parseRecallDate', () => {
       expect(parseRecallDate(value)).toBeNull();
     }
   );
+});
+
+describe('inferDateOrder', () => {
+  it('learns the order from the records that can only read one way', () => {
+    expect(inferDateOrder(['06/03/2019', '24/04/2024'])).toBe('day-first');
+    expect(inferDateOrder(['06/03/2019', '06/15/2020'])).toBe('month-first');
+  });
+
+  it('says unknown when nothing in the batch disambiguates', () => {
+    expect(inferDateOrder(['01/01/2026', '03/02/2019'])).toBe('unknown');
+    expect(inferDateOrder([])).toBe('unknown');
+  });
+
+  it('says unknown when the batch disagrees with itself', () => {
+    /*
+      ⚠ Not a majority vote. Two formats in one response means the assumption
+      that a response has *a* format is already false, and voting would produce
+      a confident answer out of evidence that has contradicted itself.
+    */
+    expect(inferDateOrder(['24/04/2024', '06/15/2020'])).toBe('unknown');
+  });
 });
 
 describe('normaliseRecall', () => {
@@ -170,8 +236,13 @@ describe('normaliseRecalls', () => {
 
   it('orders by recency within a severity band', () => {
     const list = normaliseRecalls([
-      { ...FROM_STORAGE, Summary: 'Older', ReportReceivedDate: '01/01/2019' },
-      { ...FROM_STORAGE, Summary: 'Newer', ReportReceivedDate: '01/01/2026' },
+      /*
+        ⚠ Unambiguous on purpose. `01/01/2019` reads identically either way, so
+        both dates would be refused and this would be asserting insertion order
+        under the name of recency — vacuous in exactly the shape §5 warns about.
+      */
+      { ...FROM_STORAGE, Summary: 'Older', ReportReceivedDate: '15/01/2019' },
+      { ...FROM_STORAGE, Summary: 'Newer', ReportReceivedDate: '15/01/2026' },
     ]);
 
     expect(list.map((r) => r.summary)).toEqual(['Newer', 'Older']);

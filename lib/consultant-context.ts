@@ -181,7 +181,8 @@ export async function loadConsultantContext(
       .select('*')
       .eq('vehicle_id', vehicleId)
       .order('created_at', { ascending: false }),
-    client.from('nhtsa_data').select('recalls').eq('vehicle_id', vehicleId).maybeSingle(),
+    /* `lookup_status` so the advisor can say "not checked" rather than "none". FN-03. */
+    client.from('nhtsa_data').select('recalls,lookup_status').eq('vehicle_id', vehicleId).maybeSingle(),
     client.from('vehicle_health_summary').select('*').eq('vehicle_id', vehicleId).maybeSingle(),
   ]);
 

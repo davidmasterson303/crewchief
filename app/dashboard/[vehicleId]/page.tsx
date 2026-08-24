@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { recallsWereChecked } from '@crewchief/core/nhtsa-lookup';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
 import DashboardContent from '@/components/DashboardContent';
@@ -61,7 +62,12 @@ export default function DashboardPage({ params }: { params: { vehicleId: string 
       const [vehicleResult, knowledgeResult, nhtsaResult, healthSummaryResult, recallActionsResult, historyResult] = await Promise.all([
         supabase.from('vehicles').select('*').eq('id', params.vehicleId).maybeSingle(),
         supabase.from('vehicle_knowledge_base').select('*').eq('vehicle_id', params.vehicleId).maybeSingle(),
-        supabase.from('nhtsa_data').select('recalls').eq('vehicle_id', params.vehicleId).maybeSingle(),
+        /*
+          ⚠ `lookup_status` travels — FN-03. Without it this page can only ask
+          "is there a row", which is true for a lookup NHTSA did not recognise
+          and is how a green tick lands on a truck with open campaigns.
+        */
+        supabase.from('nhtsa_data').select('recalls,lookup_status').eq('vehicle_id', params.vehicleId).maybeSingle(),
         supabase.from('vehicle_health_summary').select('*').eq('vehicle_id', params.vehicleId).maybeSingle(),
         supabase.from('recall_actions').select('campaign_number').eq('vehicle_id', params.vehicleId),
         /*
@@ -137,7 +143,22 @@ export default function DashboardPage({ params }: { params: { vehicleId: string 
 
   return (
     <ErrorBoundary>
-      <DashboardLayout vehicle={data.vehicle} currentPage="dashboard" vehicleImage={vehicleImage} healthSummary={data.healthSummary}>
+      {/*
+        ⚠ **UX-21 · `knowledge` was not passed, so the reliability reading was
+        missing from the dashboard alone.** `DashboardLayout` renders
+        "RELIABILITY 7/10" from `knowledge.reliability_score`, and the consultant
+        and vehicle-info pages both supply it — this one fetched the row (it is
+        `knowledgeResult` above, used for `research_status` twice on this very
+        page) and did not hand it over. One prop, and the effect was a fact that
+        appears on two screens and vanishes on the third.
+      */}
+      <DashboardLayout
+        vehicle={data.vehicle}
+        knowledge={data.knowledge}
+        currentPage="dashboard"
+        vehicleImage={vehicleImage}
+        healthSummary={data.healthSummary}
+      >
         <div className="space-y-8">
           {/*
             Unconditional now. The hero used to render only when a photo
@@ -196,17 +217,19 @@ export default function DashboardPage({ params }: { params: { vehicleId: string 
               summary={healthSummaryLine(data.healthSummary?.health_score)}
             >
               {/*
-                ⚠ `recallsChecked` is whether an NHTSA **row exists**, not
-                whether it listed recalls. Those are different facts and
-                conflating them is what put a green "No active recalls" tick on
-                a 2003 Accord whose lookup had never run. `maybeSingle()`
-                returns null when there is no row, which is the evidence.
+                ⚠ `recallsChecked` is whether the lookup **matched**, not
+                whether a row exists. Three facts, not one, and conflating them
+                is what put a green "No active recalls" tick on a 2003 Accord
+                whose lookup had never run — and, once that was fixed, would
+                have put the same tick on any car whose make NHTSA does not
+                recognise. `recallsWereChecked` is the one place that question
+                is answered; see `packages/core/src/nhtsa-lookup.ts`.
               */}
               <HealthSummary
                 healthSummary={data.healthSummary}
                 vehicleId={params.vehicleId}
                 recalls={data.nhtsa?.recalls || []}
-                recallsChecked={Boolean(data.nhtsa)}
+                recallsChecked={recallsWereChecked(data.nhtsa?.lookup_status)}
                 researchComplete={data.knowledge?.research_status === 'completed'}
               />
             </CollapsibleSection>

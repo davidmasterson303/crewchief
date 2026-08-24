@@ -100,6 +100,65 @@ export const SERVICE_COOLDOWN_DAYS = 30;
  */
 export const SWEEP_GENERATE_CAP = 10;
 
+/**
+ * How many stale NHTSA lookups one sweep may refresh.
+ *
+ * ── ⚠ Why there is a cap on a free API (FN-02) ──────────────────────────────
+ *
+ * NHTSA's recall endpoint costs nothing, so this cap is **not** about money —
+ * which makes it different from `SWEEP_GENERATE_CAP`, and the difference is
+ * worth stating so nobody "optimises" it away.
+ *
+ * It is about two things the sweep cannot afford. **Request volume against
+ * somebody else's service**: a garage of a thousand cars all crossing 90 days
+ * in the same week would fire a thousand requests in one burst from one IP, and
+ * there is no published rate limit to reason against. And **the function
+ * timeout**: this sweep already has more to do than fits comfortably in a
+ * Netlify invocation, and each refresh is two round trips.
+ *
+ * A car whose lookup is a day past due waits until tomorrow. Recalls arrive on
+ * a scale of weeks; a backlog draining over several nights is not a defect.
+ *
+ * Higher than `SWEEP_GENERATE_CAP` because the unit cost is a free HTTP call
+ * rather than a Pro-model generation.
+ */
+export const SWEEP_RECALL_REFRESH_CAP = 40;
+
+/**
+ * Which vehicles' recall data is stale enough to re-fetch tonight.
+ *
+ * ⚠ **A row that has never recorded an outcome comes first.** `lookup_status`
+ * arrived on 24 Aug and every row written before it reads `unknown`, which
+ * means we genuinely do not know whether that car's recalls were ever matched.
+ * Those are the rows most likely to be hiding a `no_match`, so they are
+ * refreshed ahead of ones that are merely old.
+ *
+ * Then oldest-due first, so a backlog drains in the order it accumulated rather
+ * than by whatever order the database happened to return.
+ */
+export function recallsToRefresh<T extends { nextCheckDue: string | null; lookupStatus: string | null }>(
+  candidates: readonly T[],
+  now: Date = new Date(),
+  cap: number = SWEEP_RECALL_REFRESH_CAP
+): SweepPlan<T> {
+  const due = candidates.filter((candidate) => {
+    if (candidate.lookupStatus !== 'matched') return true;
+    if (!candidate.nextCheckDue) return true;
+
+    const at = Date.parse(candidate.nextCheckDue);
+    return Number.isNaN(at) ? true : at <= now.getTime();
+  });
+
+  const ordered = [...due].sort((a, b) => {
+    const unresolved = Number(b.lookupStatus !== 'matched') - Number(a.lookupStatus !== 'matched');
+    if (unresolved !== 0) return unresolved;
+
+    return (a.nextCheckDue ?? '').localeCompare(b.nextCheckDue ?? '');
+  });
+
+  return applySendCap(ordered, cap);
+}
+
 export interface RecallToRaise {
   campaignNumber: string;
   recall: NormalisedRecall;

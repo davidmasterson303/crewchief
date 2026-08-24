@@ -1,4 +1,11 @@
 import { getServiceRoleClient } from '@/lib/supabase';
+import { checkMonthlyBudget } from '@/lib/ai-budget';
+import { budgetMessage } from '@crewchief/core/ai/budget';
+import {
+  nextCheckDue,
+  readRecallResponse,
+  type NhtsaLookup,
+} from '@crewchief/core/nhtsa-lookup';
 import { genAI, proStructuredConfig } from '@/lib/gemini';
 import { recordAiUsageInBackground } from '@/lib/ai-usage';
 import { VEHICLE_RESEARCH_PROMPT } from '@crewchief/core/prompts';
@@ -156,6 +163,28 @@ export async function researchVehicleDossier(
   const timeoutMs = options.timeoutMs ?? RESEARCH_TIMEOUT_MS;
 
   try {
+    /*
+      ⚠ **PERF-06, and this is the one that mattered most.** This is the single
+      most expensive call in the application — the Pro model with
+      `maxOutputTokens: 32768` — and it had **no ceiling in front of it at all**.
+      A user past their tier limit could keep generating dossiers indefinitely.
+
+      `userId` is `null` for the demo path and for the sweep, and both are
+      allowed through deliberately: the demo has its own separate ceiling, and
+      the sweep is capped at `SWEEP_GENERATE_CAP` cars a night by construction.
+      A monthly per-user budget has no user to charge in either case.
+    */
+    if (userId) {
+      const budget = await checkMonthlyBudget(userId);
+      if (!budget.allowed) {
+        logger.warn('RESEARCH:BUDGET_SPENT', 'Monthly AI budget spent; not researching', {
+          vehicleId,
+          userId,
+        });
+        return { success: false, error: budgetMessage(budget) };
+      }
+    }
+
     const client = getServiceRoleClient();
 
     /*
@@ -361,22 +390,97 @@ export async function researchVehicleDossier(
   }
 }
 
-async function fetchNHTSARecalls(vehicleId: string, year: number, make: string, model: string) {
+/**
+ * Does NHTSA recognise this make for this year?
+ *
+ * ⚠ Returns `null` for "could not tell", which is **not** `false`. The caller
+ * treats `null` as "do not claim a match", so a failure here costs a green tick
+ * rather than granting one — see `readRecallResponse`.
+ */
+async function makeIsKnownToNhtsa(year: number, make: string): Promise<boolean | null> {
   try {
-    const client = getServiceRoleClient();
     const response = await fetch(
-      `https://api.nhtsa.gov/recalls/recallsByVehicle?make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&modelYear=${year}`
+      `https://vpic.nhtsa.dot.gov/api/vehicles/GetModelsForMakeYear/make/${encodeURIComponent(make)}/modelyear/${year}?format=json`
     );
 
-    if (response.ok) {
-      const data = await response.json();
-      const recalls = data.results || [];
+    if (!response.ok) return null;
 
-      await client.from('nhtsa_data').insert({
-        vehicle_id: vehicleId,
-        recalls: recalls,
-        last_checked: new Date().toISOString(),
-        next_check_due: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+    const data = (await response.json()) as { Count?: unknown; Results?: unknown };
+    if (Array.isArray(data.Results)) return data.Results.length > 0;
+    if (typeof data.Count === 'number') return data.Count > 0;
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fetch this vehicle's recalls and record **what the lookup concluded**.
+ *
+ * ── ⚠ Three defects in six lines, all found on 24 Aug ───────────────────────
+ *
+ * The version this replaces was:
+ *
+ *     await client.from('nhtsa_data').insert({ vehicle_id, recalls, … });
+ *
+ * **1 · `.insert()` against a `UNIQUE NOT NULL` column.** A second call for the
+ * same vehicle raises `23505`.
+ *
+ * **2 · The result was not destructured at all**, so that error was invisible.
+ * Between them, recalls were fetched **once per vehicle, ever** — a car
+ * researched in February shows a green tick forever, even after NHTSA opens a
+ * stall-while-driving campaign against it in April. The nightly sweep reads the
+ * same frozen array and raises nothing. There was no second entry point either:
+ * `researchVehicleDossier` short-circuits on `research_status === 'completed'`.
+ *
+ * **3 · `next_check_due` was written and read by nothing.** The "quarterly
+ * recheck" the schema header advertises did not exist. It does now — the
+ * nightly sweep selects on it.
+ *
+ * And the fourth, which is the worst of them: a lookup NHTSA did not recognise
+ * was stored identically to a clean car. `packages/core/src/nhtsa-lookup.ts`
+ * carries that argument in full.
+ */
+export async function fetchNHTSARecalls(
+  vehicleId: string,
+  year: number,
+  make: string,
+  model: string
+) {
+  try {
+    const client = getServiceRoleClient();
+
+    /*
+      Both requests together rather than in sequence: the vocabulary check is
+      only consulted when zero recalls come back, and waiting for it serially
+      would add its latency to every research run for nothing.
+    */
+    const [response, makeIsKnown] = await Promise.all([
+      fetch(
+        `https://api.nhtsa.gov/recalls/recallsByVehicle?make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&modelYear=${year}`
+      ),
+      makeIsKnownToNhtsa(year, make),
+    ]);
+
+    const results = response.ok ? ((await response.json()) as { results?: unknown }).results : null;
+    const lookup = readRecallResponse({ ok: response.ok, results, makeIsKnown });
+
+    await writeNhtsaRow(client, vehicleId, lookup);
+
+    if (lookup.status !== 'matched') {
+      /*
+        ⚠ Warned, not swallowed. A `no_match` is the state in which this product
+        knows least about a car's safety, and it is invisible on screen by
+        design — the tile says "we cannot say" rather than raising an alarm — so
+        the log is the only place it is countable.
+      */
+      logger.warn('RESEARCH:NHTSA_UNMATCHED', 'NHTSA did not recognise this vehicle', {
+        vehicleId,
+        status: lookup.status,
+        make,
+        model,
+        year,
       });
     }
   } catch (error) {
@@ -385,4 +489,64 @@ async function fetchNHTSARecalls(vehicleId: string, year: number, make: string, 
       error: error instanceof Error ? error.message : String(error),
     });
   }
+}
+
+/**
+ * Write the lookup, tolerating a database that has not had the migration yet.
+ *
+ * ⚠ **`CLAUDE.md` §2: the database and the migrations folder disagree, both
+ * ways, and have done five times.** `lookup_status` arrives in
+ * `20260824100000`, and the deploy that carries this code can reach production
+ * before somebody runs it in the SQL editor. Sending an unknown column makes
+ * PostgREST reject the **whole row** with `42703`, which would take recall
+ * fetching down entirely — turning a correctness fix into an outage.
+ *
+ * So the column is sent, and a `42703` retries once without it and logs at
+ * error level naming the migration. The fallback is deliberately loud and
+ * deliberately temporary: it should be deleted the day the migration is
+ * confirmed applied.
+ */
+async function writeNhtsaRow(
+  client: ReturnType<typeof getServiceRoleClient>,
+  vehicleId: string,
+  lookup: NhtsaLookup
+) {
+  const row = {
+    vehicle_id: vehicleId,
+    recalls: lookup.recalls,
+    last_checked: new Date().toISOString(),
+    next_check_due: nextCheckDue(lookup.status),
+  };
+
+  const { error } = await client
+    .from('nhtsa_data')
+    .upsert({ ...row, lookup_status: lookup.status }, { onConflict: 'vehicle_id' });
+
+  if (!error) return;
+
+  if (error.code === '42703') {
+    logger.error(
+      'RESEARCH:NHTSA_SCHEMA_LAG',
+      new Error('nhtsa_data.lookup_status is missing — run migration 20260824100000'),
+      { vehicleId }
+    );
+
+    const { error: retryError } = await client
+      .from('nhtsa_data')
+      .upsert(row, { onConflict: 'vehicle_id' });
+
+    if (retryError) {
+      logger.error('RESEARCH:NHTSA_WRITE_FAILED', new Error(retryError.message), { vehicleId });
+    }
+    return;
+  }
+
+  /*
+    ⚠ Checked at all, which it was not before. The `23505` this used to raise
+    every time a vehicle was re-researched went into a variable nobody read.
+  */
+  logger.error('RESEARCH:NHTSA_WRITE_FAILED', new Error(error.message), {
+    vehicleId,
+    code: error.code,
+  });
 }
