@@ -24,7 +24,7 @@ import { toast } from 'sonner';
 import { invalidateDashboardCache } from '@crewchief/core/query-invalidation';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
 import { CONTEXT_KIND_LABELS, type ContextKind } from '@crewchief/core/consultant-context-kinds';
-import { parseAnswerLine } from '@crewchief/core/answer-markup';
+import { AnswerLine } from '@/components/AnswerLine';
 import { adviceDisclosure } from '@crewchief/core/advice-disclosure';
 
 /*
@@ -132,54 +132,6 @@ function getFollowUps(lastMessage: string): string[] {
     return FOLLOW_UP_SUGGESTIONS.performance;
   }
   return FOLLOW_UP_SUGGESTIONS.default;
-}
-
-/**
- * Draws the runs `@crewchief/core/answer-markup` identifies.
- *
- * The tokenising moved to core on 5 Aug because the Expo advisor had none of
- * it: the same answer rendered as literal `**$1,461**` on the phone while the
- * web showed it bold. One-client capability, second client silently without —
- * the same shape as the health band and the context-kind labels.
- *
- * Only the drawing is web. React Native has no `<strong>`.
- */
-function renderMarkdownLine(line: string, key: number) {
-  const tokens = parseAnswerLine(line);
-
-  return tokens.map((token, index) => {
-    /*
-      ⚠ **FN-14.** This drew bold and treated everything else as plain, so
-      single-asterisk emphasis reached the screen as literal asterisks — seen
-      live on the demo: *"of \*if\* it fails, it's \*when\*"*. A screen reader
-      reads that as "asterisk when asterisk".
-
-      `<em>` rather than a font-style class, so the emphasis survives for a
-      screen reader as well as for the eye. Both flags can be set at once —
-      `***x***` — which is the case that used to render corrupted.
-    */
-    if (token.bold && token.italic) {
-      return (
-        <strong key={`bi-${key}-${index}`} className="font-semibold text-white">
-          <em>{token.text}</em>
-        </strong>
-      );
-    }
-
-    if (token.bold) {
-      return (
-        <strong key={`b-${key}-${index}`} className="font-semibold text-white">
-          {token.text}
-        </strong>
-      );
-    }
-
-    if (token.italic) {
-      return <em key={`i-${key}-${index}`}>{token.text}</em>;
-    }
-
-    return <span key={`t-${key}-${index}`}>{token.text}</span>;
-  });
 }
 
 /*
@@ -899,7 +851,9 @@ export default function ConsultantChat({
                     )}
                     <div className="space-y-1.5">
                       {msg.content.split('\n').map((line: string, i: number) => (
-                        <p key={i} className="text-sm leading-relaxed break-words">{renderMarkdownLine(line, i)}</p>
+                        <p key={i} className="text-sm leading-relaxed break-words">
+                          <AnswerLine line={line} lineKey={i} />
+                        </p>
                       ))}
                     </div>
                     {msg.wishlistActions && msg.wishlistActions.length > 0 && (

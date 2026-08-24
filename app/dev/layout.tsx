@@ -43,6 +43,21 @@ import { notFound } from 'next/navigation';
  * was crawlable. `app/robots.ts` now excludes it, and this is what makes the
  * exclusion true rather than a request.
  */
+/**
+ * ⚠ **Dynamic, so `notFound()` returns a real 404 status.**
+ *
+ * Found by testing the production build rather than reasoned about. Without
+ * this, Next prerenders these routes at build time, `notFound()` runs *during
+ * generation*, and the result is a static not-found page served with **HTTP
+ * 200**. The body is correct — the RLS probe results are genuinely gone, which
+ * is the security half — but a crawler reads 200 as "this page exists", which
+ * is the other half of SEC-10 and the reason `app/robots.ts` was written.
+ *
+ * Rendering per request costs a function invocation on a route nobody should be
+ * reaching, and buys the status code that makes the exclusion true.
+ */
+export const dynamic = 'force-dynamic';
+
 export default function DevLayout({ children }: { children: React.ReactNode }) {
   /*
     ⚠ `NODE_ENV`, not a bespoke flag. Netlify sets it to `production` for every
