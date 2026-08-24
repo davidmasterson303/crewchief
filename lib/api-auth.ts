@@ -59,7 +59,15 @@ export type VehicleAccessResult = VehicleAccessGranted | VehicleAccessDenied;
  * Deliberately vague — "not found" and "not yours" must be indistinguishable
  * so this cannot be used to probe for which vehicle IDs exist.
  */
-const NOT_FOUND_MESSAGE = 'Vehicle not found';
+/**
+ * The one message for both "does not exist" and "is not yours".
+ *
+ * ⚠ Exported as of 24 Aug so a caller doing its own second-id check answers in
+ * the same words — `parseInvoiceLineItems` takes a `documentId` alongside the
+ * vehicle it authorized (SEC-01), and a distinct message there would turn the
+ * endpoint into an oracle for which document ids exist.
+ */
+export const NOT_FOUND_MESSAGE = 'Vehicle not found';
 
 function deny(error: string, status: number): VehicleAccessDenied {
   return {
