@@ -1,6 +1,16 @@
 'use client';
 
 import { useState } from 'react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -67,6 +77,21 @@ export function WishlistSection({ vehicleId }: WishlistSectionProps) {
     },
     staleTime: 1000 * 60 * 2,
   });
+
+  /**
+   * The item awaiting confirmation — UX-05.
+   *
+   * ⚠ **A stray tap used to delete a wishlist item, permanently, with no
+   * question asked.** The delete control sits 6px from "Done" and carries
+   * `.tap-target-44`, whose invisible hit area extends 8px each side — so the
+   * last two pixels of "Done" fired Delete instead. No confirmation, no undo,
+   * and the row is gone.
+   *
+   * The phone already asks. Two clients, one destructive action, and only one
+   * of them was careful — this codebase's most repeated defect, on the one
+   * control here that cannot be taken back.
+   */
+  const [pendingDelete, setPendingDelete] = useState<WishlistItem | null>(null);
 
   const handleDelete = async (itemId: string) => {
     try {
@@ -277,7 +302,13 @@ export function WishlistSection({ vehicleId }: WishlistSectionProps) {
                           Done
                         </Button>
                         <button
-                          onClick={() => handleDelete(item.id)}
+                          /*
+                            UX-05. Asks first. The overlapping hit areas are
+                            worth fixing too, but a confirmation is what makes
+                            the mistake recoverable rather than merely less
+                            likely.
+                          */
+                          onClick={() => setPendingDelete(item)}
                           disabled={deletingId === item.id}
                           className="tap-target-44 w-7 h-7 flex items-center justify-center rounded-lg text-white/25 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
                           aria-label="Remove item"
@@ -398,6 +429,47 @@ export function WishlistSection({ vehicleId }: WishlistSectionProps) {
         onOpenChange={setShowQuoteDetailDialog}
         quote={selectedQuote}
       />
+
+      {/*
+        ── ⚠ UX-05 · one stray tap used to delete an item forever ─────────────
+
+        The delete control sits 6px from "Done" and carries `.tap-target-44`,
+        whose invisible hit area extends 8px each side — so the last two pixels
+        of "Done" fired Delete. No confirmation, no undo, and the row was gone.
+        **iOS asks first; web did not.**
+
+        The item is **named** rather than "are you sure?", because the person
+        who hit this by accident was reaching for a different button and needs to
+        find out *which* row is about to go, not merely that something is.
+      */}
+      <AlertDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove {pendingDelete?.item_name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              It comes off this car&apos;s list. Nothing else changes — any work you have already
+              recorded stays in the service history.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep it</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const item = pendingDelete;
+                setPendingDelete(null);
+                if (item) void handleDelete(item.id);
+              }}
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

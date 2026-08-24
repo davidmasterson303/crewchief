@@ -91,7 +91,7 @@ export default function ModificationDetailsCard({ vehicleId, modName, vehicle, d
               size="sm"
               onClick={() => handleGenerateDetails(false)}
               disabled={isManualLoading}
-              className="bg-accent hover:bg-accent/90 text-white whitespace-nowrap transition-colors"
+              className="whitespace-nowrap transition-colors"
             >
               {isManualLoading ? (
                 <>
@@ -124,7 +124,7 @@ export default function ModificationDetailsCard({ vehicleId, modName, vehicle, d
           <Button
             size="sm"
             onClick={() => setIsExpanded(!isExpanded)}
-            className="bg-accent/80 hover:bg-accent text-white font-semibold px-4 shadow-lg transition-all hover:shadow-xl hover:scale-105"
+            className="font-semibold px-4 shadow-lg transition-all hover:shadow-xl hover:scale-105"
           >
             {isExpanded ? (
               <>
@@ -204,7 +204,7 @@ export default function ModificationDetailsCard({ vehicleId, modName, vehicle, d
                 size="sm"
                 onClick={handleAddToWishlist}
                 disabled={isAddingToWishlist}
-                className="w-full bg-accent hover:bg-accent/90 text-white h-8 transition-colors"
+                className="w-full h-8 transition-colors"
               >
                 {isAddingToWishlist ? (
                   <>

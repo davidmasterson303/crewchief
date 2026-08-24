@@ -144,7 +144,32 @@ export default function MaintenanceHistoryDialog({
             <Button
               type="submit"
               disabled={isLoading}
-              className="bg-accent hover:bg-accent/90 text-white"
+      /*
+        ── ⚠ UI-01 · white on cyan is 1.81:1 ─────────────────────────────────
+
+        `--accent` is `#22D3EE` (cyan-400) and white ink on it measures
+        **1.81:1** against a 4.5 floor — and the hover, `bg-accent/90`, is
+        **2.19:1**, *worse than resting*. `app/globals.css:203-211` documents
+        and rejects exactly that failure for `--primary` (*"Hover is a live,
+        readable state; nothing exempts it"*); the reasoning was written down
+        and not applied to `--accent`.
+
+        There is a second offence stacked on it: `globals.css:214-216` reserves
+        cyan-400 for *"accent + glow / focus ring / brand mark"*, with
+        `--primary` as the button fill. These sites used the **glow** colour as
+        a fill.
+
+        `components/ui/button.tsx:8-12` already states the rule — *"a call site
+        that still needs a colour is a bug in the primitive."* So the override
+        is deleted rather than recoloured: the `default` variant supplies
+        `bg-primary` with `text-primary-foreground`, which is the design
+        system's own CTA pair at **5.10:1**.
+
+        The web contrast gate could not see any of this. It is one regex —
+        `text-white\/(\d{1,2})` — so bare `text-white` at full alpha is not
+        missed, it is **unrepresentable**; and the scan has no concept of a
+        background, so white-on-cyan and white-on-black are the same input.
+      */
             >
               {isLoading ? (
                 <>

@@ -219,7 +219,16 @@ export default function SettingsPage() {
           </SettingsSection>
 
           <div className="flex justify-end">
-            <Button onClick={handleSave} disabled={saving || Boolean(nameError)} className="bg-primary hover:bg-accent">
+            {/*
+              ⚠ **UI-01, the worst of them.** `hover:bg-accent` with the default
+              variant's `text-primary-foreground` renders "Save changes" at
+              **1.72:1 while the pointer is on it** — illegible at exactly the
+              moment somebody is about to press it.
+
+              `bg-primary` was already the default variant's fill, so the whole
+              override said nothing except "and make the hover unreadable".
+            */}
+            <Button onClick={handleSave} disabled={saving || Boolean(nameError)}>
               {saving ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden={true} />

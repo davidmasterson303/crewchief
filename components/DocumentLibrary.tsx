@@ -54,7 +54,13 @@ export default function DocumentLibrary({ vehicleId }: DocumentLibraryProps) {
       case 'manual':
         return <FileText className="h-5 w-5 text-purple-600" />;
       default:
-        return <FileIcon className="h-5 w-5 text-slate-600" />;
+        /*
+          ⚠ UI-03. `text-slate-600` measures **2.55:1** on this product's dark
+          surface — a light-theme palette class on a dark page. It is an icon
+          rather than a string, so it fails no text floor, and it is still the
+          quietest thing on a row somebody is trying to identify a file from.
+        */
+        return <FileIcon className="h-5 w-5 text-muted-foreground" />;
     }
   };
 

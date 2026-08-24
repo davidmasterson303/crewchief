@@ -31,10 +31,25 @@ export default function ModWishlistButton({
     <Button
       size={size}
       variant={isSaved ? 'outline' : 'default'}
+      /*
+        ── ⚠ UI-01 / UI-03 · both halves of this were unreadable ─────────────
+
+        Saved: `text-gray-700` on a near-black surface at **1.63:1** — a
+        light-theme palette class left on a dark product. Unsaved: white on
+        `--accent` (cyan-400) at **1.81:1**, with the hover *worse* at 2.19:1.
+
+        Both overrides are deleted rather than recoloured. `components/ui/button.tsx`
+        states the rule directly — *"a call site that still needs a colour is a
+        bug in the primitive"* — and the two variants already carry the right
+        pairs: `default` is `bg-primary` with `text-primary-foreground` at
+        5.10:1, `outline` is the token border with `text-foreground`.
+
+        The red hover is kept: it is what tells you the control removes rather
+        than adds, and `hover:text-red-600` on the page surface clears the
+        floor. Only the resting greys go.
+      */
       className={
-        isSaved
-          ? 'h-7 text-xs border-gray-300 text-gray-700 hover:border-red-600 hover:text-red-600'
-          : 'h-7 text-xs bg-accent text-white hover:bg-accent/90'
+        isSaved ? 'h-7 text-xs hover:border-red-600 hover:text-red-600' : 'h-7 text-xs'
       }
       onClick={toggleWishlist}
       disabled={wishlistLoading || loading}

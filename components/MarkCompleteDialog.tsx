@@ -173,7 +173,7 @@ export function MarkCompleteDialog({
             <div>
               <div className="flex items-center justify-between mb-2">
                 <Label>Total Cost</Label>
-                <span className="text-lg font-semibold text-slate-900">
+                <span className="text-lg font-semibold text-foreground">
                   ${(formData.partsCost + formData.laborCost).toFixed(2)}
                 </span>
               </div>

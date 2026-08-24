@@ -279,10 +279,33 @@ export function ClusterGauge({
                 className="num gauge-label"
                 textAnchor="middle"
                 dominantBaseline="central"
+                /*
+                  ── ⚠ UI-04 · both floors broken on one element ──────────────
+
+                  Measured live on 23 Aug: **10px** type at **2.20:1** — the
+                  12px type floor and the 4.5:1 contrast floor, on the
+                  dashboard's headline instrument, at the same time.
+
+                  Measured against `--background` `#100F0D`: 0.24 alpha is
+                  **2.12:1** and 0.42 is **4.09:1**, so neither of the two
+                  values here cleared it and the boundary ticks were only
+                  slightly less illegible than the rest.
+
+                  0.55 is **6.24:1** for a boundary and 0.50 is **5.34:1** for
+                  an ordinary tick — the ramp's own floor, which the mobile
+                  theme states as the quietest a string may be. The distinction
+                  between the two survives; both are now readable.
+
+                  ⚠ **Not `text-*` utilities.** This is SVG, where Tailwind's
+                  text sizing does not apply and `font-size` is the attribute
+                  that works — which is also why every text scan in this repo is
+                  blind to it. `.gauge-label` carries the size in `globals.css`
+                  where forced-colors can reach it.
+                */
                 fill={
-                  BOUNDARIES.has(tick) ? 'rgb(255 255 255 / 0.42)' : 'rgb(255 255 255 / 0.24)'
+                  BOUNDARIES.has(tick) ? 'rgb(255 255 255 / 0.55)' : 'rgb(255 255 255 / 0.5)'
                 }
-                fontSize="10"
+                fontSize="12"
                 fontWeight="500"
               >
                 {tick}

@@ -25,6 +25,7 @@ import { invalidateDashboardCache } from '@crewchief/core/query-invalidation';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
 import { CONTEXT_KIND_LABELS, type ContextKind } from '@crewchief/core/consultant-context-kinds';
 import { parseAnswerLine } from '@crewchief/core/answer-markup';
+import { adviceDisclosure } from '@crewchief/core/advice-disclosure';
 
 /*
  * These are the four collections this component *renders*, and no longer the
@@ -146,13 +147,39 @@ function getFollowUps(lastMessage: string): string[] {
 function renderMarkdownLine(line: string, key: number) {
   const tokens = parseAnswerLine(line);
 
-  return tokens.map((token, index) =>
-    token.bold ? (
-      <strong key={`b-${key}-${index}`} className="font-semibold text-white">{token.text}</strong>
-    ) : (
-      <span key={`t-${key}-${index}`}>{token.text}</span>
-    )
-  );
+  return tokens.map((token, index) => {
+    /*
+      ⚠ **FN-14.** This drew bold and treated everything else as plain, so
+      single-asterisk emphasis reached the screen as literal asterisks — seen
+      live on the demo: *"of \*if\* it fails, it's \*when\*"*. A screen reader
+      reads that as "asterisk when asterisk".
+
+      `<em>` rather than a font-style class, so the emphasis survives for a
+      screen reader as well as for the eye. Both flags can be set at once —
+      `***x***` — which is the case that used to render corrupted.
+    */
+    if (token.bold && token.italic) {
+      return (
+        <strong key={`bi-${key}-${index}`} className="font-semibold text-white">
+          <em>{token.text}</em>
+        </strong>
+      );
+    }
+
+    if (token.bold) {
+      return (
+        <strong key={`b-${key}-${index}`} className="font-semibold text-white">
+          {token.text}
+        </strong>
+      );
+    }
+
+    if (token.italic) {
+      return <em key={`i-${key}-${index}`}>{token.text}</em>;
+    }
+
+    return <span key={`t-${key}-${index}`}>{token.text}</span>;
+  });
 }
 
 /*
@@ -976,6 +1003,28 @@ export default function ConsultantChat({
                         </span>
                       ))}
                     </div>
+                  )}
+
+                  {/*
+                    ── ⚠ UX-16 / LEG-05 · the disclosure, where the advice is ──
+
+                    **The product never said its advice was AI-generated**, and
+                    the safety disclaimer lived only on a Terms page nobody
+                    opens. A disclaimer at the point of advice is worth far more
+                    than one behind a link, and it costs a line of copy.
+
+                    Under every assistant turn, not once at the top of the
+                    thread: a person scrolling a long conversation reads the
+                    answer, not the header. `adviceDisclosure` keeps the wording
+                    identical here and on the phone — a safety sentence that
+                    says one thing on one client is this codebase's most
+                    repeated defect applied to the sentence that limits
+                    liability.
+                  */}
+                  {msg.role === 'assistant' && msg.content && (
+                    <p className="measure text-xs text-white/50 mt-2">
+                      {adviceDisclosure('consultant')}
+                    </p>
                   )}
 
                   {/*

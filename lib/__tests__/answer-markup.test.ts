@@ -167,3 +167,64 @@ describe('invoice totals reach the consultant prompt', () => {
     expect(send).toMatch(/typeof data\.total_cost !== 'number'/);
   });
 });
+
+/**
+ * ── FN-14: single-asterisk emphasis, and the triple form ────────────────────
+ *
+ * Seen on the deployed demo, 23 Aug: *"of \*if\* it fails, it's \*when\*"* and
+ * *"you \*always\* replace them as a pair"* — asterisks rendered as characters,
+ * on the product's flagship feature. A screen reader says "asterisk when
+ * asterisk".
+ *
+ * `***x***` was worse: the bold rule consumed four of the six markers and left
+ * a stray `*` at each end.
+ */
+describe('emphasis, not asterisks', () => {
+  it('reads single-asterisk emphasis as emphasis', () => {
+    expect(parseAnswerLine("it's not *if* it fails, it's *when*")).toEqual([
+      { text: "it's not ", bold: false, italic: false },
+      { text: 'if', bold: false, italic: true },
+      { text: " it fails, it's ", bold: false, italic: false },
+      { text: 'when', bold: false, italic: true },
+    ]);
+  });
+
+  it('reads the triple form as both, not as bold plus a stray marker', () => {
+    expect(parseAnswerLine('this is ***urgent***')).toEqual([
+      { text: 'this is ', bold: false, italic: false },
+      { text: 'urgent', bold: true, italic: true },
+    ]);
+  });
+
+  it('still leaves arithmetic alone', () => {
+    /*
+      ⚠ The case that makes this hard, and the reason it is a scanner rather
+      than a lookbehind regex — which is a **parse-time SyntaxError** on Safari
+      before 16.4, not a failed match.
+    */
+    expect(parseAnswerLine('torque to 25 ft-lb * 2')).toEqual([
+      { text: 'torque to 25 ft-lb * 2', bold: false, italic: false },
+    ]);
+  });
+
+  it('leaves an unclosed marker as text', () => {
+    expect(parseAnswerLine('a * b')).toEqual([{ text: 'a * b', bold: false, italic: false }]);
+    expect(parseAnswerLine('**unfinished')).toEqual([
+      { text: '**unfinished', bold: false, italic: false },
+    ]);
+  });
+
+  it('does not treat a marker inside a word as emphasis', () => {
+    expect(parseAnswerLine('part*number')).toEqual([
+      { text: 'part*number', bold: false, italic: false },
+    ]);
+  });
+
+  it('keeps bold working beside it', () => {
+    expect(parseAnswerLine('that ran **$1,461** all-in')).toEqual([
+      { text: 'that ran ', bold: false, italic: false },
+      { text: '$1,461', bold: true, italic: false },
+      { text: ' all-in', bold: false, italic: false },
+    ]);
+  });
+});

@@ -33,6 +33,15 @@
 export interface AnswerToken {
   text: string;
   bold: boolean;
+  /**
+   * `*emphasis*` — FN-14.
+   *
+   * ⚠ Absent until 24 Aug, and the consequence was visible on the deployed
+   * demo: *"of \*if\* it fails, it's \*when\*"* and *"you \*always\* replace them
+   * as a pair"* rendered with their asterisks. A screen reader says "asterisk
+   * when asterisk".
+   */
+  italic: boolean;
 }
 
 /** One rendered line: either an ordinary paragraph or a bulleted item. */
@@ -41,39 +50,128 @@ export interface AnswerLine {
   tokens: AnswerToken[];
 }
 
-/**
- * `**bold**` → runs.
- *
- * Non-greedy, so `**a** and **b**` yields two bold runs rather than one that
- * swallows the middle. An unclosed `**` matches nothing and survives as text.
- */
-const BOLD = /\*\*(.+?)\*\*/g;
-
 /** `* item`, `- item`, `• item` — with the marker removed. */
 const BULLET = /^\s*[*\-•]\s+/;
 
+/**
+ * ── ⚠ Why this is a scanner and not a regex (FN-14) ─────────────────────────
+ *
+ * Single-asterisk emphasis needs to be told apart from **arithmetic**, and this
+ * codebase already has a test for it: `"25 ft-lb * 2"` must survive intact.
+ * The rule that distinguishes them is about the characters on *either side* of
+ * the marker — an opening `*` is not preceded by a word character and not
+ * followed by a space; a closing `*` is not preceded by a space and not
+ * followed by a word character.
+ *
+ * Expressed as a regex that needs lookbehind, and **lookbehind is a parse-time
+ * syntax error on Safari before 16.4** — not a failed match, a thrown
+ * SyntaxError that takes the whole bundle with it. For a mobile-first product
+ * that is not a trade worth making for four characters of brevity.
+ *
+ * So the scanner walks the line once. It is longer and it is decidable by
+ * reading it.
+ *
+ * ── Order is longest-first, and it is load-bearing ──────────────────────────
+ *
+ * `***x***` has to be recognised before `**x**`, or the bold rule consumes four
+ * of the six asterisks and leaves a stray `*` at each end — which is exactly
+ * how the audit found `***x***` "rendering corrupted".
+ */
+const WORD = /[A-Za-z0-9_]/;
+
+function isWord(char: string | undefined): boolean {
+  return char !== undefined && WORD.test(char);
+}
+
+function isSpace(char: string | undefined): boolean {
+  return char === undefined || /\s/.test(char);
+}
+
+/**
+ * Where a run of `marker` closes, or `-1`.
+ *
+ * `single` applies the arithmetic guard: the closing marker must not be
+ * preceded by a space and must not be followed by a word character.
+ */
+function closingAt(line: string, from: number, marker: string, single: boolean): number {
+  let at = line.indexOf(marker, from);
+
+  while (at !== -1) {
+    const contentOk = at > from;
+    const spacingOk = !single || (!isSpace(line[at - 1]) && !isWord(line[at + marker.length]));
+
+    if (contentOk && spacingOk) return at;
+    at = line.indexOf(marker, at + 1);
+  }
+
+  return -1;
+}
+
 export function parseAnswerLine(line: string): AnswerToken[] {
   const tokens: AnswerToken[] = [];
-  let last = 0;
+  let plain = '';
+  let at = 0;
 
-  BOLD.lastIndex = 0;
-  let match: RegExpExecArray | null;
-
-  while ((match = BOLD.exec(line)) !== null) {
-    if (match.index > last) {
-      tokens.push({ text: line.slice(last, match.index), bold: false });
+  const flush = () => {
+    if (plain !== '') {
+      tokens.push({ text: plain, bold: false, italic: false });
+      plain = '';
     }
-    tokens.push({ text: match[1], bold: true });
-    last = match.index + match[0].length;
+  };
+
+  while (at < line.length) {
+    if (line[at] !== '*') {
+      plain += line[at];
+      at += 1;
+      continue;
+    }
+
+    /*
+      Longest marker first. `***` is both, `**` is bold, `*` is emphasis — and
+      recognising them in the other order is what corrupts `***x***`.
+    */
+    const candidates: Array<{ marker: string; bold: boolean; italic: boolean }> = [
+      { marker: '***', bold: true, italic: true },
+      { marker: '**', bold: true, italic: false },
+      { marker: '*', bold: false, italic: true },
+    ];
+
+    let consumed = false;
+
+    for (const { marker, bold, italic } of candidates) {
+      if (!line.startsWith(marker, at)) continue;
+
+      const single = marker === '*';
+
+      /*
+        ⚠ The arithmetic guard's opening half. `25 ft-lb * 2` has a space after
+        the marker, and a word character before it in `a*b` — either rules the
+        run out, and both are cases a person meant literally.
+      */
+      if (single && (isSpace(line[at + 1]) || isWord(line[at - 1]))) continue;
+
+      const close = closingAt(line, at + marker.length, marker, single);
+      if (close === -1) continue;
+
+      flush();
+      tokens.push({ text: line.slice(at + marker.length, close), bold, italic });
+      at = close + marker.length;
+      consumed = true;
+      break;
+    }
+
+    if (!consumed) {
+      // An unclosed marker is text. `**` with no partner survives as itself.
+      plain += line[at];
+      at += 1;
+    }
   }
 
-  if (last < line.length) {
-    tokens.push({ text: line.slice(last), bold: false });
-  }
+  flush();
 
   // An empty line still needs one token, so a renderer can draw the gap the
   // model put there rather than collapsing paragraphs together.
-  return tokens.length > 0 ? tokens : [{ text: line, bold: false }];
+  return tokens.length > 0 ? tokens : [{ text: line, bold: false, italic: false }];
 }
 
 /**

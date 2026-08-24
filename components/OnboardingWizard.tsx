@@ -26,7 +26,11 @@ interface OnboardingWizardProps {
   };
 }
 
-const STEP_LABELS = ['Vehicle', 'Powertrain', 'Mileage', 'Ownership', 'Performance'];
+/*
+  ⚠ Unused as of 24 Aug — `displayLabels` is assembled from the flow's actual
+  shape, including the clarification step this list never knew about (UX-25).
+  Kept out rather than left as a second source of truth.
+*/
 
 /**
  * Progress through the wizard.
@@ -442,9 +446,32 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
     return '';
   };
 
-  const displayLabels = powertrainSkipped
-    ? ['Vehicle', 'Mileage', 'Ownership', 'Performance']
-    : STEP_LABELS;
+  /*
+    ── ⚠ UX-25 · the wizard said "Step 6 of 5" ─────────────────────────────────
+
+    `clarificationStep` is `powertrainSkipped ? 5 : 6` — a real extra step,
+    reached when the VIN decode came back uncertain about the engine or the
+    transmission — and `totalSteps` was the flat `powertrainSkipped ? 4 : 5`.
+    So the moment somebody landed on it the indicator read **Step 6 of 5**, the
+    progress bar drew past 100%, and `aria-valuenow` exceeded `aria-valuemax`.
+
+    It happens on exactly the journey where the product has just told the person
+    it is not sure about their car, which is the worst moment to look like it
+    cannot count.
+
+    Both numbers come from one expression now, so a step added to the flow moves
+    the denominator with it rather than needing to be remembered twice.
+  */
+  const hasClarification = uncertaintyData !== null;
+
+  const displayLabels = [
+    'Vehicle',
+    ...(powertrainSkipped ? [] : ['Powertrain']),
+    'Mileage',
+    'Ownership',
+    'Performance',
+    ...(hasClarification ? ['Specifications'] : []),
+  ];
 
   return (
     <div className="min-h-screen bg-[#080808] flex items-center justify-center p-4">
@@ -459,7 +486,11 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
         <div className="glass-panel rounded-2xl p-5 sm:p-8">
           <StepIndicator
             currentStep={step}
-            totalSteps={powertrainSkipped ? 4 : 5}
+            /*
+              UX-25. Derived from the same list the labels are, so the count and
+              the names cannot disagree — which is what "Step 6 of 5" was.
+            */
+            totalSteps={displayLabels.length}
             labels={displayLabels}
           />
 
