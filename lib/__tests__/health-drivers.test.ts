@@ -75,12 +75,56 @@ describe('maintenanceDriver', () => {
       a gap in *our records*, not a fault in the car. Charging for it would let
       a car with no invoices score worse than one with a genuine overdue brake
       fluid — punishing the owner for our missing data.
+
+      Asserted against a car where **something** is known, because that is where
+      the property is actually observable: two clean services and one unknown
+      must score the same as two clean services alone.
+    */
+    const partial = maintenanceDriver([due('later'), due('later'), due('unknown')]);
+    const known = maintenanceDriver([due('later'), due('later')]);
+
+    expect(partial.score).toBe(known.score);
+    // Reported rather than absorbed. "—" on its own reads as a bug.
+    expect(partial.detail).toMatch(/1 service with no record to count from/);
+  });
+
+  it('scores nothing at all when nothing is known — FN-01b', () => {
+    /*
+      ⚠ **The defect this replaces, seen live on 23 Aug.** Three unknowns
+      produced `100 - 0 = 100` and the sentence *"Nothing overdue, across 3
+      tracked services"* — a **perfect maintenance score for a car with no
+      service records**, in the module written to stop absence reading as an
+      all-clear.
+
+      Both halves were individually right: not penalising an unknown is correct,
+      and 100 minus nothing is 100. What is wrong is **scoring at all** when
+      every input is a gap. `null` already means "we cannot say" here — the
+      no-schedule branch returns it — and this is the same absence reached one
+      step later.
     */
     const blind = maintenanceDriver([due('unknown'), due('unknown'), due('unknown')]);
 
-    expect(blind.score).toBe(100);
-    // Reported rather than absorbed. "—" on its own reads as a bug.
-    expect(blind.detail).toMatch(/3 services with no record to count from/);
+    expect(blind.score).toBeNull();
+    expect(blind.detail).toMatch(/No service records yet for any of 3 tracked services/);
+    // And it must not be dressed as good news on the way out.
+    expect(blind.detail).not.toMatch(/[Nn]othing overdue/);
+  });
+
+  it('leads with the absence when there is nothing else to report', () => {
+    /*
+      "Nothing overdue, across 8 tracked services. 3 services with no record to
+      count from." reads as a clean bill with a footnote — and the footnote is
+      the load-bearing half. When missing records are the only thing to say,
+      they are what the sentence opens with.
+    */
+    const mostlyBlind = maintenanceDriver([
+      due('later'),
+      due('unknown'),
+      due('unknown'),
+      due('unknown'),
+    ]);
+
+    expect(mostlyBlind.detail).toMatch(/^3 services with no record to count from\./);
   });
 
   it('describes the same car the number does', () => {

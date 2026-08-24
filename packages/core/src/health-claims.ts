@@ -163,3 +163,147 @@ export function recallEvidenceForPrompt(params: {
       : ['  (none found)']),
   ].join('\n');
 }
+
+/**
+ * ── Whether a stored health verdict may be presented as a current one ───────
+ *
+ * **The bug this exists to make impossible, observed 23 Aug.** The M235i's
+ * detail screen read:
+ *
+ *   > a complete lack of documented maintenance … impossible to assess its
+ *   > current condition
+ *
+ * while the service history one tap away listed **5 services and $1,461**,
+ * including an oil change, brake pads and rotors, spark plugs and a coolant
+ * flush — all read off an invoice the owner had scanned with this app.
+ *
+ * Nothing was broken. `vehicle_health_summary` was generated on 30 Jul; the
+ * invoice was filed on 6 Aug; `generateVehicleHealthSummary` learned to read
+ * `maintenance_line_items` on 5 Aug and has not been run for this car since.
+ * Every layer rendered exactly what it held.
+ *
+ * That is the same shape as the Takata tile in this file's opening docblock,
+ * one step further on: there, absence was rendered as an all-clear; here, an
+ * **out-of-date reading is rendered as a current one.** And this direction is
+ * worse than a wrong number, because it tells the owner the app did not read
+ * the invoice they just gave it — which is the premise of the product.
+ *
+ * ── Why the rule is "the verdict must name its inputs" ──────────────────────
+ *
+ * A summary that cannot say what it read cannot be checked against anything.
+ * Both halves of this function come out of that:
+ *
+ *   `inputs`  what the screen knows it is holding — 5 services, 2 recalls —
+ *             for a `ProvenanceRow`. It makes the contradiction *visible at
+ *             review time* rather than invisible, which is the only reason the
+ *             one above survived three weeks.
+ *   `state`   whether the prose may be shown at all.
+ *
+ * ⚠ **`stale` needs positive evidence, and its absence is not freshness.** If
+ * the caller cannot say when records were filed — the count request failed, say
+ * — the verdict is left `current` rather than marked stale. Erring the other
+ * way would put a "this is out of date" line on every car whose second request
+ * timed out, and a warning that fires on healthy data is the one that gets made
+ * to go away. §5.
+ *
+ * ⚠ **This is in `core`, not on the screen.** Web renders the same stored
+ * summary from the same table, and the defect above was originally two of them:
+ * a capability that lives in one client's component is one the second client
+ * silently lacks. That is this codebase's most repeated defect.
+ */
+export type VerdictState = 'current' | 'stale' | 'absent';
+
+export interface HealthVerdict {
+  state: VerdictState;
+  /**
+   * The prose to render.
+   *
+   * The stored summary when it may stand; a plain statement of what is out of
+   * date when it may not; `null` when there is nothing to say. It is never the
+   * stored summary in the `stale` case — the sentence itself is the thing that
+   * is wrong, and showing it beside a caveat leaves the owner to decide which
+   * half of their screen to believe.
+   */
+  text: string | null;
+  /** What the screen knows was read. For `ProvenanceRow`. Possibly empty. */
+  inputs: string[];
+}
+
+function plural(count: number, one: string, many: string): string {
+  return `${count} ${count === 1 ? one : many}`;
+}
+
+export function healthVerdict(params: {
+  /** `vehicle_health_summary.summary`. */
+  summary: string | null | undefined;
+  /** `vehicle_health_summary.last_generated`. */
+  generatedAt: string | null | undefined;
+  /** How many service records the screen is holding. `null` = could not say. */
+  serviceCount: number | null;
+  /**
+   * When the most recent service record was **filed**, not when the work was
+   * done.
+   *
+   * ⚠ Filed, because that is what the verdict could have read. A shop visit
+   * dated 2 Aug that was scanned on 6 Aug was invisible to a summary generated
+   * on the 4th, and comparing against the service date would call that summary
+   * current. `null` = could not say, which leaves the verdict alone.
+   */
+  newestFiledAt: string | null;
+  /** Open recalls — total minus what the owner has marked repaired. */
+  openRecalls: number | null;
+}): HealthVerdict {
+  const inputs: string[] = [];
+
+  if (params.serviceCount !== null) {
+    inputs.push(
+      params.serviceCount === 0
+        ? 'no service records'
+        : plural(params.serviceCount, 'recorded service', 'recorded services')
+    );
+  }
+
+  /*
+    Only when there are some. "Based on 0 open recalls" is a sentence that reads
+    as an all-clear, and this file exists because that inference was drawn once
+    already from an empty value.
+  */
+  if (params.openRecalls !== null && params.openRecalls > 0) {
+    inputs.push(plural(params.openRecalls, 'open recall', 'open recalls'));
+  }
+
+  const written = typeof params.summary === 'string' ? params.summary.trim() : '';
+  if (written === '') return { state: 'absent', text: null, inputs };
+
+  const filed = timestamp(params.newestFiledAt);
+  const generated = timestamp(params.generatedAt);
+
+  /*
+    Unknown filing time means no evidence of staleness — see the docblock. An
+    unparseable or missing `last_generated` **with** a known filing time is
+    treated as stale: a reading that cannot say when it was taken cannot claim
+    to postdate anything.
+  */
+  if (filed !== null && (generated === null || generated < filed)) {
+    const missed =
+      params.serviceCount !== null && params.serviceCount > 0
+        ? plural(params.serviceCount, 'service record', 'service records')
+        : 'service records';
+
+    return {
+      state: 'stale',
+      text: `This reading was taken before your ${missed} were filed, so it does not account for them.`,
+      inputs,
+    };
+  }
+
+  return { state: 'current', text: written, inputs };
+}
+
+/** Milliseconds, or `null` for anything that is not a usable date. */
+function timestamp(value: string | null | undefined): number | null {
+  if (typeof value !== 'string' || value.trim() === '') return null;
+
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? null : parsed;
+}

@@ -16,6 +16,13 @@ import { researchVehicleDossier } from '@/lib/vehicle-research';
 import { showsModifications } from '@crewchief/core/mod-progression';
 import { logger } from '@crewchief/core/logger';
 import { healthClaim, recallEvidenceForPrompt } from '@crewchief/core/health-claims';
+import {
+  firstNumber,
+  firstString,
+  firstStringArray,
+  scoreInRange,
+} from '@crewchief/core/model-json';
+import { recallsWereChecked } from '@crewchief/core/nhtsa-lookup';
 import { CONTACT_EMAIL } from '@/lib/legal';
 import { checkRateLimit } from '@/lib/rate-limit';
 import {
@@ -27,7 +34,12 @@ import { recomputePerformanceStats } from '@/lib/performance-stats';
 import { recordAiUsageInBackground } from '@/lib/ai-usage';
 import { downloadStoredFile } from '@/lib/storage-objects';
 import { loadConsultantContext, loadedContextKinds } from '@/lib/consultant-context';
-import { authorizeVehicleAccess, authorizeVehicleScopedRow, requireSession } from '@/lib/api-auth';
+import {
+  authorizeVehicleAccess,
+  authorizeVehicleScopedRow,
+  NOT_FOUND_MESSAGE,
+  requireSession,
+} from '@/lib/api-auth';
 import { isDemoVehicleId } from '@crewchief/core/demo';
 import {
   vehicleStoragePath,
@@ -761,6 +773,18 @@ export async function fetchPowertrainOptions(
       return { success: false, error: session.error };
     }
 
+    /*
+      ⚠ **PERF-06.** Eleven of fourteen Gemini call sites bypassed the monthly
+      ceiling — `packages/core/src/ai/budget.ts` is 20KB of careful reasoning
+      about limits that almost nothing called. A user past their tier could keep
+      generating indefinitely; only the consultant and the invoice parser
+      refused. `every-generation-has-a-ceiling.test.ts` names every site now.
+    */
+    const budget = await checkMonthlyBudget(session.userId);
+    if (!budget.allowed) {
+      return { success: false, error: budgetMessage(budget) };
+    }
+
     const cacheKey = `${year}-${make}-${model}-${trim || ''}`.toLowerCase();
     const cached = powertrainCache.get(cacheKey);
     if (cached) {
@@ -1203,11 +1227,21 @@ export async function sendConsultantMessage(params: {
         have to infer whether a gap is tax or a line item it failed to read.
         Older documents have no `total_cost` and are skipped entirely rather
         than reported as $0, which would be a confident lie about a real bill.
+
+        ⚠ **`> 0`, not `typeof … === 'number'` (FN-05).** The type check was the
+        whole guard, and `0` **is** a number — so a failed extraction, which
+        used to be written as a completed invoice with `total_cost: 0`, passed
+        straight through it and the advisor duly answered "$0" for a $1,519.44
+        bill. The upstream defect is fixed; this is the second lock, and it is
+        the one that holds for every row already written that way.
+
+        A genuinely free service is not a thing an invoice records, so nothing
+        legitimate is lost by refusing zero.
       */
       invoiceTotals: documents
         .map((doc: any) => {
           const data = doc.extracted_data || {};
-          if (typeof data.total_cost !== 'number') return null;
+          if (typeof data.total_cost !== 'number' || !(data.total_cost > 0)) return null;
 
           const parts = [
             data.vendor_name || 'Unknown shop',
@@ -1859,6 +1893,18 @@ export async function generateVehicleHealthSummary(vehicleId: string, forceRefre
       return { success: false, error: access.error };
     }
 
+    /*
+      ⚠ **PERF-06.** This is Gemini-backed and had a rate limit but no spend
+      ceiling — so a user past their monthly allowance could keep regenerating
+      health summaries ten a minute, indefinitely.
+
+      ⚠ Placed **after** the ownership check and **before** the cache read, so a
+      cached answer is still served to somebody over budget. Refusing to hand
+      back a row we already have would be charging them for a lookup that costs
+      nothing.
+    */
+    const budget = await checkMonthlyBudget(access.userId);
+
     const client = getServiceRoleClient();
 
     if (!forceRefresh) {
@@ -1877,6 +1923,10 @@ export async function generateVehicleHealthSummary(vehicleId: string, forceRefre
           return { success: true, data: existingHealth, cached: true };
         }
       }
+    }
+
+    if (!budget.allowed) {
+      return { success: false, error: budgetMessage(budget) };
     }
 
     const [vehicleResult, knowledgeResult, serviceResult, lineItemResult, issueTrackResult, modTrackResult, nhtsaResult] = await Promise.all([
@@ -1946,7 +1996,14 @@ export async function generateVehicleHealthSummary(vehicleId: string, forceRefre
       Prose is the more dangerous of the two, because it is the part a person
       actually reads and it carries no icon to qualify it.
     */
-    const recallsChecked = Boolean(nhtsa);
+    /*
+      ⚠ **FN-03: the outcome, not the row.** `Boolean(nhtsa)` asked "did we
+      write something", which is true for a lookup NHTSA did not recognise —
+      `{"Count": 0, "results": []}` for "Chevy" instead of "CHEVROLET" is the
+      same bytes as a genuinely clean truck. `recallsWereChecked` reads the
+      status the lookup recorded, and only `matched` is evidence.
+    */
+    const recallsChecked = recallsWereChecked((nhtsa as { lookup_status?: string } | null)?.lookup_status);
     const activeRecalls = nhtsa?.recalls?.length || 0;
     const completedService = serviceItems.filter((s: any) => s.status === 'completed').length;
     const pendingService = serviceItems.filter((s: any) => s.status !== 'completed').length;
@@ -1999,8 +2056,12 @@ Based on the owner's provided service history, provide a concise health assessme
 - summary (1-2 sentences about their vehicle's condition based on provided history)
 - redFlags (array of critical issues mentioned in their service records)
 - maintenanceStatus (status of provided service records and upcoming items)
-- recallStatus (status of recalls for this model)
 - issuesOverview (summary of owner-reported and addressed issues)
+
+Do not report on recalls. Whether this vehicle's recalls have been checked at
+all is a fact about our lookup, not about the car, and we write that sentence
+ourselves — see \`recall_status\` below. A model-authored "no recalls to date"
+would be rendered verbatim beside a vehicle NHTSA was never asked about.
 - recommendations (array of 2-3 actions based on their provided service history)
 
 Important: Frame all recommendations as "based on your provided service history". Only reference issues the owner has documented or common known issues. Leave fields empty/null if no data is available. Do not make assumptions about hidden problems.
@@ -2045,10 +2106,18 @@ Format as valid JSON only, no markdown.`;
       treats any written status as evidence and would have rendered
       "No recalls to date" verbatim.
     */
-    let healthData = {
+    let healthData: {
+      health_score: number | null;
+      summary: string;
+      red_flags: string[];
+      maintenance_status: string;
+      recall_status: string;
+      issues_overview: string;
+      recommendations: string[];
+    } = {
       health_score: 70,
       summary: 'We could not generate an assessment for this vehicle.',
-      red_flags: [] as string[],
+      red_flags: [],
       maintenance_status: '',
       recall_status: healthClaim(
         'recall',
@@ -2059,21 +2128,94 @@ Format as valid JSON only, no markdown.`;
       recommendations: ['Keep regular maintenance schedule'],
     };
 
+    /*
+      ── ⚠ FN-01 · the prompt asks camelCase and this read snake_case ─────────
+
+      **Every health score CrewChief has ever generated was 70.** The prompt
+      above asks for `healthScore`, `redFlags`, `maintenanceStatus`,
+      `recallStatus` and `issuesOverview`; this block read `health_score`,
+      `red_flags` and the rest in snake_case. `healthData.health_score` was
+      therefore *always* `undefined`, and the line that followed set 70 on every
+      successful generation. `redFlags` met the same fate and was forced to `[]`.
+
+      Confirmed against the live API on 23 Aug: the M235i returns
+      `health_score: 70`, `red_flags: []`, and **no `maintenance_status`,
+      `recall_status` or `issues_overview` keys at all** — because
+      `healthData = JSON.parse(...)` replaced the whole defaults object rather
+      than filling gaps in it, so the three fields the model never supplied under
+      those names were not merely wrong, they were absent.
+
+      The seeded demo Accord reads 74 only because that number came from
+      `20260314142241_seed_demo_vehicles.sql`. So it was never "every vehicle is
+      70" — it was "every vehicle this function has ever assessed is 70", which
+      is worse, because the constant was indistinguishable from a reading.
+
+      Three things changed, and all three were needed:
+
+      1. **`extractJSON`, not `JSON.parse`.** It is defined at the top of this
+         file and it strips the ``` fences that "Format as valid JSON only, no
+         markdown" does not reliably prevent. Every other extraction site here
+         already uses it.
+      2. **An explicit camelCase → snake_case map**, the same shape as the mod
+         detail parser further down this file. The two spellings are now written
+         next to each other, which is the only arrangement where a rename to one
+         of them is visible.
+      3. **The score is nullable end to end.** `70` remains a documented neutral
+         on the **parse-failure** path — `advice-range.ts` carries that argument
+         — but it must never be what gets stored when the model actually
+         answered. A number the model did not produce, stored in the column a
+         gauge reads, is the shape of defect this whole codebase is written
+         against.
+
+      ⚠ The merge is field-by-field into `healthData` rather than a wholesale
+      replacement. That is what keeps `recall_status` — which routes through
+      `healthClaim` so an unchecked vehicle gets the same "we cannot say"
+      sentence here and on the tile — from being silently dropped by a model
+      response that omits it.
+    */
     try {
-      healthData = JSON.parse(responseText);
-      if (healthData.health_score === undefined) healthData.health_score = 70;
-      /*
-        ⚠ Same reasoning as the defaults above, and this one is easier to miss:
-        it re-imposes the all-clear on a *successful* parse whose summary came
-        back empty. The model declining to summarise is not evidence the car is
-        fine.
-      */
-      if (!healthData.summary) {
-        healthData.summary = 'We could not generate an assessment for this vehicle.';
-      }
-      if (!Array.isArray(healthData.red_flags)) healthData.red_flags = [];
-      if (!Array.isArray(healthData.recommendations)) healthData.recommendations = [];
+      const parsed = extractJSON(responseText);
+
+      /** The model's spelling, then ours. A rename to either side is visible here. */
+      const score = scoreInRange(firstNumber(parsed.healthScore, parsed.health_score));
+      const redFlags = firstStringArray(parsed.redFlags, parsed.red_flags);
+      const recommendations = firstStringArray(parsed.recommendations);
+      const summary = firstString(parsed.summary);
+
+      healthData = {
+        ...healthData,
+        /*
+          ⚠ `null` when the model did not give a number, **never 70**. The
+          column is nullable and every reader in this codebase already handles
+          it — `packages/core/src/health-drivers.ts` models `score: number |
+          null` explicitly. A missing score is "we cannot say"; 70 is a claim.
+        */
+        health_score: score,
+        /*
+          Same reasoning, one field over: a successful parse whose summary came
+          back empty keeps the "we could not generate an assessment" default
+          rather than inheriting an all-clear. The model declining to summarise
+          is not evidence the car is fine.
+        */
+        summary: summary ?? healthData.summary,
+        red_flags: redFlags ?? [],
+        recommendations: recommendations ?? healthData.recommendations,
+        maintenance_status: firstString(parsed.maintenanceStatus, parsed.maintenance_status) ?? healthData.maintenance_status,
+        /*
+          ⚠ The model's `recallStatus` is **not** allowed to overwrite ours.
+          `healthClaim` treats any written status as evidence and renders it
+          verbatim, so a model that writes "No recalls to date" for a vehicle
+          NHTSA was never asked about would defeat the tile fix from the other
+          side. Ours is derived from whether the lookup actually ran.
+        */
+        issues_overview: firstString(parsed.issuesOverview, parsed.issues_overview) ?? healthData.issues_overview,
+      };
     } catch {
+      /*
+        The defaults stand, including `health_score: 70` — and here that is
+        honest, because it is the documented neutral for "we have no reading",
+        paired with a summary that says exactly that.
+      */
       console.warn('Failed to parse health data, using defaults');
     }
 
@@ -2199,6 +2341,18 @@ export async function generateModificationDetails(vehicleId: string, modName: st
     const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
     if (!access.ok) {
       return { success: false, error: access.error };
+    }
+
+    /*
+      ⚠ **PERF-06.** Eleven of fourteen Gemini call sites bypassed the monthly
+      ceiling — `packages/core/src/ai/budget.ts` is 20KB of careful reasoning
+      about limits that almost nothing called. A user past their tier could keep
+      generating indefinitely; only the consultant and the invoice parser
+      refused. `every-generation-has-a-ceiling.test.ts` names every site now.
+    */
+    const budget = await checkMonthlyBudget(access.userId);
+    if (!budget.allowed) {
+      return { success: false, error: budgetMessage(budget) };
     }
 
     const client = getServiceRoleClient();
@@ -3360,6 +3514,51 @@ export async function parseInvoiceLineItems(documentId: string, vehicleId: strin
     }
   }
   try {
+    /*
+      ── ⚠ SEC-01 · **two** ids arrive here and only one was authorized ───────
+
+      This checked `vehicleId` and then used `documentId` — the caller's other
+      argument, never verified — against `getServiceRoleClient()`, which bypasses
+      RLS entirely. Three writes downstream keyed on it:
+
+          .from('maintenance_line_items').delete().eq('source_document_id', documentId)
+          .from('vehicle_documents').update({…}).eq('id', documentId)
+
+      So an authenticated user passing **their own** `vehicleId` and **somebody
+      else's** `documentId` deleted that stranger's maintenance line items, took
+      over their document row, and had the victim's `file_url` written into
+      their own vehicle and returned to them.
+
+      The residual risk the audit named is exactly this shape: *a second
+      client-supplied id inside a function whose first id is correctly
+      authorized.* One authorization does not cover two ids.
+
+      `authorizeVehicleScopedRow` exists for precisely this and
+      `vehicle_documents` is already in `VehicleScopedTable`. It resolves the
+      document's parent vehicle through the service role and authorizes **that**
+      — so the check below is the one that matters: the document's own vehicle
+      must be the vehicle we were asked to write to.
+    */
+    const documentAccess = await authorizeVehicleScopedRow('vehicle_documents', documentId, {
+      intent: 'write',
+    });
+    if (!documentAccess.ok) {
+      return { success: false, error: documentAccess.error };
+    }
+
+    if (documentAccess.vehicleId !== vehicleId) {
+      /*
+        ⚠ The same 404 the authorizer uses for "not found" and "not yours", for
+        the same reason: distinguishing them turns this endpoint into an oracle
+        for which document ids exist. `NOT_FOUND_MESSAGE` is the shared string.
+      */
+      logger.warn('INVOICE:DOCUMENT_VEHICLE_MISMATCH', 'Document belongs to another vehicle', {
+        documentId,
+        vehicleId,
+      });
+      return { success: false, error: NOT_FOUND_MESSAGE };
+    }
+
     const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
     if (!access.ok) {
       return { success: false, error: access.error };
@@ -3576,7 +3775,56 @@ Return ONLY valid JSON, no markdown code blocks, no explanations.`;
 
       console.log(`[Gemini Extraction] Invoice #${invoiceData.invoice_number}, Shop: ${invoiceData.shop_name}, Date: ${invoiceData.service_date}, Raw items: ${invoiceData.items.length}, Total: $${invoiceData.grand_total}`);
     } catch (parseError) {
-      console.error('[Gemini Extraction Failed]', parseError);
+      /*
+        ── ⚠ FN-05 · a failed extraction became a completed $0 invoice ────────
+
+        This `catch` logged and **carried on**. The defaults above assume
+        success — `is_valid_invoice: true`, `items: []` — so execution fell
+        through to the write with `total_cost: 0` and
+        `extraction_status: 'completed'`, and returned `{ success: true }`.
+
+        Three things followed from that, and the third is the one that matters:
+
+        1. The UI said the upload worked. The maintenance list showed nothing.
+        2. `extraction_status: 'completed'` meant **nothing would ever retry
+           it**. The invoice was gone as far as this product was concerned.
+        3. **The advisor's own guard was defeated**, because `0` is a number:
+
+               if (typeof data.total_cost !== 'number') return null;
+
+           The comment two lines above that guard states the intent — *"Older
+           documents have no `total_cost` and are skipped entirely rather than
+           reported as $0, which would be a confident lie about a real bill."*
+           A failed extraction wrote a numeric `0`, the guard passed, and asked
+           *"what did my last service cost?"* the advisor answered **"$0"** for
+           a $1,519.44 bill.
+
+        So the failure is now a failure. Nothing is written, the caller is told,
+        and the document is left in a state a retry can find.
+      */
+      logger.error('INVOICE:EXTRACTION_FAILED', parseError as Error, {
+        vehicleId,
+        documentId,
+      });
+
+      /*
+        ⚠ Marked `failed`, not left alone. `extraction_status` is what a retry
+        path selects on, and a row stuck at `processing` is indistinguishable
+        from one still in flight. Best-effort: if this write fails too, the
+        caller still gets an honest error, which is the half that matters.
+      */
+      await client
+        .from('vehicle_documents')
+        .update({ extraction_status: 'failed' })
+        .eq('id', documentId)
+        .eq('vehicle_id', vehicleId);
+
+      return {
+        success: false,
+        error: 'EXTRACTION_FAILED',
+        message:
+          'We could not read that invoice. The image may be too dark or too small — try again with a straighter, brighter photo.',
+      };
     }
 
     const lineItemsToInsert = invoiceData.items.map((item: any, index: number) => ({
@@ -3616,10 +3864,20 @@ Return ONLY valid JSON, no markdown code blocks, no explanations.`;
     const combinedItems = combineLineItems(itemsWithoutTax);
     console.log(`[Combining] ${itemsWithoutTax.length} items -> ${combinedItems.length} combined items`);
 
+    /*
+      ⚠ **Every id-keyed read and write below is also scoped to `vehicleId`**
+      (SEC-01). The ownership check at the top of this function is the primary
+      control and these are defence in depth — but they are the layer that would
+      have contained the original defect on its own, and they cost a clause.
+
+      The service role bypasses RLS, so `.eq('id', documentId)` alone is a
+      cross-tenant statement wearing the shape of a scoped one.
+    */
     const { data: docData } = await client
       .from('vehicle_documents')
       .select('file_url')
       .eq('id', documentId)
+      .eq('vehicle_id', vehicleId)
       .single();
 
     const invoiceUrl = docData?.file_url || null;
@@ -3627,14 +3885,16 @@ Return ONLY valid JSON, no markdown code blocks, no explanations.`;
     const { data: existingItems } = await client
       .from('maintenance_line_items')
       .select('id')
-      .eq('source_document_id', documentId);
+      .eq('source_document_id', documentId)
+      .eq('vehicle_id', vehicleId);
 
     if (existingItems && existingItems.length > 0) {
       console.log(`[Duplicate Detection] Found ${existingItems.length} existing items for document ${documentId}, removing...`);
       const { error: deleteError } = await client
         .from('maintenance_line_items')
         .delete()
-        .eq('source_document_id', documentId);
+        .eq('source_document_id', documentId)
+        .eq('vehicle_id', vehicleId);
 
       if (deleteError) {
         console.error('[DB Error] Failed to delete existing items:', deleteError);
@@ -3739,7 +3999,9 @@ Return ONLY valid JSON, no markdown code blocks, no explanations.`;
         },
         extraction_status: 'completed',
       })
-      .eq('id', documentId);
+      /* SEC-01. Scoped, like every other id-keyed write in this function. */
+      .eq('id', documentId)
+      .eq('vehicle_id', vehicleId);
 
     return {
       success: true,
@@ -4119,7 +4381,17 @@ export async function removeVehiclePhoto(vehicleId: string) {
   }
 }
 
-export async function validateConsultantDocument(
+/**
+ * ── ⚠ Not exported (SEC-02) ─────────────────────────────────────────────────
+ *
+ * An internal step of `uploadConsultantDocument`, which authorizes the vehicle
+ * before calling it. As an export it was a POST endpoint reaching the **vision**
+ * model with caller-supplied base64 and no session, no rate limit and no
+ * budget — and `authorizeVehicleAccess` returns `ok` for a demo vehicle id with
+ * no session at all when the intent is `read`, which is what made it reachable
+ * anonymously. The three demo ids are public constants.
+ */
+async function validateConsultantDocument(
   vehicleId: string,
   fileBase64: string,
   mimeType: string
@@ -4697,7 +4969,28 @@ interface CostEstimate {
   total_high: number;
 }
 
-export async function estimateCosts(
+/**
+ * ── ⚠ Not exported, and that is the fix (SEC-02 / FN-04) ────────────────────
+ *
+ * `app/actions.ts` carries `'use server'`, so **every export in it compiles
+ * into a publicly invokable POST endpoint**. Seventy-one of them.
+ *
+ * This function is an internal step of `generateQuoteRequestV2`, and as an
+ * export it was also a **free LLM proxy**: no `requireSession`, no
+ * `authorizeVehicleAccess`, no `checkRateLimit`, no `checkMonthlyBudget`, no
+ * usage recording. Every prompt field is caller-supplied, `serviceItems` has no
+ * length cap, and `withRetry` runs it up to three times.
+ *
+ * ⚠ **The audit recommended deleting it, on the reading that nothing calls it.
+ * That is wrong** — `generateQuoteRequestV2` does, in this file, which is
+ * presumably what the grep matched and read as the definition. Deleting it
+ * would have broken the quote flow.
+ *
+ * Dropping the `export` is the actual fix and it is strictly better: the
+ * capability stays, the endpoint goes, and the authorization that matters is
+ * the one its caller already performs on a vehicle it owns.
+ */
+async function estimateCosts(
   vehicle: any,
   serviceItems: any[],
   zipCode: string
@@ -4844,7 +5137,28 @@ Return ONLY valid JSON with no additional text.`;
   }
 }
 
-export async function generateEmailDraft(
+/**
+ * ── ⚠ Not exported, and that is the fix (SEC-02 / FN-04) ────────────────────
+ *
+ * `app/actions.ts` carries `'use server'`, so **every export in it compiles
+ * into a publicly invokable POST endpoint**. Seventy-one of them.
+ *
+ * This function is an internal step of `generateQuoteRequestV2`, and as an
+ * export it was also a **free LLM proxy**: no `requireSession`, no
+ * `authorizeVehicleAccess`, no `checkRateLimit`, no `checkMonthlyBudget`, no
+ * usage recording. Every prompt field is caller-supplied, `serviceItems` has no
+ * length cap, and `withRetry` runs it up to three times.
+ *
+ * ⚠ **The audit recommended deleting it, on the reading that nothing calls it.
+ * That is wrong** — `generateQuoteRequestV2` does, in this file, which is
+ * presumably what the grep matched and read as the definition. Deleting it
+ * would have broken the quote flow.
+ *
+ * Dropping the `export` is the actual fix and it is strictly better: the
+ * capability stays, the endpoint goes, and the authorization that matters is
+ * the one its caller already performs on a vehicle it owns.
+ */
+async function generateEmailDraft(
   vehicle: any,
   serviceItems: any[],
   additionalNotes?: string
@@ -5495,9 +5809,22 @@ export async function preloadAllPerformanceModifications(vehicleId: string) {
   }
 }
 
-export async function getCacheDebugInfo() {
-  return cacheDebugLog;
-}
+/*
+  ── ⚠ `getCacheDebugInfo` is deleted (SEC-17) ─────────────────────────────────
+
+  It was `export async function getCacheDebugInfo() { return cacheDebugLog; }`
+  — and because this file carries `'use server'`, that made it a **public POST
+  endpoint returning a cross-tenant, in-memory log of full vehicle UUIDs** with
+  no session, no rate limit and no ownership check. Every vehicle whose mods had
+  been looked at on that warm Lambda instance, to anyone who asked.
+
+  It had no caller anywhere: `app`, `components`, `hooks`, `lib` and `packages`
+  all grep clean. So this is a deletion rather than a de-export.
+
+  `cacheDebugLog` itself stays. It is a bounded ring buffer feeding
+  `console.log` through `logCacheDebug`, which is where those timings are
+  actually read — in the function log, by a person, not over HTTP.
+*/
 
 // ─── TIER ACHIEVEMENT SYSTEM ────────────────────────────────────────────────
 
@@ -5640,6 +5967,18 @@ export async function generateBackfillMod(
   try {
     const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
     if (!access.ok) {
+      return { success: false };
+    }
+
+    /*
+      ⚠ **PERF-06.** Eleven of fourteen Gemini call sites bypassed the monthly
+      ceiling — `packages/core/src/ai/budget.ts` is 20KB of careful reasoning
+      about limits that almost nothing called. A user past their tier could keep
+      generating indefinitely; only the consultant and the invoice parser
+      refused. `every-generation-has-a-ceiling.test.ts` names every site now.
+    */
+    const budget = await checkMonthlyBudget(access.userId);
+    if (!budget.allowed) {
       return { success: false };
     }
 
@@ -5845,6 +6184,18 @@ export async function ensureAggressiveModMinimum(vehicleId: string): Promise<{ s
   try {
     const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
     if (!access.ok) {
+      return { success: false, generated: 0 };
+    }
+
+    /*
+      ⚠ **PERF-06.** Eleven of fourteen Gemini call sites bypassed the monthly
+      ceiling — `packages/core/src/ai/budget.ts` is 20KB of careful reasoning
+      about limits that almost nothing called. A user past their tier could keep
+      generating indefinitely; only the consultant and the invoice parser
+      refused. `every-generation-has-a-ceiling.test.ts` names every site now.
+    */
+    const budget = await checkMonthlyBudget(access.userId);
+    if (!budget.allowed) {
       return { success: false, generated: 0 };
     }
 

@@ -12,6 +12,7 @@
 
 import {
   healthClaim,
+  healthVerdict,
   mayReassure,
   recallEvidenceForPrompt,
   type ClaimKind,
@@ -187,5 +188,139 @@ describe('the narrative cannot claim what the tile refused', () => {
         `checked=${checked}:${promptAllowsAllClear}`
       );
     }
+  });
+});
+
+/**
+ * ── `healthVerdict` — an out-of-date reading is not a current one ────────────
+ *
+ * The 23 Aug defect in full: the M235i's summary was generated 30 Jul, five
+ * line items were filed 6 Aug, and the detail screen presented the older
+ * sentence — "a complete lack of documented maintenance" — beside the newer
+ * records. The case below is that exact pair of timestamps.
+ */
+describe('healthVerdict', () => {
+  const SUMMARY =
+    'Based on your provided service history, the vehicle\'s health is highly uncertain due to a complete lack of documented maintenance.';
+
+  it('refuses to present the M235i sentence beside the records it never read', () => {
+    const verdict = healthVerdict({
+      summary: SUMMARY,
+      generatedAt: '2026-07-30T01:05:47.583+00:00',
+      serviceCount: 5,
+      newestFiledAt: '2026-08-06T02:43:11.903661+00:00',
+      openRecalls: 2,
+    });
+
+    expect(verdict.state).toBe('stale');
+    // The sentence itself is what is wrong; it must not survive as a caption.
+    expect(verdict.text).not.toContain('complete lack');
+    expect(verdict.text).toContain('5 service records');
+  });
+
+  it('names what it read, so the contradiction is visible', () => {
+    const verdict = healthVerdict({
+      summary: 'Solid history, nothing overdue.',
+      generatedAt: '2026-08-20T00:00:00Z',
+      serviceCount: 5,
+      newestFiledAt: '2026-08-06T00:00:00Z',
+      openRecalls: 2,
+    });
+
+    expect(verdict.state).toBe('current');
+    expect(verdict.text).toBe('Solid history, nothing overdue.');
+    expect(verdict.inputs).toEqual(['5 recorded services', '2 open recalls']);
+  });
+
+  it('never lists zero recalls, because that reads as an all-clear', () => {
+    const verdict = healthVerdict({
+      summary: 'Nothing to report.',
+      generatedAt: '2026-08-20T00:00:00Z',
+      serviceCount: 0,
+      newestFiledAt: null,
+      openRecalls: 0,
+    });
+
+    expect(verdict.inputs).toEqual(['no service records']);
+  });
+
+  it('leaves the verdict alone when it cannot say when records were filed', () => {
+    /*
+      The count request failed. Marking every such car stale would put a
+      warning on healthy data, and a guard that cries wolf gets made to pass.
+    */
+    const verdict = healthVerdict({
+      summary: 'Solid history.',
+      generatedAt: '2026-07-30T00:00:00Z',
+      serviceCount: null,
+      newestFiledAt: null,
+      openRecalls: null,
+    });
+
+    expect(verdict.state).toBe('current');
+    expect(verdict.inputs).toEqual([]);
+  });
+
+  it('treats a reading that cannot date itself as stale, once records exist', () => {
+    // The live row's `last_generated` is a `2000-01-01` sentinel; an absent or
+    // unparseable one must not be read as "generated just now".
+    for (const generatedAt of [null, '', 'not a date']) {
+      expect(
+        healthVerdict({
+          summary: SUMMARY,
+          generatedAt,
+          serviceCount: 5,
+          newestFiledAt: '2026-08-06T00:00:00Z',
+          openRecalls: 2,
+        }).state
+      ).toBe('stale');
+    }
+  });
+
+  it('says nothing rather than something, when there is no summary', () => {
+    for (const summary of [null, undefined, '   ']) {
+      const verdict = healthVerdict({
+        summary,
+        generatedAt: null,
+        serviceCount: 3,
+        newestFiledAt: '2026-08-06T00:00:00Z',
+        openRecalls: 0,
+      });
+
+      expect(verdict.state).toBe('absent');
+      expect(verdict.text).toBeNull();
+      // The provenance still travels: what was read is known even when no
+      // sentence was written from it.
+      expect(verdict.inputs).toEqual(['3 recorded services']);
+    }
+  });
+
+  it('is filed-date, not service-date', () => {
+    /*
+      A shop visit dated 2 Aug, scanned on 6 Aug, against a summary generated on
+      the 4th. Comparing the *service* date would call that summary current —
+      it could not have read a record that did not exist yet.
+    */
+    expect(
+      healthVerdict({
+        summary: SUMMARY,
+        generatedAt: '2026-08-04T00:00:00Z',
+        serviceCount: 5,
+        newestFiledAt: '2026-08-06T00:00:00Z',
+        openRecalls: 0,
+      }).state
+    ).toBe('stale');
+  });
+
+  it('singularises', () => {
+    const verdict = healthVerdict({
+      summary: 'Fine.',
+      generatedAt: '2026-08-20T00:00:00Z',
+      serviceCount: 1,
+      newestFiledAt: '2026-08-06T00:00:00Z',
+      openRecalls: 1,
+    });
+
+    expect(verdict.inputs).toEqual(['1 recorded service', '1 open recall']);
   });
 });

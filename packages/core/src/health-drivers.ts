@@ -123,13 +123,56 @@ export function maintenanceDriver(services: ServiceDue[]): HealthDriver {
   const unknown = count('unknown');
 
   /*
+    ── ⚠ FN-01b · nothing known is not "nothing overdue" ─────────────────────
+
+    `STATUS_PENALTY.unknown` is **0**, and that is right: an owner should not be
+    marked down for records we do not have. But 0 penalty across every service
+    produces `100 - 0 = 100`, and the sentence beside it read *"Nothing overdue,
+    across 8 tracked services"* — a **perfect maintenance score for a car with
+    no service records at all**, in the one module written to stop absence being
+    rendered as an all-clear. Confirmed live on 23 Aug against the M235i.
+
+    The two halves were each defensible and the combination was not. Not
+    penalising an unknown is correct; **scoring at all when everything is
+    unknown is not**, because a score computed from no evidence is a claim.
+
+    `null` already means "we cannot say" here — the no-schedule branch above
+    returns it — so the fix is to reach the same conclusion from the same
+    absence, arrived at one step later.
+  */
+  if (unknown === services.length) {
+    return {
+      key: 'maintenance',
+      label,
+      score: null,
+      detail: `No service records yet for any of ${plural(services.length, 'tracked service')}.`,
+    };
+  }
+
+  /*
     The sentence is assembled from the same counts the score is, so it can never
     describe a different car than the number does.
+
+    ⚠ **The absence leads when there is nothing else to report.** "Nothing
+    overdue, across 8 tracked services. 3 services with no record to count from."
+    reads as a clean bill with a footnote, and the footnote is the load-bearing
+    half. When the only thing to say is that records are missing, that is what
+    the sentence opens with.
   */
   const parts: string[] = [];
   if (overdue > 0) parts.push(`${plural(overdue, 'service')} overdue`);
   if (due > 0) parts.push(`${due} due now`);
-  if (parts.length === 0) parts.push('Nothing overdue');
+
+  const counted = services.length - unknown;
+
+  if (parts.length === 0) {
+    const detail =
+      unknown > 0
+        ? `${plural(unknown, 'service')} with no record to count from. Nothing overdue among the ${counted} we can check.`
+        : `Nothing overdue, across ${plural(services.length, 'tracked service')}.`;
+
+    return { key: 'maintenance', label, score: clamp(100 - penalty), detail };
+  }
 
   let detail = `${parts.join(', ')}, across ${plural(services.length, 'tracked service')}.`;
   if (unknown > 0) {

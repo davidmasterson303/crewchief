@@ -235,7 +235,19 @@ describe('the summary does not assert what nobody checked', () => {
   });
 
   it('asks whether the lookup ran, not just what it found', () => {
-    expect(summary).toMatch(/const recallsChecked = Boolean\(nhtsa\)/);
+    /*
+      ⚠ **Tightened 24 Aug (FN-03).** This asserted `Boolean(nhtsa)`, which
+      answers "did we write a row" — and a row is written for a lookup NHTSA did
+      not recognise, because `{"Count": 0, "results": []}` for "Chevy" instead
+      of "CHEVROLET" is byte-identical to a genuinely clean truck.
+
+      So the old spelling was itself the defect this suite is named for, one
+      level down: absence rendered as an all-clear, pinned in place by a guard.
+      `recallsWereChecked` reads the outcome the lookup recorded, and only
+      `matched` is evidence.
+    */
+    expect(summary).toMatch(/recallsWereChecked\(/);
+    expect(summary).not.toMatch(/const recallsChecked = Boolean\(nhtsa\)/);
   });
 
   it('builds the recall section through the shared rule', () => {
@@ -268,10 +280,20 @@ describe('the summary does not assert what nobody checked', () => {
       least is known — and they said the car was fine on every axis at once.
       A fallback is the last place that should sound certain.
     */
-    const defaults = summary.slice(
-      summary.indexOf('let healthData = {'),
-      summary.indexOf('try {', summary.indexOf('let healthData = {'))
-    );
+    /*
+      ⚠ Anchored on `let healthData`, without the brace. The declaration gained a
+      type annotation on 24 Aug — `let healthData: { health_score: number | null;
+      … } = {` — when the score became nullable, and `'let healthData = {'`
+      stopped matching. The slice returned an **empty string** and every
+      `not.toMatch` below passed against nothing.
+
+      The length assertion is the only reason that was visible, which is the
+      whole argument for having one. §5.
+    */
+    const declaredAt = summary.indexOf('let healthData');
+    expect(declaredAt).toBeGreaterThan(-1);
+
+    const defaults = summary.slice(declaredAt, summary.indexOf('try {', declaredAt));
 
     expect(defaults.length).toBeGreaterThan(50);
     expect(defaults).not.toMatch(/'Vehicle is in good condition'/);
