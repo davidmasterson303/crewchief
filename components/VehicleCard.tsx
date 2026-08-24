@@ -106,7 +106,7 @@ interface VehicleCardProps {
  * either. Both were single-card moments; three of them side by side in the
  * garage grid read as noise, and the band colour already carries severity.
  */
-function HealthRing({ score }: { score: number }) {
+function HealthRing({ score }: { score: number | null }) {
   /*
    * The garage grid adopts the same instrument as the dashboard hero — the
    * ticked 270° dial, at the 56px slot this card has always used. Roadmap
@@ -119,6 +119,14 @@ function HealthRing({ score }: { score: number }) {
    * well. It also stays still: no count-up, no pulse — both were single-card
    * moments, and three of them side by side in this grid read as noise while
    * the band colour already carries severity.
+   *
+   * ── ⚠ D10 · `null` travels, and used to arrive here as red ────────────────
+   *
+   * This card's own docblock has carried the rule for months — *"no score is
+   * not a zero"* — and the prop type said `number` while the call site passed
+   * `healthSummary.health_score` out of an `any`, so a null walked straight
+   * past it into `ClusterGauge` and painted a 0. The rule was written down and
+   * the type did not enforce it; `number | null` is the enforcement.
    */
   return <ClusterGauge score={score} variant="card" size={56} />;
 }
@@ -401,7 +409,13 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary, alerts }: V
             </div>
           </div>
 
-          {healthSummary && <HealthRing score={healthSummary.health_score} />}
+          {/*
+            ⚠ `?? null`, never `?? 0`. The row existing and the score existing
+            are two different facts: a vehicle assessed and found unscoreable
+            has a row with a null score, and it gets the unknown face rather
+            than the bottom of the scale.
+          */}
+          {healthSummary && <HealthRing score={healthSummary.health_score ?? null} />}
 
           {/*
             The options menu used to live inside the photo plate. With the strip

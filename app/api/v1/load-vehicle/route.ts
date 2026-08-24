@@ -4,9 +4,7 @@ import type { ApiResponse } from '@crewchief/core/types';
 import { checkRateLimit, getClientIdentifier, rateLimitResponse } from '@/lib/rate-limit';
 import { authorizeVehicleAccess } from '@/lib/api-auth';
 import { resolveVehiclePhoto } from '@/lib/vehicle-photo';
-import { evaluateSchedule } from '@crewchief/core/service-due';
-import { historyLookups } from '@crewchief/core/service-history';
-import { healthDrivers } from '@crewchief/core/health-drivers';
+import { driversForVehicle } from '@crewchief/core/health-drivers';
 
 export const dynamic = 'force-dynamic';
 
@@ -235,16 +233,18 @@ export async function GET(request: NextRequest): Promise<Response> {
     const schedule = knowledgeData?.maintenance_schedule;
     const history = historyResult.error ? [] : (historyResult.data ?? []);
 
-    const services = Array.isArray(schedule)
-      ? evaluateSchedule({
-          schedule,
-          currentMileage: (vehicle.current_mileage as number | null) ?? 0,
-          ...historyLookups(history),
-        })
-      : [];
+    /*
+      ⚠ The assembly moved into `driversForVehicle` — D10.
 
-    const drivers = healthDrivers({
-      services,
+      It was correct here and it was correct *only* here, which is why the web
+      dashboard rendered no drivers at all. Both clients read the one function
+      now; the three decisions this block used to make locally (empty schedule,
+      degraded history, `undefined` recalls) are stated in its docblock and are
+      unchanged.
+    */
+    const drivers = driversForVehicle({
+      schedule,
+      historyRows: history,
       /*
         `undefined` when the embed is absent, which the driver reads as "never
         checked" rather than "none". An empty array means NHTSA was asked and

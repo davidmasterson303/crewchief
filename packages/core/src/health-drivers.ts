@@ -1,4 +1,5 @@
-import type { DueStatus, ServiceDue } from './service-due';
+import { evaluateSchedule, type DueStatus, type ServiceDue } from './service-due';
+import { historyLookups, type ServiceHistoryRow } from './service-history';
 import { normaliseRecalls, worstSeverity, type NormalisedRecall } from './recalls';
 
 /**
@@ -348,4 +349,95 @@ export function healthDrivers(params: {
       today: params.today,
     }),
   ];
+}
+
+/* ── One assembly, for every client ──────────────────────────────────────── */
+
+/**
+ * The three drivers for one vehicle, from the rows a client actually holds.
+ *
+ * ── ⚠ Why the assembly is here and not at each call site ────────────────────
+ *
+ * `healthDrivers` takes *evaluated* services, so every caller first has to run
+ * `evaluateSchedule` over the knowledge base's schedule with `historyLookups`
+ * built from the vehicle's maintenance rows — and get three separate things
+ * right while doing it: that a missing schedule is `[]` rather than a throw,
+ * that a failed history read degrades to no history rather than to no services,
+ * and that `recalls` stays `undefined` when NHTSA was never asked instead of
+ * becoming an empty array.
+ *
+ * `app/api/v1/load-vehicle/route.ts` got all three right. It was also the
+ * **only** caller, which is why the web dashboard rendered no drivers at all —
+ * and the reason D10 could specify "refuse to render a band when all three
+ * drivers return null" against a client that had no drivers to consult.
+ *
+ * Duplicating that assembly to fix it would be this codebase's most repeated
+ * defect volunteered for a second time: a capability that is subtly right in
+ * one client and subtly different in the other. So the assembly moves here,
+ * where both read it, and the third client that needs it inherits the three
+ * decisions rather than re-making them.
+ */
+export function driversForVehicle(params: {
+  /** `vehicle_knowledge_base.maintenance_schedule`. Anything not an array means no schedule. */
+  schedule: unknown;
+  /** `maintenance_line_items` rows. Pass `[]` for a read that failed — see below. */
+  historyRows: ServiceHistoryRow[];
+  /**
+   * Raw `nhtsa_data.recalls`.
+   *
+   * ⚠ `undefined` when the lookup never ran or did not resolve. `recallDriver`
+   * reads that as "not checked" and an empty array as "checked, none found",
+   * and they must not be collapsed.
+   */
+  recalls: unknown;
+  currentMileage?: number | null;
+  year?: number | null;
+  today?: string;
+}): HealthDriver[] {
+  /*
+    A failed history read degrades to *no history*, never to no services. Every
+    mileage-driven service still evaluates from the odometer alone; what is lost
+    is the date evidence, which `maintenanceDriver` reports as `unknown` and is
+    explicitly built not to charge for.
+  */
+  const services = Array.isArray(params.schedule)
+    ? evaluateSchedule({
+        schedule: params.schedule as Parameters<typeof evaluateSchedule>[0]['schedule'],
+        currentMileage: params.currentMileage ?? 0,
+        ...historyLookups(params.historyRows),
+        ...(params.today === undefined ? {} : { today: params.today.slice(0, 10) }),
+      })
+    : [];
+
+  return healthDrivers({
+    services,
+    recalls: params.recalls,
+    currentMileage: params.currentMileage,
+    year: params.year,
+    today: params.today,
+  });
+}
+
+/**
+ * Whether the drivers support showing a band at all.
+ *
+ * ── ⚠ D10 · "refuse to render a band when all three drivers return null" ────
+ *
+ * The health score comes from the model and the drivers are computed, so the
+ * two can disagree — and the disagreement that matters is the one where the
+ * model returns a confident number for a car about which *nothing computable is
+ * known*. Every driver `null` means: no service schedule or no records against
+ * it, no recall lookup, and no odometer-and-year pair. A score presented as a
+ * reading on top of that is a judgement about nothing, which is the same defect
+ * as the hardcoded 70 arriving by a longer route.
+ *
+ * ⚠ This is deliberately **all** rather than **any**. One null driver is
+ * normal and is exactly the case the drivers are written to report honestly —
+ * a car with an odometer and no recall check still supports a reading. Refusing
+ * on any null would suppress the band on most real vehicles and teach everyone
+ * to ignore the rule.
+ */
+export function driversSupportAScore(drivers: HealthDriver[]): boolean {
+  if (drivers.length === 0) return false;
+  return drivers.some((driver) => driver.score !== null);
 }

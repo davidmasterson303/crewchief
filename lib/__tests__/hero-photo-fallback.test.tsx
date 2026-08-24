@@ -25,11 +25,17 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import DiagnosticHero from '@/components/DiagnosticHero';
 
 /**
- * The score and its band label are held back until the 900ms scan reveal
- * finishes, so a test that asserts them on the first frame is asserting the
- * loading state. This runs the reveal out.
+ * Runs any pending timers out.
+ *
+ * ⚠ This used to be `completeScan`, and it was load-bearing: the hero held its
+ * score behind a 900ms `setTimeout` that stood in for a diagnostic. D13 removed
+ * the timer, so the dial is live on mount and there is no reveal to complete.
+ *
+ * It is kept, and still called, precisely so this suite would notice a *new*
+ * timer appearing in front of the reading. If someone reintroduces a staged
+ * reveal, the assertions before this call are what fail.
  */
-function completeScan() {
+function settle() {
   act(() => {
     jest.advanceTimersByTime(1000);
   });
@@ -127,25 +133,122 @@ describe('the score', () => {
   it('renders the band label derived from the score, never free text', () => {
     render(<DiagnosticHero {...M235i} healthScore={74} />);
 
-    // Held back during the reveal — asserting here would test the placeholder.
-    expect(screen.queryByText('Fair')).not.toBeInTheDocument();
-
-    completeScan();
-
     // 74 is "Fair" (>= 60). A hand-written label is how 61 came to be "Good".
+    // Present immediately: there is no reveal to wait out any more.
+    expect(screen.getByText('Fair')).toBeInTheDocument();
+
+    settle();
     expect(screen.getByText('Fair')).toBeInTheDocument();
   });
 
-  it('says "Diagnostics complete" only once the scan is done, and only with a photo', () => {
-    render(<DiagnosticHero {...M235i} photo="https://example.test/car.jpg" healthScore={74} />);
+  /*
+    ── ⚠ D13 · the caption is a claim, and these are the teeth ────────────────
 
-    expect(screen.getByText('Scanning…')).toBeInTheDocument();
-    completeScan();
-    expect(screen.getByText('Diagnostics complete')).toBeInTheDocument();
+    The replaced test asserted `'Scanning…'` then `'Diagnostics complete'`, and
+    it passed for years while the app told every owner it had examined their
+    car. It was a correct test of the wrong behaviour — which is the failure
+    mode rule 5 is about, arriving from the other direction: not a guard that
+    checks nothing, but a guard that faithfully pins something untrue.
+  */
+  it('never claims a diagnostic it did not run', () => {
+    render(
+      <DiagnosticHero
+        {...M235i}
+        photo="https://example.test/car.jpg"
+        healthScore={74}
+        work={{ serviceRecords: 0, recalls: 0 }}
+      />
+    );
+
+    settle();
+
+    expect(screen.queryByText(/diagnostics complete/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/scanning/i)).not.toBeInTheDocument();
   });
 
-  it('is absent entirely when there is no score, rather than showing zero', () => {
-    render(<DiagnosticHero {...M235i} />);
-    expect(screen.queryByText('/100')).not.toBeInTheDocument();
+  it('names the records it actually read', () => {
+    render(<DiagnosticHero {...M235i} healthScore={74} work={{ serviceRecords: 12, recalls: 3 }} />);
+
+    expect(screen.getByText('Read 12 service records and 3 recall campaigns.')).toBeInTheDocument();
+  });
+
+  it('says so plainly when it read nothing', () => {
+    render(<DiagnosticHero {...M235i} work={{ serviceRecords: 0, recalls: 0 }} />);
+
+    expect(
+      screen.getByText(
+        'No service records on file, and no recalls found for this year, make and model.'
+      )
+    ).toBeInTheDocument();
+  });
+
+  /*
+    ── ⚠ D10 · a null score is not a zero, and this is where it was ──────────
+
+    The replaced assertion was `expect(queryByText('/100')).not.toBeInTheDocument()`
+    — vacuous twice over. `ClusterGauge` prints no denominator at all, so the
+    string was absent regardless; and it was checked against `healthScore`
+    *undefined*, the one case that renders no dial, so it never exercised the
+    defect. A car whose score is `null` rendered a full red dial reading 0.
+
+    Both states are asserted here, separately, because they are different
+    claims: `undefined` is "this caller shows no score", `null` is "this car has
+    no score".
+  */
+  it('renders no dial at all when the caller passes no score', () => {
+    const { container } = render(<DiagnosticHero {...M235i} />);
+    settle();
+
+    expect(container.querySelector('[role="img"]')).toBeNull();
+  });
+
+  it('renders an unknown dial — not a zero — when the score is null', () => {
+    render(<DiagnosticHero {...M235i} healthScore={null} work={{ serviceRecords: 0, recalls: 0 }} />);
+    settle();
+
+    const dial = screen.getByRole('img', { name: /health score/i });
+    expect(dial).toHaveAttribute(
+      'aria-label',
+      'Health score not available — not enough history yet'
+    );
+
+    // The reading is a dash, and no band judgement is printed beside it.
+    expect(dial.textContent).toContain('—');
+    expect(dial.textContent).not.toMatch(/\b0\b/);
+    for (const band of ['Needs attention', 'Poor', 'Fair', 'Good', 'Excellent']) {
+      expect(screen.queryByText(band)).not.toBeInTheDocument();
+    }
+
+    // Anti-vacuous: this suite can still detect a real reading on the same path.
+    expect(screen.getByText('No score yet')).toBeInTheDocument();
+  });
+
+  it('offers the action that closes the gap, when the caller supplies one', () => {
+    const onAddRecord = jest.fn();
+    render(<DiagnosticHero {...M235i} healthScore={null} onAddRecord={onAddRecord} />);
+    settle();
+
+    expect(screen.getByText(/not enough history yet/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add a service record' }));
+    expect(onAddRecord).toHaveBeenCalledTimes(1);
+  });
+
+  /*
+    The model's summary describes an assessment. When there is no score there
+    was no assessment, so prose about the car must not appear beside a dial
+    whose whole content is that we have nothing to say about it.
+  */
+  it('does not print the model summary beside an unknown score', () => {
+    render(
+      <DiagnosticHero {...M235i} healthScore={null} reason="Vehicle is in good condition" />
+    );
+    settle();
+
+    expect(screen.queryByText('Vehicle is in good condition')).not.toBeInTheDocument();
+
+    // Anti-vacuous: the same prop does render beside a real score.
+    render(<DiagnosticHero {...M235i} healthScore={74} reason="Vehicle is in good condition" />);
+    expect(screen.getByText('Vehicle is in good condition')).toBeInTheDocument();
   });
 });

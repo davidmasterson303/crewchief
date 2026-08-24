@@ -132,7 +132,26 @@ function useIgnitionSweep(target: number, enabled: boolean): number {
 }
 
 interface ClusterGaugeProps {
-  score: number;
+  /**
+   * The reading, or `null` when there is not enough history to make one.
+   *
+   * ── ⚠ D10 · `null` is not a zero, and this dial used to draw it as one ────
+   *
+   * `DiagnosticHero` passed `healthScore ?? 0` and `VehicleCard` passed
+   * `healthSummary.health_score` straight through, so a car the model had
+   * declined to score — the state `app/actions.ts` was rewritten to produce
+   * rather than fake a 70 — arrived here as `0` and rendered a **full red dial
+   * reading 0, labelled "Needs attention"**. Not an error, not a blank: a
+   * confident worst-possible reading about a car nobody had assessed.
+   *
+   * That is the defect this whole file's sibling modules are written against —
+   * `health-drivers.ts` says it four times, the garage card calls it "no score
+   * is not a zero" — arriving through the one component that draws the number.
+   *
+   * So the type carries it. A caller cannot pass a missing score without
+   * deciding what a missing score looks like, because the compiler now asks.
+   */
+  score: number | null;
   /**
    * 'hero' is the full dial: minors every 5, numbered majors, needle and hub,
    * the reading on its own line beneath. 'card' is the same instrument at the
@@ -153,6 +172,22 @@ export function ClusterGauge({
 }: ClusterGaugeProps) {
   const isCard = variant === 'card';
 
+  /**
+   * No reading. Every branch below that would assert something about the car
+   * is switched off by this, rather than fed a substitute number.
+   */
+  const unknown = score === null;
+
+  /*
+    ⚠ Hooks run on every path, including the unknown one.
+
+    `0` here is a placeholder for arithmetic that is never drawn — the sweep is
+    disabled and the band is discarded when `unknown`. It must not become a
+    default score: the guards below are what stop it reaching the face, and the
+    reason it is safe to write is that nothing reads it.
+  */
+  const swept = useIgnitionSweep(score ?? 0, active && !isCard && !unknown);
+
   /*
     The card dial is deliberately still — no sweep, no count-up. VehicleCard's
     ring comment already settled this: those were single-card moments, and
@@ -160,14 +195,24 @@ export function ClusterGauge({
     colour already carries severity. Adopting the ticked dial there does not
     reopen it.
   */
-  const swept = useIgnitionSweep(score, active && !isCard);
-  const value = isCard ? score : swept;
+  const value = isCard ? score ?? 0 : swept;
 
   // Band comes from the *target*, never the swept value: the face must not
   // cycle amber → cyan → green on its way to a reading.
-  const band = useHealthBand(score);
+  const band = useHealthBand(score ?? 0);
 
-  const settled = isCard || Math.abs(swept - score) < 0.5;
+  /*
+    ⚠ The unknown face takes no band colour at all.
+
+    Not the lowest band, not a neutral green — the muted ink the rest of this
+    product uses for "we cannot say", the same choice `HealthDrivers` on mobile
+    makes for a `null` driver. Colouring an unmeasured dial would assert a
+    condition nobody checked, which is the overclaim in a different paint.
+  */
+  const ink = unknown ? 'rgb(255 255 255 / 0.38)' : band.color;
+  const inkRgb = unknown ? '255 255 255' : band.rgb;
+
+  const settled = isCard || unknown || Math.abs(swept - (score ?? 0)) < 0.5;
   const clamped = Math.max(0, Math.min(100, value));
 
   /*
@@ -200,7 +245,17 @@ export function ClusterGauge({
     <div
       className={isCard ? 'flex flex-col items-center gap-1 flex-shrink-0' : 'flex-shrink-0'}
       role="img"
-      aria-label={`Health score ${Math.round(score)} out of 100 — ${band.label}`}
+      /*
+        ⚠ The unknown state has to be spoken, not merely undrawn. A dial that
+        renders "—" and announces "Health score 0 out of 100" would be honest
+        to the eye and false to a screen reader, which is the half of this
+        product nobody looks at while fixing the other half.
+      */
+      aria-label={
+        unknown
+          ? 'Health score not available — not enough history yet'
+          : `Health score ${Math.round(score)} out of 100 — ${band.label}`
+      }
     >
       <svg
         viewBox={viewBox}
@@ -213,26 +268,43 @@ export function ClusterGauge({
           className="gauge-track"
           d={TRACK}
           fill="none"
-          stroke={isCard ? `rgba(${band.rgb},0.10)` : 'rgb(255 255 255 / 0.08)'}
+          stroke={isCard ? `rgba(${inkRgb},0.10)` : 'rgb(255 255 255 / 0.08)'}
           strokeWidth="6"
           strokeLinecap="butt"
+          /*
+            Dashed when there is no reading. The scale is still real — this is
+            the instrument, and the range it measures has not gone away — but a
+            broken line reads as "not measured" the way an unbroken one reads as
+            "measured and empty". `strokeDasharray` on the *track* rather than a
+            second element, so there is nothing extra to keep in register.
+          */
+          strokeDasharray={unknown ? '2 5' : undefined}
         />
 
-        <path
-          className="gauge-arc"
-          d={TRACK}
-          fill="none"
-          stroke={band.color}
-          strokeWidth="6"
-          strokeLinecap="butt"
-          pathLength={100}
-          strokeDasharray={`${clamped} 100`}
-          style={{
-            // The light is the data; a heavy bloom reads as chrome. Held back
-            // until the needle settles so the sweep itself stays crisp.
-            filter: settled ? `drop-shadow(0 0 4px rgba(${band.rgb},0.28))` : 'none',
-          }}
-        />
+        {/*
+          The lit arc *is* the claim — its length is the score. There is no
+          honest length for a score nobody has, so the unknown face has no arc
+          at all rather than a zero-length one. (A zero-length arc and a missing
+          arc look identical here only because the caps are butt; that is a
+          coincidence of styling, not a reason to draw a reading of 0.)
+        */}
+        {!unknown && (
+          <path
+            className="gauge-arc"
+            d={TRACK}
+            fill="none"
+            stroke={band.color}
+            strokeWidth="6"
+            strokeLinecap="butt"
+            pathLength={100}
+            strokeDasharray={`${clamped} 100`}
+            style={{
+              // The light is the data; a heavy bloom reads as chrome. Held back
+              // until the needle settles so the sweep itself stays crisp.
+              filter: settled ? `drop-shadow(0 0 4px rgba(${band.rgb},0.28))` : 'none',
+            }}
+          />
+        )}
 
         {/* Minors — hairlines, every 5, hero only. */}
         {!isCard &&
@@ -315,18 +387,28 @@ export function ClusterGauge({
 
         {/* Needle. Hero runs it to the pivot and caps it with a hub; the card
             stops it short, because its reading sits in the well. */}
-        <g transform={`rotate(${angleFor(clamped)} ${CX} ${CY})`}>
-          <line
-            className="gauge-needle"
-            x1={CX}
-            y1={42}
-            x2={CX}
-            y2={isCard ? 62 : CY}
-            stroke={band.color}
-            strokeWidth={isCard ? 3 : 2.5}
-            strokeLinecap={isCard ? 'round' : 'butt'}
-          />
-        </g>
+        {/*
+          ⚠ No needle without a reading. A needle points at a value; parking one
+          at the bottom of the scale is how the unknown state became "0" in the
+          first place, and it would be the most convincing wrong answer on the
+          face. The hub stays on the hero — it is the instrument, not the
+          reading — but takes the muted ink so nothing on a dark face glows a
+          judgement.
+        */}
+        {!unknown && (
+          <g transform={`rotate(${angleFor(clamped)} ${CX} ${CY})`}>
+            <line
+              className="gauge-needle"
+              x1={CX}
+              y1={42}
+              x2={CX}
+              y2={isCard ? 62 : CY}
+              stroke={band.color}
+              strokeWidth={isCard ? 3 : 2.5}
+              strokeLinecap={isCard ? 'round' : 'butt'}
+            />
+          </g>
+        )}
         {!isCard && (
           <circle
             className="gauge-hub"
@@ -334,7 +416,7 @@ export function ClusterGauge({
             cy={CY}
             r="5"
             fill="rgb(12 11 10)"
-            stroke={band.color}
+            stroke={ink}
             strokeWidth="1.5"
           />
         )}
@@ -360,14 +442,20 @@ export function ClusterGauge({
           className="num gauge-reading"
           textAnchor="middle"
           dominantBaseline="central"
-          fill={isCard ? '#FFFFFF' : band.color}
+          fill={unknown ? ink : isCard ? '#FFFFFF' : band.color}
           // 60, not 64: tabular figures make "100" exactly 1.5x the width of
           // "88", and at 64 a perfect score measured 40.4px inside a 43.6px
           // well. It fit, with 1.6px a side. 60 buys the margin back.
           fontSize={isCard ? 60 : 30}
           fontWeight="700"
         >
-          {Math.round(value)}
+          {/*
+            An em dash, not a 0 and not an empty string. `health-drivers.ts`
+            settled the wording for a missing driver — "a dash on its own reads
+            as a bug" — which is why the sentence beneath the dial is not
+            optional and says what is missing.
+          */}
+          {unknown ? '—' : Math.round(value)}
         </text>
       </svg>
 
@@ -392,11 +480,21 @@ export function ClusterGauge({
               : 'block text-center font-semibold leading-none animate-fade-in'
           }
           style={{
-            color: band.color,
+            color: ink,
             ...(isCard ? {} : { fontSize: size * 0.07, marginTop: size * 0.02 }),
           }}
         >
-          {isCard ? band.short : band.label}
+          {/*
+            ⚠ Never a band. `getHealthBand(0)` returns a real judgement with a
+            real colour, and printing it here is what put "Needs attention"
+            under a car that had simply never been assessed. The unknown face
+            says which of the two it is.
+
+            "No score yet" rather than "Unknown": the *yet* is the load-bearing
+            word — it tells the owner this is a gap that closes, which is what
+            makes the action beneath it worth tapping.
+          */}
+          {unknown ? (isCard ? 'No score' : 'No score yet') : isCard ? band.short : band.label}
         </span>
       )}
     </div>

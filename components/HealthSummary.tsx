@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { adviceDisclosure } from '@crewchief/core/advice-disclosure';
 import { healthClaim, mayReassure } from '@crewchief/core/health-claims';
+import type { HealthDriver } from '@crewchief/core/health-drivers';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -37,6 +38,18 @@ interface HealthSummaryProps {
   recallsChecked?: boolean;
   /** Whether vehicle research reached `completed`. */
   researchComplete?: boolean;
+  /**
+   * The three computed drivers — D10.
+   *
+   * ⚠ Assembled by the caller through `driversForVehicle`, never here. This
+   * component holds a model-written summary row and has no access to the
+   * schedule, the maintenance rows or the odometer, and a component that
+   * fetched its own would be a second answer to what the drivers are.
+   *
+   * Defaults to `[]`, which renders nothing — the honest result for a caller
+   * that has not wired them rather than a fabricated set of blanks.
+   */
+  drivers?: HealthDriver[];
   compact?: boolean;
 }
 
@@ -82,12 +95,66 @@ function ScoreRing({ score }: { score: number }) {
   );
 }
 
+/**
+ * The three computed drivers — the web half of what mobile has had since 15 Aug.
+ *
+ * ── ⚠ Not terms in a sum, and this must not imply they are ──────────────────
+ *
+ * `health_score` comes from the model; these are computed from rows. So they
+ * explain the *subject* without arithmetically explaining the *total*, and they
+ * are laid out as three peers: no plus signs, no "= 74", no ordering that
+ * suggests one contributes more. `health-drivers.ts` carries the same warning
+ * at the source and `HealthDrivers.tsx` on mobile makes the same choices — this
+ * is deliberately its twin rather than a second design, because a driver that
+ * reads one way on the phone and another on the web is this codebase's most
+ * repeated defect wearing a new hat.
+ */
+function HealthDriverRows({ drivers }: { drivers: HealthDriver[] }) {
+  if (drivers.length === 0) return null;
+
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.02] divide-y divide-white/8">
+      {drivers.map((driver) => (
+        <div key={driver.key} className="p-4">
+          <div className="flex items-baseline justify-between gap-3">
+            <h4 className="text-sm font-semibold text-white">{driver.label}</h4>
+            {/*
+              ⚠ An unmeasured driver takes muted ink, never a band. Banding a
+              `null` asserts a condition nobody checked — the same overclaim
+              `ClusterGauge`'s unknown face exists to prevent, one level down.
+            */}
+            <span
+              className="num text-xl font-bold leading-none"
+              style={{
+                color:
+                  driver.score === null
+                    ? 'rgb(255 255 255 / 0.38)'
+                    : getHealthBand(driver.score).color,
+              }}
+            >
+              {driver.score === null ? '—' : driver.score}
+            </span>
+          </div>
+          {/*
+            Always present, including at `null`. A dash on its own reads as a
+            bug; "Recalls have not been checked for this vehicle" reads as an
+            honest gap, and the difference between the two is what the sentence
+            is carrying.
+          */}
+          <p className="text-sm text-white/55 leading-relaxed mt-1">{driver.detail}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function HealthSummary({
   vehicleId,
   healthSummary,
   recalls = [],
   recallsChecked = false,
   researchComplete = false,
+  drivers = [],
   compact = false,
 }: HealthSummaryProps) {
   const router = useRouter();
@@ -356,6 +423,16 @@ export default function HealthSummary({
             ))}
           </div>
         )}
+
+        {/*
+          The computed drivers sit above the model-written tiles on purpose.
+
+          The tiles are prose from the model; these are arithmetic over rows the
+          owner can go and count. When the two disagree — and they can, since
+          nothing makes the score a function of the drivers — the checkable half
+          should be the half read first.
+        */}
+        <HealthDriverRows drivers={drivers} />
 
         <div className="grid md:grid-cols-3 gap-3">
           <div className={`p-4 rounded-xl border ${

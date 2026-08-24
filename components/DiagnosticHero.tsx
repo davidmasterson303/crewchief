@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef } from 'react';
 import { VehicleIdentity } from '@/components/VehicleIdentity';
 import { ClusterGauge } from '@/components/ClusterGauge';
+import { describeReadWork, type ReadWork } from '@crewchief/core/work-narration';
 
 interface DiagnosticHeroProps {
   /** A renderable photo URL, already signed by the caller. Null is expected. */
@@ -12,9 +13,35 @@ interface DiagnosticHeroProps {
   make?: string | null;
   model?: string | null;
   trim?: string | null;
-  healthScore?: number;
+  /**
+   * The reading, or `null` when there is not enough history to make one.
+   *
+   * ⚠ `null` and `undefined` are different here and both are real. `undefined`
+   * is "this caller does not show a score at all"; `null` is "this car has no
+   * score", which is a statement about the car and gets the unknown face.
+   */
+  healthScore?: number | null;
   /** One line on why the score is what it is. Optional. */
   reason?: string | null;
+  /**
+   * What the assessment was actually built from — D13.
+   *
+   * Omitted by callers that genuinely cannot say, which renders no caption
+   * rather than a made-up one.
+   */
+  work?: ReadWork;
+  /** What to do about a missing score. Rendered only when there is no reading. */
+  onAddRecord?: () => void;
+  /**
+   * What the action's button says.
+   *
+   * ⚠ A prop rather than a constant because the two clients reach different
+   * screens, and the label has to name the one it actually opens. The web
+   * dashboard sends people to the Maintenance page, whose own button reads
+   * "Upload Invoice"; a button here promising "Add a service record" would be
+   * describing a form that page does not have.
+   */
+  addRecordLabel?: string;
   /** Band height. 400px is the design default. */
   height?: number;
 }
@@ -57,11 +84,12 @@ export default function DiagnosticHero({
   trim,
   healthScore,
   reason,
+  work,
+  onAddRecord,
+  addRecordLabel = 'Add a service record',
   height = 400,
 }: DiagnosticHeroProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [scanDone, setScanDone] = useState(false);
-  const [mounted, setMounted] = useState(false);
 
   /*
     The band table and the count-up both moved into ClusterGauge, which owns
@@ -71,13 +99,39 @@ export default function DiagnosticHero({
     and only its address has moved.
   */
 
-  useEffect(() => {
-    setMounted(true);
-    const timer = setTimeout(() => setScanDone(true), 900);
-    return () => clearTimeout(timer);
-  }, []);
+  /*
+    ── ⚠ D13 · the 900ms timer that used to live here is gone ────────────────
 
-  const score = healthScore ?? 0;
+    It set `scanDone`, which drove three things: a cyan scan line across the
+    photograph, the caption's flip from "Scanning…" to "Diagnostics complete",
+    and `ClusterGauge`'s `active` prop. None of them was waiting on work —
+    the score, the recalls and the records all arrive with the page — so the
+    animation measured nothing but itself and the caption asserted a diagnostic
+    that had not happened. `work-narration.ts` carries the full argument.
+
+    ── The beat was not replaced with another beat ───────────────────────────
+
+    D13 leaves the door open — *"if you want the beat, make it show something
+    true — the actual records it read, counting up"* — and `readWorkCount` is
+    exported for exactly that. It is deliberately not taken here.
+
+    Animating the count inside "Read 12 service records." means re-rendering a
+    sentence while its subject changes, which reads as a glitch rather than as
+    assembly, and it re-introduces motion whose only job is to make an instant
+    result feel earned. That instinct is what produced the 900ms timer. The
+    sentence is already the substantial thing; a car with twelve invoices says
+    twelve, and that lands without being counted out loud.
+
+    If the beat is wanted later it belongs on the count alone, in its own
+    element, not threaded through prose.
+  */
+
+  /**
+   * ⚠ `null`, not `0`. `??` here would resurrect the exact defect: `0` is a
+   * legitimate score and `ClusterGauge` will happily paint it red.
+   */
+  const score = healthScore ?? null;
+  const unknownScore = score === null;
 
   return (
     <section
@@ -97,24 +151,20 @@ export default function DiagnosticHero({
         />
 
         {/*
-          The scan sweep. Transient — it runs once, for 850ms, and leaves
-          nothing behind. That is what keeps it compatible with "no tint,
-          vignette or scrim over any in-app photograph": those are persistent
-          layers that cost the photo permanently, this is motion.
+          ── ⚠ D13 · the cyan scan sweep that crossed this photograph is gone ──
+
+          It was defended, correctly, as *motion rather than a layer* — it cost
+          the photo nothing permanently and so did not breach "no tint, vignette
+          or scrim over any in-app photograph". That defence is still sound and
+          is no longer the question.
+
+          What it did was depict a scan. A luminous line travelling down a
+          photograph of the owner's car, resolving into "Diagnostics complete",
+          is a picture of the app examining the vehicle — and the app had not
+          examined anything; it had waited 900ms. The honesty problem was never
+          the ink budget, it was the depiction, so tuning the opacity could not
+          have fixed it and removing the element is the whole fix.
         */}
-        {mounted && !scanDone && (
-          <div
-            className="scan-line absolute left-0 right-0 h-[2px] pointer-events-none"
-            style={{
-              position: 'absolute',
-              zIndex: 4,
-              background:
-                'linear-gradient(90deg, transparent 0%, rgba(34,211,238,0) 5%, rgba(34,211,238,1) 50%, rgba(34,211,238,0) 95%, transparent 100%)',
-              boxShadow: '0 0 18px 4px rgba(34,211,238,0.55), 0 0 40px 8px rgba(34,211,238,0.18)',
-              animation: 'scanLine 0.85s cubic-bezier(0.4,0,0.6,1) forwards',
-            }}
-          />
-        )}
       </div>
 
       {/*
@@ -141,8 +191,25 @@ export default function DiagnosticHero({
           reader still hears which vehicle the hero belongs to — the information
           was never the problem, the third copy of it was.
         */}
+        {/*
+          ── ⚠ D13 · what this line says is now checkable ───────────────────────
+
+          It read `!photo ? 'No photo yet' : scanDone ? 'Diagnostics complete' :
+          'Scanning…'` — a caption whose only input was a photograph and a
+          timer, announcing a completed diagnostic over a car with no records,
+          no recall lookup and no assessment.
+
+          It names the records the assessment was built from instead. Every
+          figure in it is a row somebody can go and count in the service log,
+          which is the same standard `health-drivers.ts` holds its inputs to.
+
+          The photo state survives as a fallback because it is still true and
+          still the most useful thing to say when there is nothing else — but it
+          is now the *last* resort rather than the first branch, since what the
+          app read matters more than whether there is a picture of the car.
+        */}
         <p className="label-uppercase mb-6">
-          {!photo ? 'No photo yet' : scanDone ? 'Diagnostics complete' : 'Scanning…'}
+          {work ? describeReadWork(work) : !photo ? 'No photo yet' : null}
         </p>
 
         {/*
@@ -165,10 +232,48 @@ export default function DiagnosticHero({
         */}
         {healthScore !== undefined && (
           <div className="flex flex-col sm:flex-row sm:items-center gap-5 sm:gap-9">
-            <ClusterGauge score={score} active={scanDone} />
-            {reason && (
-              <p className="text-sm text-white/50 leading-relaxed flex-1 max-w-prose">{reason}</p>
-            )}
+            {/*
+              `active` was `scanDone` — the dial held its sweep until a timer
+              elsewhere on the screen said a fictional scan had finished. There
+              is nothing to wait for, so it is live on mount.
+            */}
+            <ClusterGauge score={score} active />
+            <div className="flex-1 max-w-prose">
+              {/*
+                ── ⚠ D10 · the unknown score gets a sentence and an action ────
+
+                A dashed dial reading "—" tells an owner that something is
+                absent without telling them what, or that it is theirs to fix.
+                The dial says *there is no reading*; this says *why*, and the
+                button says *what closes it*.
+
+                `reason` is not used for this. It is the model's summary of an
+                assessment, and when there is no score there was no assessment
+                — printing it here would attach prose about the car to a state
+                whose entire content is that we have nothing to say about it.
+              */}
+              {unknownScore ? (
+                <>
+                  <p className="text-sm text-white/70 leading-relaxed">
+                    Not enough history yet. CrewChief works out a score from this car&apos;s
+                    service records, and there are not enough on file to say anything useful.
+                  </p>
+                  {onAddRecord && (
+                    <button
+                      type="button"
+                      onClick={onAddRecord}
+                      className="tap-target-44 mt-3 inline-flex items-center rounded-xl border border-info-border bg-info-wash px-4 py-2 text-sm font-semibold text-info-strong transition-colors hover:bg-info-wash/70"
+                    >
+                      {addRecordLabel}
+                    </button>
+                  )}
+                </>
+              ) : (
+                reason && (
+                  <p className="text-sm text-white/50 leading-relaxed">{reason}</p>
+                )
+              )}
+            </div>
           </div>
         )}
 
@@ -177,27 +282,6 @@ export default function DiagnosticHero({
         )}
       </div>
 
-      <style jsx>{`
-        @keyframes scanLine {
-          0% {
-            top: 0%;
-            opacity: 0;
-          }
-          5% {
-            opacity: 1;
-          }
-          95% {
-            opacity: 1;
-          }
-          100% {
-            top: 100%;
-            opacity: 0;
-          }
-        }
-        .scan-line {
-          top: 0;
-        }
-      `}</style>
     </section>
   );
 }
