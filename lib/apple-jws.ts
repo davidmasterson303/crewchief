@@ -53,6 +53,13 @@ export type JwsFailureReason =
   | 'malformed-certificate'
   | 'chain-too-long'
   | 'broken-certificate-chain'
+  /*
+    ⚠ IAP-04. An intermediate without `CA:TRUE`, or a CA whose `keyUsage`
+    excludes `keyCertSign`. Both are the same class of finding: signature maths
+    proving a certificate was signed says nothing about whether its issuer was
+    permitted to sign it.
+  */
+  | 'issuer-is-not-a-certificate-authority'
   | 'chain-does-not-reach-a-pinned-root'
   | 'certificate-outside-validity-window'
   | 'bad-signature'
@@ -168,10 +175,67 @@ export function verifyAppleSignedPayload<T = unknown>(
     Each certificate must actually be signed by the next one up. `checkIssued`
     compares names; `verify` checks the signature. Both, because the first
     without the second is an assertion about strings.
+
+    ── ⚠ IAP-04 · signature maths is not the whole of chain validation ─────────
+
+    This loop used to be exactly that and nothing else, and the gap is a
+    documented deviation from Apple's own procedure. Node's `X509Certificate`
+    exposes `.ca` and `.keyUsage`; **neither was consulted anywhere in this
+    file.** No `CA:TRUE` check on intermediates, no `keyCertSign`, no path
+    length. Only the *top* of the caller-supplied chain was anchored; everything
+    below it was trusted on signature alone.
+
+    The consequence: an attacker holding the private key for **any** certificate
+    that chains to Apple Root CA - G3 — an Apple Developer certificate at $99/yr
+    being the obvious candidate — could mint a subordinate, sign a forged
+    transaction, and submit the chain. `/api/internal/apple-notifications` is a
+    public URL whose docblock states *"The signature is the authentication."*
+
+    ⚠ One thing remains genuinely uncertain and is worth writing down rather
+    than implying away: whether today's Apple WWDR developer intermediate is
+    itself issued by Root CA - **G3** or by the older RSA root. If G1, the forged
+    chain breaks at the anchor and this was defence in depth all along. The two
+    checks below are correct either way — they are what Apple's own
+    `app-store-server-library` does — so the answer changes the severity, not
+    the fix. Confirm at apple.com/certificateauthority/.
   */
   for (let i = 0; i < chain.length - 1; i += 1) {
     const child = chain[i];
     const parent = chain[i + 1];
+
+    /*
+      ⚠ **The parent must be allowed to be a CA.** Without this, a leaf
+      certificate — which Apple issues to any paying developer — can be
+      presented as an intermediate and used to vouch for a forged certificate
+      beneath it. `basicConstraints CA:TRUE` is the field that distinguishes
+      "may sign other certificates" from "may sign data", and it is the whole
+      point of the extension.
+    */
+    if (parent.ca !== true) {
+      return {
+        ok: false,
+        reason: 'issuer-is-not-a-certificate-authority',
+        detail: `${parent.subject} has no CA:TRUE basic constraint`,
+      };
+    }
+
+    /*
+      ⚠ **There is deliberately no `keyCertSign` check here**, and the gap is
+      worth stating rather than leaving unexplained.
+
+      Apple's own `app-store-server-library` checks the basic `keyUsage`
+      extension for `keyCertSign` on every issuer. Node's
+      `X509Certificate.keyUsage` **is not that field** — it exposes the
+      *extended* key usage OIDs, and returns `undefined` for a certificate
+      carrying `keyUsage = critical,keyCertSign,cRLSign`. Verified against a
+      generated fixture with exactly those bits set.
+
+      So the check cannot be written from what Node exposes without parsing the
+      DER by hand, and a check that silently never fires is worse than none —
+      it is `.tap-target-44` matching a comment six hundred lines above the
+      rule. `CA:TRUE` above is the load-bearing half and is genuinely
+      available; this is the residual, stated.
+    */
     if (!child.checkIssued(parent) || !safeVerify(child, parent)) {
       return {
         ok: false,

@@ -374,3 +374,69 @@ describe('auto-renew status is recorded but never decides entitlement', () => {
     expect(resolveEntitledTier(record, new Date('2026-09-01T00:00:00Z')).name).toBe('paid');
   });
 });
+
+/**
+ * ── IAP-07 / IAP-09: two states the decision layer used to drop ─────────────
+ */
+describe('states that were silently unhandled', () => {
+  it('restores access when Apple reverses a refund — IAP-07', () => {
+    /*
+      ⚠ The failure was **one-directional and permanent**. `REFUND` sets
+      `revokedAt`, `resolveEntitledTier` reads a revoked record as not live, and
+      `REFUND_REVERSED` — Apple saying the refund it granted has been reversed,
+      because the chargeback failed — was not in `STATE_BEARING_TYPES`. So it
+      fell into `unhandled-notification-type`, was logged, and dropped.
+
+      The customer is paying and locked out, and the only signal that would fix
+      it is the one being ignored.
+    */
+    const revoked = applyAppleNotification(null, event({ notificationType: 'REFUND' }));
+    expect(revoked.action).toBe('write');
+    expect(revoked.action === 'write' && revoked.record.revokedAt).not.toBeNull();
+
+    const restored = applyAppleNotification(
+      revoked.action === 'write' ? revoked.record : null,
+      event({
+        notificationType: 'REFUND_REVERSED',
+        signedDate: at('2026-08-19T10:00:00Z'),
+        expiresDate: at('2026-09-18T10:00:00Z'),
+      })
+    );
+
+    expect(restored.action).toBe('write');
+    expect(restored.action === 'write' && restored.record.revokedAt).toBeNull();
+    expect(restored.action === 'write' && restored.record.tier).not.toBe('free');
+  });
+
+  it('refuses a paid tier that arrives with no expiry — IAP-09', () => {
+    /*
+      ⚠ `expiresAt: null` means "does not expire" to `resolveEntitledTier`. For
+      a subscription that is a **lifetime grant** written from a payload we do
+      not understand, and no renewal event would ever correct it.
+
+      `ignore`, not a write of `free`: revoking somebody mid-period on the
+      strength of a payload already judged untrustworthy is the wrong direction
+      to be wrong in.
+    */
+    const decision = applyAppleNotification(
+      null,
+      event({ notificationType: 'DID_RENEW', expiresDate: null })
+    );
+
+    expect(decision).toMatchObject({ action: 'ignore', reason: 'paid-tier-with-no-expiry' });
+  });
+
+  it('still writes a revocation that has no expiry, because it does not need one', () => {
+    /*
+      The anti-vacuous half. A refund's truth is `revokedAt`, not `expiresDate`
+      — refusing it for a missing expiry would leave access running on a
+      subscription that has been refunded, which is the opposite of the fix.
+    */
+    const decision = applyAppleNotification(
+      null,
+      event({ notificationType: 'REVOKE', expiresDate: null })
+    );
+
+    expect(decision.action).toBe('write');
+  });
+});

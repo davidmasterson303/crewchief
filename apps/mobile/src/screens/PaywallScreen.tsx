@@ -7,6 +7,7 @@ import Well from '../components/Well';
 import { API_BASE_URL } from '../config';
 import { border, radius, space, surface, text, type } from '../theme';
 import type { PurchaseResolution } from '@crewchief/core/purchase-flow';
+import { entitlementMultiple } from '@crewchief/core/ai/budget';
 
 /**
  * One thing somebody can buy.
@@ -57,6 +58,9 @@ export interface SubscriptionOption {
  * reinstall, a second device, or a subscription bought before signing in all
  * end up needing it, and a customer who cannot find it buys twice.
  */
+/** IAP-06. Derived from `TIERS`, so the copy cannot drift from the ceilings. */
+const PAID_MULTIPLE = entitlementMultiple();
+
 export default function PaywallScreen({
   visible,
   options,
@@ -118,10 +122,23 @@ export default function PaywallScreen({
 
         <ScrollView contentContainerStyle={styles.body}>
           <Text style={styles.headline}>More room for the advisor</Text>
+          {/*
+            ── ⚠ IAP-06 · the multiple is derived, not written down ────────────
+
+            This said *"raises that allowance **five times** over"*. The tiers
+            are 400,000 and 1,000,000 output tokens a month, so the real figure
+            is **2.5×** — a misleading claim about what a subscription buys,
+            made **inside the binary**, which is Guideline 2.3.1 territory.
+
+            It is computed from `TIERS` now rather than restated, so the copy
+            cannot drift from the ceilings again. `entitlementMultiple` rounds to
+            one decimal and drops a trailing `.0`, so 2.5× reads as "2.5" and a
+            future 3× reads as "3" rather than "3.0".
+          */}
           <Text style={styles.lede}>
             The free plan includes a monthly allowance for CrewChief&apos;s AI features — asking the
-            advisor, and building a maintenance picture for a car. Plus raises that allowance five
-            times over. Everything else in the app stays exactly as it is.
+            advisor, and building a maintenance picture for a car. Plus raises that allowance{' '}
+            {PAID_MULTIPLE} times over. Everything else in the app stays exactly as it is.
           </Text>
 
           {resolution?.message && (

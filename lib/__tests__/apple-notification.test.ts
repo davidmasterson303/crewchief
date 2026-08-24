@@ -29,6 +29,18 @@ const MONTHLY = 'co.davidmasterson.crewchief.paid.monthly';
 const SIGNED = Date.parse('2026-08-18T10:00:00Z');
 const EXPIRES = Date.parse('2026-09-18T10:00:00Z');
 
+/**
+ * The bundle this deployment accepts — read from `apps/mobile/app.json` rather
+ * than written down.
+ *
+ * ⚠ A hardcoded copy here would let the binary be renamed while these tests
+ * kept passing against the old name, which is precisely the shape of thing that
+ * makes a check pass for the wrong app.
+ */
+const BUNDLE_ID: string = JSON.parse(
+  readFileSync(join(__dirname, '..', '..', 'apps', 'mobile', 'app.json'), 'utf8')
+).expo.ios.bundleIdentifier;
+
 const b64u = (b: Buffer | string) => Buffer.from(b as never).toString('base64url');
 const der = (pem: string) =>
   pem.replace(/-----(BEGIN|END) CERTIFICATE-----/g, '').replace(/\s+/g, '');
@@ -45,6 +57,14 @@ function jws(payload: unknown, chain: string[] = CHAIN, key: string = KEY): stri
 
 function transaction(over: Record<string, unknown> = {}) {
   return {
+    /*
+      ⚠ **IAP-03.** Apple has carried this since StoreKit 2 shipped, and this
+      codebase never declared it, never parsed it and never compared it — so a
+      transaction Apple signed for *any other app in the store* verified here and
+      granted a paid tier. The only product gate was a name lookup in
+      `PRODUCT_TIERS`, which is an accident of naming rather than a control.
+    */
+    bundleId: BUNDLE_ID,
     transactionId: '2000000000000009',
     originalTransactionId: '2000000000000001',
     productId: MONTHLY,
@@ -88,7 +108,7 @@ function notification({
 
 describe('a notification becomes one event', () => {
   it('flattens all three layers into the fields the decision needs', () => {
-    const result = parseAppleNotification(notification(), { rootCertificates: ROOTS, now: NOW });
+    const result = parseAppleNotification(notification(), { rootCertificates: ROOTS, now: NOW, bundleId: BUNDLE_ID });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -106,10 +126,7 @@ describe('a notification becomes one event', () => {
   });
 
   it('works without renewal info, which is often absent', () => {
-    const result = parseAppleNotification(notification({ renewal: null }), {
-      rootCertificates: ROOTS,
-      now: NOW,
-    });
+    const result = parseAppleNotification(notification({ renewal: null }), { rootCertificates: ROOTS, now: NOW, bundleId: BUNDLE_ID });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -122,15 +139,12 @@ describe('a notification becomes one event', () => {
       Reading the number as truthy would turn any unexpected value into
       `false`, which renders as "the customer cancelled" on a screen.
     */
-    const off = parseAppleNotification(notification({ renewal: { autoRenewStatus: 0 } }), {
-      rootCertificates: ROOTS,
-      now: NOW,
-    });
+    const off = parseAppleNotification(notification({ renewal: { autoRenewStatus: 0 } }), { rootCertificates: ROOTS, now: NOW, bundleId: BUNDLE_ID });
     expect(off.ok && off.event.autoRenewStatus).toBe(false);
 
     const unknown = parseAppleNotification(
       notification({ renewal: { autoRenewStatus: 'yes' } }),
-      { rootCertificates: ROOTS, now: NOW }
+      { rootCertificates: ROOTS, now: NOW, bundleId: BUNDLE_ID }
     );
     expect(unknown.ok && unknown.event.autoRenewStatus).toBeNull();
   });
@@ -152,7 +166,7 @@ describe('a notification becomes one event', () => {
           signedTransactionInfo: jws(transaction({ signedDate: SIGNED })),
         },
       }),
-      { rootCertificates: ROOTS, now: NOW }
+      { rootCertificates: ROOTS, now: NOW, bundleId: BUNDLE_ID }
     );
 
     expect(result.ok && result.event.signedDate).toBe(SIGNED);
@@ -170,7 +184,7 @@ describe('every layer is verified, not just the envelope', () => {
     */
     const result = parseAppleNotification(
       notification({ txnChain: ROGUE_CHAIN, txnKey: ROGUE_KEY }),
-      { rootCertificates: ROOTS, now: NOW }
+      { rootCertificates: ROOTS, now: NOW, bundleId: BUNDLE_ID }
     );
 
     expect(result).toMatchObject({
@@ -183,7 +197,7 @@ describe('every layer is verified, not just the envelope', () => {
     // Absent means Apple sent none. Unverifiable means something is wrong.
     const result = parseAppleNotification(
       notification({ renewalChain: ROGUE_CHAIN, renewalKey: ROGUE_KEY }),
-      { rootCertificates: ROOTS, now: NOW }
+      { rootCertificates: ROOTS, now: NOW, bundleId: BUNDLE_ID }
     );
 
     expect(result).toMatchObject({
@@ -203,7 +217,7 @@ describe('every layer is verified, not just the envelope', () => {
       ROGUE_KEY
     );
 
-    expect(parseAppleNotification(forged, { rootCertificates: ROOTS, now: NOW })).toMatchObject({
+    expect(parseAppleNotification(forged, { rootCertificates: ROOTS, now: NOW, bundleId: BUNDLE_ID })).toMatchObject({
       ok: false,
       reason: 'envelope:chain-does-not-reach-a-pinned-root',
     });
@@ -211,7 +225,7 @@ describe('every layer is verified, not just the envelope', () => {
 
   it('rejects a notification carrying no transaction at all', () => {
     const empty = jws({ notificationType: 'DID_RENEW', signedDate: SIGNED, data: {} });
-    expect(parseAppleNotification(empty, { rootCertificates: ROOTS, now: NOW })).toMatchObject({
+    expect(parseAppleNotification(empty, { rootCertificates: ROOTS, now: NOW, bundleId: BUNDLE_ID })).toMatchObject({
       ok: false,
       reason: 'missing-transaction-info',
     });
@@ -234,7 +248,7 @@ describe('the fields without which there is nothing to record', () => {
         notificationType: 'DID_RENEW',
         data: { signedTransactionInfo: jws(transaction(missing)) },
       }),
-      { rootCertificates: ROOTS, now: NOW }
+      { rootCertificates: ROOTS, now: NOW, bundleId: BUNDLE_ID }
     );
 
     expect(result).toMatchObject({ ok: false, reason: 'missing-required-fields' });
@@ -251,7 +265,7 @@ describe('the fields without which there is nothing to record', () => {
           signedTransactionInfo: jws(transaction({ environment: undefined })),
         },
       }),
-      { rootCertificates: ROOTS, now: NOW }
+      { rootCertificates: ROOTS, now: NOW, bundleId: BUNDLE_ID }
     );
 
     expect(result.ok && result.event.environment).toBe('Sandbox');
@@ -260,10 +274,7 @@ describe('the fields without which there is nothing to record', () => {
 
 describe('a bare StoreKit transaction, as the purchase path sends it', () => {
   it('reads as a subscription', () => {
-    const result = parseAppleTransaction(jws(transaction()), {
-      rootCertificates: ROOTS,
-      now: NOW,
-    });
+    const result = parseAppleTransaction(jws(transaction()), { rootCertificates: ROOTS, now: NOW, bundleId: BUNDLE_ID });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -275,7 +286,7 @@ describe('a bare StoreKit transaction, as the purchase path sends it', () => {
     const revokedAt = Date.parse('2026-08-18T11:00:00Z');
     const result = parseAppleTransaction(
       jws(transaction({ revocationDate: revokedAt })),
-      { rootCertificates: ROOTS, now: NOW }
+      { rootCertificates: ROOTS, now: NOW, bundleId: BUNDLE_ID }
     );
 
     expect(result.ok && result.event.notificationType).toBe('REVOKE');
@@ -284,10 +295,65 @@ describe('a bare StoreKit transaction, as the purchase path sends it', () => {
 
   it('rejects a transaction signed by anyone but Apple', () => {
     expect(
-      parseAppleTransaction(jws(transaction(), ROGUE_CHAIN, ROGUE_KEY), {
-        rootCertificates: ROOTS,
-        now: NOW,
-      })
+      parseAppleTransaction(jws(transaction(), ROGUE_CHAIN, ROGUE_KEY), { rootCertificates: ROOTS, now: NOW, bundleId: BUNDLE_ID })
     ).toMatchObject({ ok: false, reason: 'transaction:chain-does-not-reach-a-pinned-root' });
+  });
+});
+
+/**
+ * ── IAP-03: Apple signed it, but not for us ─────────────────────────────────
+ *
+ * `bundleId` was not declared on `TransactionInfo`, so it was never parsed and
+ * never compared — a repo-wide search returned exactly one hit, `app.json:11`,
+ * the Expo config. Apple's WWDR chain signs transactions for **every app in the
+ * store**, so a verified chain proved *"Apple signed this"*, not *"Apple signed
+ * this for CrewChief"*. The only product gate was a name lookup in
+ * `PRODUCT_TIERS` — an accident of naming, not a control.
+ */
+describe('a transaction has to be for this app', () => {
+  const options = { rootCertificates: ROOTS, now: NOW, bundleId: BUNDLE_ID };
+
+  it('refuses a correctly signed transaction from another app', () => {
+    const foreign = jws(transaction({ bundleId: 'com.someone.else' }));
+
+    expect(parseAppleTransaction(foreign, options)).toMatchObject({
+      ok: false,
+      reason: 'transaction-is-for-another-app',
+    });
+  });
+
+  it('refuses one with no bundleId at all', () => {
+    /*
+      ⚠ Refused, not waved through. Apple has carried this field since StoreKit
+      2 shipped, so a transaction without one is malformed or not Apple's — and
+      "the field we check is missing, so skip the check" makes a control optional
+      for exactly the payloads that would fail it.
+    */
+    const { bundleId: _dropped, ...withoutBundle } = transaction();
+
+    expect(parseAppleTransaction(jws(withoutBundle), options)).toMatchObject({
+      ok: false,
+      reason: 'transaction-is-for-another-app',
+    });
+  });
+
+  it('refuses a notification whose inner transaction is another app’s', () => {
+    // Both entry points, because the notification path is the public URL.
+    const foreign = notification({ txn: transaction({ bundleId: 'com.someone.else' }) });
+
+    expect(parseAppleNotification(foreign, options)).toMatchObject({
+      ok: false,
+      reason: 'transaction-is-for-another-app',
+    });
+  });
+
+  it('still accepts our own', () => {
+    // Anti-vacuous: a check that refused everything would pass all three above.
+    expect(parseAppleTransaction(jws(transaction()), options)).toMatchObject({ ok: true });
+    expect(parseAppleNotification(notification({}), options)).toMatchObject({ ok: true });
+  });
+
+  it('reads the bundle id from the binary, so the two cannot drift', () => {
+    expect(BUNDLE_ID).toBe('co.davidmasterson.crewchief');
   });
 });

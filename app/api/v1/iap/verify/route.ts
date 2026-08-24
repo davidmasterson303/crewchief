@@ -4,7 +4,7 @@ import type { NextRequest } from 'next/server';
 import type { ApiResponse } from '@crewchief/core/types';
 import { checkRateLimit, getClientIdentifier, rateLimitResponse } from '@/lib/rate-limit';
 import { requireSession } from '@/lib/api-auth';
-import { getAppleRootCertificates } from '@/lib/apple-root-ca';
+import { getAppleRootCertificates, APPLE_BUNDLE_ID } from '@/lib/apple-root-ca';
 import { parseAppleTransaction } from '@/lib/apple-notification';
 import {
   applyVerifiedAppleEvent,
@@ -88,6 +88,12 @@ export async function POST(request: NextRequest): Promise<Response> {
 
   const parsed = parseAppleTransaction(jwsRepresentation, {
     rootCertificates: getAppleRootCertificates(),
+    /*
+      ⚠ IAP-03. Apple's chain signs transactions for **every app in the
+      store**, so anchoring proves "Apple signed this", not "Apple signed this
+      for CrewChief".
+    */
+    bundleId: APPLE_BUNDLE_ID,
   });
 
   if (!parsed.ok) {

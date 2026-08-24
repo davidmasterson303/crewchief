@@ -401,6 +401,74 @@ async function purgeVehicleStorage(
  * not be removed is the wrong trade. The failures are logged so orphans can
  * be swept later.
  */
+/**
+ * Keep Apple's billing identifier when the account that owned it goes.
+ *
+ * ⚠ **No PII crosses this line, and that is what makes it compatible with a
+ * privacy policy that calls deletion complete.** `original_transaction_id` is
+ * Apple's identifier for a *billing relationship* — not an email, a name, a
+ * device or a user id. `user_id` is deliberately not carried: a deleted
+ * account's id surviving in a table is the exact thing the deletion promise is
+ * about.
+ *
+ * What it buys: a support conversation that starts with the customer ("Apple is
+ * still charging me") can be reconciled against a record, and a genuine
+ * re-purchase can reclaim its own history.
+ */
+async function recordOrphanedSubscription(
+  client: ReturnType<typeof getServiceRoleClient>,
+  userId: string
+) {
+  const { data: entitlement, error } = await client
+    .from('account_entitlements')
+    .select('original_transaction_id, product_id, tier, expires_at, environment')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) {
+    logger.error('ACCOUNT_DELETE:ENTITLEMENT_READ', new Error(error.message), { userId });
+    return;
+  }
+
+  /*
+    No entitlement, or one with no transaction to record. The overwhelmingly
+    common case — most accounts never subscribe — and not worth a log line.
+  */
+  if (!entitlement?.original_transaction_id) return;
+
+  const { error: writeError } = await client.from('orphaned_apple_subscriptions').upsert(
+    {
+      original_transaction_id: entitlement.original_transaction_id,
+      product_id: entitlement.product_id,
+      tier: entitlement.tier,
+      expires_at: entitlement.expires_at,
+      environment: entitlement.environment,
+      orphaned_at: new Date().toISOString(),
+      /* A re-deletion is a fresh orphaning, so a previous reclaim is cleared. */
+      reclaimed_at: null,
+    },
+    { onConflict: 'original_transaction_id' }
+  );
+
+  if (writeError) {
+    /*
+      ⚠ Error level, and it names the transaction id — which is the whole point
+      of the record. If this line is the only trace that survives, it is still
+      enough to reconcile against when the customer writes in.
+    */
+    logger.error('ACCOUNT_DELETE:ORPHAN_UNRECORDED', new Error(writeError.message), {
+      originalTransactionId: entitlement.original_transaction_id,
+    });
+    return;
+  }
+
+  logger.warn(
+    'ACCOUNT_DELETE:SUBSCRIPTION_ORPHANED',
+    'An account with a live Apple subscription was deleted; Apple will keep billing until the customer cancels',
+    { originalTransactionId: entitlement.original_transaction_id, tier: entitlement.tier }
+  );
+}
+
 export async function deleteAccount() {
   const session = await requireSession();
   if (!session.ok) {
@@ -423,6 +491,67 @@ export async function deleteAccount() {
     }
 
     const vehicleIds = (vehicles ?? []).map((v) => v.id);
+
+    /*
+      ── ⚠ IAP-05 · a deleted account can still be paying Apple ───────────────
+
+      `account_entitlements.user_id` is `ON DELETE CASCADE`, and this function
+      never read that table before calling `auth.admin.deleteUser`. The row went
+      — `tier`, `expires_at`, and critically `original_transaction_id` — and
+      nothing was written anywhere first.
+
+      **Deleting an account here cancels nothing at Apple's end.** Only the
+      customer can, from Settings. So they keep being billed, monthly,
+      indefinitely; every `DID_RENEW` arrives, finds no owner, and returns
+      `200 received:true applied:false` at info level — indistinguishable from a
+      notification for somebody who never existed. And when they email support
+      there is no transaction id on file to reconcile against, because it was
+      deleted with the row.
+
+      Second-order and worse: the transaction becomes unowned, so the ownership
+      check in `/api/v1/iap/verify` stops firing, and a **different account**
+      presenting that same JWS gets bound to the subscription.
+
+      ⚠ Read and recorded **before** the cascade, for the same reason the
+      inventory above is: after `deleteUser` there is nothing left to read.
+
+      ⚠ **A failure here does not stop the deletion.** App Store 5.1.1(v)
+      requires deletion to work, and refusing to delete an account because a
+      bookkeeping row could not be written would trade a compliance requirement
+      for a support convenience. It is logged at error level instead, which is
+      the honest trade and the one the storage purge above already makes.
+    */
+    await recordOrphanedSubscription(client, userId);
+
+    /*
+      ── ⚠ DB-11 · rate-limit rows outlive a deletion the policy calls complete ─
+
+      `api_rate_limits.identifier` holds the **user's UUID** for every
+      authenticated tier, as a bare text column with no foreign key — so the
+      cascade does not reach it. A deleted account's id therefore survives in a
+      table nothing else references, for up to the retention window.
+
+      It is the **only** user-identifying row that outlives a deletion the
+      privacy policy describes as complete, which makes it small and
+      disproportionately worth removing: the promise is the thing that is
+      expensive to be wrong about, not the row.
+
+      ⚠ Best-effort, like the storage purge. App Store 5.1.1(v) requires
+      deletion to work; refusing to delete an account because a throttling
+      counter could not be cleared would be the wrong trade. Logged instead.
+
+      ⚠ Before the cascade for the same reason as everything above it: `userId`
+      is what this deletes on, and after `deleteUser` there is nothing to hold
+      the value.
+    */
+    const { error: limitsError } = await client
+      .from('api_rate_limits')
+      .delete()
+      .eq('identifier', userId);
+
+    if (limitsError) {
+      logger.error('ACCOUNT_DELETE:RATE_LIMITS', new Error(limitsError.message), { userId });
+    }
 
     // ---- 2. storage first --------------------------------------------------
     const purge = await purgeVehicleStorage(client, vehicleIds);

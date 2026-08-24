@@ -83,3 +83,20 @@ export function getAppleRootCertificates(
 ): string[] {
   return [APPLE_ROOT_CA_G3, ...readPinnedRoots(env)];
 }
+
+/**
+ * The bundle identifier this deployment accepts transactions for — IAP-03.
+ *
+ * ── ⚠ Why it is a constant and not an environment variable ──────────────────
+ *
+ * It is a property of **the binary**, not of the deployment. `app.json` says
+ * `co.davidmasterson.crewchief` and there is exactly one app; a variable would
+ * introduce a way for the two to disagree, and the failure mode of them
+ * disagreeing is that the check passes for the wrong app or fails for the right
+ * one — neither of which is visible until somebody's subscription breaks.
+ *
+ * `apps/mobile/app.json` is the source of truth and
+ * `lib/__tests__/apple-notification.test.ts` reads it to keep this in step, so
+ * renaming the bundle in one place fails the build rather than the purchase.
+ */
+export const APPLE_BUNDLE_ID = 'co.davidmasterson.crewchief';

@@ -108,6 +108,14 @@ export interface EntitlementWrite {
 export type IgnoreReason =
   | 'stale-event'
   | 'sandbox-would-overwrite-production'
+  /**
+   * IAP-09. A mapped paid product arriving with no expiry.
+   *
+   * ⚠ Worth an error-level log wherever this is consumed, not a shrug: it means
+   * a payload we cannot interpret reached a path that would otherwise have
+   * written a **lifetime** paid entitlement.
+   */
+  | 'paid-tier-with-no-expiry'
   | 'unhandled-notification-type';
 
 export type EntitlementDecision =
@@ -177,6 +185,25 @@ const STATE_BEARING_TYPES = new Set([
   'RENEWAL_EXTENDED',
   'REFUND',
   'REVOKE',
+  /*
+    ── ⚠ IAP-07 · a reversed refund used to lock somebody out forever ─────────
+
+    `REFUND_REVERSED` is Apple telling us a refund it previously granted has
+    been **reversed** — the customer's chargeback failed, or Apple reconsidered.
+    It was absent from this set and from `REVOKING_TYPES`, so it fell into
+    `unhandled-notification-type` and was logged and dropped.
+
+    The consequence is one-directional and permanent: `REFUND` set `revokedAt`,
+    `resolveEntitledTier` reads a revoked record as not live, and **nothing
+    would ever clear it**. The customer is paying and locked out, and the only
+    signal that would fix it is the one being ignored.
+
+    It is state-bearing but deliberately **not** revoking: it restores the
+    record to whatever `expiresDate` says, and the `revokedAt: null` at the foot
+    of `applyAppleNotification` — written for the re-subscribe case — does
+    exactly that here too.
+  */
+  'REFUND_REVERSED',
 ]);
 
 /**
@@ -279,6 +306,28 @@ export function applyAppleNotification(
     the grace state on the next unrelated event.
   */
   const expiresMs = laterOf(event.expiresDate, event.gracePeriodExpiresDate);
+
+  /*
+    ── ⚠ IAP-09 · a null expiry reads as a lifetime grant ────────────────────
+
+    `expiresAt: null` means "does not expire" to `resolveEntitledTier`, which is
+    correct for a **non-renewing** product and catastrophic for a subscription:
+    a mapped product arriving with no `expiresDate` — a malformed payload, a
+    field Apple stops sending, a consumable that shares a tier name — writes a
+    paid entitlement that never lapses and that no renewal event will correct.
+
+    A subscription without an expiry is not a subscription we understand, so it
+    is refused rather than stored. `ignore` rather than a write, because writing
+    `free` would revoke somebody mid-period on the strength of a payload we have
+    already decided is untrustworthy.
+  */
+  if (expiresMs === null && tier && tier !== 'free' && !REVOKING_TYPES.has(event.notificationType)) {
+    return {
+      action: 'ignore',
+      reason: 'paid-tier-with-no-expiry',
+      detail: event.productId ?? undefined,
+    };
+  }
 
   return {
     action: 'write',

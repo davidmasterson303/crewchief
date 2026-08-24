@@ -38,8 +38,15 @@ jest.mock('@/lib/entitlement-store', () => ({
   only the authority differs. Swapping it for `[]` would make every payload
   fail and the 401 test would prove nothing.
 */
+/*
+  ⚠ `APPLE_BUNDLE_ID` travels with the roots as of 24 Aug (IAP-03). The route
+  passes it to `parseAppleNotification`, which refuses a transaction Apple
+  signed for a different app — so a mock that supplied only the roots made every
+  fixture here foreign and every case 401.
+*/
 jest.mock('@/lib/apple-root-ca', () => ({
   getAppleRootCertificates: () => [readFileSync(join(FIXTURES, 'root.crt'), 'utf8')],
+  APPLE_BUNDLE_ID: 'co.davidmasterson.crewchief',
 }));
 
 const { POST } = require('@/app/api/internal/apple-notifications/route');
@@ -68,6 +75,8 @@ function notification(chain = CHAIN, key = KEY): string {
         environment: 'Production',
         signedTransactionInfo: jws(
           {
+            /* IAP-03 — the route refuses a transaction signed for another app. */
+            bundleId: 'co.davidmasterson.crewchief',
             transactionId: '2000000000000009',
             originalTransactionId: '2000000000000001',
             productId: 'co.davidmasterson.crewchief.paid.monthly',

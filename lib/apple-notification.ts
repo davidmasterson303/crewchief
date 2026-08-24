@@ -38,6 +38,8 @@ export type ParseFailureReason =
   | `transaction:${JwsFailureReason}`
   | `renewal:${JwsFailureReason}`
   | 'missing-transaction-info'
+  /** IAP-03. Correctly signed by Apple, for somebody else's app. */
+  | 'transaction-is-for-another-app'
   | 'missing-required-fields';
 
 export type ParsedNotification =
@@ -46,6 +48,16 @@ export type ParsedNotification =
 
 interface ParseOptions {
   rootCertificates: readonly string[];
+  /**
+   * The bundle identifier this deployment will accept transactions for.
+   *
+   * ⚠ **Required, and deliberately not defaulted** (IAP-03). A default would be
+   * a value somebody could forget to set correctly, and forgetting it would
+   * restore the finding silently — the chain still verifies, the product id
+   * still maps, and the entitlement is still written. The caller must say which
+   * app it is.
+   */
+  bundleId: string;
   now?: Date;
 }
 
@@ -63,6 +75,20 @@ interface NotificationEnvelope {
 }
 
 interface TransactionInfo {
+  /**
+   * The app this transaction belongs to.
+   *
+   * ⚠ **This field was not declared, so it was never parsed and never
+   * compared** (IAP-03). A repo-wide search for `bundleId` returned exactly one
+   * hit — `app.json:11`, the Expo config. Apple's WWDR chain signs transactions
+   * for **every app in the store**, so a verified chain proves *"Apple signed
+   * this"*, not *"Apple signed this for CrewChief"*.
+   *
+   * The only thing standing between a signed transaction from an unrelated app
+   * and a paid entitlement here was a product-id lookup in `PRODUCT_TIERS` — an
+   * accident of naming, not a control.
+   */
+  bundleId?: unknown;
   transactionId?: unknown;
   originalTransactionId?: unknown;
   productId?: unknown;
@@ -82,7 +108,7 @@ interface RenewalInfo {
  */
 export function parseAppleNotification(
   signedPayload: string,
-  { rootCertificates, now }: ParseOptions
+  { rootCertificates, now, bundleId }: ParseOptions
 ): ParsedNotification {
   const envelope = verifyAppleSignedPayload<NotificationEnvelope>(signedPayload, {
     rootCertificates,
@@ -125,6 +151,9 @@ export function parseAppleNotification(
     renewal = verified.payload;
   }
 
+  const forAnotherApp = rejectForeignBundle(transaction.payload, bundleId);
+  if (forAnotherApp) return forAnotherApp;
+
   const event = buildEvent({
     notificationType: asString(body.notificationType),
     subtype: asString(body.subtype),
@@ -137,6 +166,30 @@ export function parseAppleNotification(
   if (!event) return { ok: false, reason: 'missing-required-fields' };
 
   return { ok: true, event, notificationUUID: asString(body.notificationUUID) };
+}
+
+/**
+ * Refuse a transaction Apple signed for a different app — IAP-03.
+ *
+ * ⚠ **An absent `bundleId` is refused, not waved through.** Apple has included
+ * it in `JWSTransactionDecodedPayload` since StoreKit 2 shipped, so a
+ * transaction without one is either malformed or from something that is not
+ * Apple — and "the field we check is missing, so skip the check" is how a
+ * control becomes optional for exactly the payloads that would fail it.
+ */
+function rejectForeignBundle(
+  transaction: TransactionInfo,
+  bundleId: string
+): { ok: false; reason: ParseFailureReason; detail?: string } | null {
+  const claimed = asString(transaction.bundleId);
+
+  if (claimed === bundleId) return null;
+
+  return {
+    ok: false,
+    reason: 'transaction-is-for-another-app',
+    detail: claimed === null ? 'no bundleId on the transaction' : `bundleId: ${claimed}`,
+  };
 }
 
 /**
@@ -156,7 +209,7 @@ export function parseAppleNotification(
  */
 export function parseAppleTransaction(
   jwsRepresentation: string,
-  { rootCertificates, now }: ParseOptions
+  { rootCertificates, now, bundleId }: ParseOptions
 ): ParsedNotification {
   const transaction = verifyAppleSignedPayload<TransactionInfo>(jwsRepresentation, {
     rootCertificates,
@@ -165,6 +218,9 @@ export function parseAppleTransaction(
   if (!transaction.ok) {
     return { ok: false, reason: `transaction:${transaction.reason}`, detail: transaction.detail };
   }
+
+  const forAnotherApp = rejectForeignBundle(transaction.payload, bundleId);
+  if (forAnotherApp) return forAnotherApp;
 
   const revoked = asNumber(transaction.payload.revocationDate) !== null;
 

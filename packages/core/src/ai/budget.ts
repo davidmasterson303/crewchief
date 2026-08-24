@@ -83,6 +83,26 @@ export const TIERS: Record<TierName, Tier> = {
 };
 
 /**
+ * How much more the paid tier allows, as the paywall says it out loud.
+ *
+ * ── ⚠ IAP-06 · the copy said "five times" and it is 2.5× ────────────────────
+ *
+ * `PaywallScreen` claimed the paid tier *"raises that allowance five times
+ * over"*. 400,000 → 1,000,000 is **2.5×**. A misleading claim about what a
+ * subscription buys, made inside the binary, is Guideline 2.3.1 territory —
+ * and it is the kind of number that gets written once and then never revisited
+ * when the ceilings move.
+ *
+ * Derived rather than restated, so the copy cannot drift from the tiers again.
+ * One decimal, with a trailing `.0` dropped: 2.5× reads as "2.5", a future 3×
+ * reads as "3" rather than "3.0".
+ */
+export function entitlementMultiple(): string {
+  const ratio = TIERS.paid.monthlyOutputTokens / TIERS.free.monthlyOutputTokens;
+  return Number.isInteger(ratio) ? String(ratio) : ratio.toFixed(1);
+}
+
+/**
  * The public demo's own ceiling.
  *
  * ── Why the demo needs one at all ───────────────────────────────────────────

@@ -10,7 +10,7 @@
  * proves the chain is actually checked.
  */
 
-import { createPrivateKey, sign as cryptoSign } from 'node:crypto';
+import { createPrivateKey, sign as cryptoSign, X509Certificate } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -82,6 +82,16 @@ const ROOTS = [ROOT];
   which was the validity check working exactly as intended.
 */
 const NOW = new Date('2027-01-01T00:00:00Z');
+
+/**
+ * When the deliberately short-lived intermediate stops being valid.
+ *
+ * ⚠ Read off the fixture rather than written down. LibreSSL cannot backdate a
+ * certificate it signs, so regenerating the PKI moves this — and a hardcoded
+ * date would silently turn the "while it is alive" half of the expiry test into
+ * a second assertion that it is dead, which is the vacuous shape §5 is about.
+ */
+const SHORT_INTER_VALID_UNTIL = new Date(new X509Certificate(SHORT_INTER).validTo);
 
 describe('the fixtures are a real chain, not decoration', () => {
   it('verifies a genuine payload end to end', () => {
@@ -260,10 +270,18 @@ describe('certificate validity is checked on every link, against a supplied cloc
       generation time, so moving the clock moved the whole chain together and
       nothing could tell "all of them" from "the first one".
 
-      This chain cannot: the intermediate expired on 19 Aug 2026 and the leaf
-      beneath it runs to 2036. An expired intermediate is exactly as fatal as an
-      expired leaf and considerably easier to miss.
+      This chain cannot: the intermediate lives one day and the leaf beneath it
+      runs to 2036. An expired intermediate is exactly as fatal as an expired
+      leaf and considerably easier to miss.
+
+      ⚠ **The dates moved on 24 Aug** when the fixture PKI was regenerated to
+      carry `basicConstraints CA:TRUE` — the old `root.crt` had `CA:FALSE`, so
+      it was not a faithful stand-in for Apple Root CA - G3 and could not
+      exercise the issuer check added for IAP-04. LibreSSL cannot backdate a
+      certificate it signs, so the fixtures start when they were generated and
+      the two moments below are relative to that rather than absolute.
     */
+    const WHILE_ALIVE = new Date(SHORT_INTER_VALID_UNTIL.getTime() - 6 * 60 * 60 * 1000);
     const jws = makeJws({ a: 1 }, {
       chain: [SHORT_INTER_LEAF, SHORT_INTER, ROOT],
       key: SHORT_INTER_LEAF_KEY,
@@ -278,7 +296,7 @@ describe('certificate validity is checked on every link, against a supplied cloc
     expect(
       verifyAppleSignedPayload(jws, {
         rootCertificates: ROOTS,
-        now: new Date('2026-08-18T18:00:00Z'),
+        now: WHILE_ALIVE,
       })
     ).toMatchObject({ ok: true });
   });
@@ -290,5 +308,62 @@ describe('certificate validity is checked on every link, against a supplied cloc
         now: new Date('2000-01-01T00:00:00Z'),
       })
     ).toMatchObject({ ok: false, reason: 'certificate-outside-validity-window' });
+  });
+});
+
+/**
+ * ── IAP-04: a signature is not an authorisation to sign ─────────────────────
+ *
+ * `verifyAppleSignedPayload` verified each link with pure signature maths and
+ * consulted **neither** `.ca` nor `.keyUsage`, which Node exposes. No `CA:TRUE`
+ * on intermediates, no path length. Only the *top* of the caller-supplied chain
+ * was anchored; everything below was trusted on signature alone.
+ *
+ * So an attacker holding the private key for any certificate that chains to
+ * Apple Root CA - G3 — an Apple Developer certificate at $99/yr being the
+ * obvious candidate — could mint a subordinate, sign a forged transaction, and
+ * submit the chain to `/api/internal/apple-notifications`, a public URL whose
+ * docblock states *"The signature is the authentication."*
+ */
+describe('an issuer must be permitted to issue', () => {
+  it('rejects a chain where a leaf is presented as an intermediate', () => {
+    /*
+      ⚠ The exact attack. `leaf.crt` is `CA:FALSE` — the kind of certificate
+      Apple hands to every paying developer — and here it is used to vouch for a
+      certificate beneath it. The signature maths is irrelevant: it is not
+      allowed to sign certificates at all.
+
+      Built by hand rather than with `makeJws`'s defaults so the chain is
+      structurally the shape the finding describes.
+    */
+    const jws = makeJws({ a: 1 }, { chain: [ROGUE_LEAF, LEAF, INTER, ROOT], key: ROGUE_LEAF_KEY });
+
+    expect(verifyAppleSignedPayload(jws, { rootCertificates: ROOTS, now: NOW })).toMatchObject({
+      ok: false,
+      reason: 'issuer-is-not-a-certificate-authority',
+    });
+  });
+
+  it('still accepts the genuine chain, whose issuers are all CAs', () => {
+    /*
+      Anti-vacuous, and it is the case the fixture regeneration was for: the old
+      `root.crt` was `CA:FALSE`, so it was never a faithful stand-in for Apple
+      Root CA - G3 and this check would have rejected the honest chain too.
+    */
+    const jws = makeJws({ a: 1 });
+
+    expect(verifyAppleSignedPayload(jws, { rootCertificates: ROOTS, now: NOW })).toMatchObject({
+      ok: true,
+    });
+  });
+
+  it('every issuer in the fixture chain is marked as a CA', () => {
+    // Stated directly, because the whole test above is worthless if it is not.
+    for (const pem of [ROOT, INTER]) {
+      expect([pem.slice(0, 40), new X509Certificate(pem).ca]).toEqual([pem.slice(0, 40), true]);
+    }
+
+    // …and the leaf is not, which is what makes the first case an attack.
+    expect(new X509Certificate(LEAF).ca).toBe(false);
   });
 });

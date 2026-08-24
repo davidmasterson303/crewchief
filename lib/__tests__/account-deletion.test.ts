@@ -68,6 +68,24 @@ const mockVehiclesSelect = jest.fn<Promise<SupabaseResult>, any[]>(async () => (
   error: null,
 }));
 
+/**
+ * The entitlement this account holds, if any — IAP-05.
+ *
+ * Read before the cascade, because `account_entitlements.user_id` is
+ * `ON DELETE CASCADE` and after `deleteUser` there is nothing left to read.
+ */
+let entitlementRow: any = null;
+
+/** What `recordOrphanedSubscription` wrote, so a test can look at it. */
+const orphanedRows: any[] = [];
+/** Identifiers cleared from `api_rate_limits` — DB-11. */
+const deletedRateLimitIdentifiers: string[] = [];
+const mockOrphanUpsert = jest.fn<Promise<SupabaseResult>, any[]>(async (row: any) => {
+  ORDER.push('record-orphan');
+  orphanedRows.push(row);
+  return { data: {}, error: null };
+});
+
 let sessionResult: any = { ok: true, userId: 'user-1' };
 
 jest.mock('@/lib/api-auth', () => ({
@@ -78,13 +96,35 @@ jest.mock('@crewchief/core/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));
 
+/*
+  ⚠ **Table-aware as of 24 Aug.** It used to answer every `from()` identically,
+  which was fine while `deleteAccount` read one table — and stopped being fine
+  when it started reading `account_entitlements` before the cascade (IAP-05).
+  A mock that cannot tell two tables apart cannot assert anything about either.
+*/
 jest.mock('@/lib/supabase', () => ({
   getServiceRoleClient: () => ({
-    from: () => ({
+    from: (table: string) => ({
       select: () => ({
-        eq: mockVehiclesSelect,
+        eq:
+          table === 'account_entitlements'
+            ? () => ({ maybeSingle: async () => ({ data: entitlementRow, error: null }) })
+            : mockVehiclesSelect,
         in: async () => ({ data: [], error: null }),
         maybeSingle: async () => ({ data: null, error: null }),
+      }),
+      upsert: mockOrphanUpsert,
+      /*
+        DB-11. `api_rate_limits.identifier` holds the user's UUID as bare text
+        with no foreign key, so the cascade never reached it — the one
+        user-identifying row that outlived a deletion the privacy policy calls
+        complete.
+      */
+      delete: () => ({
+        eq: async (_column: string, value: string) => {
+          deletedRateLimitIdentifiers.push(value);
+          return { data: null, error: null };
+        },
       }),
     }),
     storage: {
@@ -98,6 +138,9 @@ const { deleteAccount } = require('@/lib/account-data');
 
 beforeEach(() => {
   ORDER.length = 0;
+  orphanedRows.length = 0;
+  deletedRateLimitIdentifiers.length = 0;
+  entitlementRow = null;
   listedPrefixes.length = 0;
   removedPaths.length = 0;
   jest.clearAllMocks();
@@ -401,5 +444,127 @@ describe('both delete surfaces show the subscription notice', () => {
     */
     const source = read(file);
     expect(source).not.toMatch(/does not cancel your subscription/i);
+  });
+});
+
+/**
+ * ── IAP-05: a deleted account can still be paying Apple ─────────────────────
+ *
+ * `account_entitlements.user_id` is `ON DELETE CASCADE`, and `deleteAccount`
+ * never read that table before calling `auth.admin.deleteUser`. The row went —
+ * `tier`, `expires_at`, and critically `original_transaction_id` — and nothing
+ * was written anywhere first.
+ *
+ * **Deleting an account here cancels nothing at Apple's end.** Only the
+ * customer can, from Settings. So Apple keeps billing them, every `DID_RENEW`
+ * arrives to find no owner and returns `200 applied:false` at info level, and
+ * when they email support there is no transaction id on file to reconcile
+ * against — because it was deleted with the row.
+ */
+describe('deleteAccount — a live subscription', () => {
+  const LIVE = {
+    original_transaction_id: '2000000000000001',
+    product_id: 'crewchief.pro.monthly',
+    tier: 'paid',
+    expires_at: '2026-09-18T10:00:00.000Z',
+    environment: 'Production',
+  };
+
+  it('records the billing identifier before the cascade takes it', async () => {
+    entitlementRow = LIVE;
+
+    await deleteAccount();
+
+    expect(orphanedRows).toHaveLength(1);
+    expect(orphanedRows[0]).toMatchObject({
+      original_transaction_id: '2000000000000001',
+      tier: 'paid',
+    });
+
+    /*
+      ⚠ **Order, not merely presence.** After `deleteUser` the entitlement row
+      is gone, so a record written afterwards would be a record of nothing.
+    */
+    expect(ORDER.indexOf('record-orphan')).toBeLessThan(ORDER.indexOf('delete-auth-user'));
+  });
+
+  it('carries no user id into the surviving row', async () => {
+    /*
+      ⚠ The property that makes this compatible with a privacy policy calling
+      deletion complete. `original_transaction_id` is **Apple's** identifier for
+      a billing relationship — not an email, a name, a device or a user id. A
+      deleted account's id surviving in a table is the exact thing the promise
+      is about.
+    */
+    entitlementRow = LIVE;
+
+    await deleteAccount();
+
+    expect(Object.keys(orphanedRows[0])).not.toContain('user_id');
+    expect(JSON.stringify(orphanedRows[0])).not.toContain('user-1');
+  });
+
+  it('writes nothing for an account that never subscribed', async () => {
+    // The overwhelmingly common case, and it must not leave a row behind.
+    entitlementRow = null;
+
+    await deleteAccount();
+
+    expect(orphanedRows).toEqual([]);
+  });
+
+  it('writes nothing when the entitlement has no transaction to record', async () => {
+    entitlementRow = { ...LIVE, original_transaction_id: null };
+
+    await deleteAccount();
+
+    expect(orphanedRows).toEqual([]);
+  });
+
+  it('still deletes the account when the record cannot be written', async () => {
+    /*
+      ⚠ App Store 5.1.1(v) requires deletion to work. Refusing to delete because
+      a bookkeeping row failed would trade a compliance requirement for a
+      support convenience — the same judgement the storage purge above makes.
+    */
+    entitlementRow = LIVE;
+    mockOrphanUpsert.mockImplementationOnce(async () => ({
+      data: null,
+      error: { message: 'table missing' } as never,
+    }));
+
+    const result = await deleteAccount();
+
+    expect(result.success).toBe(true);
+    expect(ORDER).toContain('delete-auth-user');
+  });
+});
+
+/**
+ * ── DB-11: the one row that outlived a complete deletion ────────────────────
+ */
+describe('deleteAccount — the rate-limit trail', () => {
+  it('clears the identifier the cascade cannot reach', async () => {
+    /*
+      ⚠ `api_rate_limits.identifier` is the **user's UUID** for every
+      authenticated tier, stored as bare text with no foreign key — so
+      `ON DELETE CASCADE` does not touch it and the id survives for the
+      retention window in a table nothing else references.
+
+      Small, and disproportionately worth removing: the expensive thing is not
+      the row, it is a privacy policy that describes deletion as complete.
+    */
+    await deleteAccount();
+
+    expect(deletedRateLimitIdentifiers).toContain('user-1');
+  });
+
+  it('does it before the cascade, while there is still an id to delete on', async () => {
+    await deleteAccount();
+
+    expect(ORDER).toContain('delete-auth-user');
+    // The delete is keyed on `userId`, which the session supplies — but the
+    // ordering rule is the same one every other step here follows.
+    expect(deletedRateLimitIdentifiers).toHaveLength(1);
   });
 });
