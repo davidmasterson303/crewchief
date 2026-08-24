@@ -1,6 +1,7 @@
 'use client';
 
 import { Smartphone } from 'lucide-react';
+import { isDemoSite } from '@/lib/site-role';
 
 /**
  * Where the iOS app lives — and the honest answer while it does not live
@@ -80,6 +81,27 @@ export function AppStoreCTA({ variant = 'hero', className = '' }: Props) {
     : 'h-9 px-4 text-sm gap-2 whitespace-nowrap';
 
   if (!appIsListed()) {
+    /*
+      ── ⚠ LEG-10 · a reviewer must not be told the app is unavailable ────────
+
+      This renders *"iPhone app coming soon"* on `crewchief.davidmasterson.co`,
+      which is the **marketing URL on the App Store listing** — the page an App
+      Review reviewer opens while reviewing the binary. Reading that the iPhone
+      app is *coming* while holding it is at best confusing and at worst reads
+      as a premature submission.
+
+      It is honest and it is right for the **demo**, which is a portfolio piece
+      whose visitors genuinely cannot download anything yet. So the state stays
+      and its audience narrows: on the product hostname the CTA renders nothing
+      at all until `APP_STORE_URL` is set, and setting it turns the real link on
+      everywhere at once.
+
+      ⚠ **Nothing, rather than different words.** Every alternative — "in
+      review", "launching soon", "available shortly" — is a claim about a date
+      nobody controls, on the page Apple reads. Silence says nothing false.
+    */
+    if (!isDemoSite(process.env.NEXT_PUBLIC_SITE_ROLE)) return null;
+
     /*
       Not a button, not a link, no hover state, no focus ring — there is
       nothing to press. Giving it any of those would be the dead-CTA this

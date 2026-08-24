@@ -26,6 +26,27 @@
 import { render, screen } from '@testing-library/react';
 import { AppStoreCTA, APP_STORE_URL, appIsListed } from '@/components/AppStoreCTA';
 
+/*
+  ── ⚠ LEG-10 · the pre-launch state is the demo's, not the product's ─────────
+
+  `iPhone app coming soon` renders on `crewchief.davidmasterson.co`, which is
+  the **marketing URL on the App Store listing** — the page an App Review
+  reviewer opens while reviewing the binary. Being told the iPhone app is coming
+  while holding it reads as a premature submission.
+
+  So the copy narrowed to the demo, where it is true and useful, and the product
+  hostname renders nothing until `APP_STORE_URL` is set. These tests exercise
+  the pre-launch state, so they need the demo role — an unset one is "the
+  product", deliberately, which `site-role.ts` explains at length.
+*/
+beforeAll(() => {
+  process.env.NEXT_PUBLIC_SITE_ROLE = 'true';
+});
+
+afterAll(() => {
+  delete process.env.NEXT_PUBLIC_SITE_ROLE;
+});
+
 describe('AppStoreCTA', () => {
   describe('while the app is not on the store', () => {
     /*

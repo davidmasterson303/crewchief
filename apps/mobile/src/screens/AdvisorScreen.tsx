@@ -16,8 +16,12 @@ import { ApiRequestError } from '../api/client';
 import Button from '../components/Button';
 import EmptyState from '../components/EmptyState';
 import ProvenanceRow from '../components/ProvenanceRow';
+import { adviceDisclosure } from '@crewchief/core/advice-disclosure';
+import { ADVISOR_AI_CONSENT } from '@crewchief/core/ai-consent-copy';
+import AiConsentSheet from '../components/AiConsentSheet';
+import { readAiConsent, recordAiConsent, type AiConsent } from '../onboarding/ai-consent';
 import { Skeleton } from '../components/Skeleton';
-import { border, radius, space, status, surface, text, type } from '../theme';
+import { TARGET_MIN, border, brand, radius, space, status, surface, text, type } from '../theme';
 import { CONTEXT_KIND_LABELS, type ContextKind } from '@crewchief/core/consultant-context-kinds';
 import type { ConsultantEstimate } from '@crewchief/core/consultant-estimate';
 import EstimateWell from '../components/EstimateWell';
@@ -112,10 +116,26 @@ function nextId(): string {
 
 export function AdvisorScreen({
   vehicleId,
+  vehicleTitle,
   initialQuestion,
   onSignOut,
 }: {
   vehicleId: string;
+  /**
+   * The car this thread is about, rendered as a context row under the nav.
+   *
+   * ⚠ **R52.** It used to be half the nav title — `Advisor · 2015 BMW M235i` —
+   * which is two pieces of information in a slot that fits one. On a 16e it
+   * truncated, and truncating a nav title costs the **back button's label**
+   * first: iOS gives the title the space and drops the label to a bare chevron.
+   * So a long car name silently turned this screen's back control into the only
+   * unlabelled one in the app, which is how it was reported (R6).
+   *
+   * Below the nav it can be as long as it is, and it shows what the advisor is
+   * answering *about* — which is the thing a person needs to see, and the nav
+   * title never was.
+   */
+  vehicleTitle?: string;
   /**
    * A question the screen was opened *with* — from a notification tap or a
    * deep link — asked once, automatically.
@@ -131,6 +151,44 @@ export function AdvisorScreen({
 }) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [draft, setDraft] = useState('');
+  /* Drives the composer's focus ring — see the panel's note at the call site. */
+  const [focused, setFocused] = useState(false);
+
+  /**
+   * Whether this person has agreed their question and this car's records may go
+   * to Google — LEG-02.
+   *
+   * ⚠ **Guideline 5.1.2(i), amended November 2025**, requires explicit
+   * permission before personal data reaches a third-party AI. The disclosure
+   * existed in the privacy policy; the only consent was sign-up wrap.
+   *
+   * Narrower than the invoice sheet on purpose: what leaves here is this car's
+   * own records and the question typed — no images, no third party's business
+   * details. Saying so is more useful than one generic warning covering both,
+   * and somebody who agreed to the invoice sheet has already agreed to more.
+   */
+  /*
+    ⚠ `null` is **"still reading"**, which is not the same as `'unknown'`
+    ("asked nobody yet"). `readAiConsent` is async, so for the first frames the
+    screen does not know the answer — and treating that as "not answered" fired
+    the sheet at somebody who had already agreed, and on the advisor's
+    deep-link path consumed the one-shot ref before consent had resolved,
+    leaving the question unasked forever.
+  */
+  const [consent, setConsent] = useState<AiConsent | null>(null);
+  const [consentOpen, setConsentOpen] = useState(false);
+  const pendingQuestion = useRef<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    void readAiConsent().then((answer) => {
+      if (live) setConsent(answer);
+    });
+
+    return () => {
+      live = false;
+    };
+  }, []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -208,8 +266,23 @@ export function AdvisorScreen({
   /** The composer's send. Guards on what the user may do; `ask` does the work. */
   const send = useCallback(() => {
     if (!canSend) return;
+
+    /*
+      ⚠ **Asked before the question leaves, not after** (LEG-02). Consent
+      obtained once a model has already answered is consent for something that
+      has happened.
+
+      The question is held so accepting sends it rather than making them type it
+      again — a consent sheet that loses your work reads as an obstacle.
+    */
+    if (consent === 'unknown') {
+      pendingQuestion.current = trimmed;
+      setConsentOpen(true);
+      return;
+    }
+
     void ask(trimmed);
-  }, [canSend, trimmed, ask]);
+  }, [canSend, trimmed, ask, consent]);
 
   /*
     Asked once per mount, guarded by a ref rather than state: React mounts
@@ -220,12 +293,37 @@ export function AdvisorScreen({
     const question = initialQuestion?.trim();
     if (!question || askedOnOpen.current) return;
 
+    /*
+      ⚠ **Waits for the consent read.** `null` is "still reading", and acting on
+      it would burn the one-shot ref below before the answer arrived — leaving a
+      notification's question typed into the composer and never sent.
+    */
+    if (consent === null) return;
+
     askedOnOpen.current = true;
     setDraft(question);
+
+    /*
+      ⚠ **The gate applies to a link too** (LEG-02). This path is a notification
+      tap — "Tap to ask the advisor what it means" — and it sends a question and
+      this car's records to Google without anybody typing. A consent requirement
+      that the app's own deep link walks around is not a consent requirement.
+
+      The question is already in the composer, so declining leaves it there to
+      send by hand later rather than losing it.
+    */
+    if (consent === 'unknown') {
+      pendingQuestion.current = question;
+      setConsentOpen(true);
+      return;
+    }
+
+    if (consent === 'declined') return;
+
     // Deliberately not routed through `send`, which reads `trimmed` from state
     // that has not committed yet on this tick.
     void ask(question);
-  }, [initialQuestion, ask]);
+  }, [initialQuestion, ask, consent]);
 
   return (
     <KeyboardAvoidingView
@@ -238,13 +336,56 @@ export function AdvisorScreen({
       */
       keyboardVerticalOffset={Platform.OS === 'ios' ? 96 : 0}
     >
+      {/*
+        ── ⚠ LEG-02 · explicit permission before the question leaves ─────────
+
+        Declining does not block the screen: the transcript, the starter rows
+        and the composer all stay, and the composer's own note explains what is
+        off. Blocking the product on a privacy refusal would trade a 5.1.2
+        problem for a 5.1.1(v)-shaped one.
+      */}
+      <AiConsentSheet
+        visible={consentOpen}
+        copy={ADVISOR_AI_CONSENT}
+        onAccept={() => {
+          const question = pendingQuestion.current;
+          pendingQuestion.current = null;
+          setConsentOpen(false);
+          setConsent('granted');
+          void recordAiConsent('granted');
+          /* `ask`, not `send` — the gate is satisfied and `send` would re-read it. */
+          if (question) void ask(question);
+        }}
+        onDecline={() => {
+          pendingQuestion.current = null;
+          setConsentOpen(false);
+          setConsent('declined');
+          void recordAiConsent('declined');
+        }}
+      />
+
+      {/*
+        ── R52 · the car, under the nav rather than inside its title ─────────
+
+        A quiet line, not a chip and not a heading: it names what the thread is
+        about and gets out of the way. It is above the transcript so it does not
+        scroll off — the context is true for every turn, not just the first.
+      */}
+      {vehicleTitle ? (
+        <View style={styles.context}>
+          <Text style={styles.contextLabel} numberOfLines={1}>
+            About {vehicleTitle}
+          </Text>
+        </View>
+      ) : null}
+
       <FlatList
         ref={listRef}
         data={turns}
         keyExtractor={(turn) => turn.id}
         contentContainerStyle={styles.transcript}
         renderItem={({ item }) => <TurnView turn={item} />}
-        ListEmptyComponent={<AdvisorEmptyState />}
+        ListEmptyComponent={<AdvisorEmptyState onPick={setDraft} />}
         /*
           Content-size rather than a call after each setState: the answer's
           height is not known until it has laid out, and scrolling before that
@@ -278,12 +419,23 @@ export function AdvisorScreen({
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <View style={styles.composer}>
+      {/*
+        ── R51 · a panel with its own focus ring, not a field in a row ───────
+
+        The border used to be on the `TextInput`, inside a row that also held
+        the button — so the composer read as two controls that happened to be
+        adjacent, and the focused edge belonged to the smaller of them. Now the
+        panel carries the border and the ring, and the send control lives inside
+        it: one object, which is what it is.
+      */}
+      <View style={[styles.composer, focused && styles.composerFocused]}>
         <TextInput
           style={styles.input}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           value={draft}
           onChangeText={setDraft}
-          placeholder="Ask about this car…"
+          placeholder="Type a question"
           /*
             ⚠ Named, because a placeholder is not a label — and this was the one
             unlabelled input left in the app, on the screen the product's whole
@@ -303,7 +455,7 @@ export function AdvisorScreen({
           returnKeyType="default"
         />
         {/*
-          The inverse CTA, from the primitive.
+          The filled primary, from the primitive.
 
           ⚠ It also puts this on the 44pt floor. The hand-rolled version had
           `paddingVertical: 13` and no `minHeight`, so its height depended on
@@ -315,13 +467,22 @@ export function AdvisorScreen({
         */}
         <Button
           label="Ask"
-          variant="inverse"
+          variant="primary"
           size="small"
           onPress={() => void send()}
           disabled={!canSend}
           accessibilityLabel="Send question to the advisor"
         />
       </View>
+
+      {consent === 'declined' ? (
+        <Text style={styles.declineNote}>
+          {ADVISOR_AI_CONSENT.declineNote}{' '}
+          <Text style={styles.declineAction} onPress={() => setConsentOpen(true)}>
+            Change that
+          </Text>
+        </Text>
+      ) : null}
 
       {overLength ? (
         <Text style={styles.counter}>
@@ -358,8 +519,17 @@ function AnswerText({ answer }: { answer: string }) {
           return <View key={index} style={styles.answerGap} />;
         }
 
+        /*
+          ⚠ **FN-14.** Bold was the only run this drew, so single-asterisk
+          emphasis reached the screen as literal asterisks — the same defect the
+          web had, on the same shared tokeniser. Both flags can be set at once
+          (`***x***`), so the styles compose rather than branching three ways.
+        */
         const content = line.tokens.map((token, tokenIndex) => (
-          <Text key={tokenIndex} style={token.bold ? styles.advisorBold : undefined}>
+          <Text
+            key={tokenIndex}
+            style={[token.bold && styles.advisorBold, token.italic && styles.advisorItalic]}
+          >
             {token.text}
           </Text>
         ));
@@ -428,6 +598,26 @@ function TurnView({ turn }: { turn: Turn }) {
         narrows a claim that was never that narrow.
       */}
       {turn.estimate ? <EstimateWell estimate={turn.estimate} /> : null}
+
+      {/*
+        ── ⚠ UX-16 / LEG-05 · the disclosure, where the advice is ────────────
+
+        **The product never said its advice was AI-generated**, and the safety
+        disclaimer lived only on a Terms page nobody opens. A disclaimer at the
+        point of advice is worth far more than one behind a link.
+
+        Under every turn rather than once at the top: somebody scrolling a long
+        conversation reads the answer, not the header. The wording comes from
+        `@crewchief/core/advice-disclosure` so it is identical on both clients —
+        a safety sentence that says one thing on the phone and another on the
+        web is this codebase's most repeated defect applied to the sentence that
+        limits liability.
+
+        ⚠ Below the estimate, not above it. It qualifies everything in the turn
+        including the prices, and a line placed before them would read as
+        qualifying only the prose.
+      */}
+      <Text style={styles.disclosure}>{adviceDisclosure('consultant')}</Text>
     </View>
   );
 }
@@ -449,16 +639,63 @@ function TurnView({ turn }: { turn: Turn }) {
  * how the primitive reached 15 Aug with zero callers while four screens rolled
  * their own.
  */
-function AdvisorEmptyState() {
+const STARTERS = [
+  'Is the timing chain something I should worry about?',
+  'What should I do at the next service?',
+  'Is $1,400 fair for front control arms?',
+];
+
+/**
+ * ── R50: the starters are rows, and R54: they sit near the composer ─────────
+ *
+ * They were three bare `<Text>` lines inside `EmptyState`'s `children`, which
+ * centres. Three questions of three different lengths, centred, produced a
+ * ragged stack with no container and no edge to align to — reported as "each a
+ * different indent, ragged, centre-ish". The block was also at the **top** of a
+ * 60%-empty screen, so the eye travelled header → prompts → composer across a
+ * void.
+ *
+ * Both are fixed by shape rather than by nudging: full-width rows on
+ * `surface.raised` with a hairline border, and the whole block pushed to the
+ * foot of the list so the three things a new user reads are within a thumb of
+ * each other.
+ *
+ * ⚠ **Tapping fills the composer; it does not send.** `EmptyState`'s own rule
+ * was that these must not be controls, because "making them buttons would turn
+ * a conversation into a menu on the first screen a new user meets". That
+ * concern is real and survives here: the question lands in the composer, where
+ * it can be edited or deleted, and asking it is still a deliberate second act.
+ * They moved out of `EmptyState.children` rather than that rule being relaxed —
+ * the primitive still takes no controls.
+ */
+function AdvisorEmptyState({ onPick }: { onPick: (question: string) => void }) {
   return (
-    <EmptyState
-      headline="Ask about this car"
-      body="The advisor already knows its service history, open issues, recalls and mods. You do not need to explain them."
-    >
-      <Text style={styles.emptyExample}>“Is the timing chain something I should worry about?”</Text>
-      <Text style={styles.emptyExample}>“What should I do at the next service?”</Text>
-      <Text style={styles.emptyExample}>“Is $1,400 fair for front control arms?”</Text>
-    </EmptyState>
+    <View style={styles.emptyWrap}>
+      <EmptyState
+        align="start"
+        headline="Ask about this car"
+        body="The advisor already knows its service history, open issues, recalls and mods. You do not need to explain them."
+      />
+
+      <View style={styles.starters}>
+        {STARTERS.map((question) => (
+          <Pressable
+            key={question}
+            onPress={() => onPick(question)}
+            accessibilityRole="button"
+            /*
+              Named as what it does, because the visible text is a question and
+              a screen reader announcing only the question leaves it ambiguous
+              whether tapping asks it or writes it.
+            */
+            accessibilityLabel={`Start with: ${question}`}
+            style={({ pressed }) => [styles.starterRow, pressed && styles.starterRowPressed]}
+          >
+            <Text style={styles.starterText}>{question}</Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
   );
 }
 
@@ -479,9 +716,22 @@ const styles = StyleSheet.create({
   youText: { ...type.body, color: text.primary, lineHeight: 21 },
 
   advisorRow: { gap: space.sm },
+  /*
+    UX-16 / LEG-05. `text.muted` is the floor and this sits on it deliberately:
+    quiet enough to stay out of the answer's way, never quieter than a string
+    may be. Same treatment as `ProvenanceRow` above it.
+  */
+  disclosure: { ...type.label, letterSpacing: 0, lineHeight: 16, color: text.muted },
   advisorText: { ...type.body, color: text.primary },
   /* Weight only. A brighter colour as well would make ordinary text read as dimmed. */
   advisorBold: { fontFamily: interFace('700'), fontWeight: '700' },
+  /*
+    ⚠ `fontStyle`, not a second face. React Native synthesises an oblique from
+    the loaded face, and Inter's italic cut is not bundled — asking for a
+    `fontFamily` that is not there is how §6's silent-font-substitution defect
+    happens. The synthesised slant is the honest option here.
+  */
+  advisorItalic: { fontStyle: 'italic' },
   answer: { gap: 2 },
   answerGap: { height: space.sm },
   /* Hanging indent: the glyph sits outside the text column so wrapped lines align. */
@@ -489,7 +739,6 @@ const styles = StyleSheet.create({
   bulletMark: { ...type.body, color: text.muted },
 
 
-  emptyExample: { ...type.body, fontSize: 14, lineHeight: 20, color: text.muted },
 
   thinking: { gap: space.sm, paddingHorizontal: space.lg },
   thinkingBars: { gap: space.sm },
@@ -498,24 +747,94 @@ const styles = StyleSheet.create({
   /* #f87171 — the same red SignInScreen uses, and above the AA floor on `surface.page`. */
   error: { ...type.value, color: status.dangerText, paddingHorizontal: space.lg, paddingTop: space.sm },
   counter: { fontSize: 12, color: status.dangerText, paddingHorizontal: space.lg, paddingBottom: 6 },
+  /*
+    LEG-02's declined state. `text.muted`, not the counter's red: declining is a
+    choice somebody made, not an error they hit, and dressing it as a failure
+    is how a privacy refusal starts to feel punished.
+  */
+  declineNote: {
+    ...type.value,
+    color: text.muted,
+    paddingHorizontal: space.lg,
+    paddingBottom: space.sm,
+  },
+  /* The way back. Underlined, because a coloured word is not a control. */
+  declineAction: { color: brand.accent, textDecorationLine: 'underline' },
+
+  /* ── R52 · the context row ────────────────────────────────────────────── */
+  context: {
+    paddingHorizontal: space.lg,
+    paddingTop: space.sm,
+    paddingBottom: space.xs,
+  },
+  contextLabel: { ...type.value, color: text.muted },
+
+  /* ── R50 · the starter block ──────────────────────────────────────────── */
+  emptyWrap: {
+    /*
+      R54. `flex: 1` inside a `flexGrow: 1` content container, pushing the block
+      to the foot of the list — header → starters → composer within a thumb,
+      rather than at the top of a 60%-empty screen with the composer far below.
+    */
+    flex: 1,
+    justifyContent: 'flex-end',
+    gap: space.lg,
+  },
+  starters: { gap: space.sm },
+  starterRow: {
+    /*
+      Full width, left-aligned, `surface.raised`, hairline border, `radius.well`
+      — the system's starter-row treatment. The container is what makes three
+      questions of three different lengths read as a set rather than as ragged
+      text.
+    */
+    backgroundColor: surface.raised,
+    borderWidth: 1,
+    borderColor: border.panel,
+    borderRadius: radius.well,
+    paddingHorizontal: space.md,
+    /* Comfortably over the 44pt floor at one line, and grows with two. */
+    paddingVertical: space.md,
+    minHeight: TARGET_MIN,
+    justifyContent: 'center',
+  },
+  starterRowPressed: { backgroundColor: surface.well, borderColor: border.fieldHover },
+  starterText: { ...type.body, fontSize: 15, lineHeight: 21, color: text.primary },
 
   composer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: space.sm,
-    padding: space.md,
-    borderTopWidth: 1,
-    borderTopColor: border.panel,
-  },
-  input: {
-    flex: 1,
+    padding: space.sm,
+    margin: space.md,
     backgroundColor: surface.raised,
     borderWidth: 1,
     borderColor: border.field,
+    /*
+      ⚠ `radius.well`, not `radius.card`. The composer is a bar on
+      `surface.raised`, and `mobile-surface-ladder.test.ts` fails a container
+      that claims the card radius and the bar surface at once — which the first
+      draft of this panel did. The rule is right: a card radius on a bar surface
+      is a card that forgot which step it was on.
+    */
     borderRadius: radius.well,
-    paddingHorizontal: space.md,
-    paddingTop: space.md,
-    paddingBottom: space.md,
+  },
+  /*
+    The focus ring, and it is a **border colour**, never an outline or a shadow:
+    both render inconsistently across the two platforms, and a ring that is
+    present on one and absent on the other is worse than none.
+  */
+  composerFocused: { borderColor: brand.accent },
+  input: {
+    flex: 1,
+    /*
+      No border and no fill of its own. The panel around it is the control now
+      — a second edge inside the first is the "field in a row" this stopped
+      being.
+    */
+    paddingHorizontal: space.sm,
+    paddingTop: space.sm,
+    paddingBottom: space.sm,
     color: text.primary,
     fontSize: 16,
     // Four lines before it scrolls, so a long question stays visible while it

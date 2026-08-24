@@ -1,6 +1,15 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { INVOICE_AI_CONSENT } from '@crewchief/core/ai-consent-copy';
+
+/**
+ * Where this browser's answer lives — LEG-02.
+ *
+ * Namespaced like the phone's `crewchief.aiConsent`, so the two are obviously
+ * the same fact stored per client rather than two unrelated flags.
+ */
+const AI_CONSENT_KEY = 'crewchief.aiConsent';
 import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -33,6 +42,47 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
   const [remainingFiles, setRemainingFiles] = useState<File[]>([]);
   const [currentProcessingFile, setCurrentProcessingFile] = useState<string>('');
   const [isDragging, setIsDragging] = useState(false);
+
+  /**
+   * Whether this person has agreed their invoice may go to Google — LEG-02.
+   *
+   * ⚠ **Guideline 5.1.2(i), amended November 2025**, requires explicit
+   * permission before personal data reaches a third-party AI. The audit's fix
+   * asks for the sheet on the phone **and mirrored on the web upload dialog**,
+   * and mirrored means the same words: `@crewchief/core/ai-consent-copy` holds
+   * them, so the two clients cannot end up asking for two different consents.
+   *
+   * `localStorage` here rather than a server column, matching the phone's
+   * per-install `secureStorage`. It is a UI preference about this browser, not
+   * a record about the account — and putting it on the account would mean a
+   * consent given on one device silently covering another.
+   *
+   * ⚠ `null` is "still reading", which is not `'unknown'` ("asked nobody yet").
+   * The read happens in an effect, so treating the first frames as unanswered
+   * would flash the sheet at somebody who has already agreed.
+   */
+  const [consent, setConsent] = useState<'granted' | 'declined' | 'unknown' | null>(null);
+  const [consentOpen, setConsentOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(AI_CONSENT_KEY);
+      setConsent(stored === 'granted' || stored === 'declined' ? stored : 'unknown');
+    } catch {
+      // Blocked storage reads as unanswered, which asks. See the phone's note:
+      // proceeding on a consent we cannot demonstrate is the thing to avoid.
+      setConsent('unknown');
+    }
+  }, []);
+
+  const recordConsent = (answer: 'granted' | 'declined') => {
+    setConsent(answer);
+    try {
+      window.localStorage.setItem(AI_CONSENT_KEY, answer);
+    } catch {
+      /* A write that fails means the sheet appears again. The safe direction. */
+    }
+  };
   const dragCounterRef = useRef(0);
 
   /**
@@ -111,7 +161,33 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
     setSelectedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
+  /**
+   * The consent gate in front of `runUpload` — LEG-02.
+   *
+   * ⚠ **Asked before the file leaves, not after.** Consent obtained once the
+   * invoice has been read is consent for something that has already happened —
+   * and an invoice carries a shop's name and business address as well as the
+   * owner's own car.
+   *
+   * `null` waits: it means the stored answer has not been read yet, and
+   * treating it as unanswered would ask somebody who already agreed.
+   *
+   * ⚠ Split from the work so the sheet's accept handler can call `runUpload`
+   * directly. Calling this from there would read the `consent` this render
+   * still holds — `'unknown'` — and re-open the sheet.
+   */
   const handleUpload = async (bypassVehicleCheck: boolean = false) => {
+    if (consent === null) return;
+
+    if (consent === 'unknown') {
+      setConsentOpen(true);
+      return;
+    }
+
+    await runUpload(bypassVehicleCheck);
+  };
+
+  const runUpload = async (bypassVehicleCheck: boolean = false) => {
     if (selectedFiles.length === 0) return;
 
     setUploading(true);
@@ -264,7 +340,8 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
         setCurrentFileForMismatch(null);
         setRemainingFiles([]);
         setUploading(false);
-        await handleUpload(false);
+        /* Already past the consent gate — this is the same upload continuing. */
+        await runUpload(false);
       } else {
         setSelectedFiles([]);
         setCurrentFileForMismatch(null);
@@ -451,6 +528,60 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
           )}
         </DialogContent>
       </Dialog>
+
+      {/*
+        ── ⚠ LEG-02 · the same consent the phone asks for, in the same words ──
+
+        `@crewchief/core/ai-consent-copy` holds the text so the two clients
+        cannot end up asking for two different consents — which is what a
+        second, hand-written copy on this side would be.
+
+        ⚠ Declining closes this dialog rather than disabling the product: the
+        person can still record services by hand, which is what `declineNote`
+        says. Blocking on a privacy refusal would be the wrong trade here for
+        the same reason it is on the phone.
+      */}
+      <AlertDialog open={consentOpen} onOpenChange={setConsentOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{INVOICE_AI_CONSENT.title}</AlertDialogTitle>
+            <AlertDialogDescription>{INVOICE_AI_CONSENT.body}</AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <ul className="space-y-1.5 text-sm text-white/70 list-disc pl-5">
+            {INVOICE_AI_CONSENT.points.map((point) => (
+              <li key={point}>{point}</li>
+            ))}
+          </ul>
+
+          <p className="text-xs text-white/50">{INVOICE_AI_CONSENT.declineNote}</p>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                recordConsent('declined');
+                setConsentOpen(false);
+              }}
+            >
+              {INVOICE_AI_CONSENT.decline}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                recordConsent('granted');
+                setConsentOpen(false);
+                /*
+                  Continue into the upload they started. `granted` is passed
+                  explicitly rather than read back from state, which has not
+                  committed on this tick.
+                */
+                void handleUpload(false);
+              }}
+            >
+              {INVOICE_AI_CONSENT.accept}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={showVehicleMismatchDialog} onOpenChange={setShowVehicleMismatchDialog}>
         <AlertDialogContent className="bg-[#0d0d0d] border-white/10">

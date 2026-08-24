@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { adviceDisclosure } from '@crewchief/core/advice-disclosure';
 import { healthClaim, mayReassure } from '@crewchief/core/health-claims';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -281,6 +282,18 @@ export default function HealthSummary({
               {healthSummary.summary && (
                 <p className="text-sm text-white/55 mt-1.5 max-w-xl leading-relaxed">{healthSummary.summary}</p>
               )}
+              {/*
+                ── ⚠ UX-16 / LEG-05 · this reads as an assessment ────────────
+
+                Confident prose beside a number on a dial, and nothing on the
+                screen said a model wrote it. The safety disclaimer lived only
+                on a Terms page nobody opens.
+
+                Under the summary rather than under the score: it qualifies the
+                sentence, and the score's own honesty problem is a different one
+                (FN-01 — every generated score was a hardcoded 70).
+              */}
+              <p className="text-xs text-white/50 mt-2 max-w-xl">{adviceDisclosure('health')}</p>
             </div>
           </div>
           <Button

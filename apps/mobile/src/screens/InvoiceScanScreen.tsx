@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -10,7 +10,10 @@ import {
 } from '../api/documents';
 import Button from '../components/Button';
 import { ApiRequestError } from '../api/client';
-import { border, radius, surface, text, type } from '../theme';
+import { OPTICAL_CENTRE, PAGE_BODY, border, radius, space, surface, text, type } from '../theme';
+import AiConsentSheet from '../components/AiConsentSheet';
+import { INVOICE_AI_CONSENT } from '@crewchief/core/ai-consent-copy';
+import { readAiConsent, recordAiConsent, type AiConsent } from '../onboarding/ai-consent';
 import { interFace } from '../theme/fonts';
 
 /**
@@ -107,6 +110,41 @@ export function InvoiceScanScreen({
   onFiled?: () => void;
 }) {
   const [state, setState] = useState<State>({ status: 'idle' });
+
+  /**
+   * Whether this person has agreed their invoice may go to Google — LEG-02.
+   *
+   * ⚠ **Guideline 5.1.2(i), amended November 2025**, requires explicit
+   * permission before personal data reaches a third-party AI. This screen
+   * photographs a document carrying a shop's name and business address —
+   * sometimes a VIN — sends it to Gemini, and said nothing about Google at all.
+   *
+   * `unknown` until the read resolves, so the sheet does not flash for somebody
+   * who already answered. The source they chose is held alongside, so accepting
+   * continues into the thing they were trying to do rather than dropping them
+   * back on the idle screen to press it again.
+   */
+  /*
+    ⚠ `null` is **"still reading"**, which is not the same as `'unknown'`
+    ("asked nobody yet"). `readAiConsent` is async, so for the first frames the
+    screen does not know the answer — and treating that as "not answered" fired
+    the sheet at somebody who had already agreed, and on the advisor's
+    deep-link path consumed the one-shot ref before consent had resolved,
+    leaving the question unasked forever.
+  */
+  const [consent, setConsent] = useState<AiConsent | null>(null);
+  const [awaitingConsent, setAwaitingConsent] = useState<'camera' | 'library' | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    void readAiConsent().then((answer) => {
+      if (live) setConsent(answer);
+    });
+
+    return () => {
+      live = false;
+    };
+  }, []);
   const [file, setFile] = useState<InvoiceFile | null>(null);
 
   const send = useCallback(
@@ -177,7 +215,16 @@ export function InvoiceScanScreen({
     [vehicleId, onSignOut, onFiled]
   );
 
-  const choose = useCallback(async (source: 'camera' | 'library') => {
+  /**
+   * Open the picker and run the upload. **No consent check** — see `choose`.
+   *
+   * ⚠ Split out on purpose. `choose` closes over `consent`, so calling it from
+   * the sheet's accept handler runs the closure that opened the sheet — where
+   * consent is still `unknown` — and re-opens it. Separating the gate from the
+   * work means accepting continues into the thing the person was doing, which
+   * is the difference between a question and an obstacle.
+   */
+  const openPicker = useCallback(async (source: 'camera' | 'library') => {
     setState({
       status: 'working',
       note: source === 'camera' ? 'Opening the camera…' : 'Opening your photos…',
@@ -206,11 +253,81 @@ export function InvoiceScanScreen({
     }
   }, [pickImage, send]);
 
+  /**
+   * The consent gate in front of `openPicker` — LEG-02.
+   *
+   * ⚠ **Asked before the picker opens, not after.** Consent obtained once the
+   * photograph exists is consent for something that has already happened, and
+   * by then the person has aimed a camera at a document carrying a shop's name
+   * and address on the strength of a screen that told them nothing about
+   * Google.
+   *
+   * `declined` is not blocked here: the idle screen stands its controls down in
+   * that state, so reaching this while declined means somebody deliberately
+   * re-opened the sheet.
+   */
+  const choose = useCallback(
+    async (source: 'camera' | 'library') => {
+      if (consent === 'unknown') {
+        setAwaitingConsent(source);
+        return;
+      }
+
+      await openPicker(source);
+    },
+    [consent, openPicker]
+  );
+
   return (
-    <ScrollView contentContainerStyle={styles.body}>
+    <>
+    <AiConsentSheet
+      visible={awaitingConsent !== null}
+      copy={INVOICE_AI_CONSENT}
+      onAccept={() => {
+        const source = awaitingConsent;
+        setAwaitingConsent(null);
+        setConsent('granted');
+        void recordAiConsent('granted');
+        /*
+          Continue into the thing they were trying to do. Dropping them back on
+          the idle screen to press the same button again is how a consent sheet
+          reads as an obstacle rather than a question.
+        */
+        /*
+          `openPicker`, not `choose` — the gate has just been satisfied and
+          re-checking it here would read the state this render still holds.
+        */
+        if (source) void openPicker(source);
+      }}
+      onDecline={() => {
+        setAwaitingConsent(null);
+        setConsent('declined');
+        void recordAiConsent('declined');
+      }}
+    />
+
+    <ScrollView
+      /*
+        R57. `OPTICAL_CENTRE` only has slack to distribute when the content is
+        shorter than the display, which is every state on this screen — so the
+        block sits a little above centre rather than pinned to the top of a
+        black field. A long error keeps its natural top alignment for free.
+      */
+      contentContainerStyle={[styles.body, OPTICAL_CENTRE]}
+    >
       {state.status === 'idle' && (
         <View style={styles.block}>
-          <Text style={styles.title}>Scan an invoice</Text>
+          {/*
+            ── R47 · the nav title said this 40pt above ───────────────────────
+
+            `Scan an invoice` rendered twice — once as the stack header's title
+            and again as the screen's H1, with nothing between them. iOS has one
+            pattern for a title that appears in both places (the large title
+            that shrinks into the bar as it scrolls) and this screen was not it;
+            it was simply the same words, twice.
+
+            The nav keeps it. What the screen leads with is what happens next.
+          */}
           {/*
             **No PDF claim.** This said "A PDF works too", which the server
             supports and this screen does not: the picker is `mediaTypes:
@@ -220,11 +337,50 @@ export function InvoiceScanScreen({
             another native module, another cloud build — so it waits for the
             next one rather than costing its own.
           */}
-          <Text style={styles.body_}>
+          <Text style={styles.lead}>
             Photograph a service invoice and its line items are read and added to this car's
             history.
           </Text>
-          <Button label="Take a photo" variant="inverse" onPress={() => void choose('camera')} />
+
+          {/*
+            ── R49 · what happens next, stated before it happens ─────────────
+
+            The screen offered two ways to start and said nothing about where
+            they lead. The system's rule is that AI uncertainty is stated
+            plainly, and this is the moment for it: a model reads a photograph
+            and writes rows into the owner's permanent service record.
+
+            ⚠ The review's suggested line was *"You review them before anything
+            is saved."* **That is not true** and is not written here. Line items
+            are written by `uploadInvoice` as soon as extraction succeeds; the
+            only thing held back for confirmation is a vehicle mismatch. What is
+            promised is what actually happens.
+          */}
+          <Text style={styles.expectation}>
+            The reading is done by a model, so check the lines afterwards. If the invoice looks
+            like a different car, we ask before filing it.
+          </Text>
+          {/*
+            ── ⚠ LEG-02 · declining means "no AI features", never "no app" ────
+
+            The controls stand down rather than the screen refusing, and the
+            line below says what declining cost and how to change it. Blocking
+            the product on a privacy refusal would trade a 5.1.2 problem for a
+            5.1.1(v)-shaped one — and the garage, the history and the recall
+            list are all useful without a model.
+          */}
+          {consent === 'declined' ? (
+            <View style={styles.block}>
+              <Text style={styles.body_}>{INVOICE_AI_CONSENT.declineNote}</Text>
+              <Button
+                label="Change that"
+                variant="outline"
+                onPress={() => setAwaitingConsent('camera')}
+              />
+            </View>
+          ) : (
+            <>
+          <Button label="Take a photo" variant="primary" onPress={() => void choose('camera')} />
           {/*
             Not a fallback. Plenty of invoices arrive as an emailed PDF or a
             photo taken days ago — and the simulator has no camera at all, so a
@@ -236,6 +392,8 @@ export function InvoiceScanScreen({
             variant="outline"
             onPress={() => void choose('library')}
           />
+            </>
+          )}
         </View>
       )}
 
@@ -282,7 +440,7 @@ export function InvoiceScanScreen({
           */}
           <Button
             label="Yes, file it here"
-            variant="inverse"
+            variant="primary"
             onPress={() => file && void send(file, true)}
             disabled={!file}
           />
@@ -300,7 +458,7 @@ export function InvoiceScanScreen({
           <Text style={styles.body_}>{state.message}</Text>
           <Button
             label="Try another photo"
-            variant="inverse"
+            variant="primary"
             onPress={() => void choose('camera')}
           />
           <Button
@@ -343,7 +501,7 @@ export function InvoiceScanScreen({
             session, which is what makes `App.tsx` show the sign-in screen.
           */}
           {state.signInMayHelp ? (
-            <Button label="Sign in again" variant="inverse" onPress={onSignOut} />
+            <Button label="Sign in again" variant="primary" onPress={onSignOut} />
           ) : null}
 
           {state.retryable && file ? (
@@ -354,14 +512,14 @@ export function InvoiceScanScreen({
                 it is the verb, so this steps down to outline — the ladder the
                 variant names rather than two whites competing.
               */
-              variant={state.signInMayHelp ? 'outline' : 'inverse'}
+              variant={state.signInMayHelp ? 'outline' : 'primary'}
               onPress={() => void send(file, false)}
             />
           ) : null}
 
           <Button
             label="Choose a different file"
-            variant={state.retryable && file ? 'outline' : 'inverse'}
+            variant={state.retryable && file ? 'outline' : 'primary'}
             onPress={() => void choose('library')}
           />
 
@@ -369,15 +527,23 @@ export function InvoiceScanScreen({
         </View>
       )}
     </ScrollView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  body: { padding: 20, gap: 14, flexGrow: 1 },
+  body: { ...PAGE_BODY },
   block: { gap: 12 },
   title: { color: text.primary, fontSize: 22, fontFamily: interFace('700'), fontWeight: '700', letterSpacing: -0.3 },
   /* `body_` because `body` is the container above. */
   body_: { color: text.muted, fontSize: 15, lineHeight: 22 },
+  /* The one line that says what this screen is for. A step above the rest. */
+  lead: { ...type.body, fontSize: 15, lineHeight: 22, color: text.secondary },
+  /*
+    R49. What the model does with the photograph, and where the result lands.
+    Quieter than the lead — it is a caveat, not the offer — and above the floor.
+  */
+  expectation: { ...type.value, color: text.muted, marginTop: space.xs },
 
   centred: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   note: { color: text.muted, fontSize: 14 },

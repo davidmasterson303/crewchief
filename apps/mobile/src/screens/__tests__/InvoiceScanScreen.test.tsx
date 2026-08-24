@@ -34,6 +34,30 @@ import { ApiRequestError } from '../../api/client';
  * filed against the wrong vehicle is worse than one not filed at all.
  */
 
+/*
+  ── ⚠ LEG-02 · these tests are about scanning, not about consent ─────────────
+
+  Guideline 5.1.2(i) (amended Nov 2025) requires explicit permission before
+  personal data reaches a third-party AI, so the screen now asks before it opens
+  the picker. Every case below assumes that question has already been answered —
+  the consent flow itself is exercised in its own describe at the foot of this
+  file.
+
+  Mocked rather than written to `secureStorage`, because the store is
+  `expo-secure-store` and there is none in a test runner.
+*/
+/*
+  ⚠ Prefixed `mock` because jest forbids a factory referencing an out-of-scope
+  variable — the guard against a mock reading a value that has not initialised
+  yet. The prefix is the documented escape hatch.
+*/
+let mockConsent: 'granted' | 'declined' | 'unknown' = 'granted';
+
+jest.mock('../../onboarding/ai-consent', () => ({
+  readAiConsent: jest.fn(async () => mockConsent),
+  recordAiConsent: jest.fn(async () => {}),
+}));
+
 jest.mock('../../api/documents', () => {
   const actual = jest.requireActual('../../api/documents');
   return { ...actual, uploadInvoice: jest.fn() };
@@ -283,5 +307,112 @@ describe('when it works', () => {
     await user.press(view.getByText('Choose from library'));
 
     await waitFor(() => expect(props.onFiled).toHaveBeenCalled());
+  });
+});
+
+/**
+ * ── LEG-02: explicit permission before an invoice reaches Google ────────────
+ *
+ * Apple amended Guideline 5.1.2(i) in November 2025 to require **explicit
+ * permission** before personal data is shared with a third-party AI — not
+ * disclosure, permission. CrewChief had the disclosure in its privacy policy;
+ * the only consent was sign-up wrap.
+ *
+ * This is the screen where it mattered most and was least visible: it
+ * photographs a document carrying **a third party's name and business
+ * address**, sometimes a VIN, sends it to Gemini, and said nothing about
+ * Google at all.
+ */
+describe('asking before an invoice goes to Google', () => {
+  afterEach(() => {
+    mockConsent = 'granted';
+  });
+
+  it('asks before the picker opens, not after', async () => {
+    /*
+      ⚠ **Before**, and the ordering is the whole finding. Consent obtained
+      after the photograph exists is consent for something that already
+      happened — and by then the person has aimed a camera at a document on the
+      strength of a screen that told them nothing.
+    */
+    mockConsent = 'unknown';
+    const user = userEvent.setup();
+    const pickImage = jest.fn();
+
+    const view = await render(
+      <InvoiceScanScreen vehicleId="v1" pickImage={pickImage} onSignOut={jest.fn()} />
+    );
+
+    await user.press(await view.findByText('Take a photo'));
+
+    await view.findByText('Reading an invoice uses Google’s AI');
+    expect(pickImage).not.toHaveBeenCalled();
+  });
+
+  it('names Google, and names what is in the photograph', async () => {
+    /*
+      "Third-party AI services" is the phrasing that satisfies nobody. Deciding
+      needs to know **who** and **what** — and the part somebody would not think
+      of is that an invoice is not only their own data.
+    */
+    mockConsent = 'unknown';
+    const user = userEvent.setup();
+
+    const view = await render(
+      <InvoiceScanScreen vehicleId="v1" pickImage={jest.fn()} onSignOut={jest.fn()} />
+    );
+
+    await user.press(await view.findByText('Take a photo'));
+
+    await view.findByText(/The photograph goes to Google/);
+    await view.findByText(/the shop’s name and address/);
+  });
+
+  it('continues into what they were doing once they agree', async () => {
+    // Dropping them back to press the same button again is how a consent sheet
+    // reads as an obstacle rather than a question.
+    mockConsent = 'unknown';
+    const user = userEvent.setup();
+    const pickImage = jest.fn(async () => null);
+
+    const view = await render(
+      <InvoiceScanScreen vehicleId="v1" pickImage={pickImage} onSignOut={jest.fn()} />
+    );
+
+    await user.press(await view.findByText('Choose from library'));
+    await user.press(await view.findByText('Scan invoices'));
+
+    await waitFor(() => expect(pickImage).toHaveBeenCalledWith('library'));
+  });
+
+  it('does not block the app when they decline', async () => {
+    /*
+      ⚠ Declining means "no AI features", **never** "no app". Blocking the
+      product on a privacy refusal trades a 5.1.2 problem for a
+      5.1.1(v)-shaped one — and the garage, the history and the recall list are
+      all useful without a model.
+    */
+    mockConsent = 'declined';
+
+    const view = await render(
+      <InvoiceScanScreen vehicleId="v1" pickImage={jest.fn()} onSignOut={jest.fn()} />
+    );
+
+    await view.findByText(/You can still add services by hand/);
+    expect(view.queryByText('Take a photo')).toBeNull();
+    // …and it is a decision they can revisit, not a dead end.
+    view.getByText('Change that');
+  });
+
+  it('sends nothing when they decline', async () => {
+    mockConsent = 'declined';
+    const pickImage = jest.fn();
+
+    const view = await render(
+      <InvoiceScanScreen vehicleId="v1" pickImage={pickImage} onSignOut={jest.fn()} />
+    );
+
+    await view.findByText(/You can still add services by hand/);
+    expect(pickImage).not.toHaveBeenCalled();
   });
 });
