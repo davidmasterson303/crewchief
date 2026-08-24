@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from '@/components/ui/button';
 import { ExternalLink, AlertCircle, HelpCircle } from 'lucide-react';
 import { healthClaim } from '@crewchief/core/health-claims';
+import { RECALL_MATCH_CAVEAT } from '@crewchief/core/advice-disclosure';
 
 interface RecallHistoryModalProps {
   recalls: any[];
@@ -66,6 +67,16 @@ export default function RecallHistoryModal({ recalls, trigger, checked }: Recall
                   ? 'This vehicle has no recalls to date'
                   : 'We have not checked this vehicle for recalls yet'}
             </DialogDescription>
+            {/*
+              ⚠ §10 / D11. The description above says "found for this vehicle"
+              and "no recalls to date" — both of which an owner will read as
+              being about their car. The match was on year, make and model;
+              there is no VIN in this lookup and never has been. Same constant
+              as the alert card and the mobile screen.
+            */}
+            {checked && (
+              <p className="text-xs text-muted-foreground pt-1">{RECALL_MATCH_CAVEAT}</p>
+            )}
           </DialogHeader>
 
           {recalls.length === 0 ? (

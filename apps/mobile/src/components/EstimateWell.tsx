@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { formatRange } from '@crewchief/core/advice-range';
+import { adviceDisclosure } from '@crewchief/core/advice-disclosure';
 import type { ConsultantEstimate } from '@crewchief/core/consultant-estimate';
 
 import Well from './Well';
@@ -79,6 +80,22 @@ export default function EstimateWell({ estimate }: { estimate: ConsultantEstimat
           <Text style={styles.likelyAmount}>{formatRange(estimate.likely)}</Text>
         </View>
       ) : null}
+
+      {/*
+        ── ⚠ UX-16 / D11 · the estimate is its own claim ─────────────────────
+
+        The advisor's answer above already carries `adviceDisclosure`
+        ('consultant'), and that is not sufficient here. This block is where the
+        prose stops and *numbers* start — a reader who skims the answer and
+        stops on the figures has read a set of prices with no provenance
+        attached, and prices are the thing they will repeat to a shop.
+
+        The estimate surface says what the consultant one does not: that the
+        real number depends on the shop, the parts and what they find. That is
+        the caveat specific to money, and it is why `advice-disclosure.ts`
+        models four surfaces rather than one string.
+      */}
+      <Text style={styles.disclosure}>{adviceDisclosure('estimate')}</Text>
     </Well>
   );
 }
@@ -91,6 +108,12 @@ const styles = StyleSheet.create({
     this framing sentence compete with the prices it is introducing.
   */
   caption: { ...type.value, color: text.muted },
+  /*
+    Same role as the caption that opens the well — quiet, above the 12px floor,
+    and deliberately not `type.label`, which would make a caveat compete with
+    the prices it qualifies.
+  */
+  disclosure: { ...type.value, color: text.muted, marginTop: space.sm },
   row: {
     flexDirection: 'row',
     alignItems: 'flex-start',

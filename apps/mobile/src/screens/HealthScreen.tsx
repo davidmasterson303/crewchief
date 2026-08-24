@@ -13,6 +13,7 @@ import { RecallDetailScreen } from './RecallDetailScreen';
 import { Skeleton, SkeletonCard } from '../components/Skeleton';
 import { apiRequest, ApiRequestError } from '../api/client';
 import type { HealthDriver } from '@crewchief/core/health-drivers';
+import { adviceDisclosure } from '@crewchief/core/advice-disclosure';
 import { getHealthBandJudgement } from '@crewchief/core/health-band';
 import { space, text, type } from '../theme';
 
@@ -313,10 +314,28 @@ export function HealthScreen({
         </Card>
       )}
 
-      <Text style={styles.footnote}>
-        The score is an assessment from what we know about {state.name} — its schedule, its
-        recorded work and its mileage for its age. It is not an inspection.
-      </Text>
+      {/*
+        ── ⚠ UX-16 / D11 · this footnote was a second copy, and it omitted the AI ─
+
+        It read: *"The score is an assessment from what we know about {name} —
+        its schedule, its recorded work and its mileage for its age. It is not
+        an inspection."*
+
+        Two problems, and the second is the one that made it a finding. It was a
+        hand-written paraphrase of the health disclosure, so the phone and the
+        web said different things about the same number — the drift
+        `advice-disclosure.ts` exists to prevent and that
+        `advice-says-it-is-generated.test.ts` explicitly asserts against for the
+        consultant. And it never said a **model** wrote the reading, which is
+        the whole of UX-16: "an assessment from what we know" describes a
+        process without naming the thing doing it.
+
+        The inputs it listed are not lost. `HealthDrivers` sits directly above
+        and names all three with a sentence each, computed rather than
+        paraphrased — which is a better answer to "what is this made of" than a
+        line of prose restating it from memory.
+      */}
+      <Text style={styles.footnote}>{adviceDisclosure('health')}</Text>
     </ScrollView>
   );
 }

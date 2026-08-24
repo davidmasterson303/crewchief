@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 
 import AlertBanner from '../components/AlertBanner';
+import { adviceDisclosure } from '@crewchief/core/advice-disclosure';
 import BuildGauge from '../components/BuildGauge';
 import Button from '../components/Button';
 import Card from '../components/Card';
@@ -427,6 +428,25 @@ export function BuildScreen({
           <BuildGauge position={position} />
         </View>
         <Text style={styles.summary}>{progressionSummary(rungs, completed)}</Text>
+        {/*
+          ── ⚠ UX-16 / D11 · the mods are generated and this screen never said ─
+
+          The ladder's ordering is the product's own argument and is not
+          generated — `ROLE_LADDER` is a constant. Everything placed *on* it is:
+          the mod list, each rationale, and the details card behind every row
+          come from a model.
+
+          Under the summary rather than under the gauge, because it qualifies
+          the suggestion rather than the position — the position is arithmetic
+          over what the owner has actually recorded, and disclaiming that as
+          AI-written would be false in the unhelpful direction.
+
+          `ModificationsTab.tsx` renders the identical string on the web. That
+          is the point: a disclosure present on one client and absent from the
+          other is this codebase's most repeated defect applied to the sentence
+          that limits liability.
+        */}
+        <Text style={styles.disclosure}>{adviceDisclosure('plan')}</Text>
       </Card>
 
       {state.shows ? (
@@ -644,4 +664,6 @@ const styles = StyleSheet.create({
 
   empty: { ...type.body, color: text.secondary },
   footnote: { ...type.value, color: text.muted },
+  /** Same quiet role as the footnote; a caveat must not compete with the list. */
+  disclosure: { ...type.value, color: text.muted, marginTop: space.sm },
 });

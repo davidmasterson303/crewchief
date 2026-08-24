@@ -30,11 +30,45 @@ import { ADVISOR_AI_CONSENT, INVOICE_AI_CONSENT } from '@crewchief/core/ai-conse
 
 const ROOT = join(__dirname, '..', '..');
 
-const WEB_CHAT = readFileSync(join(ROOT, 'components', 'ConsultantChat.tsx'), 'utf8');
-const MOBILE_ADVISOR = readFileSync(
-  join(ROOT, 'apps', 'mobile', 'src', 'screens', 'AdvisorScreen.tsx'),
-  'utf8'
-);
+const read = (...parts: string[]) => readFileSync(join(ROOT, ...parts), 'utf8');
+
+const WEB_CHAT = read('components', 'ConsultantChat.tsx');
+const MOBILE_ADVISOR = read('apps', 'mobile', 'src', 'screens', 'AdvisorScreen.tsx');
+
+const WEB_HEALTH = read('components', 'HealthSummary.tsx');
+const MOBILE_HEALTH = read('apps', 'mobile', 'src', 'screens', 'HealthScreen.tsx');
+
+const WEB_MODS = read('components', 'insights', 'ModificationsTab.tsx');
+const MOBILE_MODS = read('apps', 'mobile', 'src', 'screens', 'BuildScreen.tsx');
+
+const WEB_SCHEDULE = read('components', 'insights', 'MaintenanceTab.tsx');
+const MOBILE_SCHEDULE = read('apps', 'mobile', 'src', 'screens', 'ServiceMilestoneScreen.tsx');
+
+const MOBILE_ESTIMATE = read('apps', 'mobile', 'src', 'components', 'EstimateWell.tsx');
+
+const WEB_RECALL_CARD = read('components', 'RecallAlerts.tsx');
+const WEB_RECALL_MODAL = read('components', 'RecallHistoryModal.tsx');
+const MOBILE_RECALL = read('apps', 'mobile', 'src', 'screens', 'RecallDetailScreen.tsx');
+
+/**
+ * Source with comments stripped, so an assertion cannot be satisfied by a
+ * docblock that merely *discusses* the disclosure.
+ *
+ * ⚠ This is the `.tap-target-44` trap from rule 5, and these files are full of
+ * exactly the prose that would spring it — every one of them explains the
+ * finding it closes in a comment directly above the line that closes it. A scan
+ * over raw text would pass for a file where somebody deleted the JSX and left
+ * the paragraph.
+ */
+function rendered(source: string): string {
+  return source
+    .split('\n')
+    .filter((line) => {
+      const t = line.trimStart();
+      return !t.startsWith('*') && !t.startsWith('//') && !t.startsWith('/*');
+    })
+    .join('\n');
+}
 
 describe('the disclosure itself', () => {
   it('names the thing rather than hedging about accuracy', () => {
@@ -80,6 +114,79 @@ describe('both clients render it', () => {
       on its own.
     */
     expect(MOBILE_ADVISOR).toMatch(/adviceDisclosure\('consultant'\)/);
+  });
+
+  /*
+    ── ⚠ D11 · once per surface, on both clients ─────────────────────────────
+
+    The disclosure module has modelled four surfaces since it was written and
+    two of them were rendered by nothing at all. `RECALL_MATCH_CAVEAT` was
+    exported, asserted for its wording by the test above, and shown on no
+    screen — a constant no client renders is a written fix, not a shipped one,
+    which is the distinction this whole round of work is about.
+
+    Table-driven so adding a surface means adding a row: the failure this
+    guards is one client quietly lacking what the other has, and that is
+    invisible from either side on its own.
+  */
+  const SURFACES: Array<[string, string, RegExp]> = [
+    ['web health', WEB_HEALTH, /adviceDisclosure\('health'\)/],
+    ['mobile health', MOBILE_HEALTH, /adviceDisclosure\('health'\)/],
+    ['web mods', WEB_MODS, /adviceDisclosure\('plan'\)/],
+    ['mobile mods', MOBILE_MODS, /adviceDisclosure\('plan'\)/],
+    ['mobile estimate', MOBILE_ESTIMATE, /adviceDisclosure\('estimate'\)/],
+  ];
+
+  it.each(SURFACES)('%s renders its disclosure', (_name, source, pattern) => {
+    expect(pattern.test(rendered(source))).toBe(true);
+  });
+
+  /*
+    The schedule is disclosed through `service-provenance.ts` rather than
+    `adviceDisclosure('plan')`, and deliberately: that module exists for
+    schedule provenance and says the more careful thing ("typical", not
+    "manufacturer-recommended"). Two sentences making one disclosure on one
+    screen is the duplication these modules exist to avoid.
+
+    ⚠ The web rendered nothing here at all until D11, while mobile had carried
+    the label since the module was written — the same list of intervals, from
+    the same column, reading as manufacturer fact on one client.
+  */
+  it.each([
+    ['web', WEB_SCHEDULE],
+    ['mobile', MOBILE_SCHEDULE],
+  ])('%s schedule names its provenance', (_name, source) => {
+    expect(rendered(source)).toMatch(/SCHEDULE_BASIS_LABELS\['generated-schedule'\]/);
+  });
+
+  it.each([
+    ['web recall card', WEB_RECALL_CARD],
+    ['web recall modal', WEB_RECALL_MODAL],
+    ['mobile recall screen', MOBILE_RECALL],
+  ])('%s carries the match caveat', (_name, source) => {
+    /*
+      ⚠ And never the AI disclosure. A recall is NHTSA's record quoted; "written
+      by AI" under a safety notice is false in the one direction that is
+      actually dangerous — the reader hedges on a defect notice.
+    */
+    const body = rendered(source);
+    expect(body).toMatch(/RECALL_MATCH_CAVEAT/);
+    expect(body).not.toMatch(/adviceDisclosure\(/);
+  });
+
+  it('can still detect a surface that lost its disclosure', () => {
+    /*
+      Anti-vacuous, per rule 5. Every assertion above is a `toMatch` over source
+      text, and the whole family would pass forever if `rendered` returned
+      something that never matches — or, worse, if it stripped so little that a
+      comment satisfied it. Both directions are checked here.
+    */
+    expect(rendered("const x = 1;\n<Text>{adviceDisclosure('health')}</Text>")).toMatch(
+      /adviceDisclosure\('health'\)/
+    );
+    expect(rendered("  * we render adviceDisclosure('health') here\n  // and here too")).not.toMatch(
+      /adviceDisclosure/
+    );
   });
 
   it('neither writes its own wording', () => {

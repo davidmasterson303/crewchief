@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Check, CircleCheck as CheckCircle, ThumbsDown, ChevronDown, ChevronUp } from 'lucide-react';
 import { useState } from 'react';
+import { adviceDisclosure } from '@crewchief/core/advice-disclosure';
 import { nextRungs, progressionSummary } from '@crewchief/core/mod-progression';
 import { buildPosition, buildSummary } from '@crewchief/core/build-progress';
 import { BuildGauge } from '@/components/BuildGauge';
@@ -141,6 +142,29 @@ export default function ModificationsTab({
           {buildSummary(position, restMods.length + rungs.length)}
         </p>
       </div>
+
+      {/*
+        ── ⚠ UX-16 / D11 · the mod list is generated and said so nowhere ─────
+
+        Every mod on this tab, its rationale, its ordering on the ladder and the
+        details card behind it came out of a model. Neither client disclosed it:
+        the dossier card above says "AI-researched insights", which is about the
+        *dossier*, and this tab is reached by clicking away from that sentence —
+        so a reader arrives at a ranked list of parts to buy for their car with
+        no indication of where the ranking came from.
+
+        `plan` rather than `consultant`: this is not an answer to a question, it
+        is a suggestion from the car's typical profile, and the sentence says
+        the thing that matters for a mod — that the owner's own history and
+        manual come first.
+
+        ⚠ The *schedule* tab is deliberately not given this string. It carries
+        `SCHEDULE_BASIS_LABELS['generated-schedule']` instead, which is the
+        module written for schedule provenance and is what mobile renders — two
+        sentences making the same disclosure on one screen would be the
+        duplication these modules exist to avoid.
+      */}
+      <p className="text-xs text-white/50">{adviceDisclosure('plan')}</p>
 
       {/*
         `TierProgressCard` used to sit here. The dial replaces it: it showed

@@ -1,5 +1,6 @@
 'use client';
 
+import { RECALL_MATCH_CAVEAT } from '@crewchief/core/advice-disclosure';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ShieldAlert, ExternalLink, X, ChevronDown, ChevronUp, Check, Loader as Loader2 } from 'lucide-react';
@@ -166,6 +167,26 @@ export default function RecallAlerts({ recalls, vehicleId, addressedCampaigns = 
           </button>
         </div>
       )}
+      {/*
+        ── ⚠ §10 / D11 · matched on year, make and model, never on the VIN ────
+
+        This card names a count of "Active Recalls" for the vehicle, which reads
+        as a statement about *this car*. It is a statement about NHTSA's list for
+        its year, make and model — `nhtsa-lookup.ts` has never had a VIN to match
+        on. Telling an owner their specific car is affected, or clear, is the
+        overclaim `CLAUDE.md` §10 names explicitly.
+
+        ⚠ Not `adviceDisclosure`. A recall is NHTSA's record quoted, not
+        generated advice, and "written by AI" under a safety notice would be
+        false in the direction that gets it ignored.
+
+        The mobile recall screen renders the identical string. One sentence, two
+        clients, from one constant.
+      */}
+      <p className="px-5 py-3 text-xs text-white/50 border-t border-red-400/15">
+        {RECALL_MATCH_CAVEAT}
+      </p>
+
     </div>
   );
 }

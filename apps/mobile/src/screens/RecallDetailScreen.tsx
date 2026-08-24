@@ -41,6 +41,7 @@ import {
   type NormalisedRecall,
   type RecallSeverity,
 } from '@crewchief/core/recalls';
+import { RECALL_MATCH_CAVEAT } from '@crewchief/core/advice-disclosure';
 import { healthClaim } from '@crewchief/core/health-claims';
 import { interFace } from '../theme/fonts';
 
@@ -574,6 +575,27 @@ export function RecallDetailScreen({
         )}
       </View>
 
+      {/*
+        ── ⚠ §10 / D11 · matched on year, make and model — never on the VIN ───
+
+        `RECALL_MATCH_CAVEAT` has been exported and asserted by
+        `advice-says-it-is-generated.test.ts` since the disclosure module was
+        written, and rendered by nothing. A constant that no screen shows is a
+        written fix rather than a shipped one.
+
+        ⚠ It is **not** `adviceDisclosure`. A recall is NHTSA's own record,
+        quoted — putting "written by AI" under one would be false in the
+        direction that gets a safety notice ignored, which is the single place
+        in this product where a hedging reader is in actual danger. The caveat a
+        recall needs is the *matching* one, and it is a different claim.
+
+        Shown whenever the lookup has run, listed or not: the caveat qualifies
+        how the match was made, so it is as true of "no recalls found" as it is
+        of three — and the empty case is where an owner is most likely to take
+        it as a statement about their specific car.
+      */}
+      {state.checked && <Text style={styles.matchCaveat}>{RECALL_MATCH_CAVEAT}</Text>}
+
       {actionError && (
         <AlertBanner tone="critical" headline="That was not saved" body={actionError} />
       )}
@@ -882,6 +904,8 @@ const styles = StyleSheet.create({
     for it.
   */
   name: { ...type.editorial, color: text.primary, letterSpacing: -0.5 },
+  /** Quiet, and above the 12px floor. A caveat, not a warning. */
+  matchCaveat: { ...type.value, color: text.muted },
   count: { color: text.muted, fontSize: 14, marginTop: -10 },
 
   banner: { borderRadius: radius.card, padding: 16, gap: 6, borderWidth: 1 },
