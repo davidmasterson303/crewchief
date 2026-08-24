@@ -61,6 +61,27 @@ export const dynamic = 'force-dynamic';
   about: the board said the migration was the blocker, and the artefact said
   otherwise.
 */
+/*
+  ⚠ `last_generated` travels because **a verdict has to be able to say when it
+  was reached.**
+
+  On 23 Aug the M235i's detail screen read "a complete lack of documented
+  maintenance … impossible to assess its current condition" while its service
+  history listed five records and $1,461. Both were rendering honestly: the
+  stored summary was generated on 30 Jul, the line items were filed on 6 Aug,
+  and the row has not been recomputed since.
+
+  `generateVehicleHealthSummary` reads `maintenance_line_items` as of 5 Aug,
+  so a recompute would now produce the right answer — but nothing on the
+  mobile read path performs one, and this route returned no way for the client
+  to tell that the sentence it was given predates the records beside it. A
+  stale verdict that cannot be recognised as stale is indistinguishable from a
+  wrong one, and it tells the owner the app did not read the invoice they just
+  scanned.
+
+  One column, and it is what lets the screen refuse to present an out-of-date
+  reading as a current one.
+*/
 const GARAGE_COLUMNS =
   'id,year,make,model,trim,color,current_mileage,image_url,custom_image_url,' +
   'performance_mindedness,ownership_objective,created_at,' +
@@ -68,7 +89,7 @@ const GARAGE_COLUMNS =
   'next_service_label,next_service_at_miles,next_service_due_on,' +
   'nhtsa_data(recalls),' +
   'recall_actions(campaign_number,addressed_at),' +
-  'vehicle_health_summary(health_score,summary,red_flags)';
+  'vehicle_health_summary(health_score,summary,red_flags,last_generated)';
 
 interface GarageRow {
   id: string;

@@ -51,6 +51,26 @@ export async function GET() {
       commit,
       branch: process.env.BRANCH || process.env.HEAD || 'unknown',
       builtAt: process.env.BUILD_TIME || null,
+      /*
+        ── ⚠ The product version, added 24 Aug ──────────────────────────────
+
+        The commit answers *"is this the build I pushed"*, which is what the
+        promote gate needs. It does not answer *"which release is this"*, which
+        is what a person asks — and a support conversation that starts "which
+        version are you on" cannot be answered from a SHA by anybody who is not
+        holding the repository.
+
+        Read from `package.json` at **build** time through `next.config.js`, for
+        exactly the reason `COMMIT_REF` is: a route reading it at request time
+        would need the file in the function bundle.
+
+        ⚠ It is the same number as the binary's. `apps/mobile/app.json`,
+        `apps/mobile/package.json` and the root `package.json` are held in step
+        by `lib/__tests__/one-product-one-version.test.ts` — one product, one
+        version, and a mismatch between the API and the app that talks to it is
+        a support conversation nobody can resolve.
+      */
+      version: process.env.NEXT_PUBLIC_APP_VERSION || 'unknown',
     },
     {
       headers: {
