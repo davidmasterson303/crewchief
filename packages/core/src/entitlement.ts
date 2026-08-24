@@ -31,6 +31,7 @@
  */
 
 import { TIERS, type Tier, type TierName } from './ai/budget';
+import { decideFeatureAccess, type FeatureDecision, type PaidFeature } from './paid-features';
 
 export interface EntitlementRecord {
   /** What was sold. Anything not in `TierName` is treated as unrecognised. */
@@ -111,6 +112,41 @@ export function hasLiveEntitlement(
   now: Date = new Date()
 ): boolean {
   return resolveEntitledTier(record, now).name !== 'free';
+}
+
+/**
+ * Whether this account may use a paid feature — the pricing decision of 24 Aug.
+ *
+ * ── ⚠ What this module gates changed, and the old shape survives beneath ────
+ *
+ * `resolveEntitledTier` answers *what may they spend*; that question has not
+ * gone away and `decideBudget` still asks it. What changed is that the spend
+ * ceiling is no longer **what is sold** — it is abuse protection behind the
+ * gate, invisible to the customer, and the thing sold is three named features.
+ * `paid-features.ts` carries the full argument.
+ *
+ * So this is a second reader of the same record rather than a replacement, for
+ * the same reason `hasLiveEntitlement` is: the *question* is different.
+ * "What may they use today" and "is there a live subscription" already needed
+ * separate answers, and "may they open the advisor" is a third — one that must
+ * be answerable without a usage query, because it is asked on a screen before
+ * anything has been spent.
+ *
+ * ⚠ Every unclear record still resolves to `free`, and therefore to a refusal
+ * once enforcement is on. That is the same direction `resolveEntitledTier`
+ * fails in and for the same reason: reading a malformed row as paid gives the
+ * product away to exactly the case an attacker would aim for.
+ */
+export function entitlesFeature(
+  record: EntitlementRecord | null | undefined,
+  feature: PaidFeature,
+  options: { enforced?: boolean; now?: Date } = {}
+): FeatureDecision {
+  return decideFeatureAccess({
+    feature,
+    tier: resolveEntitledTier(record, options.now ?? new Date()).name,
+    enforced: options.enforced,
+  });
 }
 
 function isKnownTier(value: string): value is TierName {

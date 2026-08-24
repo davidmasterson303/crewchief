@@ -9,6 +9,7 @@ import {
   withThinking,
 } from '@/lib/gemini';
 import { checkDemoBudget, checkMonthlyBudget } from '@/lib/ai-budget';
+import { checkFeatureAccess, featureRefusal } from '@/lib/feature-gate';
 import { checkStoredPhotoSize } from '@crewchief/core/image-resize';
 import { budgetMessage, demoBudgetMessage } from '@crewchief/core/ai/budget';
 import { POWERTRAIN_OPTIONS_PROMPT, CONSULTANT_SYSTEM_PROMPT, CONSULTANT_DOCUMENT_VALIDATION_PROMPT } from '@crewchief/core/prompts';
@@ -1059,6 +1060,28 @@ export async function sendConsultantMessage(params: {
         return { success: false, error: demoBudgetMessage(demo) };
       }
     } else {
+      /*
+        ── The feature gate, above the budget and distinct from it ────────────
+
+        The advisor is one of the three things a subscription buys — the pricing
+        decision of 24 Aug. This asks *may they use it at all*; the budget below
+        asks whether this particular call is affordable, and both still run: the
+        ceiling is abuse protection behind the gate rather than a thing being
+        sold. `paid-features.ts` carries the argument.
+
+        ⚠ Inside the authenticated branch on purpose. The demo above reaches the
+        consultant through its own budget and must keep doing so — it is a
+        portfolio piece with its own ceiling, and a paywall on it would be a
+        paywall on the page recruiters are sent to.
+
+        ⚠ Enforcement is off until there is something to buy. See
+        `lib/feature-gate.ts`.
+      */
+      const gate = featureRefusal(await checkFeatureAccess(access.userId, 'advisor'));
+      if (gate) {
+        return { success: false, error: gate };
+      }
+
       const budget = await checkMonthlyBudget(access.userId);
       if (!budget.allowed) {
         return { success: false, error: budgetMessage(budget) };
@@ -2350,6 +2373,16 @@ export async function generateModificationDetails(vehicleId: string, modName: st
       generating indefinitely; only the consultant and the invoice parser
       refused. `every-generation-has-a-ceiling.test.ts` names every site now.
     */
+    /*
+      Modification detail is part of the vehicle dossier, which is one of the
+      three paid features. The dossier is what the mods tab renders — the
+      ladder, the rationales and this card behind every row.
+    */
+    const modGate = featureRefusal(await checkFeatureAccess(access.userId, 'dossier'));
+    if (modGate) {
+      return { success: false, error: modGate };
+    }
+
     const budget = await checkMonthlyBudget(access.userId);
     if (!budget.allowed) {
       return { success: false, error: budgetMessage(budget) };
@@ -3562,6 +3595,17 @@ export async function parseInvoiceLineItems(documentId: string, vehicleId: strin
     const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
     if (!access.ok) {
       return { success: false, error: access.error };
+    }
+
+    /*
+      Invoice scanning is a paid feature — the pricing decision of 24 Aug. The
+      gate sits above the ceiling for the reason the consultant's note gives:
+      one asks whether the feature is theirs, the other whether the call is
+      affordable.
+    */
+    const invoiceGate = featureRefusal(await checkFeatureAccess(access.userId, 'invoice-scanning'));
+    if (invoiceGate) {
+      return { success: false, error: invoiceGate };
     }
 
     // 5.1 — the other path a user can drive repeatedly, and the one still

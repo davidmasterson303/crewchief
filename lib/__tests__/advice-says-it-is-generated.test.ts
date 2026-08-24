@@ -51,23 +51,21 @@ const WEB_RECALL_MODAL = read('components', 'RecallHistoryModal.tsx');
 const MOBILE_RECALL = read('apps', 'mobile', 'src', 'screens', 'RecallDetailScreen.tsx');
 
 /**
- * Source with comments stripped, so an assertion cannot be satisfied by a
- * docblock that merely *discusses* the disclosure.
+ * Source with every comment removed, so an assertion cannot be satisfied by
+ * prose that merely *discusses* the thing it is checking for.
  *
- * ⚠ This is the `.tap-target-44` trap from rule 5, and these files are full of
- * exactly the prose that would spring it — every one of them explains the
- * finding it closes in a comment directly above the line that closes it. A scan
- * over raw text would pass for a file where somebody deleted the JSX and left
- * the paragraph.
+ * ⚠ Whole `/* … *\/` regions, not lines that begin with a comment marker. A
+ * line-prefix filter looks right and fails on exactly the comments in this
+ * codebase: a JSX `{/* … *\/}` block's middle lines start with ordinary words,
+ * so the filter kept them — and these files all explain the finding they close
+ * directly above the line that closes it. That is the `.tap-target-44` trap
+ * from rule 5, which found a string in a comment 600 lines from the rule.
+ *
+ * Over-removal is the safe direction here: it can only make an assertion harder
+ * to satisfy, never easier.
  */
 function rendered(source: string): string {
-  return source
-    .split('\n')
-    .filter((line) => {
-      const t = line.trimStart();
-      return !t.startsWith('*') && !t.startsWith('//') && !t.startsWith('/*');
-    })
-    .join('\n');
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
 }
 
 describe('the disclosure itself', () => {
@@ -184,9 +182,16 @@ describe('both clients render it', () => {
     expect(rendered("const x = 1;\n<Text>{adviceDisclosure('health')}</Text>")).toMatch(
       /adviceDisclosure\('health'\)/
     );
-    expect(rendered("  * we render adviceDisclosure('health') here\n  // and here too")).not.toMatch(
-      /adviceDisclosure/
-    );
+
+    /*
+      ⚠ A real JSX comment, whose middle line starts with an ordinary word. This
+      is the exact shape a line-prefix filter kept, and every file this suite
+      scans contains one: the finding is explained directly above the line that
+      closes it.
+    */
+    expect(
+      rendered("{/*\n  we render adviceDisclosure('health') here\n*/}\n// and adviceDisclosure here")
+    ).not.toMatch(/adviceDisclosure/);
   });
 
   it('neither writes its own wording', () => {

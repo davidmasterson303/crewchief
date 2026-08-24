@@ -1,5 +1,6 @@
 import { getServiceRoleClient } from '@/lib/supabase';
 import { checkMonthlyBudget } from '@/lib/ai-budget';
+import { checkFeatureAccess, featureRefusal } from '@/lib/feature-gate';
 import { budgetMessage } from '@crewchief/core/ai/budget';
 import {
   nextCheckDue,
@@ -175,6 +176,28 @@ export async function researchVehicleDossier(
       A monthly per-user budget has no user to charge in either case.
     */
     if (userId) {
+      /*
+        The dossier is one of the three paid features — the pricing decision of
+        24 Aug — and this function is what builds it.
+
+        ⚠ Inside the same `if (userId)` as the budget, and for the same two
+        reasons: the demo has its own ceiling, and the nightly sweep is capped
+        by construction. Neither has an account to charge or to check, and
+        gating the sweep would quietly stop it refreshing dossiers for accounts
+        that *are* entitled.
+
+        ⚠ Enforcement is off until there is something to buy. See
+        `lib/feature-gate.ts`.
+      */
+      const gate = featureRefusal(await checkFeatureAccess(userId, 'dossier'));
+      if (gate) {
+        logger.warn('RESEARCH:NOT_ENTITLED', 'Dossier is a paid feature; not researching', {
+          vehicleId,
+          userId,
+        });
+        return { success: false, error: gate };
+      }
+
       const budget = await checkMonthlyBudget(userId);
       if (!budget.allowed) {
         logger.warn('RESEARCH:BUDGET_SPENT', 'Monthly AI budget spent; not researching', {

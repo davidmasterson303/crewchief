@@ -234,6 +234,16 @@ const NOT_PORTABLE: Record<string, string> = {
   */
   'lib/ai-budget.ts': 'reads usage with the service role — reaches Supabase through lib/supabase',
   /*
+    The same split again, and the reasoning is the mirror of `ai-budget`'s. The
+    decision — what the paid features are, what the copy says, what an
+    unenforced gate means — is in `packages/core/src/paid-features.ts` and is
+    portable. Only the entitlement read needs a service-role client, and it
+    needs one for a sharper reason than usage does: a client that could read its
+    own entitlement row could write one.
+  */
+  'lib/feature-gate.ts':
+    'reads entitlements with the service role — reaches Supabase through lib/supabase',
+  /*
     The same split a third time. The vocabulary, the visitor-id rule and the
     cumulative counts are in `packages/core/src/funnel.ts` and are portable.
     Only the write needs a service-role client, and here that is not a detail:

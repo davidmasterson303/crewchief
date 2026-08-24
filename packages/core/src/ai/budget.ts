@@ -82,25 +82,26 @@ export const TIERS: Record<TierName, Tier> = {
   paid: { name: 'paid', monthlyOutputTokens: 1_000_000 },
 };
 
-/**
- * How much more the paid tier allows, as the paywall says it out loud.
- *
- * ── ⚠ IAP-06 · the copy said "five times" and it is 2.5× ────────────────────
- *
- * `PaywallScreen` claimed the paid tier *"raises that allowance five times
- * over"*. 400,000 → 1,000,000 is **2.5×**. A misleading claim about what a
- * subscription buys, made inside the binary, is Guideline 2.3.1 territory —
- * and it is the kind of number that gets written once and then never revisited
- * when the ceilings move.
- *
- * Derived rather than restated, so the copy cannot drift from the tiers again.
- * One decimal, with a trailing `.0` dropped: 2.5× reads as "2.5", a future 3×
- * reads as "3" rather than "3.0".
- */
-export function entitlementMultiple(): string {
-  const ratio = TIERS.paid.monthlyOutputTokens / TIERS.free.monthlyOutputTokens;
-  return Number.isInteger(ratio) ? String(ratio) : ratio.toFixed(1);
-}
+/*
+  ── ⚠ `entitlementMultiple()` was here, and IAP-06 closed by deletion ────────
+
+  It computed the paid:free ratio so `PaywallScreen` could say the subscription
+  "raises that allowance N times over" without the number drifting from `TIERS`.
+  That was the right fix for the arithmetic — the copy had claimed **five**
+  times against a real 2.5× — and it left the actual problem standing: an
+  allowance is not something a customer can see, judge, or relate to their own
+  use, so the sentence was unintelligible whatever number went in it.
+
+  The pricing decision of 24 Aug moved the boundary from how much you have used
+  to which features you have, so there is **no multiple to state** and the
+  sentence is gone rather than corrected. A derived figure nothing renders is
+  the same defect in a smaller form.
+
+  ⚠ The ceilings below did not go anywhere and are still enforced. What changed
+  is their role: abuse protection behind the gate, never customer-facing copy.
+  `paid-features.ts` carries the argument, and this file's own words for `free`
+  — "a fuse, not a meter" — are now true of `paid` as well.
+*/
 
 /**
  * The public demo's own ceiling.
