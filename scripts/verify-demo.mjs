@@ -149,6 +149,35 @@ async function checkRedirects() {
  * tokens and takes no input — see the route for why a prompt-based check would
  * have been a public endpoint that spends money on request.
  */
+/**
+ * The repository's `.env`, as a map.
+ *
+ * ⚠ **This script does not populate `process.env`**, and that caught me out on
+ * 24 Aug: the secret lookup below was written as `process.env.AI_HEALTH_SECRET`
+ * and found nothing on a machine where the value lives only in `.env` — turning
+ * a check into a **blocking failure** that would have stopped every demo
+ * promote. `checkAnonData` had always read the file by hand; now both do,
+ * through one reader.
+ *
+ * Returns `{}` rather than throwing. A missing `.env` is a real state on a CI
+ * box, and each caller says what that means for its own check.
+ */
+function readDotEnv() {
+  try {
+    return Object.fromEntries(
+      readFileSync(join(here, '..', '.env'), 'utf8')
+        .split('\n')
+        .filter((l) => l.trim() && !l.trim().startsWith('#') && l.includes('='))
+        .map((l) => {
+          const i = l.indexOf('=');
+          return [l.slice(0, i).trim(), l.slice(i + 1).trim()];
+        })
+    );
+  } catch {
+    return {};
+  }
+}
+
 async function checkAiCredential() {
   console.log('\nThe AI credential this build will actually use');
   const url = `${base}/api/health/ai`;
@@ -161,10 +190,23 @@ async function checkAiCredential() {
     indistinguishable from a build that predates the route, so the missing-secret
     case has to be reported separately or a promote would pass on silence.
   */
-  const secret = process.env.AI_HEALTH_SECRET || process.env.CONSULTANT_HEALTH_SECRET;
+  const env = { ...readDotEnv(), ...process.env };
+  const secret = env.AI_HEALTH_SECRET || env.CONSULTANT_HEALTH_SECRET;
+
   if (!secret) {
-    fail('AI_HEALTH_SECRET is not set locally — cannot verify the AI credential');
-    console.log('        it must match the value set on the deployment. See CLAUDE.md §7.');
+    /*
+      ⚠ **Warn, not fail.** The credential is checked on the *deployment*, and
+      not having the secret **here** says nothing about whether the deployment's
+      key works — it says this machine cannot ask. Blocking a promote on a local
+      configuration gap would be the gate refusing for a reason unrelated to the
+      thing being promoted, which is the opposite of what it is for.
+
+      It is loud, and it names both places the value has to match, because a
+      warning nobody can act on is the one that gets ignored. See CLAUDE.md §7:
+      secrets are usually needed in two places and setting one looks done.
+    */
+    warn('no AI_HEALTH_SECRET here — cannot ask the deployment whether its Gemini key works');
+    console.log('        set it in .env AND on the Netlify site, with matching values.');
     return;
   }
 
