@@ -143,11 +143,35 @@ describe('the suggestions', () => {
     const { view } = await mount();
 
     await view.findByText('Fuel injector seals');
-    // Two urgent rows, and both say the same thing.
-    expect(view.getAllByText('Do first')).toHaveLength(2);
-    // And the ones that are not urgent get their kind in plain words.
+
+    /*
+      ⚠ **R40, 23 Aug.** Every chip now names the row's *kind*; none of them
+      names its priority. The urgent rows used to read "Do first" — and because
+      the list is sorted urgent-first, that word appeared on every row of the
+      first screenful and told the reader nothing the order had not. Urgency is
+      the section header and the chip's colour.
+    */
+    // `ListGroup` uppercases its label, so the header reads DO FIRST; the row's
+    // chip does not, which is what makes these two distinguishable here.
+    expect(view.getAllByText('DO FIRST')).toHaveLength(1);
+    expect(view.queryByText('Do first')).toBeNull();
+
+    // Two urgent rows, each still naming what kind of thing it is.
+    expect(view.getAllByText('Known issue').length).toBeGreaterThan(0);
     view.getByText('Modification');
-    view.getByText('Known issue');
+  });
+
+  it('drops the sections while filtering, because a result set is not a plan', async () => {
+    respond();
+    const user = userEvent.setup();
+    const { view } = await mount();
+
+    await view.findByText('Fuel injector seals');
+    await user.type(view.getByLabelText("Search suggestions"), 'filter');
+
+    // The count is the useful label on a search; "Do first" over one match is not.
+    expect(view.queryByText('DO FIRST')).toBeNull();
+    expect(view.queryByText('EVERYTHING ELSE')).toBeNull();
   });
 });
 
@@ -158,7 +182,7 @@ describe('filtering as you type', () => {
     const { view } = await mount();
 
     await view.findByText('K&N Drop-in Air Filter');
-    await user.type(view.getByLabelText(/Filter suggestions/i), 'filter');
+    await user.type(view.getByLabelText("Search suggestions"), 'filter');
 
     view.getByText('K&N Drop-in Air Filter');
     expect(view.queryByText('Fuel injector seals')).toBeNull();
@@ -176,7 +200,7 @@ describe('filtering as you type', () => {
     const { view } = await mount();
 
     await view.findByText('K&N Drop-in Air Filter');
-    await user.type(view.getByLabelText(/Filter suggestions/i), 'hesitation');
+    await user.type(view.getByLabelText("Search suggestions"), 'hesitation');
 
     view.getByText('10th Gen CVT Transmission');
     expect(view.queryByText('K&N Drop-in Air Filter')).toBeNull();
@@ -190,7 +214,7 @@ describe('filtering as you type', () => {
     const { view } = await mount();
 
     await view.findByText('K&N Drop-in Air Filter');
-    await user.type(view.getByLabelText(/Filter suggestions/i), 'clunk over bumps');
+    await user.type(view.getByLabelText("Search suggestions"), 'clunk over bumps');
 
     await view.findByLabelText('Add clunk over bumps to the wishlist');
     view.getByText(/Nothing we know about matches/i);
@@ -257,7 +281,7 @@ describe('adding — the claims that moved from the composer', () => {
     const { view } = await mount();
 
     await view.findByText('K&N Drop-in Air Filter');
-    await user.type(view.getByLabelText(/Filter suggestions/i), '   ');
+    await user.type(view.getByLabelText("Search suggestions"), '   ');
 
     expect(view.queryByLabelText(/^Add {3}to the wishlist$/)).toBeNull();
     expect(posted()).toBeUndefined();
@@ -274,7 +298,7 @@ describe('adding — the claims that moved from the composer', () => {
     const { view } = await mount();
 
     await view.findByText('K&N Drop-in Air Filter');
-    await user.type(view.getByLabelText(/Filter suggestions/i), 'Wipers');
+    await user.type(view.getByLabelText("Search suggestions"), 'Wipers');
     await user.press(await view.findByLabelText('Add Wipers to the wishlist'));
 
     await waitFor(() => expect(posted()).toBeDefined());
@@ -312,7 +336,17 @@ describe('adding — the claims that moved from the composer', () => {
   it('signs out if the add comes back 401', async () => {
     request.mockImplementation((path: string, init?: { method?: string }) => {
       if (init?.method === 'POST') {
-        return Promise.reject(new ApiRequestError({ status: 401, message: 'Unauthorized' }));
+        /*
+          ⚠ **`origin: 'device'` as of 24 Aug (MOB-08).** This screen used to sign
+          out on **any** 401, including a `server` one that a retry a second later
+          would have accepted — and then `return`ed without setting a state, so
+          offline with an expired token it showed skeletons forever with no error
+          and no retry.
+
+          A device-side 401 is the one that genuinely means "signed out", and it is
+          the one this case is about.
+        */
+        return Promise.reject(new ApiRequestError({ status: 401, origin: 'device', message: 'Unauthorized' }));
       }
       if (path.startsWith('/wishlist')) return Promise.resolve({ wishlistItems: [] } as never);
       return Promise.resolve({

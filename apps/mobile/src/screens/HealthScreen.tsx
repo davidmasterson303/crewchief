@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useRefetchOnFocus } from '../navigation/useRefetchOnFocus';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import Button from '../components/Button';
@@ -8,6 +9,7 @@ import HealthDrivers from '../components/HealthDrivers';
 import HealthHistory, { type HealthReading } from '../components/HealthHistory';
 import Plinth from '../components/Plinth';
 import SectionHeader from '../components/SectionHeader';
+import { RecallDetailScreen } from './RecallDetailScreen';
 import { Skeleton, SkeletonCard } from '../components/Skeleton';
 import { apiRequest, ApiRequestError } from '../api/client';
 import type { HealthDriver } from '@crewchief/core/health-drivers';
@@ -97,10 +99,13 @@ export function HealthScreen({
   vehicleId,
   title,
   onSignOut,
+  onAskAdvisor,
 }: {
   vehicleId: string;
   title?: string;
   onSignOut: () => void;
+  /** Threaded through to the recalls section — see `R16` below. */
+  onAskAdvisor: (vehicleId: string, question: string) => void;
 }) {
   const [state, setState] = useState<State>({ kind: 'loading' });
   const [refreshing, setRefreshing] = useState(false);
@@ -131,7 +136,27 @@ export function HealthScreen({
           history: Array.isArray(data.health_history) ? data.health_history : [],
         });
       } catch (error) {
-        if (error instanceof ApiRequestError && error.status === 401) {
+        /*
+          ── ⚠ MOB-08 · a server 401 is not "you are signed out" ─────────────
+
+          This forced a sign-out on **any** 401 and then `return`ed without
+          setting a state — which is only safe if `onSignOut()` unmounts the
+          screen, and it does not when the network call was the thing that
+          failed. Result: offline with an expired token, this screen shows
+          skeletons **forever** — no error, no retry, nothing to pull.
+
+          `isLocallySignedOut` is the distinction the client already goes to
+          trouble to make, with a docblock recording that a real tester hit this
+          three times out of three on 5 Aug — and exactly **one** screen
+          consumed it. A `device` 401 is genuinely signed out; a `server` 401
+          may be a token the server would accept a second later, and destroying
+          a working session over one response is how a spurious failure becomes
+          a forced re-login.
+
+          Falls through to the error state either way, so there is always
+          something on screen and something to press.
+        */
+        if (error instanceof ApiRequestError && error.isLocallySignedOut) {
           onSignOut();
           return;
         }
@@ -153,6 +178,19 @@ export function HealthScreen({
   useEffect(() => {
     void load();
   }, [load]);
+
+  /*
+    ── ⚠ MOB-09 · a write behind this screen used to be invisible ─────────────
+
+    Nothing in this app refetched on focus. Every screen loaded once on mount
+    and kept whatever it had — so adding to the wishlist, marking a recall
+    repaired, confirming an odometer or scanning an invoice all succeeded and
+    then returned to a screen that said they had not.
+
+    `useRefetchOnFocus` carries the full argument, including why this runs on
+    the first focus too rather than being clever about skipping it.
+  */
+  useRefetchOnFocus(load);
 
   if (state.kind === 'loading') {
     return (
@@ -224,6 +262,40 @@ export function HealthScreen({
           <HealthDrivers drivers={state.drivers} />
         </Card>
       )}
+
+      {/*
+        ── ⚠ R16 · recalls live here, under the score they drive ─────────────
+
+        `Recalls` was a top-level destination for content already surfaced twice
+        — the garage bay banners the count, and the vehicle hub banners the
+        worst one — which made it a third path to the same two items.
+
+        More to the point, recalls **are** one of the things driving the number
+        above. A separate screen put the cause a navigation away from the
+        effect, on the one screen whose entire job is explaining the effect.
+
+        ⚠ It keeps its own component and its own fetch rather than being folded
+        into this screen's payload. `RecallDetailScreen` owns the marking flow,
+        the severity banners and the NHTSA-not-checked state, all of which are
+        genuinely its own problem; what changed is where it is *reached from*.
+        The hub's red banner deep-links to this section rather than to a route.
+      */}
+      <View
+        /*
+          The anchor the hub's banner scrolls to. Named rather than measured:
+          a deep link to "the recalls part of Health" has to survive the drivers
+          card above it changing height.
+        */
+        nativeID="health-recalls"
+      >
+        <RecallDetailScreen
+          embedded
+          vehicleId={vehicleId}
+          title={title}
+          onAskAdvisor={onAskAdvisor}
+          onSignOut={onSignOut}
+        />
+      </View>
 
       {/*
         ⚠ Nothing at all below two readings, rather than an empty panel under a

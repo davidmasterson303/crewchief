@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRefetchOnFocus } from '../navigation/useRefetchOnFocus';
 import {
   ActivityIndicator,
   Animated,
@@ -20,13 +21,15 @@ import type { HealthDriver } from '@crewchief/core/health-drivers';
 import { buildPosition } from '@crewchief/core/build-progress';
 import { showsModifications } from '@crewchief/core/mod-progression';
 import { UNKNOWN_TIMING, describeNextService, localToday } from '@crewchief/core/garage-next-service';
-import { normaliseRecalls } from '@crewchief/core/recalls';
+import { componentPlainName, normaliseRecalls } from '@crewchief/core/recalls';
+import { healthVerdict } from '@crewchief/core/health-claims';
 import AlertBanner from '../components/AlertBanner';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import DialChip, { DIAL_CHIP_SLOT } from '../components/DialChip';
 import { HeroBed, HeroEmpty } from '../components/HeroBed';
 import { type HealthReading } from '../components/HealthHistory';
+import ProvenanceRow from '../components/ProvenanceRow';
 import Icon from '../components/Icon';
 import ListGroup from '../components/ListGroup';
 import NavRow from '../components/NavRow';
@@ -100,6 +103,11 @@ interface HealthSummary {
   health_score?: number | null;
   summary?: string | null;
   red_flags?: unknown[] | null;
+  /**
+   * When this reading was taken. Added 23 Aug alongside `healthVerdict` — the
+   * screen cannot refuse an out-of-date sentence without knowing its date.
+   */
+  last_generated?: string | null;
 }
 
 interface Vehicle {
@@ -251,7 +259,48 @@ interface Knowledge {
  */
 interface HubCounts {
   services: number | null;
+  /**
+   * When the most recent service record was **filed**, ISO, or `null` if the
+   * count could not be read.
+   *
+   * ⚠ Filed rather than performed. It exists to date the health verdict against
+   * what it could have seen, and a visit dated 2 Aug that was scanned on the
+   * 6th was invisible to a summary generated on the 4th. `healthVerdict`
+   * carries the full argument.
+   */
+  servicesFiledAt: string | null;
   wishlist: { count: number; total: number } | null;
+}
+
+/**
+ * The most recent `created_at` among filed service records, or `null`.
+ *
+ * ⚠ Returns `null` for an empty list rather than "now" or the epoch. A car with
+ * no records has no filing date, and either substitute would be a claim: the
+ * epoch would call every verdict stale, and `now` would call every verdict
+ * current. §6 — a missing value is "we cannot say".
+ */
+function newestFiledAt(items: Array<{ created_at?: string | null }>): string | null {
+  let newest: string | null = null;
+  let newestAt = -Infinity;
+
+  for (const item of items) {
+    if (typeof item?.created_at !== 'string') continue;
+
+    /*
+      Parsed rather than compared as strings. These do all come from one
+      Postgres column and would sort lexically today — but that holds only while
+      every row carries the same offset and the same fractional precision, which
+      is a property of the data rather than of anything enforced here.
+    */
+    const at = Date.parse(item.created_at);
+    if (Number.isNaN(at) || at <= newestAt) continue;
+
+    newest = item.created_at;
+    newestAt = at;
+  }
+
+  return newest;
 }
 
 type State =
@@ -278,7 +327,6 @@ export function VehicleDetailScreen({
   onOpenWishlist,
   onOpenHistory,
   onOpenHealth,
-  onOpenBuild,
   onOpenMilestone,
   onOpenProfile,
   pickPhoto,
@@ -304,14 +352,14 @@ export function VehicleDetailScreen({
     Callbacks, like every other destination here, for the reason the header
     gives: this screen does not know react-navigation exists.
 
-    `onOpenHealth` and `onOpenBuild` are where two instruments went. They were
+    `onOpenHealth` is where the health instrument went, and `onOpenWishlist`
+    now carries the build with it — see the hub's own note on R15. They were
     cards on this screen — a dial with three drivers and a chart, and a second
     dial with a five-rung ladder — and between them they were most of why the
     IA read as cluttered. `onOpenMilestone` was already a route and simply had
     no way in from here; it took a notification to reach it.
   */
   onOpenHealth: () => void;
-  onOpenBuild: () => void;
   onOpenMilestone: () => void;
   /** The owner's four onboarding answers, editable. */
   onOpenProfile: () => void;
@@ -390,7 +438,7 @@ export function VehicleDetailScreen({
             health_history?: HealthReading[];
             knowledge?: Knowledge | null;
           }>(`/load-vehicle?vehicleId=${encodeURIComponent(vehicleId)}`),
-          apiRequest<{ maintenanceLineItems?: unknown[] }>(
+          apiRequest<{ maintenanceLineItems?: Array<{ created_at?: string | null }> }>(
             `/load-maintenance-data?vehicleId=${encodeURIComponent(vehicleId)}`
           ),
           apiRequest<{ wishlistItems?: Array<Record<string, unknown>> }>(
@@ -406,12 +454,15 @@ export function VehicleDetailScreen({
           return;
         }
 
+        const filedItems =
+          servicesResult.status === 'fulfilled' &&
+          Array.isArray(servicesResult.value.maintenanceLineItems)
+            ? servicesResult.value.maintenanceLineItems
+            : null;
+
         const counts: HubCounts = {
-          services:
-            servicesResult.status === 'fulfilled' &&
-            Array.isArray(servicesResult.value.maintenanceLineItems)
-              ? servicesResult.value.maintenanceLineItems.length
-              : null,
+          services: filedItems === null ? null : filedItems.length,
+          servicesFiledAt: filedItems === null ? null : newestFiledAt(filedItems),
           wishlist:
             wishlistResult.status === 'fulfilled'
               ? summariseWishlist(wishlistResult.value.wishlistItems)
@@ -456,6 +507,19 @@ export function VehicleDetailScreen({
   useEffect(() => {
     void load();
   }, [load]);
+
+  /*
+    ── ⚠ MOB-09 · a write behind this screen used to be invisible ─────────────
+
+    Nothing in this app refetched on focus. Every screen loaded once on mount
+    and kept whatever it had — so adding to the wishlist, marking a recall
+    repaired, confirming an odometer or scanning an invoice all succeeded and
+    then returned to a screen that said they had not.
+
+    `useRefetchOnFocus` carries the full argument, including why this runs on
+    the first focus too rather than being clever about skipping it.
+  */
+  useRefetchOnFocus(load);
 
   /**
    * Add or replace this car's photograph.
@@ -591,10 +655,39 @@ export function VehicleDetailScreen({
     names the worst open component is information. `component` is NHTSA's own
     short field; the summary would be a paragraph.
   */
-  const worstRecall = open[0]?.component
-    ? openRecalls === 1
-      ? `${open[0].component}. Free to fix at a franchised dealer.`
-      : `Worst: ${open[0].component}. Free to fix at a franchised dealer.`
+  /*
+    ── The verdict, and why it is not `health.summary` ───────────────────────
+
+    See `healthVerdict` in `@crewchief/core/health-claims` for the defect: this
+    screen read "a complete lack of documented maintenance" over a car with five
+    filed services, because the stored sentence was written before they arrived
+    and nothing on this path recomputes it.
+
+    Computed here because this is the first point at which both of its inputs
+    exist — the open recall count is worked out immediately above, and the
+    service count came back with the load.
+  */
+  const verdict = healthVerdict({
+    summary: health?.summary,
+    generatedAt: health?.last_generated,
+    serviceCount: counts.services,
+    newestFiledAt: counts.servicesFiledAt,
+    openRecalls,
+  });
+
+  /*
+    ⚠ **R28 / §6.** It printed `Worst: AIR BAGS:SIDE/WINDOW:HEAD` — NHTSA's
+    taxonomy string, in caps, in the product's loudest banner. `componentPlainName`
+    with `short` names the system alone, because this is one line carrying a
+    component, a severity and an instruction and the qualifiers do not fit in it.
+
+    "Worst:" is gone with it. The banner already sits under a count, so the
+    superlative was doing nothing a reader could act on — it now reads as one
+    sentence: *"Airbags — free to fix at a franchised dealer."*
+  */
+  const worstComponent = componentPlainName(open[0]?.component ?? null, { short: true });
+  const worstRecall = worstComponent
+    ? `${worstComponent} — free to fix at a franchised dealer.`
     : null;
 
   /*
@@ -619,14 +712,6 @@ export function VehicleDetailScreen({
     vehicle.current_mileage ?? null,
     localToday()
   );
-
-  /*
-    ⚠ `completed` is empty and it is empty everywhere — `modification_tracking`
-    holds no rows across the product, re-confirmed against the live database on
-    23 Aug. So every car reads Stock. That is the honest state, and `BuildScreen`
-    is where it is explained rather than merely displayed.
-  */
-  const buildLabel = buildPosition([]).label;
 
   /*
     ── What each row says is behind it ───────────────────────────────────────
@@ -862,8 +947,38 @@ export function VehicleDetailScreen({
             <Text style={[styles.scoreBand, { color: healthBandHex(band) }]}>{band.label}</Text>
           </View>
 
-          {health?.summary ? <Text style={styles.summary}>{health.summary}</Text> : null}
-          <NavRow icon="gauge" label="What is driving this score" onPress={onOpenHealth} last />
+          {/*
+            ⚠ `verdict.text`, never `health.summary`. The stored sentence is
+            shown only when the reading is current; when it predates the records
+            on file, what renders instead is a statement of that, and the
+            sentence itself does not appear at all — see `healthVerdict`.
+          */}
+          {verdict.text ? <Text style={styles.summary}>{verdict.text}</Text> : null}
+
+          {/*
+            What the number was worked out from, named. This is the half that
+            makes a contradiction like the one above visible while somebody is
+            looking at the screen, rather than only to whoever thinks to open
+            the service history and compare.
+          */}
+          <ProvenanceRow kinds={verdict.inputs} />
+
+          {/*
+            ── R24 · a list row, not a link floating in a paragraph ──────────
+
+            `NavRow` with `last` draws no divider, so this chevron row sat
+            directly under the provenance line with nothing separating them —
+            it read as a link inside the text block rather than as the card's
+            way out. The rule it now follows is the one `ListGroup` uses: a row
+            is separated from what it is not part of.
+
+            The whole card is deliberately **not** the target. It carries the
+            score, the verdict and the provenance, and three different things to
+            read do not make one thing to press.
+          */}
+          <View style={styles.cardExit}>
+            <NavRow icon="gauge" label="What is driving this score" onPress={onOpenHealth} last />
+          </View>
         </Card>
       )}
 
@@ -909,21 +1024,25 @@ export function VehicleDetailScreen({
         a wishlist total, the next service. Where it does not know, it carries
         **nothing** — never a zero, which would claim the place is empty.
       */}
-      <ListGroup label="This car">
-        <NavRow icon="clock" label="Service due" count={serviceDue} onPress={onOpenMilestone} />
-        <NavRow icon="wrench" label="Service history" count={historyCount} onPress={onOpenHistory} />
-        <NavRow icon="heart" label="Wishlist" count={wishlistCount} onPress={onOpenWishlist} />
-        {/*
-          The build, now a route. It was a dial reading Stock and a five-rung
-          scale with a marker on it, and nothing on that card could be pressed —
-          `BuildScreen` carries what was wrong with it and what it does instead.
+      {/*
+        ── ⚠ R14 / R15 · five rows became three ──────────────────────────────
 
-          Shown only when the owner has not answered "stock". `showsModifications`
-          is the one genuine off switch, and it is "not now" rather than "never".
-        */}
-        {showsModifications(vehicle.performance_mindedness) && (
-          <NavRow icon="sliders" label="Build" count={buildLabel} onPress={onOpenBuild} />
-        )}
+        It was `Service due`, `Service history`, `Wishlist`, `Build` and `Scan an
+        invoice` — five siblings off a flat list, four of which were two pairs
+        answering one question each.
+
+        `Service` is what this car has had done and what it needs; `Plan` is
+        what to do to it next, needs and mods. Both open on the segment their
+        row named, so nothing that used to be one tap away is now two.
+
+        The counts move with them. `Service` shows the history count because
+        that is the countable fact; `Plan` shows the needs count and total,
+        which is the number an owner is actually tracking.
+      */}
+      <ListGroup label="This car">
+        <NavRow icon="clock" label="Service" count={serviceDue} onPress={onOpenMilestone} />
+        <NavRow icon="wrench" label="History" count={historyCount} onPress={onOpenHistory} />
+        <NavRow icon="heart" label="Plan" count={wishlistCount} onPress={onOpenWishlist} />
         {/*
           No `detail` line any more. The spec's rows are one line each, and a
           two-line row in a group of one-liners is the row that looks broken —
@@ -979,6 +1098,20 @@ export function VehicleDetailScreen({
           onPress={onBack}
           accessibilityRole="button"
           accessibilityLabel="Back to the garage"
+          /*
+            ── ⚠ R25 · 36pt drawn, 44pt tappable ──────────────────────────────
+
+            The pill is 36 tall because that is what reads correctly over a
+            photograph — a 44pt glass slab is a bar, not a pill. `hitSlop` is
+            React Native's version of the `.tap-target-44` pseudo-element: the
+            drawn size is unchanged and the target grows around it.
+
+            Legal here for the same reason the pseudo-element is: these are
+            **standalone** targets at opposite ends of the nav row, so the
+            expanded areas cannot overlap each other or anything else. Inside a
+            dense list it would not be.
+          */
+          hitSlop={{ top: 4, bottom: 4, left: 8, right: 8 }}
           style={({ pressed }) => [styles.pill, styles.backPill, pressed && styles.pillPressed]}
         >
           <Icon name="chevron-left" size={16} color={brand.accent} />
@@ -1028,8 +1161,32 @@ export function VehicleDetailScreen({
         than a deletion — logged for Design in `docs/design-system-drift.md`.
       */}
       {score !== null && band && (
-        <View style={[styles.dialChip, { top: insets.top + 6 }]} pointerEvents="none">
-          <DialChip score={score} />
+        <View style={[styles.dialChip, { top: insets.top + 6 }]} pointerEvents="box-none">
+          {/*
+            ── R10 / R25 · it is a control now, and it says so ────────────────
+
+            The chip was `pointerEvents="none"` chrome: an arc and the numeral
+            70, which a screen reader announced as "Health score 70 out of 100 —
+            Fair" and then offered nothing to do with. Meanwhile the only way
+            into the health detail was a row most of the way down the sheet.
+
+            It persists through the whole scroll, so it is the one affordance
+            that is always in reach. The spoken name says where it goes, because
+            a reading and a door to a reading are different things and the arc
+            cannot distinguish them.
+
+            ⚠ `hitSlop`, for the same reason as the back pill — the chip is
+            drawn at the size that reads over a photograph, and the target is
+            grown around it rather than the drawing being inflated.
+          */}
+          <Pressable
+            onPress={onOpenHealth}
+            accessibilityRole="button"
+            accessibilityLabel={`Health score ${score}, ${band.label}. Opens health detail.`}
+            hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
+          >
+            <DialChip score={score} />
+          </Pressable>
         </View>
       )}
     </View>
@@ -1153,13 +1310,32 @@ const styles = StyleSheet.create({
 
   /* ── z7 · the score chip ──────────────────────────────────────────────── */
   dialChip: { position: 'absolute', right: space.lg, alignItems: 'flex-end' },
+  /* R24. The rule that separates a card's exit from its content. */
+  cardExit: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: border.panel,
+    marginTop: space.sm,
+  },
 
   /*
     The reading, at the value size rather than the instrument's. Tabular so it
     does not shift as the score moves between sweeps.
   */
   scoreHead: { flexDirection: 'row', alignItems: 'baseline', gap: space.sm },
-  scoreValue: { ...type.editorial, fontSize: 30, lineHeight: 34, ...TABULAR },
+  /*
+    ⚠ **R7 · sans, because this screen's serif role is the hero title.**
+
+    This was `type.editorial` at 30, which put **two** serif roles on one screen
+    — the 36pt car name over the photograph and this. The theme's own rule is
+    "one serif role per screen, never two", and the system offers two kinds of
+    role, (a) a name and (b) a single hero numeral. A screen picks one.
+
+    On this screen the name wins: it is the signature, it is the only place an
+    owner sees their own car, and the numeral is the *subject of the paragraph
+    under it* rather than the screen's headline. The `Health` screen is where
+    the numeral is the hero, and that is where role (b) is spent.
+  */
+  scoreValue: { ...type.title, fontSize: 30, lineHeight: 34, ...TABULAR },
   scoreBand: { ...type.label, color: text.muted },
 
   body: { padding: space.lg, gap: space.md },

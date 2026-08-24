@@ -24,7 +24,7 @@ import {
   validateProfileUpdate,
   type Mindedness,
 } from '@crewchief/core/vehicle-profile';
-import { TARGET_MIN, border, radius, space, surface, text, type } from '../theme';
+import { TARGET_MIN, border, brand, radius, space, surface, text, type } from '../theme';
 
 /**
  * The four answers, editable.
@@ -119,7 +119,27 @@ export function VehicleProfileScreen({ vehicleId, onSignOut, onSaved }: Props) {
       setState({ kind: 'loaded', initial });
       setAnswers(initial);
     } catch (error) {
-      if (error instanceof ApiRequestError && error.status === 401) {
+        /*
+          ── ⚠ MOB-08 · a server 401 is not "you are signed out" ─────────────
+
+          This forced a sign-out on **any** 401 and then `return`ed without
+          setting a state — which is only safe if `onSignOut()` unmounts the
+          screen, and it does not when the network call was the thing that
+          failed. Result: offline with an expired token, this screen shows
+          skeletons **forever** — no error, no retry, nothing to pull.
+
+          `isLocallySignedOut` is the distinction the client already goes to
+          trouble to make, with a docblock recording that a real tester hit this
+          three times out of three on 5 Aug — and exactly **one** screen
+          consumed it. A `device` 401 is genuinely signed out; a `server` 401
+          may be a token the server would accept a second later, and destroying
+          a working session over one response is how a spurious failure becomes
+          a forced re-login.
+
+          Falls through to the error state either way, so there is always
+          something on screen and something to press.
+        */
+      if (error instanceof ApiRequestError && error.isLocallySignedOut) {
         onSignOut();
         return;
       }
@@ -182,7 +202,27 @@ export function VehicleProfileScreen({ vehicleId, onSignOut, onSaved }: Props) {
       await apiRequest('/vehicles', { method: 'PATCH', body: changed });
       onSaved();
     } catch (error) {
-      if (error instanceof ApiRequestError && error.status === 401) {
+        /*
+          ── ⚠ MOB-08 · a server 401 is not "you are signed out" ─────────────
+
+          This forced a sign-out on **any** 401 and then `return`ed without
+          setting a state — which is only safe if `onSignOut()` unmounts the
+          screen, and it does not when the network call was the thing that
+          failed. Result: offline with an expired token, this screen shows
+          skeletons **forever** — no error, no retry, nothing to pull.
+
+          `isLocallySignedOut` is the distinction the client already goes to
+          trouble to make, with a docblock recording that a real tester hit this
+          three times out of three on 5 Aug — and exactly **one** screen
+          consumed it. A `device` 401 is genuinely signed out; a `server` 401
+          may be a token the server would accept a second later, and destroying
+          a working session over one response is how a spurious failure becomes
+          a forced re-login.
+
+          Falls through to the error state either way, so there is always
+          something on screen and something to press.
+        */
+      if (error instanceof ApiRequestError && error.isLocallySignedOut) {
         onSignOut();
         return;
       }
@@ -346,9 +386,15 @@ const styles = StyleSheet.create({
     backgroundColor: surface.well,
   },
   /* An explicit fill, never an opacity — the contrast audit cannot composite one. */
-  choiceOn: { backgroundColor: surface.inverse, borderColor: surface.inverse },
+  /*
+    ⚠ The selected state is the brand fill, not white. It was `surface.inverse`
+    until 23 Aug, which put a white fill on a screen whose primary button is
+    cyan — the same two-filled-treatments conflict the retired `inverse` button
+    variant caused, one control down. See `Button`'s docblock.
+  */
+  choiceOn: { backgroundColor: brand.primary, borderColor: brand.primary },
   choiceText: { ...type.uiStrong, color: text.secondary },
-  choiceTextOn: { color: text.onInverse },
+  choiceTextOn: { color: text.onPrimary },
 
   objective: { minHeight: 96, paddingTop: space.md, textAlignVertical: 'top' },
 });

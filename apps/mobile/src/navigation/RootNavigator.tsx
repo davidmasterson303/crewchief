@@ -1,6 +1,10 @@
-import { useEffect } from 'react';
-import { Linking, Pressable } from 'react-native';
-import { NavigationContainer, type LinkingOptions } from '@react-navigation/native';
+import { useCallback, useEffect, useState } from 'react';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
+import {
+  NavigationContainer,
+  useNavigationContainerRef,
+  type LinkingOptions,
+} from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import {
@@ -12,18 +16,17 @@ import { currentPushPermission, registerForPush } from '../notifications/registe
 import { shouldRegisterSilently } from '@crewchief/core/push-priming';
 
 import { AdvisorScreen } from '../screens/AdvisorScreen';
-import { BuildScreen } from '../screens/BuildScreen';
 import { HealthScreen } from '../screens/HealthScreen';
 import { InvoiceScanScreen } from '../screens/InvoiceScanScreen';
-import { RecallDetailScreen } from '../screens/RecallDetailScreen';
-import { WishlistScreen } from '../screens/WishlistScreen';
 import { WishlistAddScreen } from '../screens/WishlistAddScreen';
-import { ServiceHistoryScreen } from '../screens/ServiceHistoryScreen';
-import { ServiceMilestoneScreen } from '../screens/ServiceMilestoneScreen';
 import { pickInvoiceImage, pickVehiclePhoto } from '../media/pick-image';
 import { GarageScreen } from '../screens/GarageScreen';
 import { AddVehicleScreen } from '../screens/AddVehicleScreen';
 import { VehicleDetailScreen } from '../screens/VehicleDetailScreen';
+import { AccountScreen } from '../screens/AccountScreen';
+import TabBar, { type TabName } from './TabBar';
+import { PlanScreen, type PlanSegment } from '../screens/PlanScreen';
+import { ServiceScreen, type ServiceSegment } from '../screens/ServiceScreen';
 import { VehicleProfileScreen } from '../screens/VehicleProfileScreen';
 import Icon from '../components/Icon';
 import { surface, text } from '../theme';
@@ -122,6 +125,17 @@ export type RootStackParamList = {
     act on it — David's call on 7 Aug was that driving an action is the point.
     The advisor is still reachable from here, per recall.
   */
+  /*
+    ⚠ **R16: this route renders `HealthScreen`.** It is kept as a name because
+    shipped notifications carry `crewchief://vehicle/<id>/recalls`, and a link
+    an installed build already sends has to keep resolving.
+
+    What it no longer is, is a destination. Recalls drive the score, the garage
+    bay banners the count and the hub banners the worst one — a top-level screen
+    for two items already surfaced twice was a third path to the same content,
+    and it put the cause a navigation away from the effect. `HealthScreen` shows
+    them under the dial they move.
+  */
   RecallDetail: { vehicleId: string; title?: string };
   /*
     5.6, and the one route here that widens the mobile surface rather than
@@ -129,8 +143,15 @@ export type RootStackParamList = {
     new features to `mobile: n/a`; David agreed to the widening on 7 Aug —
     "people may want to add items to wishlist on the go."
   */
-  Wishlist: { vehicleId: string; title?: string };
-  ServiceHistory: { vehicleId: string; title?: string };
+  /**
+   * ── R15 · Plan — needs and mods, one destination ──────────────────────────
+   *
+   * Replaces `Wishlist` and `Build`, which were two hub rows answering one
+   * question. `PlanScreen` carries the argument; the short version is that a
+   * charge pipe is both a known failure and the first mod anyone fits, and two
+   * lists made the owner file it before they could find it.
+   */
+  Plan: { vehicleId: string; title?: string; segment?: PlanSegment };
   /*
     5.6. Where a service-due notification lands. It opened the vehicle screen
     until 7 Aug, on the reasoning that "your oil change is due" needs no
@@ -138,7 +159,14 @@ export type RootStackParamList = {
     odometer first, then states the milestone, then offers each job to the
     wishlist.
   */
-  ServiceMilestone: { vehicleId: string; title?: string };
+  /**
+   * ── R14 · Service — what is due, and what has been done ───────────────────
+   *
+   * Replaces `ServiceMilestone` and `ServiceHistory`. The path stays
+   * `vehicle/:vehicleId/service` because that is what shipped service-due
+   * notifications carry.
+   */
+  Service: { vehicleId: string; title?: string; segment?: ServiceSegment };
   /*
     ── 23 Aug: two instruments became two destinations ──────────────────────
 
@@ -155,8 +183,18 @@ export type RootStackParamList = {
     exists so those three suggestions can be read, added to the wishlist, or
     declined, which is what a plan is.
   */
-  Build: { vehicleId: string; title?: string };
   Health: { vehicleId: string; title?: string };
+  /**
+   * The account, and it is a **route** as of 23 Aug (R13).
+   *
+   * ⚠ It was a modal owned by `GarageScreen`, which made "account deletion is
+   * one tap from the garage" a thing somebody had to remember to render on
+   * every return path — `mobile-account-reachable.test.ts` exists because that
+   * was got wrong once already. As a destination on the bar it is one tap from
+   * **every** screen, and App Store 5.1.1(v) is satisfied structurally rather
+   * than by vigilance.
+   */
+  Account: undefined;
   /*
     The wishlist's catalogue — `native-wishlist.spec.html` puts Add in the nav
     bar, and a nav-bar `+` implies a destination rather than a sheet. The
@@ -225,17 +263,39 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 const linking: LinkingOptions<RootStackParamList> = {
   prefixes: ['crewchief://'],
   config: {
+    /*
+      ── ⚠ MOB-07 · a cold-start notification tap trapped the user ────────────
+
+      Without this, a link opened from a **cold start** produces a stack with
+      **exactly one route**: no back button, the edge-swipe gesture does
+      nothing, `goBack()` is a no-op, and there is no tab bar underneath. The
+      only way out is force-quitting the app.
+
+      That is the flagship path. A recall notification says *"Tap to see what it
+      means"*, and this product delivered its first real ones on 16 Aug — so the
+      journey most likely to be somebody's first is the one with no exit.
+
+      `initialRouteName` tells React Navigation to seed the stack with the
+      garage *underneath* the linked screen, so the back button and the gesture
+      both work and land somewhere that makes sense. It costs one line and it
+      changes nothing about a warm open, where the stack already exists.
+    */
+    initialRouteName: 'Garage',
     screens: {
       Garage: 'garage',
       VehicleDetail: 'vehicle/:vehicleId',
       Advisor: 'vehicle/:vehicleId/advisor',
       InvoiceScan: 'vehicle/:vehicleId/scan',
+      /*
+        ⚠ Kept, and it renders `HealthScreen` — see the route's own note.
+        Installed builds send this path in recall notifications.
+      */
       RecallDetail: 'vehicle/:vehicleId/recalls',
-      Wishlist: 'vehicle/:vehicleId/wishlist',
-      ServiceHistory: 'vehicle/:vehicleId/history',
-      ServiceMilestone: 'vehicle/:vehicleId/service',
-      Build: 'vehicle/:vehicleId/build',
+      /* Kept: service-due notifications send this path. */
+      Service: 'vehicle/:vehicleId/service',
+      Plan: 'vehicle/:vehicleId/plan',
       Health: 'vehicle/:vehicleId/health',
+      Account: 'account',
     },
   },
 
@@ -277,6 +337,75 @@ const screenOptions = {
   contentStyle: { backgroundColor: surface.page },
 } as const;
 
+/**
+ * The label a pushed screen's back button carries.
+ *
+ * ⚠ **A screen with `headerShown: false` and no `title` publishes its route
+ * name.** native-stack takes the back label from the previous screen's `title`
+ * and falls back to `route.name` when there is none — so hiding a header does
+ * not remove that screen from the header of the next one, it only removes the
+ * value it would have used. `VehicleDetail` hid its header on 23 Aug for the
+ * hero pullback, and six screens pushed from it have read `‹ VehicleDetail`
+ * ever since: a class name, in the product's voice, on the most-travelled back
+ * button in the app.
+ *
+ * So `title` is still set below. It draws nothing — the header is off — and
+ * does exactly one job, which is this label.
+ *
+ * ── Why the year comes off ──────────────────────────────────────────────────
+ *
+ * The title is `[year, make, model].join(' ')`, and "2015 BMW M235i" is past
+ * what iOS will render in a back button: it silently collapses to "Back", which
+ * is correct but says nothing. Dropping the leading year leaves "BMW M235i",
+ * which fits and still names the car.
+ *
+ * Only a leading four-digit year is removed, and nothing else is guessed at.
+ * Taking the last word instead would give "Cherokee" for a Grand Cherokee — the
+ * kind of cleverness that is invisible until it is wrong on somebody's car.
+ */
+export function carBackTitle(title: string | undefined): string {
+  const named = title?.trim();
+  if (!named) return 'Vehicle';
+
+  return named.replace(/^\d{4}\s+/, '') || named;
+}
+
+/**
+ * The most recently opened car, for the Advisor tab — R13.
+ *
+ * ⚠ **Module state, deliberately, and it does not persist.** The advisor needs
+ * a `vehicleId`; the tab bar has none, and threading one through the navigation
+ * tree would make every screen carry a value only the bar reads.
+ *
+ * A cold start has no last car and falls back to the garage, which is correct
+ * rather than a limitation: choosing a car is a real step and guessing at one —
+ * the first in the list, the last one persisted, whatever — would open the
+ * advisor about somebody else's vehicle in a two-car garage. §10.
+ */
+let lastOpenedVehicle: { vehicleId: string; title?: string } | null = null;
+
+export function rememberVehicle(vehicleId: string, title?: string) {
+  lastOpenedVehicle = { vehicleId, title };
+}
+
+function lastVehicle() {
+  return lastOpenedVehicle;
+}
+
+/**
+ * Which tab a route belongs to.
+ *
+ * ⚠ Everything pushed off the garage — a car, its plan, its service, the scan —
+ * is still *the garage tab*, and the bar has to keep saying so. A bar that went
+ * blank three screens in would read as having lost its place, which is the
+ * failure mode of every hand-rolled tab bar.
+ */
+function tabFor(route: string | undefined): TabName {
+  if (route === 'Advisor') return 'Advisor';
+  if (route === 'Account') return 'Account';
+  return 'Garage';
+}
+
 export function RootNavigator({
   accessToken,
   email,
@@ -286,6 +415,33 @@ export function RootNavigator({
   email: string | null;
   onSignOut: () => void;
 }) {
+  /*
+    The container ref, so the tab bar can navigate and can read where it is.
+    `useNavigationContainerRef` rather than a plain ref: it is the typed one and
+    it is safe to call before the container is ready.
+  */
+  const navigation = useNavigationContainerRef<RootStackParamList>();
+  const [route, setRoute] = useState<string | undefined>(undefined);
+
+  /**
+   * Where the stack is, and which car it is about.
+   *
+   * ⚠ **Both, in one place.** `rememberVehicle` used to be called only from the
+   * garage's row, which meant a **deep link** — a recall notification, a
+   * service-due alert, a `crewchief://vehicle/<id>` URL — put somebody on a car
+   * without the Advisor tab learning which one, so the tab bounced them back to
+   * the garage they had never been to.
+   *
+   * Reading it off the container covers every way a car can be reached, present
+   * and future, because there is only one of them: the route being on screen.
+   */
+  const noteRoute = useCallback((current: { name: string; params?: object } | undefined) => {
+    setRoute(current?.name);
+
+    const params = current?.params as { vehicleId?: string; title?: string } | undefined;
+    if (params?.vehicleId) rememberVehicle(params.vehicleId, params.title);
+  }, []);
+
   /*
     Configured here rather than in `App.tsx` because this component only mounts
     once someone is signed in — and an alert about a recall is meaningless to a
@@ -321,9 +477,29 @@ export function RootNavigator({
   }, []);
 
   return (
-    <NavigationContainer linking={linking}>
+    <NavigationContainer
+      ref={navigation}
+      linking={linking}
+      /*
+        ── R13 · which tab the bar should mark ──────────────────────────────
+
+        Read off the container rather than held as state by the bar, because the
+        bar is not the only thing that navigates: a deep link, a notification
+        tap and the back gesture all move the stack, and a bar that only knew
+        about its own presses would mark the wrong tab after any of them.
+      */
+      onStateChange={() => noteRoute(navigation.getCurrentRoute())}
+      onReady={() => noteRoute(navigation.getCurrentRoute())}
+    >
+      <View style={styles.frame}>
       <Stack.Navigator screenOptions={screenOptions}>
-        <Stack.Screen name="Garage" options={{ headerShown: false }}>
+        {/*
+          `title` with the header off is the back label and nothing else — see
+          `carBackTitle`. "Garage" is what the route is called anyway, so this
+          changes no pixel; it is here so the label is a decision rather than a
+          coincidence that survives the next rename.
+        */}
+        <Stack.Screen name="Garage" options={{ headerShown: false, title: 'Garage' }}>
           {({ navigation }) => (
             <GarageScreen
               accessToken={accessToken}
@@ -332,19 +508,14 @@ export function RootNavigator({
               onOpenVehicle={(vehicleId, title) =>
                 navigation.navigate('VehicleDetail', { vehicleId, title })
               }
-              onAddVehicle={() => navigation.navigate('AddVehicle')}
               /*
-                The same seam as the invoice picker. `pick-image.ts` is the only
-                module that imports `expo-image-picker`, so the screen takes the
-                picker rather than reaching for a native module it would then be
-                unable to mount without.
-
-                Library rather than camera by default: a car photograph is
-                almost always one already taken, and the simulator has no camera
-                at all — a camera-first default could never be exercised on the
-                machine this is developed on.
+                R21. The bay's next-service row was the most actionable string
+                on the home screen and led nowhere. It opens what is due.
               */
-              pickPhoto={() => pickVehiclePhoto('library')}
+              onOpenService={(vehicleId, title) =>
+                navigation.navigate('Service', { vehicleId, title, segment: 'due' })
+              }
+              onAddVehicle={() => navigation.navigate('AddVehicle')}
             />
           )}
         </Stack.Screen>
@@ -388,7 +559,15 @@ export function RootNavigator({
             the fetch, so the car is named before the payload lands. It stops
             being a navigator concern and starts being a prop.
           */
-          options={{ headerShown: false }}
+          /*
+            `title` is the back label of every screen pushed from here, and
+            nothing else — see `carBackTitle`. Without it these read
+            `‹ VehicleDetail`.
+          */
+          options={({ route }) => ({
+            headerShown: false,
+            title: carBackTitle(route.params.title),
+          })}
         >
           {({ route, navigation }) => (
             <VehicleDetailScreen
@@ -408,22 +587,31 @@ export function RootNavigator({
                   title: route.params.title,
                 })
               }
+              /*
+                ⚠ **R16.** The banner opens `Health`, not a recalls screen. The
+                recalls are a section of it, under the dial they drive — cause
+                beside effect rather than one navigation apart.
+              */
               onViewRecalls={() =>
-                navigation.navigate('RecallDetail', {
+                navigation.navigate('Health', {
                   vehicleId: route.params.vehicleId,
                   title: route.params.title,
                 })
               }
+              /* R15. One destination, opening on the segment the row named. */
               onOpenWishlist={() =>
-                navigation.navigate('Wishlist', {
+                navigation.navigate('Plan', {
                   vehicleId: route.params.vehicleId,
                   title: route.params.title,
+                  segment: 'needs',
                 })
               }
+              /* R14. One destination, opening on the segment the row named. */
               onOpenHistory={() =>
-                navigation.navigate('ServiceHistory', {
+                navigation.navigate('Service', {
                   vehicleId: route.params.vehicleId,
                   title: route.params.title,
+                  segment: 'history',
                 })
               }
               onOpenHealth={() =>
@@ -432,23 +620,11 @@ export function RootNavigator({
                   title: route.params.title,
                 })
               }
-              onOpenBuild={() =>
-                navigation.navigate('Build', {
-                  vehicleId: route.params.vehicleId,
-                  title: route.params.title,
-                })
-              }
-              /*
-                ⚠ This route existed and had **no way in from the app**. It was
-                reachable only from a service-due notification and a deep link,
-                so anyone who dismissed the alert — or never got one — could not
-                reach the screen that confirms an odometer and offers the jobs.
-                The hub's "Service due" row is that way in.
-              */
               onOpenMilestone={() =>
-                navigation.navigate('ServiceMilestone', {
+                navigation.navigate('Service', {
                   vehicleId: route.params.vehicleId,
                   title: route.params.title,
+                  segment: 'due',
                 })
               }
               onOpenProfile={() =>
@@ -466,19 +642,24 @@ export function RootNavigator({
         <Stack.Screen
           name="Advisor"
           /*
-            "Advisor · M235i" rather than the car's name alone, which would
-            read as a second copy of the screen behind it. Arriving by link
-            there is no name yet, and "Advisor · Vehicle" reads like a bug — so
-            the qualifier is dropped entirely rather than filled with a
-            placeholder.
+            ⚠ **`Advisor`, and nothing else, as of 23 Aug (R52).** It was
+            `Advisor · 2015 BMW M235i`: two pieces of information in a slot that
+            fits one, and on a 16e the cost was not the title. iOS gives the
+            title the space it needs and takes it from the **back button's
+            label**, so a long car name turned this screen's back control into a
+            bare chevron — the only unlabelled one in the app, and duly reported
+            as a second back-button idiom.
+
+            The car did not go away; it moved below the nav, where it can be as
+            long as it is and where it says what the thread is *about*. See
+            `AdvisorScreen`'s `vehicleTitle`.
           */
-          options={({ route }) => ({
-            title: route.params.title ? `Advisor · ${route.params.title}` : 'Advisor',
-          })}
+          options={{ title: 'Advisor' }}
         >
           {({ route }) => (
             <AdvisorScreen
               vehicleId={route.params.vehicleId}
+              vehicleTitle={route.params.title}
               /*
                 React Navigation maps a query string onto params, so
                 `crewchief://vehicle/<id>/advisor?ask=...` arrives here already
@@ -490,9 +671,21 @@ export function RootNavigator({
           )}
         </Stack.Screen>
 
-        <Stack.Screen name="RecallDetail" options={{ title: 'Recalls' }}>
+        {/*
+          ── ⚠ R16 · a deep-link alias, not a destination ────────────────────
+
+          Nothing in the app navigates here. It exists because shipped builds
+          send `crewchief://vehicle/<id>/recalls` in recall notifications, and a
+          link an installed app already emits has to keep resolving — so the
+          path is kept and pointed at the screen the content moved to.
+
+          It renders `HealthScreen`, which shows the recalls under the dial they
+          drive. The title is `Health` for the same reason: a back button
+          reading "Recalls" would name a screen that no longer exists.
+        */}
+        <Stack.Screen name="RecallDetail" options={{ title: 'Health' }}>
           {({ route, navigation }) => (
-            <RecallDetailScreen
+            <HealthScreen
               vehicleId={route.params.vehicleId}
               title={route.params.title}
               onSignOut={onSignOut}
@@ -508,9 +701,11 @@ export function RootNavigator({
         </Stack.Screen>
 
         <Stack.Screen
-          name="Wishlist"
+          name="Plan"
           /*
-            ── The `+` lives here, in the nav bar ────────────────────────────
+            ── R15 · Needs and Mods, one destination ────────────────────────
+
+            ── The `+` lives here, in the nav bar ───────────────────────────
 
             `native-wishlist.spec.html` is specific about it, and about what it
             is not: *"Add is in the nav bar, not a floating action button. A FAB
@@ -518,15 +713,26 @@ export function RootNavigator({
 
             `headerRight` is set from the navigator rather than by the screen
             calling `setOptions`, so the control exists in the screen's loading
-            and error states too — the same rule that keeps Account out of
-            `GarageScreen`'s conditional returns. A person whose wishlist failed
-            to load can still add to it.
+            and error states too. A person whose list failed to load can still
+            add to it.
           */
-          options={{ title: 'Wishlist' }}
+          options={{ title: 'Plan' }}
         >
           {({ route, navigation }) => (
-            <WishlistScreen
+            <PlanScreen
               vehicleId={route.params.vehicleId}
+              title={route.params.title}
+              /*
+                ⚠ Decided here rather than inside `PlanScreen`, because the hub
+                is what knows the owner's answer — `showsModifications` reads
+                `performance_mindedness`, and the plan screen has no vehicle
+                payload of its own. A deep link arrives without it, and the
+                honest default for "we do not know yet" is to show the segment:
+                hiding it would silently narrow the app on the strength of a
+                field that was not asked for.
+              */
+              showsMods
+              initialSegment={route.params.segment}
               onSignOut={onSignOut}
               onAdd={() =>
                 navigation.navigate('WishlistAdd', {
@@ -534,52 +740,24 @@ export function RootNavigator({
                   title: route.params.title,
                 })
               }
-              /*
-                ⚠ The `+` stands down while the list is empty.
-
-                Two controls doing one job on a screen with nothing on it was
-                the redundancy — and the empty state's filled button is the one
-                worth keeping, because a 22pt glyph in the corner is not an
-                affordance on an otherwise blank screen. Once there are rows the
-                `+` is the only way in and there is no empty state competing.
-
-                `setOptions` from the screen's own render, because only the
-                screen knows whether the fetch came back empty.
-              */
-              onEmptyChange={(empty) =>
-                navigation.setOptions({
-                  headerRight: empty
-                    ? undefined
-                    : () => (
-                        <Pressable
-                          onPress={() =>
-                            navigation.navigate('WishlistAdd', {
-                              vehicleId: route.params.vehicleId,
-                              title: route.params.title,
-                            })
-                          }
-                          accessibilityRole="button"
-                          accessibilityLabel="Add to the wishlist"
-                          hitSlop={12}
-                        >
-                          <Icon name="plus" size={22} color={text.primary} />
-                        </Pressable>
-                      ),
-                })
-              }
             />
           )}
         </Stack.Screen>
 
-        <Stack.Screen name="ServiceHistory" options={{ title: 'Service history' }}>
-          {({ route }) => (
-            <ServiceHistoryScreen vehicleId={route.params.vehicleId} onSignOut={onSignOut} />
-          )}
-        </Stack.Screen>
+        {/*
+          ── R14 · Due and History, one destination ──────────────────────────
 
-        <Stack.Screen name="ServiceMilestone" options={{ title: 'Service due' }}>
+          The path is still `vehicle/:vehicleId/service` because that is what
+          shipped service-due notifications carry, and it lands on `Due` — which
+          is what such a notification is about.
+        */}
+        <Stack.Screen name="Service" options={{ title: 'Service' }}>
           {({ route }) => (
-            <ServiceMilestoneScreen vehicleId={route.params.vehicleId} onSignOut={onSignOut} />
+            <ServiceScreen
+              vehicleId={route.params.vehicleId}
+              initialSegment={route.params.segment}
+              onSignOut={onSignOut}
+            />
           )}
         </Stack.Screen>
 
@@ -618,34 +796,39 @@ export function RootNavigator({
           )}
         </Stack.Screen>
 
-        <Stack.Screen name="Health" options={{ title: 'Health' }}>
-          {({ route }) => (
-            <HealthScreen
-              vehicleId={route.params.vehicleId}
-              title={route.params.title}
+        {/*
+          ── R13 · the account, as a destination ─────────────────────────────
+
+          `visible` is deliberately not passed: `AccountScreen` renders as a
+          screen when it is absent and as a modal when it is not, and this is
+          the screen case. `onClose` goes with it — the stack header is the way
+          back, and a "Done" beside it would be a second answer to one question.
+        */}
+        <Stack.Screen name="Account" options={{ title: 'Account' }}>
+          {() => (
+            <AccountScreen
+              email={email}
+              accessToken={accessToken}
               onSignOut={onSignOut}
+              /*
+                Deletion clears the session, which unmounts this whole navigator
+                — so there is nothing here to navigate back to and nothing to
+                show a confirmation on. `App.tsx`'s gate takes over.
+              */
+              onDeleted={() => onSignOut()}
             />
           )}
         </Stack.Screen>
 
-        <Stack.Screen name="Build" options={{ title: 'Build' }}>
+        <Stack.Screen name="Health" options={{ title: 'Health' }}>
           {({ route, navigation }) => (
-            <BuildScreen
+            <HealthScreen
               vehicleId={route.params.vehicleId}
               title={route.params.title}
               onSignOut={onSignOut}
-              /*
-                A suggestion that has been added goes somewhere, and the
-                somewhere is the list it was added to. `navigate` rather than
-                `push`: coming back from the wishlist should return here, and a
-                second copy of a screen already in the stack is how a back
-                gesture stops meaning anything.
-              */
-              onOpenWishlist={() =>
-                navigation.navigate('Wishlist', {
-                  vehicleId: route.params.vehicleId,
-                  title: route.params.title,
-                })
+              /* R16. The recalls section keeps its per-recall advisor thread. */
+              onAskAdvisor={(vehicleId, ask) =>
+                navigation.navigate('Advisor', { vehicleId, title: route.params.title, ask })
               }
             />
           )}
@@ -666,6 +849,55 @@ export function RootNavigator({
           )}
         </Stack.Screen>
       </Stack.Navigator>
+
+      {/*
+        ── R13 · the bar ─────────────────────────────────────────────────────
+
+        Hidden on sign-in only, which this navigator never renders — so it is
+        always on. That is the point: the advisor and the account are reachable
+        from wherever somebody is, rather than from one screen each.
+
+        `navigate` rather than `push`, so tapping Garage from three screens deep
+        returns to the garage already on the stack instead of stacking a second
+        copy of it behind the first.
+      */}
+      <TabBar
+        current={tabFor(route)}
+        onSelect={(tab) => {
+          if (tab === 'Advisor') {
+            /*
+              ⚠ The advisor needs a car, and the bar has none.
+
+              `/api/v1/consultant` requires a `vehicleId` and authorizes against
+              it, so there is no advisor without one. `lastVehicle` is whichever
+              car was opened most recently this session — the review's own
+              suggestion, and the honest fallback when there is none is the
+              garage, where a car gets chosen. Not an empty advisor: a composer
+              that cannot send is worse than the screen that leads to one.
+            */
+            const car = lastVehicle();
+            if (car) {
+              navigation.navigate('Advisor', { vehicleId: car.vehicleId, title: car.title });
+            } else {
+              navigation.navigate('Garage');
+            }
+            return;
+          }
+
+          navigation.navigate(tab);
+        }}
+      />
+      </View>
     </NavigationContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  /*
+    The navigator and the bar in one column. `flex: 1` on the navigator means
+    the bar takes its height out of the frame rather than floating over it — the
+    same argument the wishlist spec makes against a floating action button, and
+    the 49pt the review costed against the pinned hero.
+  */
+  frame: { flex: 1 },
+});

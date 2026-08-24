@@ -1,3 +1,4 @@
+import { StyleSheet } from 'react-native';
 import { render, userEvent, waitFor } from '@testing-library/react-native';
 
 import { RecallDetailScreen } from '../RecallDetailScreen';
@@ -184,12 +185,24 @@ describe('what it will not claim', () => {
     expect(view.queryByText('How it gets fixed')).toBeNull();
   });
 
-  it('shows the remedy when there is one', async () => {
-    // The pair. Without it, the assertion above is satisfied by a screen that
-    // never renders a remedy at all.
+  it('shows the remedy when there is one, once the notice is opened', async () => {
+    /*
+      The pair. Without it, the assertion above is satisfied by a screen that
+      never renders a remedy at all.
+
+      ⚠ **R30, 23 Aug.** It is behind a disclosure now. NHTSA's summary,
+      "What could happen" and "How it gets fixed" used to render at once — three
+      levels of prose on one card, at low contrast, which is how a screen ends
+      up read by nobody. The control that opens it is asserted first, so this
+      still fails if the disclosure disappears rather than passing on absence.
+    */
     respond([rawRecall()]);
     const { view } = await mount();
 
+    const disclosure = await view.findByText('Read the full notice');
+    expect(view.queryByText('How it gets fixed')).toBeNull();
+
+    await userEvent.press(disclosure);
     expect(await view.findByText('How it gets fixed')).toBeTruthy();
   });
 });
@@ -270,7 +283,17 @@ describe('failure paths', () => {
     // Arranged before mounting: the screen fetches on mount, so a mock set
     // afterwards would be too late and the assertion would pass or fail on
     // timing rather than on behaviour.
-    request.mockRejectedValue(new ApiRequestError({ status: 401, message: 'Unauthorized' }));
+    /*
+      ⚠ **`origin: 'device'` as of 24 Aug (MOB-08).** This screen used to sign
+      out on **any** 401, including a `server` one that a retry a second later
+      would have accepted — and then `return`ed without setting a state, so
+      offline with an expired token it showed skeletons forever with no error
+      and no retry.
+
+      A device-side 401 is the one that genuinely means "signed out", and it is
+      the one this case is about.
+    */
+    request.mockRejectedValue(new ApiRequestError({ status: 401, origin: 'device', message: 'Unauthorized' }));
 
     const { props } = await mount();
 
@@ -410,7 +433,23 @@ describe('marking a recall repaired', () => {
       [{ campaign_number: '20V123000', addressed_at: '2026-08-23' }]);
     const view = await mount();
 
-    await view.findByText('1 open · 1 marked repaired');
+    /*
+      ⚠ **R31.** The open count is a `.chip-critical` now, and the marked count
+      stays a quiet line beside it — a critical chip on work somebody has
+      already had done is the colour teaching itself to mean nothing. They are
+      two nodes rather than one dot-joined string.
+    */
+    await view.findByText('1 open');
+    view.getByText('1 marked repaired');
+
+    /*
+      ⚠ **R28.** The headline is a name, not NHTSA's taxonomy string. The raw
+      value still renders once, at provenance weight beside the campaign number,
+      which is why both spellings are asserted — the mapping must not be a
+      deletion.
+    */
+    view.getByText('Fuel pump');
+    view.getByText('Air bag');
     view.getByText('FUEL PUMP');
     view.getByText('AIR BAG');
   });
@@ -506,5 +545,213 @@ describe('marking a recall repaired', () => {
     // Anti-vacuous: the other action is still offered, so this is about the
     // campaign number rather than about the actions failing to render.
     view.getByLabelText(/Find a dealer/i);
+  });
+});
+
+/**
+ * ── R28 / R29: what the card is allowed to print ────────────────────────────
+ *
+ * Both were reported off the same live card on 23 Aug, and both are the same
+ * class of defect: a value that came out of a database was rendered as if it
+ * had been written for a person.
+ */
+describe('the strings this card prints', () => {
+  it('titles the card with a name, not NHTSA’s taxonomy', async () => {
+    respond([rawRecall({ Component: 'AIR BAGS:SIDE/WINDOW:HEAD' })]);
+    const { view } = await mount();
+
+    await view.findByText('Airbags — side/window, head');
+    // The raw code survives at provenance weight — a service desk knows it.
+    view.getByText('AIR BAGS:SIDE/WINDOW:HEAD');
+  });
+
+  it('never reads the taxonomy string out loud', async () => {
+    /*
+      ⚠ The accessible names are where an enum would be *spoken*. Every one on
+      this card goes through `plainComponent`, which is the reason it exists as
+      a helper rather than a call at each site.
+    */
+    respond([rawRecall({ Component: 'AIR BAGS:SIDE/WINDOW:HEAD' })]);
+    const { view } = await mount();
+
+    await view.findByText('Airbags — side/window, head');
+    view.getByLabelText('Ask the advisor about the Airbags — side/window, head recall');
+  });
+
+  it('renders the issue date as a date — the 2025-17-12 case', async () => {
+    /*
+      The live M235i card read **`Issued 2025-17-12`**. There is no month 17.
+      `17/12/2025` is day-first, and `parseRecallDate` read every `d/d/YYYY` as
+      month-first; the string it built was then rendered faithfully by every
+      layer below it.
+    */
+    respond([rawRecall({ ReportReceivedDate: '17/12/2025' })]);
+    const { view } = await mount();
+
+    await view.findByText('Issued 17 Dec 2025');
+    expect(view.queryByText(/2025-17-12/)).toBeNull();
+  });
+
+  it('says nothing rather than guessing at a date it cannot read', async () => {
+    /*
+      §10. `01/02/2026` is readable two ways and no sibling in the batch settles
+      it — so there is no "Issued" line at all. A missing one costs an owner
+      nothing; a transposed one tells them a 2019 campaign was issued last month.
+    */
+    respond([rawRecall({ ReportReceivedDate: '01/02/2026' })]);
+    const { view } = await mount();
+
+    await view.findByText('Campaign 20V123000');
+    expect(view.queryByText(/^Issued /)).toBeNull();
+  });
+
+  it('reads an ambiguous date once a sibling settles the format', async () => {
+    /*
+      The batch inference, end to end. `01/02/2026` alone is unreadable; beside
+      `24/04/2024` — which can only be day-first — it is 1 February.
+    */
+    respond([
+      rawRecall({ ReportReceivedDate: '01/02/2026' }),
+      rawRecall({ NHTSACampaignNumber: '21V999000', ReportReceivedDate: '24/04/2024' }),
+    ]);
+    const { view } = await mount();
+
+    await view.findByText('Issued 1 Feb 2026');
+    view.getByText('Issued 24 Apr 2024');
+  });
+});
+
+/**
+ * ── R16: the same component, as a section of Health ─────────────────────────
+ *
+ * Folding recalls under the score they drive means this renders inside
+ * `HealthScreen`'s scroller. Two structural things change, and both are the
+ * kind that look fine in a unit test and are broken on a device:
+ *
+ *   - A `ScrollView` inside a `ScrollView` on the same axis. The inner one eats
+ *     the gesture and the outer one stops at its height.
+ *   - `flex: 1` inside a scroll container, which collapses to zero — so an
+ *     error state renders as an empty gap rather than as a message.
+ */
+describe('embedded in the health screen', () => {
+  /** Every host view in the rendered tree, by type name. */
+  function hostTypes(view: { toJSON: () => unknown }) {
+    const found: string[] = [];
+    const walk = (node: unknown) => {
+      if (!node || typeof node !== 'object') return;
+      const host = node as { type?: unknown; children?: unknown[] };
+      if (typeof host.type === 'string') found.push(host.type);
+      for (const child of host.children ?? []) walk(child);
+    };
+    walk(view.toJSON());
+    return found;
+  }
+
+  it('renders no scroller of its own', async () => {
+    respond([rawRecall()]);
+    const view = await render(
+      <RecallDetailScreen
+        embedded
+        vehicleId="v1"
+        onAskAdvisor={jest.fn()}
+        onSignOut={jest.fn()}
+      />
+    );
+
+    await view.findByText(/Fuel pump/);
+    expect(hostTypes(view)).not.toContain('RCTScrollView');
+  });
+
+  it('still renders one when it is the screen', async () => {
+    // The anti-vacuous half: a component that never scrolls would pass above.
+    respond([rawRecall()]);
+    const view = await render(
+      <RecallDetailScreen vehicleId="v1" onAskAdvisor={jest.fn()} onSignOut={jest.fn()} />
+    );
+
+    await view.findByText(/Fuel pump/);
+    expect(hostTypes(view)).toContain('RCTScrollView');
+  });
+
+  it('leaves the car unnamed, because the host has already named it', async () => {
+    respond([rawRecall()]);
+    const view = await render(
+      <RecallDetailScreen
+        embedded
+        vehicleId="v1"
+        onAskAdvisor={jest.fn()}
+        onSignOut={jest.fn()}
+      />
+    );
+
+    await view.findByText(/Fuel pump/);
+    expect(view.queryByText('2018 Honda Accord')).toBeNull();
+  });
+
+  it('shows an error as a message, not as an empty gap', async () => {
+    request.mockRejectedValue(new ApiRequestError({ status: 500, message: 'Upstream failed' }));
+
+    const view = await render(
+      <RecallDetailScreen
+        embedded
+        vehicleId="v1"
+        onAskAdvisor={jest.fn()}
+        onSignOut={jest.fn()}
+      />
+    );
+
+    await waitFor(() => expect(view.getByText('Could not load recalls')).toBeTruthy());
+
+    /*
+      ⚠ `flex: 1` is what would collapse it. Asserted on the style rather than
+      on a measured height, because RNTL lays nothing out — but this is the
+      exact property, and it is the one a future edit would restore by
+      copy-pasting the screen-mode container.
+    */
+    const flat = (StyleSheet.flatten(view.getByText('Could not load recalls').parent?.props.style) ??
+      {}) as Record<string, unknown>;
+    expect(flat.flex).toBe(0);
+  });
+});
+
+/**
+ * ── MOB-08: a server 401 leaves something on the screen ─────────────────────
+ *
+ * Nineteen call sites forced a sign-out on **any** 401 and then `return`ed
+ * without setting a state — which is only safe if `onSignOut()` unmounts the
+ * screen, and it does not when the network call was the thing that failed.
+ *
+ * The client already went to trouble to distinguish `isLocallySignedOut`
+ * (device) from a server 401 that a retry would fix, with a docblock recording
+ * that a real tester hit this three times out of three on 5 Aug — and exactly
+ * **one** screen consumed it.
+ */
+describe('a server 401 is not a sign-out', () => {
+  it('keeps the person here and offers a retry', async () => {
+    /*
+      ⚠ Default `origin` is `'server'`, which is the case this is about: an
+      expired token while offline, or a token the server would accept a moment
+      later. Signing out here destroys a working session over one response.
+    */
+    request.mockRejectedValue(new ApiRequestError({ status: 401, message: 'Unauthorized' }));
+
+    const { props, view } = await mount();
+
+    await waitFor(() => expect(view.getByText('Could not load recalls')).toBeTruthy());
+    expect(props.onSignOut).not.toHaveBeenCalled();
+    view.getByText('Try again');
+  });
+
+  it('does not leave the screen in skeletons forever', async () => {
+    /*
+      The half that actually hurt. `return` without a state meant the loading
+      branch stayed rendered — no error, no retry, nothing to pull — which is
+      what an offline tester saw on Health.
+    */
+    request.mockRejectedValue(new ApiRequestError({ status: 401, message: 'Unauthorized' }));
+
+    const { view } = await mount();
+
+    await waitFor(() => expect(view.getByText('Could not load recalls')).toBeTruthy());
   });
 });

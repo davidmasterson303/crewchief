@@ -15,7 +15,18 @@ import Suggest from '../components/Suggest';
 import { apiRequest, ApiRequestError } from '../api/client';
 import { decodeVin, fetchModels } from '../api/vpic';
 import { validateMileageUpdate } from '@crewchief/core/mileage-tracking';
-import { TARGET_MIN, border, radius, space, status, surface, text, type } from '../theme';
+import {
+  PAGE_BODY,
+  TARGET_MIN,
+  border,
+  brand,
+  radius,
+  space,
+  status,
+  surface,
+  text,
+  type,
+} from '../theme';
 import {
   BASELINE_AGE_OPTIONS,
   type BaselineAge,
@@ -359,7 +370,15 @@ export function AddVehicleScreen({ onAdded, onSignOut }: Props) {
       onAdded(body.vehicle.id, [year, chosenMake, chosenModel].filter(Boolean).join(' '));
     } catch (err) {
       const apiError = err as ApiRequestError;
-      if (apiError.status === 401) {
+      /*
+        ⚠ **MOB-08.** `isLocallySignedOut`, not any 401. A `device` 401 is
+        genuinely signed out; a `server` 401 may be a token the server would
+        accept a second later, and destroying a working session over one
+        response is how a spurious failure becomes a forced re-login. The
+        client's own docblock records a real tester hitting this three times out
+        of three on 5 Aug — and one screen consumed the distinction.
+      */
+      if (apiError.isLocallySignedOut) {
         onSignOut();
         return;
       }
@@ -677,12 +696,12 @@ export function AddVehicleScreen({ onAdded, onSignOut }: Props) {
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         {/*
-          The inverse CTA from the primitive — the sixth and last private copy
+          The filled primary from the primitive — the sixth and last private copy
           of a treatment four tokens existed for and no component owned.
         */}
         <Button
           label="Add to my garage"
-          variant="inverse"
+          variant="primary"
           onPress={() => void submit()}
           disabled={!canSubmit}
           busy={busy}
@@ -705,7 +724,7 @@ export function AddVehicleScreen({ onAdded, onSignOut }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: surface.page },
-  body: { padding: 24, gap: 12 },
+  body: { ...PAGE_BODY },
 
   title: { color: text.primary, fontSize: 26, fontFamily: interFace('700'), fontWeight: '700', letterSpacing: -0.5 },
   subtitle: { color: text.secondary, fontSize: 14, marginBottom: 6 },
@@ -770,9 +789,15 @@ const styles = StyleSheet.create({
   },
   ageText: { color: text.secondary, fontSize: 14, fontFamily: interFace('600'), fontWeight: '600' },
 
-  choiceOn: { backgroundColor: surface.inverse },
+  /*
+    ⚠ The selected state is the brand fill, not white. It was `surface.inverse`
+    until 23 Aug, which put a white fill on a screen whose primary button is
+    cyan — the same two-filled-treatments conflict the retired `inverse` button
+    variant caused, one control down. See `Button`'s docblock.
+  */
+  choiceOn: { backgroundColor: brand.primary },
   choiceText: { color: text.secondary, fontSize: 15, fontFamily: interFace('600'), fontWeight: '600' },
-  choiceTextOn: { color: text.onInverse },
+  choiceTextOn: { color: text.onPrimary },
 
   error: { color: status.dangerText, fontSize: 13, lineHeight: 18 },
 

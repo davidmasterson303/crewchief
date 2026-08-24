@@ -44,6 +44,10 @@ const {
   initialNotificationUrl,
   subscribeToNotificationTaps,
 } = require('../../apps/mobile/src/notifications/push');
+
+/* MOB-07's source scan reads the navigator off disk — see the last describe. */
+const { readFileSync } = require('node:fs');
+const { join } = require('node:path');
 /* eslint-enable @typescript-eslint/no-var-requires */
 
 /** A notification carrying `data.url`, shaped as expo-notifications delivers it. */
@@ -157,5 +161,57 @@ describe('subscribeToNotificationTaps', () => {
 
     unsubscribe();
     expect(remove).toHaveBeenCalled();
+  });
+});
+
+/**
+ * ── MOB-07: a cold-start tap must not be a dead end ─────────────────────────
+ *
+ * @jest-environment node
+ *
+ * Without `initialRouteName`, a link opened from a **cold start** produces a
+ * stack with exactly one route: no back button, the edge-swipe gesture does
+ * nothing, `goBack()` is a no-op, and there is no tab bar underneath. The only
+ * exit is force-quitting.
+ *
+ * That is the flagship path. A recall notification says *"Tap to see what it
+ * means"*, and this product delivered its first real ones on 16 Aug — so the
+ * journey most likely to be somebody's first was the one with no way out.
+ *
+ * A source scan because there is no React Native runtime on this side of the
+ * workspace, and because what regressed is one declarative line in a config
+ * object rather than anything a render would reach.
+ */
+describe('the linking config seeds a stack', () => {
+  const navigator = readFileSync(
+    join(__dirname, '..', '..', 'apps', 'mobile', 'src', 'navigation', 'RootNavigator.tsx'),
+    'utf8'
+  );
+
+  it('names an initial route on the linking config', () => {
+    const configAt = navigator.indexOf('const linking: LinkingOptions');
+    expect(configAt).toBeGreaterThan(-1);
+
+    /*
+      Scoped to the linking object rather than the whole file, so a
+      `initialRouteName` on some unrelated navigator would not satisfy this.
+      Bounded by the `subscribe` member, which closes the object.
+    */
+    const config = navigator.slice(configAt, navigator.indexOf('subscribe(listener)', configAt));
+
+    expect(config).toMatch(/initialRouteName: 'Garage'/);
+  });
+
+  it('puts it on the config, not inside the screens map', () => {
+    /*
+      ⚠ A real way to get this wrong. `initialRouteName` inside `screens` is a
+      *nested navigator's* initial route and does nothing at the top level —
+      it type-checks, it looks right, and the user is still trapped.
+    */
+    const screensAt = navigator.indexOf('screens: {');
+    const initialAt = navigator.indexOf("initialRouteName: 'Garage'");
+
+    expect(initialAt).toBeGreaterThan(-1);
+    expect(initialAt).toBeLessThan(screensAt);
   });
 });

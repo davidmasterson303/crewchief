@@ -104,6 +104,67 @@ describe('iOS usage descriptions exist before the build is spent', () => {
       expect(text.toLowerCase()).not.toMatch(/^crewchief (needs|requires) (the )?(camera|photo)/);
     }
   });
+
+  it('describes every use of the photo library, not only one of them', () => {
+    /*
+      ── ⚠ MOB-01, and this guard was part of the defect ─────────────────────
+
+      `NSPhotoLibraryUsageDescription` said only *"…so you can attach an invoice
+      you have already photographed."* The library is also the **default source
+      for vehicle photographs** — `pickVehiclePhoto('library')` is what the
+      hero's "Add photo" opens, and the note beside it says library-rather-than-
+      camera is deliberate because a car picture is almost always one already
+      taken.
+
+      So a reviewer adding a picture of a car was told the app wanted the
+      library for invoices. Guideline 5.1.1 requires the string to be accurate
+      about what the data is used for.
+
+      ⚠ **And the check above ratcheted it in place.** `expect(text).toMatch(
+      /invoice/i)` is satisfied by the wrong string and would have failed the
+      right one had it dropped the word — a guard measuring the correct property
+      for one of two uses. This case is the other half: the string must mention
+      the car photograph too.
+    */
+    const text = infoPlist.NSPhotoLibraryUsageDescription as string;
+
+    expect(text).toMatch(/car|vehicle|photo of your/i);
+    expect(text).toMatch(/invoice/i);
+  });
+});
+
+describe('a dark app must not launch through a white flash', () => {
+  /*
+    ── MOB-05 ────────────────────────────────────────────────────────────────
+
+    No splash was configured at all, so Expo's default — white — was what a
+    reviewer saw for the second before the first frame of a dark-only product.
+    Not a rejection on its own; it is the **first thing they see**, and it reads
+    as unfinished.
+  */
+  it('configures a splash on the product surface', () => {
+    const splash = appJson.splash;
+
+    expect(splash).toBeDefined();
+    expect(splash.image).toBeTruthy();
+  });
+
+  it('paints it the page colour, not white', () => {
+    /*
+      ⚠ `surface.page` from `apps/mobile/src/theme/index.ts`. Read as a literal
+      here rather than imported, because this suite runs under the node
+      environment and the theme module pulls in the font layer — but the value
+      is asserted against the theme file's text so the two cannot drift.
+    */
+    const splash = appJson.splash;
+    expect(splash.backgroundColor.toUpperCase()).toBe('#100F0D');
+
+    const theme = readFileSync(
+      join(__dirname, '..', '..', 'apps', 'mobile', 'src', 'theme', 'index.ts'),
+      'utf8'
+    );
+    expect(theme).toMatch(/page: '#100F0D'/);
+  });
 });
 
 describe('declarations that only bite after the build', () => {

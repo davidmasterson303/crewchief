@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useRefetchOnFocus } from '../navigation/useRefetchOnFocus';
 import {
   Pressable,
   RefreshControl,
@@ -193,7 +194,27 @@ export function BuildScreen({
 
         setDeclined(await declinedMods(vehicleId));
       } catch (error) {
-        if (error instanceof ApiRequestError && error.status === 401) {
+        /*
+          ── ⚠ MOB-08 · a server 401 is not "you are signed out" ─────────────
+
+          This forced a sign-out on **any** 401 and then `return`ed without
+          setting a state — which is only safe if `onSignOut()` unmounts the
+          screen, and it does not when the network call was the thing that
+          failed. Result: offline with an expired token, this screen shows
+          skeletons **forever** — no error, no retry, nothing to pull.
+
+          `isLocallySignedOut` is the distinction the client already goes to
+          trouble to make, with a docblock recording that a real tester hit this
+          three times out of three on 5 Aug — and exactly **one** screen
+          consumed it. A `device` 401 is genuinely signed out; a `server` 401
+          may be a token the server would accept a second later, and destroying
+          a working session over one response is how a spurious failure becomes
+          a forced re-login.
+
+          Falls through to the error state either way, so there is always
+          something on screen and something to press.
+        */
+        if (error instanceof ApiRequestError && error.isLocallySignedOut) {
           onSignOut();
           return;
         }
@@ -215,6 +236,19 @@ export function BuildScreen({
   useEffect(() => {
     void load();
   }, [load]);
+
+  /*
+    ── ⚠ MOB-09 · a write behind this screen used to be invisible ─────────────
+
+    Nothing in this app refetched on focus. Every screen loaded once on mount
+    and kept whatever it had — so adding to the wishlist, marking a recall
+    repaired, confirming an odometer or scanning an invoice all succeeded and
+    then returned to a screen that said they had not.
+
+    `useRefetchOnFocus` carries the full argument, including why this runs on
+    the first focus too rather than being clever about skipping it.
+  */
+  useRefetchOnFocus(load);
 
   /**
    * Put a suggestion on the wishlist.
@@ -258,7 +292,27 @@ export function BuildScreen({
             : held
         );
       } catch (error) {
-        if (error instanceof ApiRequestError && error.status === 401) {
+        /*
+          ── ⚠ MOB-08 · a server 401 is not "you are signed out" ─────────────
+
+          This forced a sign-out on **any** 401 and then `return`ed without
+          setting a state — which is only safe if `onSignOut()` unmounts the
+          screen, and it does not when the network call was the thing that
+          failed. Result: offline with an expired token, this screen shows
+          skeletons **forever** — no error, no retry, nothing to pull.
+
+          `isLocallySignedOut` is the distinction the client already goes to
+          trouble to make, with a docblock recording that a real tester hit this
+          three times out of three on 5 Aug — and exactly **one** screen
+          consumed it. A `device` 401 is genuinely signed out; a `server` 401
+          may be a token the server would accept a second later, and destroying
+          a working session over one response is how a spurious failure becomes
+          a forced re-login.
+
+          Falls through to the error state either way, so there is always
+          something on screen and something to press.
+        */
+        if (error instanceof ApiRequestError && error.isLocallySignedOut) {
           onSignOut();
           return;
         }
@@ -356,16 +410,22 @@ export function BuildScreen({
       {/*
         The instrument, and it is a reading rather than a score.
 
-        `position.label` is the zone in words — "Stock", "Lightly modified" — and
-        it sits under the needle for the same reason the health band's verdict
-        does: a number with no word beside it invites the reader to supply their
-        own judgement, and the judgement for a stock car is *nothing is wrong*.
+        `position.label` is the zone in words — "Stock", "Lightly modified" —
+        and it sits under the needle for the same reason the health band's
+        verdict does: a number with no word beside it invites the reader to
+        supply their own judgement, and the judgement for a stock car is
+        *nothing is wrong*.
+
+        ⚠ **The zone is drawn once, by the gauge (R42).** This card used to
+        render `position.label` again directly under `BuildGauge`'s own caption,
+        so the screen read `Stock` above `Stock` — which looks like a label row
+        whose label has been filled in with its value. The gauge owns its
+        readout; this card owns the sentence under it.
       */}
       <Card>
         <View style={styles.dial}>
           <BuildGauge position={position} />
         </View>
-        <Text style={styles.zone}>{position.label}</Text>
         <Text style={styles.summary}>{progressionSummary(rungs, completed)}</Text>
       </Card>
 
@@ -379,11 +439,31 @@ export function BuildScreen({
             selling a tune.
           */}
           <Card>
-            <SectionHeader title="The order things go in" />
+            {/*
+              §6 / R58. It was "The order things go in", which is charming and
+              is a **sentence** in a slot built for a noun — the label row is
+              12px, 600, uppercased, and every other one in the app names a
+              thing. "ORDER OF WORK" says the same and fits the slot.
+            */}
+            <SectionHeader title="Order of work" />
             <ProgressionLadder next={rungs[0]?.role} />
           </Card>
 
-          <SectionHeader title={`Next steps for ${state.name}`} />
+          {/*
+            ── ⚠ R46 · never interpolate a car into an uppercased label ──────
+
+            This was `Next steps for ${state.name}`, and `SectionHeader`
+            uppercases — so it rendered **`NEXT STEPS FOR 2015 BMW M235I`**.
+            `M235i` is a model designation and the lower-case `i` is part of the
+            name, not a typographic accident; uppercasing it produces a car that
+            does not exist.
+
+            The car is the screen's context and the nav already carries it, so
+            the label does not need it at all. `lib/__tests__/mobile-section-labels.test.ts`
+            keeps every label in this app a literal, which is the mechanical
+            version of the rule.
+          */}
+          <SectionHeader title="Next steps" />
 
           {rungs.length === 0 ? (
             <Card>
@@ -530,7 +610,6 @@ const styles = StyleSheet.create({
   errorBody: { ...type.body, color: text.muted, textAlign: 'center' },
 
   dial: { alignItems: 'center' },
-  zone: { ...type.title, color: text.primary, textAlign: 'center' },
   summary: { ...type.body, color: text.secondary, textAlign: 'center' },
 
   rungName: { ...type.bodyStrong, color: text.primary },

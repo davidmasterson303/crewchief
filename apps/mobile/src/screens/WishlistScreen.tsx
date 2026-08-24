@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useRefetchOnFocus } from '../navigation/useRefetchOnFocus';
 import {
   ActivityIndicator,
   Alert,
@@ -20,7 +21,19 @@ import { Skeleton, SkeletonCard } from '../components/Skeleton';
 import { formatCurrency } from '@crewchief/core/formatting-utils';
 import { completionPayload, type CompletionDraft } from '@crewchief/core/wishlist-completion';
 import { MarkDoneSheet } from './MarkDoneSheet';
-import { TABULAR, border, brand, radius, space, status, surface, text, type } from '../theme';
+import {
+  OPTICAL_CENTRE,
+  PAGE_BODY,
+  TABULAR,
+  border,
+  brand,
+  radius,
+  space,
+  status,
+  surface,
+  text,
+  type,
+} from '../theme';
 import { interFace } from '../theme/fonts';
 
 /**
@@ -187,7 +200,15 @@ export function WishlistScreen({ vehicleId, onSignOut, onAdd, onEmptyChange }: P
         setState({ kind: 'loaded', items: body.wishlistItems ?? [] });
       } catch (error) {
         const apiError = error as ApiRequestError;
-        if (apiError.status === 401) {
+        /*
+          ⚠ **MOB-08.** `isLocallySignedOut`, not any 401. A `device` 401 is
+          genuinely signed out; a `server` 401 may be a token the server would
+          accept a second later, and destroying a working session over one
+          response is how a spurious failure becomes a forced re-login. The
+          client's own docblock records a real tester hitting this three times out
+          of three on 5 Aug — and one screen consumed the distinction.
+        */
+        if (apiError.isLocallySignedOut) {
           onSignOut();
           return;
         }
@@ -202,6 +223,19 @@ export function WishlistScreen({ vehicleId, onSignOut, onAdd, onEmptyChange }: P
   useEffect(() => {
     void load();
   }, [load]);
+
+  /*
+    ── ⚠ MOB-09 · a write behind this screen used to be invisible ─────────────
+
+    Nothing in this app refetched on focus. Every screen loaded once on mount
+    and kept whatever it had — so adding to the wishlist, marking a recall
+    repaired, confirming an odometer or scanning an invoice all succeeded and
+    then returned to a screen that said they had not.
+
+    `useRefetchOnFocus` carries the full argument, including why this runs on
+    the first focus too rather than being clever about skipping it.
+  */
+  useRefetchOnFocus(load);
 
   /*
     Only ever from the loaded state. "Loading" is not "empty", and reporting it
@@ -232,7 +266,15 @@ export function WishlistScreen({ vehicleId, onSignOut, onAdd, onEmptyChange }: P
                 await load(true);
               } catch (error) {
                 const apiError = error as ApiRequestError;
-                if (apiError.status === 401) {
+                /*
+                  ⚠ **MOB-08.** `isLocallySignedOut`, not any 401. A `device` 401 is
+                  genuinely signed out; a `server` 401 may be a token the server would
+                  accept a second later, and destroying a working session over one
+                  response is how a spurious failure becomes a forced re-login. The
+                  client's own docblock records a real tester hitting this three times out
+                  of three on 5 Aug — and one screen consumed the distinction.
+                */
+                if (apiError.isLocallySignedOut) {
                   onSignOut();
                   return;
                 }
@@ -261,7 +303,15 @@ export function WishlistScreen({ vehicleId, onSignOut, onAdd, onEmptyChange }: P
         await load(true);
       } catch (error) {
         const apiError = error as ApiRequestError;
-        if (apiError.status === 401) {
+        /*
+          ⚠ **MOB-08.** `isLocallySignedOut`, not any 401. A `device` 401 is
+          genuinely signed out; a `server` 401 may be a token the server would
+          accept a second later, and destroying a working session over one
+          response is how a spurious failure becomes a forced re-login. The
+          client's own docblock records a real tester hitting this three times out
+          of three on 5 Aug — and one screen consumed the distinction.
+        */
+        if (apiError.isLocallySignedOut) {
           onSignOut();
           return;
         }
@@ -301,9 +351,18 @@ export function WishlistScreen({ vehicleId, onSignOut, onAdd, onEmptyChange }: P
     );
   }
 
+  const empty = state.items.length === 0;
+
   return (
     <ScrollView
-      contentContainerStyle={styles.body}
+      /*
+        R37 / R57. Optically centred when the list is empty, top-aligned the
+        moment there is anything to read. `OPTICAL_CENTRE` only has slack to
+        distribute when the content is shorter than the display, so this is one
+        rule rather than a branch — the flag is here only because the empty
+        state is short *and* the list can be too on a tall phone.
+      */
+      contentContainerStyle={[styles.body, empty && OPTICAL_CENTRE]}
       keyboardShouldPersistTaps="handled"
       refreshControl={
         <RefreshControl
@@ -451,7 +510,7 @@ const styles = StyleSheet.create({
   item: { paddingVertical: space.md, gap: space.xs },
   itemDivided: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: border.panel },
 
-  body: { padding: 20, gap: 14, paddingBottom: 40 },
+  body: { ...PAGE_BODY },
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 10 },
 
   /*
@@ -513,9 +572,15 @@ const styles = StyleSheet.create({
     minHeight: 44,
     justifyContent: 'center',
   },
-  typeChipOn: { backgroundColor: surface.inverse },
+  /*
+    ⚠ The selected state is the brand fill, not white. It was `surface.inverse`
+    until 23 Aug, which put a white fill on a screen whose primary button is
+    cyan — the same two-filled-treatments conflict the retired `inverse` button
+    variant caused, one control down. See `Button`'s docblock.
+  */
+  typeChipOn: { backgroundColor: brand.primary },
   typeText: { color: text.secondary, fontSize: 14, fontFamily: interFace('600'), fontWeight: '600' },
-  typeTextOn: { color: text.onInverse },
+  typeTextOn: { color: text.onPrimary },
 
   /*
     An explicit fill, **not `opacity`**, and that is a testability decision as

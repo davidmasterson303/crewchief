@@ -30,7 +30,17 @@ import {
 import { historyLookups, type ServiceHistoryRow } from '@crewchief/core/service-history';
 import { validateMileageUpdate } from '@crewchief/core/mileage-tracking';
 import { wishlistItemIdentifier } from '@crewchief/core/wishlist-identifier';
-import { border, radius, status, surface, text } from '../theme';
+import {
+  OPTICAL_CENTRE,
+  PAGE_BODY,
+  border,
+  radius,
+  space,
+  status,
+  surface,
+  text,
+  type,
+} from '../theme';
 import { interFace } from '../theme/fonts';
 
 /**
@@ -180,7 +190,15 @@ export function ServiceMilestoneScreen({ vehicleId, onSignOut }: Props) {
       setReading(String(mileage));
     } catch (error) {
       const apiError = error as ApiRequestError;
-      if (apiError.status === 401) {
+      /*
+        ⚠ **MOB-08.** `isLocallySignedOut`, not any 401. A `device` 401 is
+        genuinely signed out; a `server` 401 may be a token the server would
+        accept a second later, and destroying a working session over one
+        response is how a spurious failure becomes a forced re-login. The
+        client's own docblock records a real tester hitting this three times out
+        of three on 5 Aug — and one screen consumed the distinction.
+      */
+      if (apiError.isLocallySignedOut) {
         onSignOut();
         return;
       }
@@ -226,7 +244,15 @@ export function ServiceMilestoneScreen({ vehicleId, onSignOut }: Props) {
       setConfirmed(true);
     } catch (error) {
       const apiError = error as ApiRequestError;
-      if (apiError.status === 401) {
+      /*
+        ⚠ **MOB-08.** `isLocallySignedOut`, not any 401. A `device` 401 is
+        genuinely signed out; a `server` 401 may be a token the server would
+        accept a second later, and destroying a working session over one
+        response is how a spurious failure becomes a forced re-login. The
+        client's own docblock records a real tester hitting this three times out
+        of three on 5 Aug — and one screen consumed the distinction.
+      */
+      if (apiError.isLocallySignedOut) {
         onSignOut();
         return;
       }
@@ -252,7 +278,15 @@ export function ServiceMilestoneScreen({ vehicleId, onSignOut }: Props) {
         setAdded((prev) => [...prev, service.service]);
       } catch (error) {
         const apiError = error as ApiRequestError;
-        if (apiError.status === 401) {
+        /*
+          ⚠ **MOB-08.** `isLocallySignedOut`, not any 401. A `device` 401 is
+          genuinely signed out; a `server` 401 may be a token the server would
+          accept a second later, and destroying a working session over one
+          response is how a spurious failure becomes a forced re-login. The
+          client's own docblock records a real tester hitting this three times out
+          of three on 5 Aug — and one screen consumed the distinction.
+        */
+        if (apiError.isLocallySignedOut) {
           onSignOut();
           return;
         }
@@ -289,20 +323,33 @@ export function ServiceMilestoneScreen({ vehicleId, onSignOut }: Props) {
   }
 
   /*
-    The mileage gate. Rendered before anything derived from the reading, because
-    everything below is derived from the reading.
-  */
-  if (!confirmed) {
-    return (
-      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-        <Text style={styles.name}>{state.name}</Text>
-        <Text style={styles.gateLead}>
-          Still around {miles.format(state.mileage)} miles?
-        </Text>
-        <Text style={styles.gateBody}>
-          What is due depends on the odometer, so it is worth a second before the answer.
-        </Text>
+    ── ⚠ R14 / §5 · the gate is a banner, not a screen ───────────────────────
 
+    This used to `return` here: the whole screen was one question, one field and
+    one button, with 70% of the display empty under it, and what is actually
+    due was on the other side of answering it. The review's general rule came
+    out of this exact screen — **no screen exists whose only content is one
+    question.** It is a sheet, a banner, or an inline edit.
+
+    So the schedule renders either way and the question sits above it. Two taps
+    become one for anyone whose odometer has not changed, and somebody who
+    ignores the banner still sees what their car needs — computed from the last
+    reading, which is the honest thing to compute it from and is what the
+    banner says.
+
+    ⚠ **It is not dismissible, and that is deliberate.** The reading is what
+    everything below is derived from; a banner that could be waved away would
+    leave a schedule quietly computed from a number nobody confirmed, with
+    nothing on screen saying so.
+  */
+  const confirmBanner = confirmed ? null : (
+    <View style={styles.confirm}>
+      <Text style={styles.confirmLead}>Still around {miles.format(state.mileage)} miles?</Text>
+      <Text style={styles.confirmBody}>
+        What is due depends on the odometer. The list below is worked out from this reading.
+      </Text>
+
+      <View style={styles.confirmRow}>
         <TextInput
           style={styles.input}
           value={reading}
@@ -314,7 +361,7 @@ export function ServiceMilestoneScreen({ vehicleId, onSignOut }: Props) {
         />
 
         {/*
-          The inverse CTA, from the primitive.
+          The filled primary, from the primitive.
 
           ⚠ It also closes a double-submit. This was a bare `Pressable` with no
           `disabled` — the label changed to "Saving…" and the control stayed
@@ -325,13 +372,15 @@ export function ServiceMilestoneScreen({ vehicleId, onSignOut }: Props) {
         */}
         <Button
           label="That is right"
-          variant="inverse"
+          variant="primary"
+          size="small"
           busy={saving}
           onPress={() => void confirm()}
+          style={styles.confirmAction}
         />
-      </ScrollView>
-    );
-  }
+      </View>
+    </View>
+  );
 
   /*
     Track A2a. These three lookups have been parameters of `evaluateSchedule`
@@ -356,9 +405,16 @@ export function ServiceMilestoneScreen({ vehicleId, onSignOut }: Props) {
   const unknowns = services.filter((service) => service.status === 'unknown');
 
   return (
-    <ScrollView contentContainerStyle={styles.body}>
-      <Text style={styles.name}>{state.name}</Text>
-      <Text style={styles.mileageLine}>{miles.format(state.mileage)} miles</Text>
+    <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+      {confirmBanner}
+
+      {/*
+        R33, the other state. The nav carries the car; what this screen adds is
+        the reading everything below is derived from.
+      */}
+      {confirmed ? (
+        <Text style={styles.mileageLine}>{miles.format(state.mileage)} miles</Text>
+      ) : null}
 
       {milestone ? (
         <MilestoneBlock
@@ -469,15 +525,28 @@ function MilestoneBlock({
 }
 
 const styles = StyleSheet.create({
-  body: { padding: 20, gap: 14, paddingBottom: 40 },
+  body: { ...PAGE_BODY },
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 10 },
 
-  name: { color: text.primary, fontSize: 24, fontFamily: interFace('700'), fontWeight: '700', letterSpacing: -0.5 },
   mileageLine: { color: text.muted, fontSize: 14, marginTop: -10 },
 
-  gateLead: { color: text.primary, fontSize: 18, fontFamily: interFace('600'), fontWeight: '600' },
-  gateBody: { color: text.secondary, fontSize: 14, lineHeight: 20 },
+  /* ── R14 · the confirm banner ──────────────────────────────────────────── */
+  confirm: {
+    backgroundColor: surface.card,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: border.panel,
+    padding: PAGE_BODY.paddingHorizontal,
+    gap: space.sm,
+  },
+  confirmLead: { ...type.bodyStrong, color: text.primary },
+  confirmBody: { ...type.value, color: text.muted },
+  /* The field and its verb on one line — it is one question, not a form. */
+  confirmRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  confirmAction: { flexShrink: 0 },
+
   input: {
+    flex: 1,
     backgroundColor: surface.raised,
     borderRadius: radius.button,
     paddingHorizontal: 14,

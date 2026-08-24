@@ -92,7 +92,17 @@ describe('listing', () => {
       screen could add and delete items and never list them — invisible from the
       web, and indistinguishable here from an empty wishlist.
     */
-    request.mockRejectedValue(new ApiRequestError({ status: 401, message: 'Unauthorized' }));
+    /*
+      ⚠ **`origin: 'device'` as of 24 Aug (MOB-08).** This screen used to sign
+      out on **any** 401, including a `server` one that a retry a second later
+      would have accepted — and then `return`ed without setting a state, so
+      offline with an expired token it showed skeletons forever with no error
+      and no retry.
+
+      A device-side 401 is the one that genuinely means "signed out", and it is
+      the one this case is about.
+    */
+    request.mockRejectedValue(new ApiRequestError({ status: 401, origin: 'device', message: 'Unauthorized' }));
     const { props } = await mount();
 
     await waitFor(() => expect(props.onSignOut).toHaveBeenCalledTimes(1));

@@ -80,7 +80,18 @@ describe('reading the record', () => {
     const view = await mount();
 
     expect(await view.findByText(/Front brake pads/)).toBeTruthy();
-    expect(view.getByText(/BLACKMARKET MOTORSPORTS/)).toBeTruthy();
+
+    /*
+      ⚠ **R34, 23 Aug.** The shop is the visit's heading now, and it appears
+      **once** — it used to render twice per row, in caps both times, and up to
+      six times on a five-line invoice.
+
+      Title-cased on display because the source is OCR off a printed header, not
+      something anybody typed. `displayShopName` only does this to a name that
+      is entirely upper-case; a name with any lower-case letter is left alone.
+    */
+    expect(view.getAllByText('Blackmarket Motorsports')).toHaveLength(1);
+    expect(view.queryByText(/BLACKMARKET MOTORSPORTS/)).toBeNull();
   });
 
   it('does not draw invoice lines as though they were services', async () => {
@@ -111,11 +122,61 @@ describe('provenance', () => {
     distinction is either visible or lost.
   */
 
-  it('attributes a row read from an invoice', async () => {
+  it('attributes a visit read from an invoice, and says how many lines', async () => {
+    /*
+      ⚠ **R17.** The provenance belongs to the **visit**, not to each line, and
+      it now names the invoice's size — which is the fact that used to be
+      repeated on every child row and is true exactly once here.
+    */
     respondWith([INVOICE_ROW]);
     const view = await mount();
 
-    expect(await view.findByText(/Read from an invoice/)).toBeTruthy();
+    expect(await view.findByText('Read from a 1-line invoice you scanned')).toBeTruthy();
+  });
+
+  it('says it once for a multi-line invoice, not once per line', async () => {
+    /*
+      The defect in full: five line items off one document drew five cards, each
+      repeating "From a scan of 5 lines · BLACKMARKET MOTORSPORTS · $1,461
+      total". One visit, one sentence, and the shop above it rather than inside
+      it five times.
+    */
+    respondWith([
+      INVOICE_ROW,
+      { ...INVOICE_ROW, id: 'm2', item_description: 'Oil change', total_cost: 152 },
+      { ...INVOICE_ROW, id: 'm3', item_description: 'Spark plugs', total_cost: 294 },
+    ]);
+    const view = await mount();
+
+    expect(await view.findByText('Read from a 3-line invoice you scanned')).toBeTruthy();
+    expect(view.getAllByText('Blackmarket Motorsports')).toHaveLength(1);
+
+    /*
+      The visit's total is summed over its three lines. Two nodes carry it here
+      and both are right: the screen's summary covers the whole history, and
+      with one visit on file the two scopes happen to agree. The line items
+      themselves must still show their own figures.
+    */
+    expect(view.getAllByText('$1,124')).toHaveLength(2);
+    view.getByText('$678');
+    view.getByText('$152');
+    view.getByText('$294');
+  });
+
+  it('keeps a hand-recorded line as its own visit', async () => {
+    /*
+      ⚠ Marking something done on the wishlist writes a line with no source
+      document. Those are separate events, and bucketing them together would
+      claim they happened on one afternoon at one shop.
+    */
+    respondWith([
+      { ...RECOLLECTION_ROW, id: 'r1', item_description: 'Coolant flush' },
+      { ...RECOLLECTION_ROW, id: 'r2', item_description: 'Alignment' },
+    ]);
+    const view = await mount();
+
+    await view.findByText('Coolant flush');
+    expect(view.getAllByText(/told us at sign-up/i)).toHaveLength(2);
   });
 
   it('marks a recollection as one, in different words', async () => {
@@ -125,7 +186,7 @@ describe('provenance', () => {
     const label = await view.findByText(/told us at sign-up/i);
     expect(label).toBeTruthy();
     // And it must not be dressed as a record.
-    expect(view.queryByText(/Read from an invoice/)).toBeNull();
+    expect(view.queryByText(/invoice you scanned/)).toBeNull();
   });
 
   it('says nothing at all for a row with no source', async () => {
@@ -179,7 +240,17 @@ describe('failure', () => {
 
   it('signs out on a 401', async () => {
     const onSignOut = jest.fn();
-    request.mockRejectedValue(new ApiRequestError({ status: 401, message: 'Unauthorized' }));
+    /*
+      ⚠ **`origin: 'device'` as of 24 Aug (MOB-08).** This screen used to sign
+      out on **any** 401, including a `server` one that a retry a second later
+      would have accepted — and then `return`ed without setting a state, so
+      offline with an expired token it showed skeletons forever with no error
+      and no retry.
+
+      A device-side 401 is the one that genuinely means "signed out", and it is
+      the one this case is about.
+    */
+    request.mockRejectedValue(new ApiRequestError({ status: 401, origin: 'device', message: 'Unauthorized' }));
 
     await render(<ServiceHistoryScreen vehicleId="v1" onSignOut={onSignOut} />);
 

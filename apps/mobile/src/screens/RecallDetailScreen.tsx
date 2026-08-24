@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useRefetchOnFocus } from '../navigation/useRefetchOnFocus';
 import {
   Linking,
   Pressable,
@@ -10,6 +11,8 @@ import {
 } from 'react-native';
 
 import AlertBanner from '../components/AlertBanner';
+import Chip from '../components/Chip';
+import Icon from '../components/Icon';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import { apiRequest, ApiRequestError } from '../api/client';
@@ -20,8 +23,19 @@ import {
   type AddressedRecall,
 } from '../api/recalls';
 import { Skeleton, SkeletonCard } from '../components/Skeleton';
-import { border, radius, space, status, surface, text, type } from '../theme';
 import {
+  PAGE_BODY,
+  TARGET_MIN,
+  border,
+  radius,
+  space,
+  status,
+  surface,
+  text,
+  type,
+} from '../theme';
+import {
+  componentPlainName,
   hasRemedy,
   normaliseRecalls,
   type NormalisedRecall,
@@ -63,6 +77,16 @@ interface Props {
   title?: string;
   onAskAdvisor: (vehicleId: string, ask: string) => void;
   onSignOut: () => void;
+  /**
+   * Rendered as a **section of `HealthScreen`** rather than as its own screen —
+   * R16.
+   *
+   * ⚠ Two things change and both are structural. The container becomes a `View`
+   * so there is not a `ScrollView` inside a `ScrollView`, and the vehicle's name
+   * is dropped: the host already names the car, and an H1 repeating it mid-page
+   * reads as a second screen having started.
+   */
+  embedded?: boolean;
 }
 
 type State =
@@ -173,9 +197,48 @@ function calendarDate(value: string): string {
   return `${day} ${MONTHS[month - 1]} ${year}`;
 }
 
-export function RecallDetailScreen({ vehicleId, title, onAskAdvisor, onSignOut }: Props) {
+/**
+ * The recall's component, as a name rather than NHTSA's taxonomy string — R28.
+ *
+ * A thin wrapper so the screen never reaches for `recall.component` by
+ * accident: the raw value is still rendered, once, at provenance weight, and
+ * every other use on this screen goes through here — including the accessible
+ * names, which is where a database enum would otherwise be *read out loud*.
+ */
+function plainComponent(recall: { component: string | null }): string | null {
+  return componentPlainName(recall.component);
+}
+
+export function RecallDetailScreen({
+  vehicleId,
+  title,
+  onAskAdvisor,
+  onSignOut,
+  embedded = false,
+}: Props) {
   const [state, setState] = useState<State>({ kind: 'loading' });
   const [refreshing, setRefreshing] = useState(false);
+
+  /**
+   * Which recalls have their full notice open — R30.
+   *
+   * ⚠ A set rather than a single id: two open recalls on one car is the common
+   * case, and an accordion that closes one card to open another makes comparing
+   * them impossible on a screen this long.
+   *
+   * Collapsed is the default and stays the default across a refresh. Nothing
+   * here is hidden from a screen reader — the disclosure carries
+   * `accessibilityState.expanded` and names what it opens.
+   */
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
+
+  const toggleExpanded = useCallback((key: string) => {
+    setExpanded((current) => {
+      const next = new Set(current);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
+  }, []);
 
   /*
     Which campaign is mid-write, and what went wrong if one did.
@@ -231,7 +294,27 @@ export function RecallDetailScreen({ vehicleId, title, onAskAdvisor, onSignOut }
           addressed: readMarks(vehicle?.recall_actions),
         });
       } catch (error) {
-        if (error instanceof ApiRequestError && error.status === 401) {
+        /*
+          ── ⚠ MOB-08 · a server 401 is not "you are signed out" ─────────────
+
+          This forced a sign-out on **any** 401 and then `return`ed without
+          setting a state — which is only safe if `onSignOut()` unmounts the
+          screen, and it does not when the network call was the thing that
+          failed. Result: offline with an expired token, this screen shows
+          skeletons **forever** — no error, no retry, nothing to pull.
+
+          `isLocallySignedOut` is the distinction the client already goes to
+          trouble to make, with a docblock recording that a real tester hit this
+          three times out of three on 5 Aug — and exactly **one** screen
+          consumed it. A `device` 401 is genuinely signed out; a `server` 401
+          may be a token the server would accept a second later, and destroying
+          a working session over one response is how a spurious failure becomes
+          a forced re-login.
+
+          Falls through to the error state either way, so there is always
+          something on screen and something to press.
+        */
+        if (error instanceof ApiRequestError && error.isLocallySignedOut) {
           onSignOut();
           return;
         }
@@ -254,6 +337,19 @@ export function RecallDetailScreen({ vehicleId, title, onAskAdvisor, onSignOut }
     void load();
   }, [load]);
 
+  /*
+    ── ⚠ MOB-09 · a write behind this screen used to be invisible ─────────────
+
+    Nothing in this app refetched on focus. Every screen loaded once on mount
+    and kept whatever it had — so adding to the wishlist, marking a recall
+    repaired, confirming an odometer or scanning an invoice all succeeded and
+    then returned to a screen that said they had not.
+
+    `useRefetchOnFocus` carries the full argument, including why this runs on
+    the first focus too rather than being clever about skipping it.
+  */
+  useRefetchOnFocus(load);
+
   /**
    * Record — or withdraw — the owner's claim that this campaign was seen to.
    *
@@ -274,7 +370,27 @@ export function RecallDetailScreen({ vehicleId, title, onAskAdvisor, onSignOut }
         const addressed = await fetchAddressedRecalls(vehicleId);
         setState((held) => (held.kind === 'loaded' ? { ...held, addressed } : held));
       } catch (error) {
-        if (error instanceof ApiRequestError && error.status === 401) {
+        /*
+          ── ⚠ MOB-08 · a server 401 is not "you are signed out" ─────────────
+
+          This forced a sign-out on **any** 401 and then `return`ed without
+          setting a state — which is only safe if `onSignOut()` unmounts the
+          screen, and it does not when the network call was the thing that
+          failed. Result: offline with an expired token, this screen shows
+          skeletons **forever** — no error, no retry, nothing to pull.
+
+          `isLocallySignedOut` is the distinction the client already goes to
+          trouble to make, with a docblock recording that a real tester hit this
+          three times out of three on 5 Aug — and exactly **one** screen
+          consumed it. A `device` 401 is genuinely signed out; a `server` 401
+          may be a token the server would accept a second later, and destroying
+          a working session over one response is how a spurious failure becomes
+          a forced re-login.
+
+          Falls through to the error state either way, so there is always
+          something on screen and something to press.
+        */
+        if (error instanceof ApiRequestError && error.isLocallySignedOut) {
           onSignOut();
           return;
         }
@@ -312,7 +428,18 @@ export function RecallDetailScreen({ vehicleId, title, onAskAdvisor, onSignOut }
       this screen says when it has something to say, so leaving its space
       unclaimed is what makes the arrival jump.
     */
-    return (
+    /*
+      ⚠ **Embedded, this must not be a `ScrollView`** — see the container note
+      below. Nor may the error states below keep `flex: 1`: inside a host's
+      content container that collapses to zero height, and a section that
+      vanishes while loading reads as a section that is not there.
+    */
+    return embedded ? (
+      <View style={styles.embedded}>
+        <Skeleton height={72} />
+        <SkeletonCard lines={3} />
+      </View>
+    ) : (
       <ScrollView contentContainerStyle={styles.body}>
         <Skeleton height={72} />
         <SkeletonCard lines={3} />
@@ -322,7 +449,7 @@ export function RecallDetailScreen({ vehicleId, title, onAskAdvisor, onSignOut }
 
   if (state.kind === 'gone') {
     return (
-      <View style={styles.centre}>
+      <View style={[styles.centre, embedded && styles.centreEmbedded]}>
         <Text style={styles.errorTitle}>This vehicle is no longer here</Text>
         <Text style={styles.errorBody}>It may have been removed from another device.</Text>
       </View>
@@ -331,7 +458,7 @@ export function RecallDetailScreen({ vehicleId, title, onAskAdvisor, onSignOut }
 
   if (state.kind === 'error') {
     return (
-      <View style={styles.centre}>
+      <View style={[styles.centre, embedded && styles.centreEmbedded]}>
         <Text style={styles.errorTitle}>Could not load recalls</Text>
         <Text style={styles.errorBody}>{state.message}</Text>
         <Pressable style={styles.button} onPress={() => void load()} accessibilityRole="button">
@@ -373,17 +500,32 @@ export function RecallDetailScreen({ vehicleId, title, onAskAdvisor, onSignOut }
   const worst = ordered.find((recall) => !markOf(recall))?.severity;
   const banner = worst && worst !== 'standard' ? SEVERITY_BANNER[worst] : null;
 
+  /*
+    ── ⚠ R16 · a scroller, or a section inside somebody else's ───────────────
+
+    Folded into `HealthScreen`, this renders inside **that** screen's
+    `ScrollView`. Two scrollers on the same axis is a real defect on iOS rather
+    than a cosmetic one — the inner one swallows the gesture and the outer one
+    stops at the inner one's height — so the container is swapped rather than
+    nested, and the pull-to-refresh goes with it: the host owns the gesture and
+    the whole page refreshes together.
+  */
+  const Container = embedded ? View : ScrollView;
+  const containerProps = embedded
+    ? { style: styles.embedded }
+    : {
+        contentContainerStyle: styles.body,
+        refreshControl: (
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void load(true)}
+            tintColor={text.muted}
+          />
+        ),
+      };
+
   return (
-    <ScrollView
-      contentContainerStyle={styles.body}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => void load(true)}
-          tintColor={text.muted}
-        />
-      }
-    >
+    <Container {...(containerProps as object)}>
       {/*
         Before the vehicle name, deliberately. Someone arriving from a
         notification needs the instruction before the context.
@@ -398,19 +540,39 @@ export function RecallDetailScreen({ vehicleId, title, onAskAdvisor, onSignOut }
         </View>
       )}
 
-      <Text style={styles.name}>{state.name}</Text>
-      <Text style={styles.count}>
-        {state.recalls.length > 0
-          ? [
-              `${openCount} open`,
-              markedCount > 0 ? `${markedCount} marked repaired` : null,
-            ]
-              .filter(Boolean)
-              .join(' · ')
-          : state.checked
-            ? 'No recalls on record'
-            : 'Recalls not checked yet'}
-      </Text>
+      {/* The host names the car when embedded — see `Props.embedded`. */}
+      {embedded ? null : <Text style={styles.name}>{state.name}</Text>}
+
+      {/*
+        ── R31 · a count of critical items is not meta ───────────────────────
+
+        `2 open` rendered as unstyled quiet text under the car's name — the same
+        treatment as a mileage or a trim. It is a count of open safety notices,
+        and the system has a chip family that says exactly that.
+
+        ⚠ The chip is only for the **open** count. "3 marked repaired" is the
+        owner's own record and stays a quiet line: a critical chip on work
+        somebody has already had done is the colour teaching itself to mean
+        nothing.
+      */}
+      <View style={styles.countRow}>
+        {state.recalls.length > 0 ? (
+          <>
+            {openCount > 0 ? (
+              <Chip label={`${openCount} open`} tone="critical" />
+            ) : (
+              <Chip label="All marked repaired" tone="confirm" />
+            )}
+            {markedCount > 0 && openCount > 0 ? (
+              <Text style={styles.count}>{markedCount} marked repaired</Text>
+            ) : null}
+          </>
+        ) : (
+          <Text style={styles.count}>
+            {state.checked ? 'No recalls on record' : 'Recalls not checked yet'}
+          </Text>
+        )}
+      </View>
 
       {actionError && (
         <AlertBanner tone="critical" headline="That was not saved" body={actionError} />
@@ -451,28 +613,60 @@ export function RecallDetailScreen({ vehicleId, title, onAskAdvisor, onSignOut }
       {ordered.map((recall, index) => {
         const markedOn = markOf(recall);
         const working = busyCampaign !== null && busyCampaign === recall.campaignNumber;
+        /* Same key the card is rendered under, so the disclosure state follows it. */
+        const cardKey = recall.campaignNumber ?? `recall-${index}`;
 
         return (
         <Card
           key={recall.campaignNumber ?? `recall-${index}`}
           style={[styles.cardGap, markedOn ? styles.cardMarked : null]}
         >
-          {recall.component && <Text style={styles.component}>{recall.component}</Text>}
+          {/*
+            ── R28 · the headline is a name, not NHTSA's enum ────────────────
+
+            It rendered `AIR BAGS:SIDE/WINDOW:HEAD` — the taxonomy string,
+            verbatim, in caps, as the title of the most serious card in the
+            product. `componentPlainName` maps the system and lower-cases the
+            qualifiers; the raw string survives at the foot of this card, beside
+            the campaign number, because it is what a service desk recognises.
+          */}
+          {plainComponent(recall) ? (
+            <Text style={styles.component}>{plainComponent(recall)}</Text>
+          ) : null}
 
           {/*
-            ── The two actions, above the explanation ──────────────────────────
+            ── R30 · lead with the notice, then offer to act on it ───────────
 
-            The design system's recall spec is explicit that they come *before*
-            the three sentences: "its job is to drive an action, not to explain
-            a notice." Somebody arriving from a push already knows they have a
-            problem — what they do not have is anywhere to go with it, which is
-            what this screen shipped without until 23 Aug.
+            NHTSA's summary is a 90-word manufacturer paragraph, and it used to
+            render in full alongside `What could happen` and `How it gets fixed`
+            — three levels of prose at once, at low contrast, which is how a
+            screen ends up read by nobody.
+
+            Three lines here, expandable. Enough to know what is wrong before
+            being asked to act on it, which is the whole of **R27**: this card
+            used to offer "Mark as repaired" *above* any description of the
+            defect.
+          */}
+          {recall.summary ? (
+            <Text style={styles.summary} numberOfLines={expanded.has(cardKey) ? undefined : 3}>
+              {recall.summary}
+            </Text>
+          ) : null}
+
+          {/*
+            ── The two actions ───────────────────────────────────────────────
+
+            The recall spec is explicit that this card's "job is to drive an
+            action, not to explain a notice", so they stay high — above the
+            detail sections and the advisor row, and one line of summary below
+            the name of the defect. That single line is the correction: the spec
+            argues for prominence, and R27 is about **sequence**, and they are
+            reconcilable.
 
             ⚠ Neither is `.btn-primary`. Both are outline controls, because a
-            filled cyan button here would be the second filled primary in the
-            stack behind this screen and would also read as *the* recommended
-            action — and this product does not know whether an owner should be
-            booking a dealer or recording work they have already had done.
+            filled cyan button here would read as *the* recommended action — and
+            this product does not know whether an owner should be booking a
+            dealer or recording work they have already had done.
           */}
           {markedOn ? (
             /*
@@ -500,7 +694,7 @@ export function RecallDetailScreen({ vehicleId, title, onAskAdvisor, onSignOut }
                 label="Undo"
                 variant="outline"
                 busy={working}
-                accessibilityLabel={`Undo marking the ${recall.component ?? 'recall'} repaired`}
+                accessibilityLabel={`Undo marking the ${plainComponent(recall) ?? 'recall'} repaired`}
                 onPress={() =>
                   recall.campaignNumber && void setAddressed(recall.campaignNumber, false)
                 }
@@ -532,26 +726,65 @@ export function RecallDetailScreen({ vehicleId, title, onAskAdvisor, onSignOut }
             </View>
           )}
 
-          {recall.summary && <Text style={styles.summary}>{recall.summary}</Text>}
+          {/*
+            ── R30 · the detail, behind one disclosure ───────────────────────
 
-          {recall.consequence && (
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>What could happen</Text>
-              <Text style={styles.body14}>{recall.consequence}</Text>
-            </View>
+            `What could happen` and `How it gets fixed` are the two questions an
+            owner has after "what is wrong", and both are worth having — but
+            rendering all of it at once is what made none of it read. One
+            control opens the lot, including the rest of the summary above.
+          */}
+          {(recall.consequence || hasRemedy(recall)) && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded: expanded.has(cardKey) }}
+              accessibilityLabel={`${expanded.has(cardKey) ? 'Hide' : 'Show'} the full notice for the ${
+                plainComponent(recall) ?? 'recall'
+              } recall`}
+              onPress={() => toggleExpanded(cardKey)}
+              style={styles.disclosure}
+            >
+              <Text style={styles.disclosureText}>
+                {expanded.has(cardKey) ? 'Hide the full notice' : 'Read the full notice'}
+              </Text>
+              <Icon
+                name={expanded.has(cardKey) ? 'chevron-up' : 'chevron-down'}
+                size={16}
+                color={text.muted}
+              />
+            </Pressable>
+          )}
+
+          {expanded.has(cardKey) && (
+            <>
+              {recall.consequence && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionLabel}>What could happen</Text>
+                  <Text style={styles.body14}>{recall.consequence}</Text>
+                </View>
+              )}
+
+              {/*
+                Asked, not assumed. The stored payloads predate this field, so on
+                the demo cars this section is simply absent rather than empty.
+              */}
+              {hasRemedy(recall) && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionLabel}>How it gets fixed</Text>
+                  <Text style={styles.body14}>{recall.remedy}</Text>
+                </View>
+              )}
+            </>
           )}
 
           {/*
-            Asked, not assumed. The stored payloads predate this field, so on
-            the demo cars this section is simply absent rather than empty.
-          */}
-          {hasRemedy(recall) && (
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>How it gets fixed</Text>
-              <Text style={styles.body14}>{recall.remedy}</Text>
-            </View>
-          )}
+            ── R28 · the raw string, kept where it belongs ───────────────────
 
+            NHTSA's own component code is what a service desk will recognise and
+            what a campaign lookup is done against, so it is not discarded — it
+            sits here at provenance weight, beside the campaign number, rather
+            than as the card's headline.
+          */}
           <View style={styles.metaRow}>
             {recall.campaignNumber && (
               <Text style={styles.meta}>Campaign {recall.campaignNumber}</Text>
@@ -560,17 +793,24 @@ export function RecallDetailScreen({ vehicleId, title, onAskAdvisor, onSignOut }
               /* "Issued 14 Mar 2024", per the spec — not the raw ISO string. */
               <Text style={styles.meta}>Issued {calendarDate(recall.reportedOn)}</Text>
             )}
+            {recall.component && <Text style={styles.meta}>{recall.component}</Text>}
           </View>
 
           {/*
-            The advisor stays reachable, carrying this specific recall as the
-            question. It is no longer the destination, but "what does this mean
-            for my car" is still the thing the product answers best.
+            ── R32 · the differentiator, at the card's foot, on a divider ────
+
+            It was the last thing on a long card with nothing separating it from
+            the metadata above, so the one control that leads to what this
+            product does best read as a footnote. A rule and a quiet row is the
+            system's own treatment for an action that closes a card.
+
+            It carries this specific recall as the question rather than opening
+            an empty thread.
           */}
           <Pressable
             style={styles.askCta}
             accessibilityRole="button"
-            accessibilityLabel={`Ask the advisor about the ${recall.component ?? 'recall'} recall`}
+            accessibilityLabel={`Ask the advisor about the ${plainComponent(recall) ?? 'recall'} recall`}
             onPress={() =>
               onAskAdvisor(
                 vehicleId,
@@ -590,7 +830,7 @@ export function RecallDetailScreen({ vehicleId, title, onAskAdvisor, onSignOut }
           dealer, whatever the age of the vehicle.
         </Text>
       )}
-    </ScrollView>
+    </Container>
   );
 }
 
@@ -618,10 +858,30 @@ const styles = StyleSheet.create({
   },
   markedText: { ...type.value, color: text.secondary, flex: 1 },
 
-  body: { padding: 20, gap: 16, paddingBottom: 40 },
+  body: { ...PAGE_BODY },
+  /* Embedded: the host owns the gutter and the tail. Only the rhythm is ours. */
+  embedded: { gap: PAGE_BODY.gap },
+  /*
+    ⚠ `flex: 0` and a real height. `centre` is `flex: 1`, which fills a screen
+    and collapses to nothing inside a scroll container — so an embedded error
+    state would render as an empty gap rather than as a message.
+  */
+  centreEmbedded: { flex: 0, paddingVertical: space.h1 },
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 10 },
 
-  name: { color: text.primary, fontSize: 24, fontFamily: interFace('700'), fontWeight: '700', letterSpacing: -0.5 },
+  /*
+    ── R7 · this screen's one serif role ────────────────────────────────────
+
+    The system offers two editorial roles — (a) a name, (b) a single hero
+    numeral — and says one per screen, never two. Eight screens were spending
+    neither, so the typographic signature existed on exactly one surface and
+    read as an accident of that surface rather than as a system.
+
+    Here it is role (a). The car is what the open recalls are *about*, the nav
+    only carries "Recalls", and there is no numeral on this screen competing
+    for it.
+  */
+  name: { ...type.editorial, color: text.primary, letterSpacing: -0.5 },
   count: { color: text.muted, fontSize: 14, marginTop: -10 },
 
   banner: { borderRadius: radius.card, padding: 16, gap: 6, borderWidth: 1 },
@@ -666,6 +926,18 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   body14: { color: text.secondary, fontSize: 14, lineHeight: 20 },
+
+  countRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  /*
+    ── R32 · the disclosure and the advisor row ────────────────────────────
+  */
+  disclosure: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: TARGET_MIN,
+  },
+  disclosureText: { ...type.uiStrong, color: text.secondary },
 
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   meta: { color: text.muted, fontSize: 12 },

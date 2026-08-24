@@ -2,7 +2,7 @@
   "expo": {
     "name": "CrewChief",
     "slug": "crewchief",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "crewchief",
@@ -12,7 +12,7 @@
       "supportsTablet": false,
       "infoPlist": {
         "NSCameraUsageDescription": "CrewChief uses the camera so you can photograph a service invoice and have its line items read for you.",
-        "NSPhotoLibraryUsageDescription": "CrewChief needs your photo library so you can attach an invoice you have already photographed.",
+        "NSPhotoLibraryUsageDescription": "CrewChief needs your photo library so you can choose a picture of your car, or attach a service invoice you have already photographed.",
         "ITSAppUsesNonExemptEncryption": false
       },
       "privacyManifests": {
@@ -107,6 +107,11 @@
         "projectId": "55451053-dc1a-481a-8257-76b476799f57"
       }
     },
-    "owner": "masterson303"
+    "owner": "masterson303",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#100F0D"
+    }
   }
 }

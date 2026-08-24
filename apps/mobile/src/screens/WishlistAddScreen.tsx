@@ -17,6 +17,7 @@ import {
 import { wishlistItemIdentifier, type WishlistItemType } from '@crewchief/core/wishlist-identifier';
 import {
   FIELD_FONT_MIN,
+  TABULAR,
   TARGET_MIN,
   border,
   radius,
@@ -132,7 +133,27 @@ export function WishlistAddScreen({ vehicleId, title, onSignOut, onAskAdvisor, o
         ),
       });
     } catch (error) {
-      if (error instanceof ApiRequestError && error.status === 401) {
+        /*
+          ── ⚠ MOB-08 · a server 401 is not "you are signed out" ─────────────
+
+          This forced a sign-out on **any** 401 and then `return`ed without
+          setting a state — which is only safe if `onSignOut()` unmounts the
+          screen, and it does not when the network call was the thing that
+          failed. Result: offline with an expired token, this screen shows
+          skeletons **forever** — no error, no retry, nothing to pull.
+
+          `isLocallySignedOut` is the distinction the client already goes to
+          trouble to make, with a docblock recording that a real tester hit this
+          three times out of three on 5 Aug — and exactly **one** screen
+          consumed it. A `device` 401 is genuinely signed out; a `server` 401
+          may be a token the server would accept a second later, and destroying
+          a working session over one response is how a spurious failure becomes
+          a forced re-login.
+
+          Falls through to the error state either way, so there is always
+          something on screen and something to press.
+        */
+      if (error instanceof ApiRequestError && error.isLocallySignedOut) {
         onSignOut();
         return;
       }
@@ -187,7 +208,27 @@ export function WishlistAddScreen({ vehicleId, title, onSignOut, onAskAdvisor, o
         );
         onAdded();
       } catch (error) {
-        if (error instanceof ApiRequestError && error.status === 401) {
+        /*
+          ── ⚠ MOB-08 · a server 401 is not "you are signed out" ─────────────
+
+          This forced a sign-out on **any** 401 and then `return`ed without
+          setting a state — which is only safe if `onSignOut()` unmounts the
+          screen, and it does not when the network call was the thing that
+          failed. Result: offline with an expired token, this screen shows
+          skeletons **forever** — no error, no retry, nothing to pull.
+
+          `isLocallySignedOut` is the distinction the client already goes to
+          trouble to make, with a docblock recording that a real tester hit this
+          three times out of three on 5 Aug — and exactly **one** screen
+          consumed it. A `device` 401 is genuinely signed out; a `server` 401
+          may be a token the server would accept a second later, and destroying
+          a working session over one response is how a spurious failure becomes
+          a forced re-login.
+
+          Falls through to the error state either way, so there is always
+          something on screen and something to press.
+        */
+        if (error instanceof ApiRequestError && error.isLocallySignedOut) {
           onSignOut();
           return;
         }
@@ -221,10 +262,38 @@ export function WishlistAddScreen({ vehicleId, title, onSignOut, onAskAdvisor, o
     A debounce here would be latency added on purpose. `AddVehicleScreen`
     debounces because its list comes over a network; this one does not.
   */
+  const typed = query.trim();
+
   const shown = useMemo(
     () => (state.kind === 'loaded' ? filterSuggestions(query, state.suggestions) : []),
     [state, query]
   );
+
+  const exactMatch = shown.some(
+    (suggestion) => suggestion.name.toLowerCase() === typed.toLowerCase()
+  );
+
+  /**
+   * The list, in sections — R40.
+   *
+   * ⚠ **Only when nothing is typed.** A filtered set is a search result, not a
+   * plan: splitting three matches under two headers is furniture, and the
+   * matching count in the label is the useful thing there.
+   *
+   * A section is omitted when empty rather than rendered with nothing under it,
+   * so a car with no urgent work shows one list rather than an empty promise.
+   */
+  const groups = useMemo(() => {
+    if (typed) return [{ label: `${shown.length} matching`, rows: shown }];
+
+    const urgent = shown.filter((suggestion) => suggestion.urgent);
+    const rest = shown.filter((suggestion) => !suggestion.urgent);
+
+    return [
+      { label: 'Do first', rows: urgent },
+      { label: urgent.length > 0 ? 'Everything else' : 'Suggested for this car', rows: rest },
+    ].filter((group) => group.rows.length > 0);
+  }, [shown, typed]);
 
   if (state.kind === 'loading') {
     return (
@@ -245,9 +314,6 @@ export function WishlistAddScreen({ vehicleId, title, onSignOut, onAskAdvisor, o
       </View>
     );
   }
-
-  const typed = query.trim();
-  const exactMatch = shown.some((s) => s.name.toLowerCase() === typed.toLowerCase());
 
   return (
     /*
@@ -273,9 +339,20 @@ export function WishlistAddScreen({ vehicleId, title, onSignOut, onAskAdvisor, o
           style={styles.input}
           value={query}
           onChangeText={setQuery}
-          placeholder="Filter, or type something of your own"
+          placeholder="Search suggestions"
           placeholderTextColor={text.muted}
-          accessibilityLabel="Filter suggestions, or type something to add"
+          /*
+            ⚠ **R38.** It read "Filter suggestions, or type something to add",
+            which is the placeholder's two-jobs problem said out loud. Filtering
+            an existing list and authoring a new item are different verbs with
+            different results, and one name cannot signal which is about to
+            happen.
+
+            The field searches. Authoring is the block at the list's foot, which
+            appears with its own lead sentence and its own button — a visible
+            affordance rather than a hint inside a field.
+          */
+          accessibilityLabel="Search suggestions"
           autoCorrect={false}
           returnKeyType="search"
         />
@@ -306,16 +383,27 @@ export function WishlistAddScreen({ vehicleId, title, onSignOut, onAskAdvisor, o
         </Text>
       ) : null}
 
-      {shown.length > 0 && (
-        <ListGroup label={typed ? `${shown.length} matching` : 'Suggested for this car'}>
-          {shown.map((suggestion, index) => {
+      {/*
+        ── R40 · urgency is where the row sits, not a word on every row ───────
+
+        `suggestionsFor` sorts urgent-first, so "Do first" appeared on every row
+        of the first screenful and told the reader nothing they could not see
+        from the order. The order still does the work; the section header names
+        it once, and the chip goes back to saying what kind of thing the row is.
+
+        Not split while filtering. A search result set is not a plan, and two
+        headers over two matches is furniture.
+      */}
+      {groups.map(({ label, rows }) => (
+        <ListGroup key={label} label={label}>
+          {rows.map((suggestion, index) => {
             const added = state.onList.has(suggestion.identifier);
             const working = busy === suggestion.identifier;
 
             return (
               <View
                 key={suggestion.identifier}
-                style={[styles.row, index < shown.length - 1 && styles.divided]}
+                style={[styles.row, index < rows.length - 1 && styles.divided]}
               >
                 <View style={styles.rowHead}>
                   <Text style={styles.name}>{suggestion.name}</Text>
@@ -328,7 +416,20 @@ export function WishlistAddScreen({ vehicleId, title, onSignOut, onAskAdvisor, o
                   <Chip label={suggestion.chip} tone={suggestion.urgent ? 'attention' : 'neutral'} />
                 </View>
 
-                <Text style={styles.reason}>{suggestion.reason}</Text>
+                {/*
+                  ── R41 · two lines, and then the row stops ────────────────
+
+                  The reason is research prose and runs to whatever length the
+                  model wrote. Uncapped, the last row on screen ended mid-
+                  sentence at the fold with no ellipsis, which reads as a
+                  rendering fault rather than as more text below.
+
+                  Two lines is enough to say what the part is and why it
+                  matters; the whole of it is what "Learn more" is for.
+                */}
+                <Text style={styles.reason} numberOfLines={2}>
+                  {suggestion.reason}
+                </Text>
                 {suggestion.note ? <Text style={styles.note}>{suggestion.note}</Text> : null}
 
                 <View style={styles.actions}>
@@ -340,7 +441,27 @@ export function WishlistAddScreen({ vehicleId, title, onSignOut, onAskAdvisor, o
                   ) : (
                     <Button
                       label="Add"
-                      variant="outline"
+                      /*
+                        ── R39 · one control per row ─────────────────────────
+
+                        `Add` and `Learn more` were `outline` and `ghost`, which
+                        read as two equal buttons repeated down the list — so no
+                        row had a primary and the eye had nothing to land on.
+
+                        `quiet` is a fill; `ghost` is not. That is an
+                        unambiguous step rather than two borders of different
+                        weights, and it costs nothing on the row that has
+                        already been added, where the control is replaced by its
+                        state.
+
+                        ⚠ The card itself is deliberately **not** the affordance,
+                        which is what the pattern would normally ask for. There
+                        is no suggestion detail screen; the only thing a row
+                        could navigate to is the advisor, and that spends a model
+                        call. A whole-card tap target that costs money on a
+                        mis-scroll is the wrong trade.
+                      */
+                      variant="quiet"
                       size="small"
                       busy={working}
                       accessibilityLabel={`Add ${suggestion.name} to the wishlist`}
@@ -365,7 +486,7 @@ export function WishlistAddScreen({ vehicleId, title, onSignOut, onAskAdvisor, o
             );
           })}
         </ListGroup>
-      )}
+      ))}
 
       {/*
         ── The free-text fallback ──────────────────────────────────────────────
@@ -383,7 +504,7 @@ export function WishlistAddScreen({ vehicleId, title, onSignOut, onAskAdvisor, o
           </Text>
           <Button
             label={`Add “${typed}”`}
-            variant="inverse"
+            variant="primary"
             busy={busy === wishlistItemIdentifier(DEFAULT_TYPE, typed)}
             accessibilityLabel={`Add ${typed} to the wishlist`}
             onPress={() => void add(typed, DEFAULT_TYPE)}
@@ -441,7 +562,8 @@ const styles = StyleSheet.create({
   rowHead: { flexDirection: 'row', alignItems: 'center', gap: space.sm, flexWrap: 'wrap' },
   name: { ...type.bodyStrong, color: text.primary, flexShrink: 1 },
   reason: { ...type.value, color: text.secondary, lineHeight: 19 },
-  note: { ...type.label, letterSpacing: 0, color: text.muted },
+  /* Figures — "Typically 60,000 – 100,000 miles", "Every 10,000 mi". R11. */
+  note: { ...type.label, letterSpacing: 0, color: text.muted, ...TABULAR },
 
   actions: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: space.xs },
   action: { flexShrink: 1 },
