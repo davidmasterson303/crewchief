@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
 
     // Meter AI spend per user rather than per IP — IP is the wrong unit for a
     // cost control, since one user can hold many and many users share one.
-    const identifier = access.userId ?? getClientIdentifier(request);
+    const identifier = access.userId ?? getClientIdentifier(request, 'ai');
     const rateLimit = await checkRateLimit(identifier, 'ai');
     if (!rateLimit.allowed) {
       logger.warn('PERF_STATS:RATE_LIMIT', 'Rate limit exceeded', { identifier });

@@ -219,19 +219,54 @@ describe('getClientIdentifier — the existing limiter, hardened not replaced', 
     ).toBe('203.0.113.7');
   });
 
-  it('still falls back, so removing the weakness cannot cause an outage', () => {
+  it('still falls back on the browsing tier, so hardening cannot cause an outage', () => {
     /*
       Deliberate, and the reasoning is worth keeping next to the assertion. A
       platform-only version collapses every request onto one shared 60/minute
       bucket if the platform header is ever absent in production — which could
       not be verified from a development machine. That trades a hardening for a
-      live outage on the demo. The order below is strictly no worse than the
-      old behaviour anywhere and strictly better wherever the edge supplies an
-      address, which on Netlify is every external request.
+      live outage on the demo.
+
+      ⚠ **Narrowed on 24 Aug (SEC-15), not removed.** The argument above holds
+      for `default`, which is browsing traffic and spends nothing. It does not
+      hold for the two tiers standing in front of Gemini — see below.
     */
     expect(getClientIdentifier(request({ 'x-forwarded-for': '198.51.100.4' }))).toBe('198.51.100.4');
     expect(getClientIdentifier(request({ 'x-real-ip': '198.51.100.5' }))).toBe('198.51.100.5');
     expect(getClientIdentifier(request({}))).toBe('unknown');
+  });
+
+  it('refuses a caller-supplied identity on the tiers that gate spend', () => {
+    /*
+      ⚠ **SEC-15.** `x-forwarded-for` and `x-real-ip` are set by the caller, so
+      a limiter keyed on them is a limiter whose bucket the caller chooses:
+      a fresh value per request is a fresh identity with a full allowance every
+      time. `packages/core/src/client-ip.ts` forbids the fallback in as many
+      words — *"an attacker can **cause** the platform header to be missing by
+      not being behind the edge"* — and this call site kept it anyway.
+
+      On `ai` and `upload` an unverifiable caller now shares one bucket, so
+      claiming a new identity buys nothing. Worst case a genuinely
+      un-attributable user waits a minute; the alternative is an unbounded
+      Gemini bill.
+    */
+    for (const tier of ['ai', 'upload'] as const) {
+      const first = getClientIdentifier(request({ 'x-forwarded-for': '198.51.100.4' }), tier);
+      const second = getClientIdentifier(request({ 'x-forwarded-for': '203.0.113.9' }), tier);
+
+      expect(first).toBe(second);
+      expect(first).not.toContain('198.51.100.4');
+    }
+  });
+
+  it('still trusts the platform address on those tiers', () => {
+    /*
+      The anti-vacuous half: a version that ignored the header entirely would
+      pass the case above and would be the outage the fallback exists to avoid.
+    */
+    expect(
+      getClientIdentifier(request({ 'x-nf-client-connection-ip': '203.0.113.7' }), 'ai')
+    ).toBe('203.0.113.7');
   });
 
   it('takes the first entry of a forwarded list rather than the whole string', () => {

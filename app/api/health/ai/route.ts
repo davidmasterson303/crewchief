@@ -80,10 +80,77 @@ export const revalidate = 0;
 const CACHE_TTL_MS = 60_000;
 let cached: { at: number; status: number; body: Record<string, unknown> } | null = null;
 
-export async function GET() {
+/**
+ * Constant-time string compare, so a wrong secret cannot be found a byte at a
+ * time. Copied in shape from `/api/health/consultant`, which is the sibling
+ * this route should have matched from the start.
+ */
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+
+  let diff = 0;
+  for (let i = 0; i < a.length; i += 1) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+export async function GET(request: Request) {
   const noStore = {
     'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
   };
+
+  /*
+    ── ⚠ PERF-05 · this was public, unrated, and shared the production key ────
+
+    Confirmed live on 23 Aug: **200, unauthenticated, returning 50 Gemini model
+    names.** Three things wrong at once, and the second is the expensive one.
+
+    **It cannot be cached at the edge.** `force-dynamic` plus `no-store` means
+    the CDN never answers one, so *every request is a function invocation*. At
+    10 req/s from a single laptop that is ~25.9M invocations a month — roughly
+    **$600** on Netlify's public list pricing, for an endpoint nobody is
+    supposed to call.
+
+    **The 60-second cache is `let cached` at module scope, which is per warm
+    Lambda instance.** A burst produces N cold instances, each with an empty
+    cache, each making a real call to `generativelanguage.googleapis.com` with
+    the **production `GEMINI_API_KEY`** — the same key the consultant, the
+    invoice extractor and the dossier generator use. Google's quotas are
+    per-project, so exhausting them here takes the product down.
+
+    **And it is a credential-validity oracle**: 200 means the key works, 503
+    means it was rotated.
+
+    The right pattern was one file away. `/api/health/consultant` is secret-gated
+    and `auth-posture.test.ts` asserts the gate. This route's only two callers —
+    `promote-demo.mjs`, and a person choosing model identifiers — can both send
+    a header.
+
+    ⚠ **Fails closed on an unset secret**, exactly as the consultant one does: no
+    `AI_HEALTH_SECRET` means nobody can run this. An unset secret that meant
+    "open to everyone" would restore the finding the first time somebody
+    deployed without it.
+  */
+  const secret = process.env.AI_HEALTH_SECRET || process.env.CONSULTANT_HEALTH_SECRET || '';
+
+  if (!secret) {
+    return NextResponse.json(
+      {
+        ok: false,
+        reason: 'NOT_CONFIGURED',
+        detail: 'AI_HEALTH_SECRET is not set, so this check cannot be run.',
+      },
+      { status: 503, headers: noStore }
+    );
+  }
+
+  if (!timingSafeEqual(request.headers.get('x-ai-health-secret') ?? '', secret)) {
+    /*
+      404, not 401. A 401 confirms the endpoint exists and is worth attacking;
+      this route's whole problem was being findable, and the two callers that
+      matter both know the header.
+    */
+    return NextResponse.json({ ok: false, reason: 'NOT_FOUND' }, { status: 404, headers: noStore });
+  }
 
   if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
     return NextResponse.json({ ...cached.body, cached: true }, { status: cached.status, headers: noStore });

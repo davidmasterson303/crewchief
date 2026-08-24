@@ -152,8 +152,27 @@ async function checkRedirects() {
 async function checkAiCredential() {
   console.log('\nThe AI credential this build will actually use');
   const url = `${base}/api/health/ai`;
+
+  /*
+    ⚠ **Secret-gated as of 24 Aug (PERF-05).** The route was public, uncacheable
+    at the edge, and every request made a real call to Google with the
+    production key — a credential-validity oracle that cost a function
+    invocation each time. It answers 404 without the header now, which is
+    indistinguishable from a build that predates the route, so the missing-secret
+    case has to be reported separately or a promote would pass on silence.
+  */
+  const secret = process.env.AI_HEALTH_SECRET || process.env.CONSULTANT_HEALTH_SECRET;
+  if (!secret) {
+    fail('AI_HEALTH_SECRET is not set locally — cannot verify the AI credential');
+    console.log('        it must match the value set on the deployment. See CLAUDE.md §7.');
+    return;
+  }
+
   try {
-    const res = await fetch(url, { redirect: 'follow' });
+    const res = await fetch(url, {
+      redirect: 'follow',
+      headers: { 'x-ai-health-secret': secret },
+    });
     let body = {};
     try {
       body = await res.json();
@@ -162,9 +181,16 @@ async function checkAiCredential() {
     }
 
     if (res.status === 404) {
-      // A build predating the route. Not a credential failure, and not
-      // something to fail a promote over.
-      warn('no /api/health/ai on this build — cannot verify the AI credential');
+      /*
+        Either a build predating the route, or one whose `AI_HEALTH_SECRET` does
+        not match ours — the route answers 404 rather than 401 so it is not
+        findable, which means these two are the same from out here.
+
+        ⚠ Still a warning rather than a failure, because the first case is real
+        and blocking a promote on it would be blocking on a build being old. The
+        message names both so nobody reads it as only the benign one.
+      */
+      warn('no /api/health/ai on this build, or AI_HEALTH_SECRET does not match the deployment');
       return;
     }
     if (res.ok && body.ok) {

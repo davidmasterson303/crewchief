@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: NextRequest): Promise<Response> {
   logger.info('API:UPLOAD_INVOICE', 'Upload request received');
 
-  const identifier = getClientIdentifier(request);
+  const identifier = getClientIdentifier(request, 'upload');
   const rateLimit = await checkRateLimit(identifier, 'upload');
   if (!rateLimit.allowed) {
     logger.warn('API:UPLOAD_INVOICE', 'Rate limit exceeded', { identifier });
