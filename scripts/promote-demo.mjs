@@ -51,6 +51,7 @@
  */
 
 import { execSync } from 'node:child_process';
+import { awaitDeploy } from './lib/await-deploy.mjs';
 import { readFileSync } from 'node:fs';
 
 import { demoSignals, siteFraming } from './lib/site-framing.mjs';
@@ -123,7 +124,16 @@ console.log(`    HEAD ${head.slice(0, 8)}`);
 
 /* 2 ── local checks -------------------------------------------------------- */
 console.log('\nLocal checks');
-for (const [label, cmd] of [['typecheck', 'npm run typecheck'], ['tests', 'npx jest --silent']]) {
+/*
+  ⚠ **BLD-01 · the build runs here too.** See `promote-web.mjs` for the full
+  argument. `build:verify` rather than `build` because they share `.next` and a
+  build during `npm run dev` serves unstyled HTML that never hydrates.
+*/
+for (const [label, cmd] of [
+  ['typecheck', 'npm run typecheck'],
+  ['tests', 'npx jest --silent'],
+  ['build', 'npm run build:verify'],
+]) {
   try {
     execSync(cmd, { stdio: 'pipe' });
     ok(label);
@@ -410,15 +420,55 @@ try {
 */
 const mergeCommit = sh('git rev-parse demo-live').slice(0, 8);
 
+/*
+  ── ⚠ BLD-02 · the demo waited on an instruction, not on a check ────────────
+
+  `promote-web.mjs` polls `/api/version` every 15s for six minutes against the
+  merge commit and exits 1 with a specific diagnosis. This script did none of
+  that — it printed *"When it finishes: node scripts/verify-demo.mjs"* and
+  trusted that somebody would.
+
+  That is inverted relative to the risk that actually matters here. The demo is
+  **recruiter-facing during an active job search**, and the failure mode of a
+  broken `demo-live` build is a stale or dead portfolio piece with nothing
+  anywhere saying so. `verify-demo.mjs` runs *before* the merge, against the
+  candidate, and never after — so nothing in the pipeline ever looked at what
+  the demo hostname ended up serving.
+
+  Both scripts now share `awaitDeploy`, so the two hostnames are held to the
+  same standard and there is one place the poll's timing lives.
+*/
+const deployed = await awaitDeploy({
+  hostname: DEMO,
+  expectCommit: mergeCommit,
+  label: 'demo',
+});
+
+if (!deployed) {
+  console.log(`
+⚠ ${DEMO} is not serving ${mergeCommit}.
+
+Netlify accepted the push and the build did not finish, or it failed. The
+hostname is still on its previous deploy — which for the demo means a
+recruiter sees the old build, not an error.
+
+  Netlify dashboard → crewchief-demo-live → Deploys, for the build log.
+
+To undo: revert the merge commit on ${RELEASE_BRANCH} and push. The demo
+returns to its previous build without touching main.
+`);
+  process.exit(1);
+}
+
 console.log(`
-Netlify is building the demo now. When it finishes:
+${DEMO} is serving ${mergeCommit}.
 
   node scripts/verify-demo.mjs
 
-and confirm ${DEMO}/api/version reports ${mergeCommit} — the merge commit on
-${RELEASE_BRANCH}, which is what Netlify built. It will NOT report
-${head.slice(0, 8)}: that is the commit being promoted, and it is recorded in
-the merge message, not in the build.
+⚠ ${mergeCommit} is the **merge commit** on ${RELEASE_BRANCH}, which is what
+Netlify built. It will NOT report ${head.slice(0, 8)}: that is the commit being
+promoted, and it is recorded in the merge message, not in the build. Checking
+for the latter and concluding the deploy failed has cost real time before.
 
 Record ${mergeCommit} as ${RELEASE_BRANCH}'s new baseline.
 

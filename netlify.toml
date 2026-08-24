@@ -32,3 +32,79 @@ ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- . ':(exclude)apps'"
 
 [[plugins]]
 package = "@netlify/plugin-nextjs"
+
+# ── ⚠ BLD-05 · security headers ───────────────────────────────────────────────
+#
+# Measured live on both hostnames, 23 Aug: HTML routes carried
+# `x-content-type-options: nosniff` and an HSTS header, and **nothing else**.
+# No CSP, no X-Frame-Options, no Referrer-Policy, no Permissions-Policy.
+# `x-powered-by` was present. On static assets even `nosniff` was absent.
+#
+# `crewchief.davidmasterson.co` is the App Store listing's marketing URL and the
+# origin the mobile app talks to, so this is the header set a reviewer's
+# tooling — and anybody else's — looks at.
+#
+# ⚠ Every value below is written to not break something this app actually does.
+# The four that would, if written the obvious way:
+#
+#   `style-src`   Google Fonts serves stylesheets from fonts.googleapis.com and
+#                 the font files from fonts.gstatic.com. Both are named.
+#   `script-src`  Next injects inline bootstrap scripts and uses `eval` in dev.
+#                 `'unsafe-inline'` is required for the former; `'unsafe-eval'`
+#                 is NOT included, because the production build does not need it
+#                 and adding it for a dev convenience would put it in front of
+#                 App Review.
+#   `connect-src` Supabase REST, storage, auth and realtime are all on the
+#                 project's own subdomain. A wildcard over `*.supabase.co` is
+#                 deliberate rather than lazy: the project ref is an environment
+#                 variable, so pinning it here would make this file
+#                 deployment-specific and it is shared across two Netlify sites.
+#   `img-src`     `data:` for inline SVG and canvas output, `blob:` for the
+#                 photo picker's local previews before upload.
+#
+# `frame-ancestors 'none'` and `X-Frame-Options: DENY` say the same thing to
+# different vintages of browser; both are cheap and neither is load-bearing on
+# its own.
+#
+# NOT set: `Strict-Transport-Security`. Netlify already sends it, and a second
+# one from here would be two headers with one meaning — and the `preload`
+# directive in particular is a commitment that is hard to reverse and should be
+# a deliberate act rather than a line in a config sweep.
+
+[[headers]]
+for = "/*"
+  [headers.values]
+  X-Content-Type-Options = "nosniff"
+  X-Frame-Options = "DENY"
+  # `strict-origin-when-cross-origin` rather than `no-referrer`: the funnel
+  # records where a visitor arrived from, and killing the referrer entirely
+  # would silently blank that for every external link.
+  Referrer-Policy = "strict-origin-when-cross-origin"
+  # Denied outright rather than self-scoped. This product asks for the camera
+  # and the photo library on the **phone**, through the native permission
+  # prompts, never in the browser — so a page that requested any of these would
+  # be doing something nobody wrote.
+  Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"
+  Content-Security-Policy = """
+    default-src 'self'; \
+    base-uri 'self'; \
+    form-action 'self'; \
+    frame-ancestors 'none'; \
+    object-src 'none'; \
+    script-src 'self' 'unsafe-inline'; \
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; \
+    font-src 'self' https://fonts.gstatic.com data:; \
+    img-src 'self' data: blob: https://*.supabase.co; \
+    media-src 'self' data: blob:; \
+    connect-src 'self' https://*.supabase.co wss://*.supabase.co; \
+    worker-src 'self' blob:; \
+    manifest-src 'self'\
+  """
+
+# Static assets get the sniffing protection too — they had none at all, and a
+# mis-typed upload served as `text/html` from this origin is the whole reason
+# `nosniff` exists.
+[[headers]]
+for = "/_next/static/*"
+  [headers.values]
+  X-Content-Type-Options = "nosniff"

@@ -43,6 +43,7 @@
  */
 
 import { execSync } from 'node:child_process';
+import { awaitDeploy } from './lib/await-deploy.mjs';
 
 const APPLY = process.argv.includes('--apply');
 
@@ -50,8 +51,7 @@ const RELEASE_BRANCH = 'web-live';
 const SITE = 'https://crewchief.davidmasterson.co';
 
 /** How long to wait for Netlify. A cold Next build here runs about a minute. */
-const DEPLOY_TIMEOUT_MS = 6 * 60 * 1000;
-const POLL_MS = 15 * 1000;
+/* The poll's timing lives in `scripts/lib/await-deploy.mjs`, shared with the demo. */
 
 const sh = (cmd) => execSync(cmd, { encoding: 'utf8' }).trim();
 
@@ -102,7 +102,49 @@ if (pending === '') {
 
 /* 3 ── local checks -------------------------------------------------------- */
 console.log('\nLocal checks');
-for (const [label, cmd] of [['typecheck', 'npm run typecheck'], ['tests', 'npx jest --silent']]) {
+/*
+  ── ⚠ BLD-01 · `next build` runs here now ──────────────────────────────────
+
+  It did not. This loop was typecheck and tests, and **nothing in either
+  promote script ever built the app** — while `package.json` already provided
+  the safe local build (`build:verify`, writing to `.next-verify`) and
+  `next.config.js` exists partly to make that possible. The mechanism was built
+  and then not wired in.
+
+  What that let through: a Server Component that typechecks and unit-tests fine
+  and **fails at build** — a static-generation error, a `next/headers` call in
+  the wrong scope, an OOM on the builder. It gets merged and pushed, the script
+  polls `/api/version` for six minutes, times out, and reports that the hostname
+  is serving its previous build. By then the merge is already public on
+  `origin/web-live`, and the App Store hostname is frozen on an old deploy with
+  nothing saying why.
+
+  ⚠ **`build:verify`, not `build`.** They share `.next`, and `package.json`'s
+  own notes record what that costs: a build while `npm run dev` is running
+  replaces the chunks the dev server is serving, every `/_next/static` request
+  404s, and the page renders as unstyled HTML that never hydrates — presenting
+  as dead buttons rather than an error. `NEXT_DIST_DIR=.next-verify` is what
+  keeps a promote from breaking the terminal beside it.
+
+  It is last in the list because it is by far the slowest, and there is no
+  reason to spend two minutes building code whose types do not check.
+
+  ⚠ **The first run of this rewrites `tsconfig.json`**, because Next adds its
+  dist directory's generated types to `include` — and with `NEXT_DIST_DIR` set
+  that path is `.next-verify/types`, which was not there. It reformats the file
+  while it is at it.
+
+  That is a one-time cost and it is **committed**, so subsequent runs change
+  nothing. Verified: a second `build:verify` against the committed file leaves
+  it byte-identical. Had it not been, this gate would have dirtied the working
+  tree on every run and then failed its own "uncommitted changes" check above —
+  a gate that breaks the next use of itself.
+*/
+for (const [label, cmd] of [
+  ['typecheck', 'npm run typecheck'],
+  ['tests', 'npx jest --silent'],
+  ['build', 'npm run build:verify'],
+]) {
   try {
     execSync(cmd, { stdio: 'pipe' });
     ok(label);
@@ -167,36 +209,13 @@ try {
 */
 console.log(`\nWaiting for Netlify — expecting ${mergeCommit.slice(0, 8)} at ${SITE}`);
 
-const deadline = Date.now() + DEPLOY_TIMEOUT_MS;
-let live = false;
+const live = await awaitDeploy({
+  hostname: SITE,
+  expectCommit: mergeCommit,
+  label: 'web',
+});
 
-while (Date.now() < deadline) {
-  await new Promise((r) => setTimeout(r, POLL_MS));
-  try {
-    const res = await fetch(`${SITE}/api/version`, { cache: 'no-store' });
-    const body = await res.json();
-    if (body.commit === mergeCommit) {
-      ok(`serving ${mergeCommit.slice(0, 8)} on ${body.branch}`);
-      live = true;
-      break;
-    }
-    console.log(`    still ${String(body.commit).slice(0, 8)} (${body.branch})`);
-  } catch {
-    console.log('    no answer yet');
-  }
-}
-
-if (!live) {
-  console.error(`
-\x1b[31mThe deploy did not appear within ${DEPLOY_TIMEOUT_MS / 60000} minutes.\x1b[0m
-
-The merge is pushed, so this is a Netlify problem rather than a git one. Check
-the deploy log for ${RELEASE_BRANCH}. Until it succeeds the hostname is serving
-its previous build — which is safe, but it is NOT what you just promoted, and
-nothing else will tell you that.
-`);
-  process.exit(1);
-}
+if (!live) process.exit(1);
 
 console.log(`
 \x1b[32m${SITE} is live on ${mergeCommit.slice(0, 8)}.\x1b[0m

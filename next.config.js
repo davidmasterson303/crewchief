@@ -36,6 +36,30 @@ const nextConfig = {
   async redirects() {
     return [{ source: '/demo', destination: '/', permanent: false }];
   },
+  /*
+    ⚠ **BLD-05 · `x-powered-by` is off.** Next sends `X-Powered-By: Next.js` by
+    default, and it was measured live on both hostnames. It tells an attacker
+    which framework and therefore which advisories to try, and it tells a user
+    nothing. One line, no cost.
+  */
+  poweredByHeader: false,
+  /*
+    ⚠ `ignoreDuringBuilds` and no promote script runs `next lint`, so **`next
+    lint` is dead in this pipeline** — noted by the 24 Aug audit (BLD-01). Kept
+    for now rather than flipped in the same pass that added `build:verify` to
+    both promotes: turning lint back on at build time would surface an unknown
+    number of existing violations and could block a promote for reasons
+    unrelated to the change being promoted, which is the opposite of what a gate
+    is for.
+
+    The honest sequence is to run `npm run lint` once, read what it says, fix or
+    disable rules deliberately, and *then* remove this. Doing it the other way
+    round is how a gate gets disabled again a week later.
+
+    ⚠ There is deliberately no `typescript: { ignoreBuildErrors: true }` here,
+    and there must not be. Type errors do fail the Netlify build, which is the
+    one compile-time guarantee this pipeline has.
+  */
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -126,6 +150,15 @@ const nextConfig = {
     COMMIT_REF: process.env.COMMIT_REF ?? '',
     BRANCH: process.env.BRANCH ?? '',
     BUILD_TIME: new Date().toISOString(),
+    /*
+      ⚠ Read at **build** time, from the file, for the same reason `COMMIT_REF`
+      is inlined here: a route reading `package.json` at request time would need
+      it in the function bundle, and Netlify does not put it there.
+
+      `require` rather than an import — this file is CommonJS, and the version is
+      wanted as a value now rather than as a module reference.
+    */
+    NEXT_PUBLIC_APP_VERSION: require('./package.json').version,
   },
 };
 

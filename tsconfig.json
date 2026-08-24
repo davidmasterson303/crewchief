@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "es5",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -19,11 +23,21 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"],
-      "@crewchief/core/*": ["./packages/core/src/*"]
+      "@/*": [
+        "./*"
+      ],
+      "@crewchief/core/*": [
+        "./packages/core/src/*"
+      ]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next-verify/types/**/*.ts"
+  ],
   // `apps` is excluded because `include` above is a recursive glob — without
   // this the web app's typecheck compiles the Expo client too, against the
   // wrong React types, the wrong JSX runtime and a different TypeScript major.
@@ -32,5 +46,9 @@
   // Line comments deliberately: a block comment here cannot mention a glob
   // ending in a star-slash without closing itself, which silently invalidates
   // this file. It did exactly that for two runs.
-  "exclude": ["node_modules", "packages/*/node_modules", "apps/**"]
+  "exclude": [
+    "node_modules",
+    "packages/*/node_modules",
+    "apps/**"
+  ]
 }
