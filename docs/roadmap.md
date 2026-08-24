@@ -781,6 +781,21 @@
 > nothing routes to it** — wire it when the adapter lands. **E6** (upgrade prompt, ~0.5 ed) is
 > genuinely unblocked the moment IAP ships.
 >
+> ⚠ **What the subscription sells changed on 24 Aug, and the gate is already built.** The paid
+> tier is no longer a larger token allowance; it is three named features — the advisor, invoice
+> scanning and the dossier. `packages/core/src/paid-features.ts` carries the argument,
+> `lib/feature-gate.ts` enforces it, and it is wired at all four paid entry points. IAP-06 is
+> closed by deletion rather than correction: with no allowance in the pitch there is no multiple
+> to state, so `entitlementMultiple()` is gone along with the "five times over" copy. The
+> ceilings in `ai/budget.ts` are untouched and still enforced — their role is now abuse
+> protection behind the gate rather than the thing being sold.
+>
+> ⚠ **`PAID_FEATURES_ENFORCED` is off, and turning it on is part of this item rather than a
+> config change.** It encodes one rule — a feature may only be gated behind a purchase the app
+> can actually make — so it stays off until the adapter lands and the paywall is routed to.
+> Flipping it before then withdraws three features from every existing account with no way back.
+> `paid-features.test.ts` asserts the default.
+>
 > #### Housekeeping
 >
 > - **`demo-live` is 2 commits behind** — missing the recall safety fix and the research fix.
