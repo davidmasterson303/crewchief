@@ -129,6 +129,24 @@ export default function CardStatesPage() {
         healthSummary: { health_score: 80 },
       },
     },
+    {
+      title: 'Assessed, and not scoreable (D10)',
+      note:
+        'A row exists and health_score is null — the model was asked and declined. Must be a ' +
+        'dashed dial reading “—”, never a red 0. This is the state that shipped as “Needs ' +
+        'attention” on cars nobody had assessed.',
+      props: {
+        vehicle: base,
+        activeRecalls: 0,
+        healthSummary: { health_score: null, summary },
+      },
+    },
+    {
+      title: 'Never assessed',
+      note: 'No summary row at all. No dial — distinct from a null score, which is a statement ' +
+        'about the car rather than about whether we have ever looked.',
+      props: { vehicle: base, activeRecalls: 0 },
+    },
   ];
 
   return (
