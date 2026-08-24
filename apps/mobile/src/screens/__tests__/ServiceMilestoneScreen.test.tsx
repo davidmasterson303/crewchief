@@ -1,4 +1,4 @@
-import { render, userEvent } from '@testing-library/react-native';
+import { render, userEvent, waitFor } from '@testing-library/react-native';
 
 import { ServiceMilestoneScreen } from '../ServiceMilestoneScreen';
 import { apiRequest } from '../../api/client';
@@ -266,5 +266,52 @@ describe('the history it reads is the service record, not the invoice lines', ()
     await passTheGate(user, view);
 
     expect(await view.findByText(/Nothing on record says when these were last done/)).toBeTruthy();
+  });
+});
+
+/**
+ * ── R14 / §5: the question stopped being a screen ───────────────────────────
+ *
+ * This screen was one question, one field and one button, with 70% of the
+ * display empty under it — and what is actually due was on the *other side* of
+ * answering it. The review's general rule came out of this exact screen: no
+ * screen exists whose only content is one question.
+ */
+describe('the mileage confirm', () => {
+  it('shows what is due before the odometer is confirmed, not after', async () => {
+    respondWith([]);
+    const view = await render(<ServiceMilestoneScreen vehicleId="v1" onSignOut={jest.fn()} />);
+
+    /*
+      Both halves in one case, and the second is the one that changed: the
+      question is still asked, and the schedule is on screen underneath it
+      rather than behind it.
+    */
+    await view.findByText(/Still around .* miles\?/);
+    expect((await view.findAllByText(/Engine oil and filter/i)).length).toBeGreaterThan(0);
+  });
+
+  it('says what the list below was worked out from', async () => {
+    /*
+      §10. The schedule is computed from the last reading, and the banner is
+      what makes that true statement visible — a list computed from an
+      unconfirmed number with nothing on screen saying so is the overclaim this
+      product exists not to make.
+    */
+    respondWith([]);
+    const view = await render(<ServiceMilestoneScreen vehicleId="v1" onSignOut={jest.fn()} />);
+
+    await view.findByText(/The list below is worked out from this reading/);
+  });
+
+  it('drops the banner once the reading is confirmed', async () => {
+    // The anti-vacuous half: a banner that never went away would pass above.
+    respondWith([]);
+    const user = userEvent.setup();
+    const view = await render(<ServiceMilestoneScreen vehicleId="v1" onSignOut={jest.fn()} />);
+
+    await user.press(await view.findByLabelText('That is right'));
+
+    await waitFor(() => expect(view.queryByText(/Still around .* miles\?/)).toBeNull());
   });
 });

@@ -2,7 +2,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, type ViewStyle } from '
 
 import { TARGET_MIN, border, brand, radius, space, status, surface, text, type } from '../theme';
 
-export type ButtonVariant = 'primary' | 'inverse' | 'quiet' | 'outline' | 'ghost' | 'delete';
+export type ButtonVariant = 'primary' | 'quiet' | 'outline' | 'ghost' | 'delete';
 export type ButtonSize = 'small' | 'large';
 
 /**
@@ -13,22 +13,31 @@ export type ButtonSize = 'small' | 'large';
  * and disabled treatment is where every one of this product's contrast defects
  * has come from, and the two worst were both disabled states.
  *
- * ── `inverse`, and why it arrived late ──────────────────────────────────────
+ * ── ⚠ `inverse` is gone, 23 Aug. There is one filled treatment ─────────────
  *
- * The theme carries four tokens that exist for exactly one treatment — a
- * light-on-dark control that has to outrank everything: `surface.inverse`,
- * `surface.inverseDisabled`, `text.onInverse` and `text.onInverseMuted`. Until
- * 15 Aug **no primitive owned any of them**, so the treatment lived as a
- * private copy in six screens: sign-in, add-vehicle, the wishlist, the advisor,
- * the invoice scan and the service milestone.
+ * There used to be a sixth variant: white fill, near-black ink, for a verb that
+ * had to outrank everything. It was well built — four dedicated tokens, four
+ * states, measured contrast at each — and it was **against the system**. The
+ * readme's override register says it plainly: *"Advisor CTA — white fill →
+ * `.btn-primary`; a white button is a foreign colour here."*
  *
- * They diverged the way private copies do — 15pt against 16, weight 600 against
- * 700, letter-spacing on some and not others — and on the app's most important
- * control. It is the CTA a reviewer meets first.
+ * The v8.3 review found what that cost. `Take a photo`, `That is right` and
+ * `Ask` were white; `See suggestions` was cyan. Two filled primaries in one
+ * app, and the **more common one was the one the system forbids** — so the
+ * screens disagreed with each other about what a primary action looks like,
+ * which is the thing a design system exists to stop.
  *
- * ⚠ `inverse` and `primary` are **both** filled and the one-per-screen rule
- * covers them together. A screen with a white "Sign in" and a cyan "Skip" has
- * two controls claiming to be the single verb.
+ * The tokens went with it rather than being left dead. `theme/index.ts` carries
+ * the rule about why: a token nothing reads is how a retired treatment comes
+ * back, one call site at a time, with its argument already written.
+ *
+ * What survives is the reasoning that made `inverse` worth building — the
+ * treatment must be a primitive, not six private copies. Before 15 Aug it lived
+ * in sign-in, add-vehicle, the wishlist, the advisor, the invoice scan and the
+ * service milestone, diverging the way private copies do: 15pt against 16,
+ * weight 600 against 700, letter-spacing on some and not others, on the app's
+ * most important control. That is why `primary` is a variant here and not a
+ * style anybody may write out.
  *
  * ── One filled primary per screen ───────────────────────────────────────────
  *
@@ -105,16 +114,16 @@ export default function Button({
         pressed && !inert && styles[`${variant}Pressed` as const],
         inert && styles.inert,
         inert && variant === 'ghost' && styles.inertGhost,
-        inert && variant === 'inverse' && styles.inertInverse,
         style,
       ]}
     >
       {busy ? (
         /*
-          The spinner has to be legible on the fill it spins on. `inverse` is a
-          white control, so the platform default and `text.primary` would both
-          be white on white — a control that looks empty at exactly the moment
-          it is working.
+          The spinner has to be legible on the fill it spins on. `SPINNER`
+          carries the exception per variant and `text.primary` is the default —
+          the case this was written for was the retired white control, where the
+          platform default and `text.primary` were both white on white, giving a
+          control that looks empty at exactly the moment it is working.
         */
         <ActivityIndicator color={SPINNER[variant] ?? text.primary} />
       ) : (
@@ -123,7 +132,6 @@ export default function Button({
             styles[`${size}Label` as const],
             styles[`${variant}Label` as const],
             inert && styles.inertLabel,
-            inert && variant === 'inverse' && styles.inertInverseLabel,
           ]}
         >
           {label}
@@ -136,12 +144,11 @@ export default function Button({
 /**
  * The spinner's ink per variant, where the default is wrong.
  *
- * Only the two filled-light cases need naming; everything else spins in
- * `text.primary` against a dark fill.
+ * Only the brand fill needs naming — its ink is `text.onPrimary`, not white.
+ * Everything else spins in `text.primary` against a dark or absent fill.
  */
 const SPINNER: Partial<Record<ButtonVariant, string>> = {
   primary: text.onPrimary,
-  inverse: text.onInverse,
 };
 
 const styles = StyleSheet.create({
@@ -183,23 +190,6 @@ const styles = StyleSheet.create({
   primaryPressed: { backgroundColor: brand.primaryPressed },
   primaryLabel: { color: text.onPrimary },
 
-  /*
-    ── The inverse control ───────────────────────────────────────────────────
-
-    White fill, near-black ink. Used sparingly and never for two controls on one
-    screen — it is the treatment for a verb that has to outrank everything else
-    on the page, which is why it exists at all rather than being a second
-    primary.
-
-    ⚠ Pressed goes **down** to `inverseDisabled`'s neighbourhood in tone while
-    the ink stays near-black, so contrast *rises* on press. The rule elsewhere
-    in this file is that pressed never lightens under near-white ink; here the
-    ink is dark, so the same rule points the same way for the opposite reason.
-  */
-  inverse: { backgroundColor: surface.inverse },
-  inversePressed: { backgroundColor: surface.inverseDisabled },
-  inverseLabel: { color: text.onInverse },
-
   quiet: { backgroundColor: surface.raised },
   quietPressed: { backgroundColor: surface.well },
   quietLabel: { color: text.primary },
@@ -217,25 +207,6 @@ const styles = StyleSheet.create({
   deleteLabel: { color: text.primary },
 
   inert: { backgroundColor: surface.disabled, borderColor: 'transparent' },
-  /*
-    A disabled inverse keeps the light treatment rather than dropping to the
-    dark disabled fill: a white control that turns dark on the way out reads as
-    a different control appearing, not as this one becoming unavailable.
-
-    ⚠ **The ink does not dim with it**, and the first version of this got that
-    wrong. Muffling the label to `text.onInverseMuted` measured **4.17:1** on
-    this fill — the rendered contrast suite failed it on both sign-in states
-    within a minute of the variant existing.
-
-    `surface.inverseDisabled`'s own note in the theme is the answer and it was
-    there all along: it "keeps its ink near 9:1 while reading as off". The
-    dimmed *fill* is the entire signal. `text.onInverse` on it measures ~10:1,
-    so this state is legible rather than merely exempt — WCAG 1.4.3 would have
-    let it off, and taking that exemption is how a disabled control becomes
-    unreadable instead of unavailable.
-  */
-  inertInverse: { backgroundColor: surface.inverseDisabled },
-  inertInverseLabel: { color: text.onInverse },
   /*
     A disabled ghost keeps no fill — it had none to begin with, and giving it
     one on the way out makes an absent control appear.
@@ -260,8 +231,10 @@ const styles = StyleSheet.create({
    * clear step down from the `text.primary` these variants use when live, so it
    * reads as inactive without going unreadable.
    *
-   * ⚠ It applies to the **dark** variants only. `inverse` is a light fill and
-   * overrides it below: 50% white on `#B8B8B8` would be the opposite mistake.
+   * ⚠ Every variant here is a dark fill, which is what makes one disabled ink
+   * sufficient. The retired white control needed its own — 50% white on
+   * `#B8B8B8` is the opposite mistake — and a light variant returning would
+   * need one again rather than inheriting this.
    */
   inertLabel: { color: text.muted },
 });

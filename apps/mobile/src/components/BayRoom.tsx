@@ -137,14 +137,12 @@ const BLUR_OVERSCAN = 1.16;
 export default function BayRoom({
   photo,
   make,
-  onAddPhoto,
   busy = false,
   height = BAY_HERO_MAX,
 }: {
   photo?: string | null;
   make?: string | null;
   /** Omitted means no control — see `VehiclePlate` for why that is not a failure. */
-  onAddPhoto?: () => void;
   busy?: boolean;
   height?: number;
 }) {
@@ -248,31 +246,6 @@ export default function BayRoom({
         <Rect x="0" y="0" width="100%" height="100%" fill="url(#bayFade)" />
       </Svg>
 
-      {onAddPhoto ? (
-        <Pressable
-          onPress={onAddPhoto}
-          disabled={busy}
-          /*
-            ⚠ Top right, not bottom right. It moved with the hero: the bottom
-            of this room is now the fade the car's name lands in, and a pill
-            parked there either collides with the name on a long one or forces
-            the name to dodge it. The top corner is the one part of a hero that
-            is reliably empty, because a contained photograph centres.
-
-            A fill swap on press, matching `Button`'s `quiet` step — raised at
-            rest, well when pressed. A control sitting on an unknown photograph
-            has to acknowledge the tap with its own surface; fading it would
-            take the label with it, which is the rule this app removed group
-            opacity for.
-          */
-          style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
-          accessibilityRole="button"
-          accessibilityState={{ busy, disabled: busy }}
-          accessibilityLabel={photo ? 'Change photo' : 'Add photo'}
-        >
-          <Text style={styles.actionLabel}>{photo ? 'Change photo' : 'Add photo'}</Text>
-        </Pressable>
-      ) : null}
     </View>
   );
 }
@@ -341,20 +314,4 @@ const styles = StyleSheet.create({
     color: text.muted,
     paddingLeft: 5.6,
   },
-  action: {
-    position: 'absolute',
-    right: space.lg,
-    top: space.md,
-    minHeight: TARGET_MIN,
-    paddingHorizontal: space.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.pill,
-    // Solid, never a wash — this sits over an unknown photograph.
-    backgroundColor: surface.raised,
-    borderWidth: 1,
-    borderColor: border.field,
-  },
-  actionPressed: { backgroundColor: surface.well },
-  actionLabel: { ...type.label, color: text.primary },
 });

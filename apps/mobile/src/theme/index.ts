@@ -49,13 +49,22 @@ export const surface = {
   well: '#262220',
   /** Disabled fills. Never a group opacity — see `text.disabled`. */
   disabled: '#1B1917',
-  /**
-   * Light-on-dark inversion, for a control that has to outrank everything.
-   * Used sparingly and never for two controls on one screen.
-   */
-  inverse: '#FFFFFF',
-  /** A disabled inverse control. Keeps its ink near 9:1 while reading as off. */
-  inverseDisabled: '#B8B8B8',
+  /*
+    ⚠ **There is no `inverse` here any more, and that is the point.**
+
+    `#FFFFFF` and its `#B8B8B8` disabled partner were a second filled treatment
+    — a white control for a verb that had to outrank everything. It was against
+    the readme's override register (*"a white button is a foreign colour
+    here"*), and by 23 Aug the app had white CTAs on six screens and the cyan
+    fill on one, so the screens disagreed about what a primary action looks
+    like.
+
+    The tokens are **deleted rather than left unused**, for the same reason
+    `status.critical` was: a dead token holding a retired treatment is how the
+    treatment comes back, one call site at a time, with its argument already
+    written beside it. There is one filled control in this app and it is
+    `brand.primary`.
+  */
 } as const;
 
 export const border = {
@@ -86,19 +95,17 @@ export const text = {
   nonText: 'rgba(255,255,255,0.4)',
   /** Disabled ink. Exempt from the floor under WCAG 1.4.3. */
   disabled: '#6E6B67',
-  /** Ink on the filled primary. 5.10:1 on `brand.primary`. */
+  /** Ink on the filled primary — the only filled control. 5.10:1 on `brand.primary`. */
   onPrimary: '#F2FBFD',
-  /** Ink on `surface.inverse`. */
-  onInverse: '#080808',
-  /**
-   * Secondary ink on `surface.inverse`.
-   *
-   * 0.60, not 0.55. The comment that shipped with this claimed 8.6:1 and had
-   * measured white-on-white by mistake; the real figure was 4.47:1, a hair
-   * under the floor, and no source scan could catch it because the ink is
-   * dark. The rendered suite found it. 0.60 gives 5.35:1.
-   */
-  onInverseMuted: 'rgba(8,8,8,0.6)',
+  /*
+    `onInverse` and `onInverseMuted` went with `surface.inverse` on 23 Aug — see
+    its note above. Worth keeping the finding they cost: `onInverseMuted` shipped
+    at 0.55 with a comment claiming 8.6:1, which had **measured white on white**
+    by mistake. The real figure was 4.47:1, under the floor, and no source scan
+    could catch it because the ink is dark. The rendered suite found it. Any
+    future light-on-dark pair needs measuring the same way rather than reasoning
+    about.
+  */
 } as const;
 
 /**
@@ -430,6 +437,85 @@ export const type = {
  * a value that shifts sideways while it updates reads as a glitch.
  */
 export const TABULAR = { fontVariant: ['tabular-nums' as const] };
+
+/**
+ * ── R56 · the vertical rhythm, pinned ───────────────────────────────────────
+ *
+ * Measured across the ten screens in the v8.3 review: the page gutter varied
+ * between 16 and 24, the gap between cards between 6 and 16, and the space
+ * under a section label between 8 and 14 — all of it written as raw numbers at
+ * each screen. Nothing was wrong on any single screen; what was wrong was that
+ * moving between two of them felt like moving between two products.
+ *
+ * Every value here already existed in `space`. What did not exist was a name
+ * for **which slot each one belongs to**, which is the only part a screen can
+ * get wrong by accident: `padding: 20` on one body and `padding: 24` on the
+ * next is not a disagreement about the scale, it is two people picking off it
+ * independently.
+ *
+ * ⚠ Spread these rather than re-deriving them. `gap: space.md` in a screen is
+ * indistinguishable from `gap: 12` six months later; `...rhythm.cardGap` says
+ * which decision is being made and moves when the decision moves.
+ */
+export const rhythm = {
+  /** The page gutter, both edges. Every screen body. */
+  page: 16,
+  /** Nav bottom → the first element on the page. */
+  afterNav: 20,
+  /** A section label → the first card under it. */
+  afterLabel: 12,
+  /** Card → card. Also list row → list row. */
+  betweenCards: 12,
+  /** A card's own inset. */
+  cardPad: 16,
+  /** A card's title → its body. */
+  afterTitle: 8,
+  /** The last card → the safe area. Long enough to read as an end. */
+  tail: 32,
+} as const;
+
+/**
+ * The page body, as one spread: gutter, tail, and the gap between cards.
+ *
+ * The shape almost every `contentContainerStyle` in this app wants, so that the
+ * three numbers are not re-chosen per screen.
+ */
+export const PAGE_BODY = {
+  paddingHorizontal: rhythm.page,
+  paddingTop: rhythm.afterNav,
+  paddingBottom: rhythm.tail,
+  gap: rhythm.betweenCards,
+} as const;
+
+/**
+ * ── R57 · where a short screen's content sits ───────────────────────────────
+ *
+ * Four screens in the v8.3 review were **more than half empty with everything
+ * pinned to the top** — Scan an invoice, Service due, the empty wishlist and
+ * the advisor. A single-question screen with its question at the very top of a
+ * black field reads as a page that failed to finish loading, and on Service due
+ * the keyboard then strands it further.
+ *
+ * The rule, and it is one rule rather than four judgements: **content shorter
+ * than the display is centred optically; content that scrolls is top-aligned.**
+ * `flexGrow: 1` with `justifyContent: 'center'` is exactly that behaviour for
+ * free — the container only has slack to distribute when the content is short,
+ * so a list that overflows is unaffected and never has to be special-cased.
+ *
+ * ⚠ **Optically centred, not mathematically.** `paddingBottom` biases the block
+ * about a tenth of the display above true centre, which is where the eye reads
+ * "centred" — dead centre reads as low. The same reason a wordmark sits above
+ * the middle of a page.
+ *
+ * Spread into a `contentContainerStyle`, never applied to a `ScrollView`'s own
+ * `style`: on the container it distributes the content, on the view it does
+ * nothing and looks like it should have.
+ */
+export const OPTICAL_CENTRE = {
+  flexGrow: 1,
+  justifyContent: 'center' as const,
+  paddingBottom: 72,
+};
 
 /** ── Floors. All four are lintable. ─────────────────────────────────────── */
 

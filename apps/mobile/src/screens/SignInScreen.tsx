@@ -171,7 +171,7 @@ export function SignInScreen() {
         {notice ? <Text style={styles.notice}>{notice}</Text> : null}
 
         {/*
-          The inverse CTA, from the primitive rather than a sixth private copy.
+          The filled primary, from the primitive rather than a sixth private copy.
 
           `Button` carries the whole treatment: the white fill for a control
           that has to outrank everything, the disabled fill that stays light so
@@ -182,7 +182,7 @@ export function SignInScreen() {
         */}
         <Button
           label={isNew ? 'Create account' : 'Sign in'}
-          variant="inverse"
+          variant="primary"
           onPress={handleSubmit}
           disabled={!canSubmit}
           busy={busy}

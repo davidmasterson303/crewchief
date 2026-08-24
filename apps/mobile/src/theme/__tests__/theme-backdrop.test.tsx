@@ -1,5 +1,15 @@
 import { SCREEN_BACKGROUND } from '../../test-support/contrast';
-import { surface, text, brand, radius, space, TARGET_MIN, TYPE_MIN } from '../index';
+import {
+  PAGE_BODY,
+  TARGET_MIN,
+  TYPE_MIN,
+  brand,
+  radius,
+  rhythm,
+  space,
+  surface,
+  text,
+} from '../index';
 
 /**
  * The token layer's own invariants.
@@ -86,5 +96,53 @@ describe('the scales the handoff enumerated', () => {
   it('keeps spacing on the 4pt scale', () => {
     // 11, 13, 15, 22 and 68 were all in use before the token layer landed.
     expect(Object.values(space).filter((s) => s % 4 !== 0)).toEqual([]);
+  });
+});
+
+/**
+ * ── R56 · the rhythm table, pinned to the review's numbers ──────────────────
+ *
+ * The v8.3 review measured the ten built screens and found the page gutter
+ * varying between 16 and 24, card-to-card between 6 and 16, and the space under
+ * a section label between 8 and 14. It then specified one value per slot.
+ *
+ * These are those values. Pinned rather than derived, because the point of the
+ * table is that the numbers were **chosen** — a test that asserted
+ * `rhythm.page === space.lg` would pass while the scale drifted underneath it
+ * and would be testing an alias rather than a decision.
+ */
+describe('the vertical rhythm', () => {
+  it('matches the specified slots', () => {
+    expect(rhythm).toEqual({
+      page: 16,
+      afterNav: 20,
+      afterLabel: 12,
+      betweenCards: 12,
+      cardPad: 16,
+      afterTitle: 8,
+      tail: 32,
+    });
+  });
+
+  it('assembles a page body out of them and nothing else', () => {
+    /*
+      The spread every screen uses. If a raw number appears in here it appears
+      on every screen at once, which is the failure this consolidation exists to
+      make impossible rather than unlikely.
+    */
+    expect(PAGE_BODY).toEqual({
+      paddingHorizontal: rhythm.page,
+      paddingTop: rhythm.afterNav,
+      paddingBottom: rhythm.tail,
+      gap: rhythm.betweenCards,
+    });
+  });
+
+  it('keeps every slot on the spacing scale', () => {
+    // A rhythm value that is not a step of `space` is a number somebody typed.
+    const steps = new Set<number>(Object.values(space));
+    for (const [slot, value] of Object.entries(rhythm)) {
+      expect([slot, steps.has(value)]).toEqual([slot, true]);
+    }
   });
 });

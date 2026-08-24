@@ -53,6 +53,8 @@ function mount(overrides: Partial<Parameters<typeof AccountScreen>[0]> = {}) {
   const props = {
     visible: true,
     email: 'owner@example.test',
+    // Rendered only under `__DEV__`, and never asserted on here — see `DevToken`.
+    accessToken: 'test-token',
     ...overrides,
     onClose: jest.fn(),
     onSignOut: jest.fn(),

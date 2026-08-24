@@ -5,8 +5,8 @@ import Suggest from '../../components/Suggest';
 import ClusterGauge from '../../components/ClusterGauge';
 import HealthDrivers from '../../components/HealthDrivers';
 import Plinth from '../../components/Plinth';
-import { auditText, belowFloor } from '../../test-support/contrast';
-import { bay, surface } from '../../theme';
+import { AA_NORMAL, auditText, belowFloor, contrastRatio } from '../../test-support/contrast';
+import { bay, surface, text } from '../../theme';
 
 /**
  * Contrast for the surfaces that are **not** the page.
@@ -66,17 +66,17 @@ describe('surfaces that are not the page', () => {
     expect(belowFloor(auditText(view, bay.roomNear))).toEqual([]);
   });
 
-  it('keeps the add-photo control legible where it sits', async () => {
-    // A solid fill, never a wash, precisely because this sits over an unknown
-    // photograph. Measured against the room anyway — the control's own fill is
-    // what has to carry it, not the backdrop.
-    const view = await render(<BayRoom make="Subaru" onAddPhoto={jest.fn()} />);
-    const audits = auditText(view, bay.roomNear);
+  /*
+    ⚠ **R18, 23 Aug: the add-photo control is no longer on the bay**, so the case
+    that measured it is gone rather than skipped. A solid "Change photo" pill sat
+    on the photograph at the top right — the loudest control on the home screen
+    for the least frequent action anyone takes. On the garage the photograph is
+    scenery and the affordance is "open this car"; the control lives on the
+    vehicle hero, where it is that hero's implied action.
 
-    // Both the wordmark and the control, not just whichever walked first.
-    expect(audits.length).toBeGreaterThan(1);
-    expect(belowFloor(audits)).toEqual([]);
-  });
+    Its contrast still matters and is still measured — over there, against the
+    hero's guaranteed bed rather than against the bay's room.
+  */
 
   /*
     The drivers are banded on the health ramp, so every colour `healthBandHex`
@@ -150,5 +150,66 @@ describe('surfaces that are not the page', () => {
     );
 
     expect(belowFloor(auditText(view, surface.card))).toEqual([]);
+  });
+});
+
+/**
+ * ── The text ramp, measured on every surface it can land on ─────────────────
+ *
+ * Raised as **R5** by the v8.3 review, which read five strings across four
+ * screens as "materially lighter-weight than `--text-muted`" and asked for an
+ * audit. Every one of them is `text.muted` exactly — `EmptyState`'s body, the
+ * advisor's examples, `RecallDetailScreen.meta`, `ServiceHistoryScreen.meta`.
+ * Nothing is off-token and nothing is composited by a parent `opacity`; the
+ * screens read light because **the ramp's floor is where a lot of this app's
+ * content sits**, which is a hierarchy question and not a contrast one.
+ *
+ * The numbers are pinned here so that answer keeps holding rather than being
+ * re-derived by eye every review. Two are load-bearing:
+ *
+ *   - `muted` on `well` is **4.99:1** — the thinnest margin in the app, and the
+ *     reason `well` must never gain a lighter value without re-running this.
+ *   - `nonText` is **below 4.5 on every surface**. It is the hairline token and
+ *     a string wearing it fails everywhere, which is exactly why there is no
+ *     step between it and `muted` to reach for.
+ */
+describe('the text ramp against every surface', () => {
+  const SURFACES: Array<[string, string]> = [
+    ['page', surface.page],
+    ['nav', surface.nav],
+    ['raised', surface.raised],
+    ['card', surface.card],
+    ['well', surface.well],
+  ];
+
+  it.each(SURFACES)('keeps muted above the floor on %s', (_name, ground) => {
+    const ratio = contrastRatio(text.muted, ground);
+
+    expect(ratio).not.toBeNull();
+    expect(ratio!).toBeGreaterThanOrEqual(AA_NORMAL);
+  });
+
+  it.each(SURFACES)('keeps secondary comfortably clear on %s', (_name, ground) => {
+    expect(contrastRatio(text.secondary, ground)!).toBeGreaterThanOrEqual(8);
+  });
+
+  it('pins the worst case, because the margin is thin', () => {
+    /*
+      4.99:1. Not a rounding away from failing, but close enough that a
+      half-step lighter `well` would take the quietest string in a field below
+      the floor — and a field is where the app's smallest text lives.
+    */
+    expect(contrastRatio(text.muted, surface.well)!).toBeCloseTo(4.99, 1);
+  });
+
+  it.each(SURFACES)('fails nonText as body ink on %s, which is the point', (_name, ground) => {
+    /*
+      The anti-vacuous half, and a real rule rather than a formality: this is
+      the assertion that would break if somebody "fixed" a contrast complaint by
+      lightening `nonText` toward `muted`. There is deliberately no step between
+      them — "just one step quieter" is how a system accumulates off-token
+      sites, and the hairline token has to stay unusable for words.
+    */
+    expect(contrastRatio(text.nonText, ground)!).toBeLessThan(AA_NORMAL);
   });
 });

@@ -120,7 +120,6 @@ describe('the health score colour — never checked by the source scan', () => {
         onOpenWishlist={jest.fn()}
       onOpenHistory={jest.fn()}
       onOpenHealth={jest.fn()}
-      onOpenBuild={jest.fn()}
       onOpenMilestone={jest.fn()}
       onOpenProfile={jest.fn()}
       />));
@@ -157,7 +156,6 @@ describe('the hero pullback fades two strings in, and the walker cannot reach th
           onOpenWishlist={jest.fn()}
           onOpenHistory={jest.fn()}
           onOpenHealth={jest.fn()}
-          onOpenBuild={jest.fn()}
           onOpenMilestone={jest.fn()}
           onOpenProfile={jest.fn()}
         />
@@ -265,7 +263,6 @@ describe('failure states, which are where sub-floor text hides', () => {
         onOpenWishlist={jest.fn()}
       onOpenHistory={jest.fn()}
       onOpenHealth={jest.fn()}
-      onOpenBuild={jest.fn()}
       onOpenMilestone={jest.fn()}
       onOpenProfile={jest.fn()}
       />));
@@ -285,7 +282,12 @@ describe('the invoice scanner', () => {
       />
     );
 
-    await view.findByText('Scan an invoice');
+    /*
+      ⚠ **R47.** The screen's H1 is gone — it repeated the nav title 40pt above
+      it — so this waits on the lead line instead. It still has to wait on
+      *something*: an audit of an unmounted tree finds no text and passes.
+    */
+    await view.findByText(/Photograph a service invoice/);
     expect(belowFloor(auditText(view))).toEqual([]);
   });
 });
@@ -304,7 +306,6 @@ describe('the advisor CTA, which is dark text on white', () => {
         onOpenWishlist={jest.fn()}
       onOpenHistory={jest.fn()}
       onOpenHealth={jest.fn()}
-      onOpenBuild={jest.fn()}
       onOpenMilestone={jest.fn()}
       onOpenProfile={jest.fn()}
       />));
@@ -641,9 +642,15 @@ describe('the wishlist', () => {
     );
 
     await view.findByText('Fuel injector seals');
-    // Both chip tones on screen at once, which is the case worth measuring.
-    view.getByText('Do first');
+    /*
+      Both chip tones on screen at once, which is the case worth measuring. The
+      urgent one reads `Known issue` in the attention tone since R40 — the word
+      changed, the colour did not, and the colour is what this measures.
+    */
+    view.getAllByText('Known issue');
     view.getByText('Modification');
+    // The section header too: `text.muted` on the page, uppercased.
+    view.getByText('DO FIRST');
 
     expect(belowFloor(auditText(view))).toEqual([]);
   });

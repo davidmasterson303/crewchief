@@ -1,6 +1,7 @@
 # Design system ↔ build: drift register
 
-**Raised:** 23 Aug 2026 · **last updated:** 23 Aug, after Design's rulings.
+**Raised:** 23 Aug 2026 · **last updated:** 23 Aug, after Design's rulings and
+the v8.3 ten-screen UI review (§2b).
 
 **⚠ Before reading a value out of any export, check `$meta.version`.** Design
 added `$meta.$selfCheck` — six identifying values — for exactly this, because a
@@ -132,6 +133,43 @@ reinterpreted.
 | `native-wishlist` — suggestions | New `WishlistAddScreen`: the three knowledge-base sources as a filterable catalogue with Add and Learn more per row. |
 | `native-hero-pullback` — the whole screen | The vehicle hero is pinned at 62% of the display with the sheet rising over it. Four planes in render order (never `zIndex`), the dial climbing at 1.6× so it docks before the sheet edge arrives, and a crossfade to a nav chip rather than a shrink. Constants mirrored into `theme/hero-motion.ts` from `tokens/hero.css`. |
 | `native-hero-pullback` §4.4 — the compact branch | Below a 500pt hero the dial drops to `card` @104 in a 124pt plinth and the title to 28pt. Only the 4.7″ display takes it; the mini clears by 3pt. |
+
+---
+
+## 2b. The v8.3 UI review, 23 Aug — what landed and what did not
+
+A full ten-screen review came back the same day this file was raised. Its
+findings are cited by number throughout the code (`R1`, `R28`, `R57`…) so the
+argument sits beside the change rather than in a document that drifts from it.
+
+**Three of the four ship blockers were real, and the fourth was not in the app.**
+
+- **R1** — the dev access-token block on the garage. Already `__DEV__`-gated and
+  already guarded; the placement was the finding. Moved to `Account`.
+- **R2** — a floating gear on every screen. **Not in the app** — see §3.18.
+- **R3** — the health verdict contradicting the service history. **Real, and
+  confirmed against the live database**: the M235i's summary row was generated
+  30 Jul, its five line items were filed 6 Aug, and `last_generated` is a
+  `2000-01-01` sentinel. Nothing on the mobile read path recomputes, so it had
+  been stale for three weeks with no mechanism that would ever fix it. The
+  screen no longer presents an out-of-date verdict as a current one; the
+  recompute itself is §6 below.
+- **R12** — back buttons reading `‹ VehicleDetail`. Real, and caused by
+  `headerShown: false` landing on 23 Aug with no `title` beside it. Fixed, with
+  a guard.
+
+**Two findings did not reproduce**, and both are recorded rather than quietly
+dropped: R2 above, and R5's contrast claim (§3.22 — measured on every surface,
+nothing off-token).
+
+**R44 also did not reproduce.** The build dial's redline *is* painted on the
+unlit face from 82 to 100 at `--build-redline-track`'s 0.22, exactly as
+specified — visible at a reading of zero. It is faint by design, which is
+presumably why a screenshot read as missing it.
+
+**R23 likewise.** `HeroBed` is present, it is the fixed contrast floor the hero
+title sits on, and it is a **sibling** of the scaled photograph rather than a
+child — so the pullback's transform cannot take it with it.
 
 ---
 
@@ -343,6 +381,164 @@ make catalogue nor NHTSA's model list is. Every field still accepts free text.
 
 ---
 
+### 3.17 The white filled primary is retired ✅ fixed in the app
+
+Raised by the v8.3 UI review as **R4**, and it was a real conflict rather than
+an oversight.
+
+The readme's override register says *"Advisor CTA — white fill → `.btn-primary`;
+a white button is a foreign colour here."* The app shipped a `Button` variant
+called `inverse` that was exactly that white fill, and it was the CTA on **six**
+screens — sign-in, add-a-car, the wishlist, the advisor, the invoice scan and
+the service milestone — while `See suggestions` on the empty wishlist was
+correctly cyan. Two filled primaries in one product, and the commoner one was
+the one the register forbids.
+
+**The build's side of the argument was not nothing**, and it is worth recording
+because it is why this took a ruling rather than a find-and-replace.
+`theme/index.ts` carried four tokens that existed for this treatment alone —
+`surface.inverse`, `surface.inverseDisabled`, `text.onInverse`,
+`text.onInverseMuted` — one of which was moved to 0.60 to fix a **measured**
+4.47:1 failure that no source scan could see. `Button`'s docblock already stated
+that `inverse` and `primary` share the one-filled-per-screen rule. Until 15 Aug
+the treatment lived as six diverging private copies, and the primitive was built
+to end that.
+
+**Design is the authority, so it went.** Every filled control is
+`brand.primary` `#0E7490` with `text.onPrimary` `#F2FBFD`. The four tokens are
+**deleted rather than left unused** — the same rule `status.critical` was
+removed under: a dead token holding a retired treatment is how the treatment
+comes back, one call site at a time, with its argument already written beside
+it. The selected states on the profile, add-a-car and wishlist type chips moved
+with it.
+
+`primitives.test.tsx` now asserts the absence directly, so restoring the variant
+fails a test rather than passing review.
+
+### 3.18 §3.11's gear was independently read as *shipped* ✅ no change
+
+Recorded because it is evidence that the entry above it is doing its job. The
+v8.3 review's **R2** reports "a floating gear button overlays content on all ten
+screens" and files it as a ship blocker.
+
+Checked: `apps/mobile/src` contains no gear, cog or settings control of any kind
+— the whole tree greps clean — which is §3.11's decision holding. What is in the
+captures is not the app's; it belongs to the device or the capture, and the most
+likely candidate is iOS AssistiveTouch, which floats a round grey control at a
+fixed right-centre position over every screen.
+
+The review's underlying point still stands and is already this file's: **the
+system draws a control the app has nothing to open.** That ask is §3.11.
+
+### 3.19 The recall card's action order ⚠ Design — two of the system's own statements
+
+The same shape as §3.2, and it deserves the same treatment.
+
+`native-recall-detail` says this card's *"job is to drive an action, not to
+explain a notice"*, and the build put `Find a dealer` and `Mark as repaired`
+immediately under the component name. The v8.3 review's **R27** reads that as a
+defect: *"the user is offered 'mark as repaired' before being told what could
+happen."*
+
+**Both are right, and they are about different things** — the spec is about
+prominence, the review is about sequence. The card now leads with the component
+name, then three lines of the notice, then the two actions, then the rest behind
+one disclosure. The actions are still above every detail section and above the
+advisor row; what is above *them* is one paragraph saying what is wrong.
+
+**Design should confirm.** If the spec means the actions must be the first thing
+under the title with nothing between, say so and the summary moves below them.
+
+### 3.20 The tab bar is hand-rolled ⚠ Design and Code — R13
+
+**R13** is built: three destinations — Garage, Advisor, Account — on a bar that
+is a sibling of the navigator rather than a child of any screen. That is what
+makes App Store 5.1.1(v) structural instead of something `GarageScreen` has to
+remember on every return path.
+
+⚠ It is **not** `@react-navigation/bottom-tabs`. That package is JS-only and
+would cost no EAS build, but installing it runs an install across this
+workspace, and `package.json`'s own notes record what that has cost: a full
+workspace install hoists `apps/mobile`'s jest 29 to the root and splits the web
+app's jest 30 across two trees, which killed every web suite before its first
+test.
+
+What bottom-tabs buys over the hand-rolled bar is **per-tab stacks** — each tab
+remembering its own history. That is real and it is not what R13 is about. When
+a tab genuinely needs its own history, that is the moment to spend the install
+and verify it with `rm -rf node_modules && npm ci`.
+
+### 3.21 R26's inline mileage edit is **not built** ⚠ Design
+
+**R26** asks for the hero's meta line — `66,000 mi · xDrive · Daily Driver` — to
+make the mileage an `InlineEdit`, "so the one thing that changes looks
+changeable".
+
+Not built, and the reason is a collision with a design this file already
+records. The hero's identity block is `pointerEvents="none"` and **fades out on
+scroll** (§3.14, the pullback): a text field there cannot be tapped, and if it
+could, it would fade while somebody was typing into it.
+
+The half of R14 that depends on it *is* built, and it is the half that removes a
+screen: `Service → Due` now carries a confirm banner with the field and `That is
+right` inline, so the odometer question is answered where the answer is used.
+`ServiceMilestoneScreen` no longer gates the whole screen on it.
+
+**Ask:** does the mileage belong on the hero at all, given it cannot be
+interactive there? The alternatives are an editable row on `What you told us`,
+or the meta line linking to `Service → Due` where the edit already lives.
+
+### 3.22 R5's contrast finding did not reproduce ✅ measured, no change
+
+**R5** reported five strings across four screens as "materially lighter-weight
+than `--text-muted`" and asked for an audit. Every one of them is `text.muted`
+exactly — `EmptyState`'s body, the advisor's examples, `RecallDetailScreen.meta`,
+`ServiceHistoryScreen.meta`. Nothing is off-token and nothing is composited by a
+parent `opacity`; that trap was closed app-wide on 7 Aug and every remaining
+`opacity` in the tree is a scroll-driven hero transform.
+
+Measured on every surface and pinned in `surface-contrast.test.tsx`:
+
+| | page | nav | raised | card | well |
+|---|---|---|---|---|---|
+| `text.muted` | 5.34 | 5.34 | 5.24 | **5.13** | **4.99** |
+| `text.secondary` | 10.07 | 10.15 | 9.57 | 9.21 | 8.79 |
+| `text.nonText` | 3.81 | 3.80 | 3.82 | 3.78 | 3.72 |
+
+The reviewer's own figure for the floor — 5.13:1 — is `muted` on a **card**, so
+they measured it correctly and read the render as lighter than the number.
+
+Two things follow. `muted` on `well` is **4.99:1**, the thinnest margin in the
+app and the reason `well` must never gain a lighter value without re-running
+that suite. And `nonText` fails on every surface, which is exactly why there is
+no step between it and `muted` to reach for.
+
+⚠ What is real in R5 is not contrast, it is **hierarchy**: a lot of this app's
+content sits on the ramp's floor because the floor is where descriptions,
+provenance and intervals all landed. R41's ladder — description at
+`--text-secondary`, interval at `--text-muted` — is the fix, and it is applied.
+
+### 3.23 R48's camera-first scan is **not built** — a native module
+
+**R48** asks `Scan an invoice` to open the **camera preview** with `Take a photo`
+as the shutter, rather than offering two ways to start. It is right: it removes a
+tap and makes the screen's purpose self-evident.
+
+A live preview needs `expo-camera`. The current flow uses `expo-image-picker`'s
+`launchCameraAsync`, which hands the OS camera UI over and takes a file back —
+there is no preview to embed. `expo-camera` is a **native module**, so adopting
+it costs an EAS build out of a monthly allowance of about fifteen (§9).
+
+Queued with the next build that is being spent anyway, alongside
+`expo-document-picker` (§3.3's PDF gap) and `react-native-gesture-handler` for
+swipe-to-delete on service history (R9). Three findings, one build.
+
+What did land on that screen: the duplicate H1 is gone (R47), the block is
+optically centred (R57), and it now says what the model is about to do with the
+photograph (R49) — in words that are true, which the review's suggested line was
+not: line items are written as soon as extraction succeeds, and only a vehicle
+mismatch is held back for confirmation.
+
 ## 4. The export's five adherence rules, against what this repo already runs
 
 `specs/adherence-rules.spec.html` proposes five oxlint rules and says *"ship them
@@ -386,3 +582,33 @@ carried an answer.
 Fixed on 23 Aug. The note that named the wrong blocker is corrected in place —
 a docblock pointing at a migration that already ran sends the next reader to
 write it again.
+
+---
+
+## 6. One thing this review found that is not a design question
+
+**R3's other half, and it needs David's call because it spends money.**
+
+The vehicle detail screen no longer presents a stale health verdict as a current
+one — it says what the reading predates, and names its inputs. That makes the
+contradiction impossible to ship silently. It does **not** make the number
+right.
+
+Nothing on the mobile read path recomputes a health summary.
+`generateVehicleHealthSummary` learned to read `maintenance_line_items` on
+5 Aug, and `uploadInvoice` fires a best-effort refresh — but
+`/api/v1/load-vehicle` and `/api/v1/vehicles` only ever **select** the stored
+row. So a summary that went stale before that fix, or whose fire-and-forget
+refresh failed, stays stale forever. The M235i is that case.
+
+The fix is one call, and the precedent is already in `uploadInvoice`: fire
+`generateVehicleHealthSummary(vehicleId, true)` best-effort from the read path
+when the stored row predates the newest filed record.
+
+⚠ **It puts a Gemini call on a route hit every time a car is opened.** §9 says
+cap every spending path and make exhaustion degrade the feature rather than
+break it. `last_generated` only advances on success, so a persistently failing
+generation would retry on every read — `checkRateLimit(userId, 'ai')` bounds
+that, and it is the same limiter `uploadInvoice` uses before recomputing stats.
+
+Not implemented on a review line. It is a cost decision, not a design one.

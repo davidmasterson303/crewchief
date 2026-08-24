@@ -883,7 +883,14 @@ describe('the bay’s next-service row', () => {
     );
 
     view.getByText('NEXT SERVICE');
-    view.getByText('Engine oil and filter · in 420 mi');
+    /*
+      ⚠ **R21, 23 Aug.** The job and the timing are two nodes now, not one
+      dot-joined run — the job at `text.primary` and the timing quieter and
+      tabular beside it. It was the most actionable string on the home screen
+      rendered as a label-plus-run-on at one weight.
+    */
+    view.getByText('Engine oil and filter');
+    view.getByText('in 420 mi');
     await view.unmount();
   });
 
@@ -952,7 +959,8 @@ describe('the bay’s next-service row', () => {
       />
     );
 
-    view.getByText('Engine oil and filter · at 41,620 mi');
+    view.getByText('Engine oil and filter');
+    view.getByText('at 41,620 mi');
     await view.unmount();
   });
 });

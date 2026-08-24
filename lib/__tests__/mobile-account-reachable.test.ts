@@ -1,117 +1,135 @@
 /**
- * Account deletion is reachable in every state the garage can be in.
+ * Account deletion is reachable from everywhere, by construction.
  *
  * @jest-environment node
  *
  * App Store guideline **5.1.1(v)** requires account deletion to be initiated
- * from inside the app. `AccountScreen` is deliberately one tap from the garage
- * — `GarageScreen`'s own docblock says "buried would be any number of taps
- * greater than one", because the garage is the only screen a signed-in user
- * sees.
+ * from inside the reviewed app and to be genuinely available.
  *
- * **The rule that was broken:** loading and error `return`ed before the header,
- * so both drew a bare centred box with no "Account" on it. That put deletion
- * behind the API being up. A reviewer testing on a bad connection — or anyone
- * whose session had just expired, which is precisely when someone is most
- * likely to be leaving — got a screen with no way into their account at all.
+ * ── What this used to check, and why it stopped being the right question ────
  *
- * It typechecked, every test passed, and it was invisible until the screen was
- * actually rendered in a failing state. So the guard is static: an early return
- * added to this component in six months must fail here rather than in review.
+ * Until 23 Aug the account was a modal owned by `GarageScreen`, and this file
+ * checked that **every return path of that component** rendered it. It had to:
+ * loading and error `return`ed before the header, so both drew a bare centred
+ * box with no way into the account at all — putting deletion behind the API
+ * being up, for exactly the person most likely to be leaving.
  *
- * ── Why a source scan and not a render test ─────────────────────────────────
+ * That guarantee was held together by vigilance. **R13 replaced it with a
+ * structure**: the account is a tab, the bar is a sibling of the navigator
+ * rather than a child of any screen, and no early return inside a screen can
+ * take it away.
+ *
+ * ── So what is checked here now ─────────────────────────────────────────────
+ *
+ * Three structural facts, all of which a refactor could quietly undo:
+ *
+ *   1. The navigator registers an `Account` route.
+ *   2. `TabBar` is rendered **outside** `Stack.Navigator`, not inside a screen.
+ *   3. The bar offers `Account` as one of its destinations.
+ *
+ * `apps/mobile/src/navigation/__tests__/TabBar.test.tsx` covers the control
+ * itself — that it is named, that it announces its selected state, and that it
+ * is reachable from its own position. This file covers the wiring that keeps it
+ * where a screen cannot swallow it.
+ *
+ * ── Why a source scan ───────────────────────────────────────────────────────
  *
  * Same reasoning as `mobile-api-only.test.ts`: no React Native runtime, no
- * jest-expo, no second toolchain, so it runs on every `npm test` from today
- * rather than from whenever a mobile runner is configured. It is a weaker check
- * than mounting the component, and a weaker check that runs beats a stronger
- * one that does not exist.
+ * jest-expo, no second toolchain, so it runs on every `npm test` from the repo
+ * root rather than from whenever a mobile runner is configured. It is a weaker
+ * check than mounting the navigator, and a weaker check that runs beats a
+ * stronger one that does not exist.
  */
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const GARAGE = join(__dirname, '..', '..', 'apps', 'mobile', 'src', 'screens', 'GarageScreen.tsx');
+const MOBILE_SCREENS = join(__dirname, '..', '..', 'apps', 'mobile', 'src', 'screens');
+const GARAGE = join(MOBILE_SCREENS, 'GarageScreen.tsx');
+const ACCOUNT = join(MOBILE_SCREENS, 'AccountScreen.tsx');
 
-/**
- * The body of `GarageScreen` itself, without the helper components above it.
- *
- * `VehicleCard` and `DevToken` also contain `return (` and must not be held to
- * this rule — a vehicle card has no business rendering an account modal.
- */
-function garageComponentBody(): string {
-  const source = readFileSync(GARAGE, 'utf8');
-  const start = source.indexOf('export function GarageScreen(');
-  const end = source.indexOf('const styles = StyleSheet.create');
+const NAVIGATION = join(__dirname, '..', '..', 'apps', 'mobile', 'src', 'navigation');
+const NAVIGATOR = join(NAVIGATION, 'RootNavigator.tsx');
+const TAB_BAR = join(NAVIGATION, 'TabBar.tsx');
 
-  expect(start).toBeGreaterThan(-1);
-  expect(end).toBeGreaterThan(start);
+const navigator = readFileSync(NAVIGATOR, 'utf8');
+const tabBar = readFileSync(TAB_BAR, 'utf8');
 
-  return source.slice(start, end);
-}
+describe('App Store 5.1.1(v) — the account is a destination', () => {
+  it('registers an Account route', () => {
+    expect(navigator).toMatch(/<Stack\.Screen name="Account"/);
+    expect(navigator).toMatch(/Account: undefined;/);
+  });
 
-describe('GarageScreen — App Store 5.1.1(v)', () => {
-  it('renders the account surface on every return path', () => {
-    const body = garageComponentBody();
-
+  it('renders the bar outside the navigator, where no screen can swallow it', () => {
     /*
-      Split on the returns themselves. Everything before the first one is setup
-      and is not a rendered path; every chunk after one is something a user can
-      actually be looking at, and each has to carry the account affordance.
-
-      ⚠ The `(?!\))` is load-bearing and was added on 17 Aug after this test
-      failed on a change that did nothing wrong. `\breturn \(` also matches a
-      `useEffect` cleanup — `return () => { live = false; };` — so adding an
-      effect with teardown invented a "render path" consisting of the rest of
-      the setup block, which of course renders nothing at all.
-
-      That is a false positive, and a false positive on a compliance test is
-      worse than it sounds: the fix that suggests itself is to contort the
-      component until the regex is happy, which leaves the rule enforcing a
-      coding style instead of App Store 5.1.1(v). Excluding `return ()` is
-      narrow — a JSX return never opens with `)` — so every real path is still
-      caught.
+      ⚠ **The whole structural claim, in one assertion.** The five cases this
+      file used to carry existed because the account lived *inside* a screen and
+      an early return could take it away. What replaces them is position: if
+      `<TabBar` ever moves inside `<Stack.Navigator>`, it becomes a screen's
+      child again and the old failure mode comes back with it.
     */
-    const paths = body.split(/\breturn \((?!\))/).slice(1);
+    const navigatorClose = navigator.indexOf('</Stack.Navigator>');
+    const barAt = navigator.indexOf('<TabBar');
 
-    // If this component is ever rewritten into a single return, this assertion
-    // is what tells the next person to re-read the rule rather than assume the
-    // test still covers three branches.
-    expect(paths.length).toBeGreaterThanOrEqual(3);
-
-    // `forEach` rather than `for…of paths.entries()`: the web tsconfig targets
-    // below es2015 and iterating an IterableIterator there needs
-    // --downlevelIteration, which Jest's transform does not require and
-    // `tsc --noEmit` does.
-    paths.forEach((path, index) => {
-      expect({
-        path: index,
-        rendersAccount: /\{account\}|<AccountScreen/.test(path),
-      }).toEqual({ path: index, rendersAccount: true });
-    });
+    expect(navigatorClose).toBeGreaterThan(-1);
+    expect(barAt).toBeGreaterThan(navigatorClose);
   });
 
-  it('offers a way into the account, by an accessible name', () => {
-    const body = garageComponentBody();
-
-    // The label is what a screen reader announces and what a reviewer looks
-    // for. A Pressable that opens the modal but announces nothing is reachable
-    // by sight only.
-    expect(body).toMatch(/accessibilityLabel="Account"/);
-    expect(body).toMatch(/setAccountOpen\(true\)/);
+  it('offers Account on the bar', () => {
+    // The route existing is not the same as there being a way to reach it.
+    expect(tabBar).toMatch(/name: 'Account'/);
   });
 
+  it('can still detect the bar being moved inside', () => {
+    /*
+      Rule 5's other half, against a source shaped like the real one. Without
+      it, the ordering assertion above passes on any file that happens not to
+      contain `<TabBar` at all.
+    */
+    const moved = `
+      <Stack.Navigator>
+        <TabBar current="Garage" />
+      </Stack.Navigator>
+    `;
+
+    expect(moved.indexOf('<TabBar')).toBeLessThan(moved.indexOf('</Stack.Navigator>'));
+  });
+});
+
+describe('the dev token', () => {
   it('keeps the token affordance out of release builds', () => {
-    const source = readFileSync(GARAGE, 'utf8');
+    const source = readFileSync(ACCOUNT, 'utf8');
 
     /*
-      Unrelated to 5.1.1(v) and guarded here because it is the same class of
-      mistake and this is where a change to that screen gets read. `DevToken`
-      renders a live bearer token — a password for the API until it expires —
-      and it must compile out of a shipping build. Removing the `__DEV__` gate
-      would print a credential on the main screen of the App Store binary.
+      Unrelated to 5.1.1(v) and guarded beside it because it is the same class
+      of mistake, and this is where a change to the account surface gets read.
+      `DevToken` renders a live bearer token — a password for the API until it
+      expires — and it must compile out of a shipping build. Removing the
+      `__DEV__` gate would print a credential in the App Store binary.
+
+      ⚠ It moved here from `GarageScreen` on 23 Aug: the gate was never missing,
+      but the block sat at the foot of the **home screen**, which is the first
+      thing a user and a reviewer see. `keeps it off the garage` below is the
+      half of this that the move added.
     */
-    const dev = source.slice(source.indexOf('function DevToken('));
+    const start = source.indexOf('function DevToken(');
+    expect(start).toBeGreaterThan(-1);
+
+    const dev = source.slice(start);
     expect(dev.slice(0, dev.indexOf('\n}'))).toMatch(/if \(!__DEV__\) return null;/);
+  });
+
+  it('keeps the token affordance off the garage', () => {
+    /*
+      The token block is a dev affordance, and where a dev affordance lives is
+      still a decision about that screen. On the garage it was the last element
+      of the product's front page in every capture taken for review.
+
+      Asserted as absence, which is a weak shape of test — so it is paired with
+      the presence check above. Both have to hold: gone from here, and gated
+      there.
+    */
+    expect(readFileSync(GARAGE, 'utf8')).not.toMatch(/DevToken/);
   });
 });

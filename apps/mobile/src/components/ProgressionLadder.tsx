@@ -73,25 +73,37 @@ export default function ProgressionLadder({
               {!last && <View style={[styles.connector, isDone && styles.connectorDone]} />}
             </View>
 
+            {/*
+              ── R45 · the state is a chip beside the rung, not under it ─────
+
+              `done` and `next` were a **second line of muted text under the
+              rung's name**, which reads as a subtitle that has been truncated
+              to one word — the review's phrasing was "a broken subtitle", and
+              that is exactly what it looked like. A state is not a description
+              of the thing; it is a mark on it.
+
+              So they sit on the rung's own line, right-aligned. The row's name
+              takes the slack and the state keeps its width.
+
+              One state word, never both. A rung cannot be finished and next at
+              the same time, and rendering two where one is possible is how a
+              "done · next" appears in a screenshot nobody can explain.
+
+              ⚠ These stay **words**, not colour alone. A marker that only
+              changed hue would carry the entire state on a 10pt dot, which
+              fails for anyone who cannot separate the two.
+            */}
             <View style={styles.body}>
-              <Text style={[styles.label, isDone && styles.labelDone, isNext && styles.labelNext]}>
+              <Text
+                style={[styles.label, isDone && styles.labelDone, isNext && styles.labelNext]}
+              >
                 {roleLabel(role)}
               </Text>
 
-              {/*
-                One state word, never both. A rung cannot be finished and next
-                at the same time, and rendering two chips where one is possible
-                is how a "done · next" appears in a screenshot nobody can
-                explain.
-
-                These read as words rather than colour alone — a marker that
-                only changed hue would carry the entire state on a 10pt dot,
-                which fails for anyone who cannot separate the two.
-              */}
               {isDone ? (
-                <Text style={styles.stateDone}>done</Text>
+                <Text style={[styles.state, styles.stateDone]}>done</Text>
               ) : isNext ? (
-                <Text style={styles.stateNext}>next</Text>
+                <Text style={[styles.state, styles.stateNext]}>next</Text>
               ) : null}
             </View>
           </View>
@@ -134,8 +146,16 @@ const styles = StyleSheet.create({
   },
   connectorDone: { backgroundColor: border.field },
 
-  body: { flex: 1, paddingBottom: space.lg, gap: space.xs },
-  label: { ...type.ui, color: text.secondary },
+  /* R45. One line: the name takes the slack, the state keeps its width. */
+  body: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: space.sm,
+    paddingBottom: space.lg,
+  },
+  label: { ...type.ui, color: text.secondary, flexShrink: 1 },
   /**
    * A completed rung goes quiet, not bright. It is history; the eye belongs on
    * the rung that is next.
@@ -143,6 +163,19 @@ const styles = StyleSheet.create({
   labelDone: { color: text.muted },
   labelNext: { ...type.uiStrong, color: text.primary },
 
-  stateDone: { ...type.label, color: text.muted },
-  stateNext: { ...type.label, color: register.accent },
+  /*
+    Chip-shaped: a hairline pill rather than a bare word, so the state reads as
+    a mark on the rung rather than as more of its label. `Chip` itself is not
+    used — its five tones are the status families (attention, critical,
+    confirm), and "next" is neither a status nor a severity. It is where the
+    car is on a scale, which is the register accent's own job.
+  */
+  state: {
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    paddingHorizontal: space.sm,
+    paddingVertical: 1,
+  },
+  stateDone: { ...type.label, color: text.muted, borderColor: border.field },
+  stateNext: { ...type.label, color: register.accent, borderColor: register.accent },
 });

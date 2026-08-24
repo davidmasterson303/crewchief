@@ -31,6 +31,7 @@ export default function EmptyState({
   actionLabel,
   actionAccessibilityLabel,
   onAction,
+  align = 'center',
   children,
 }: {
   headline: string;
@@ -48,19 +49,32 @@ export default function EmptyState({
   actionAccessibilityLabel?: string;
   onAction?: () => void;
   /**
+   * Which way the block reads.
+   *
+   * `center` is the default and is right for a state that stands alone in a
+   * blank screen — the garage with no cars, a history with no invoices.
+   *
+   * ⚠ `start` exists for the advisor, and the reason is **R53**: its empty state
+   * was centred while the composer under it and the starter rows beside it were
+   * left-aligned, so one screen had two alignments and the eye had to re-find
+   * the margin twice on the way down. A screen picks one.
+   */
+  align?: 'center' | 'start';
+  /**
    * Extra quiet content under the body — the advisor's example questions.
    *
-   * ⚠ Not a slot for controls. The advisor's own note is the rule: those
-   * examples are **not** prompts to tap, because making them buttons would turn
-   * a conversation into a menu on the first screen a new user meets. Anything
-   * pressable belongs in `action`, where the ladder can see it.
+   * ⚠ Not a slot for controls, and it stayed that way through R50. The advisor's
+   * starter rows *are* tappable now, and they moved **out of here** rather than
+   * this rule being relaxed — they render as the advisor's own block beside this
+   * one. Anything pressable belongs in `action`, where the ladder can see it,
+   * or outside this component entirely.
    */
   children?: React.ReactNode;
 }) {
   return (
-    <View style={styles.wrap}>
-      <Text style={styles.headline}>{headline}</Text>
-      <Text style={styles.body}>{body}</Text>
+    <View style={[styles.wrap, align === 'start' && styles.wrapStart]}>
+      <Text style={[styles.headline, align === 'start' && styles.alignStart]}>{headline}</Text>
+      <Text style={[styles.body, align === 'start' && styles.alignStart]}>{body}</Text>
       {children}
       {actionLabel && onAction ? (
         <Button
@@ -87,7 +101,9 @@ const styles = StyleSheet.create({
     gap: space.sm,
     alignItems: 'center',
   },
+  wrapStart: { alignItems: 'stretch' },
   headline: { ...type.title, color: text.primary, textAlign: 'center' },
   body: { ...type.body, color: text.muted, textAlign: 'center' },
+  alignStart: { textAlign: 'left' },
   action: { marginTop: space.md, alignSelf: 'stretch' },
 });

@@ -8,7 +8,7 @@ import EmptyState from '../EmptyState';
 import Field from '../Field';
 import ListRow from '../ListRow';
 import ProvenanceRow from '../ProvenanceRow';
-import { FIELD_FONT_MIN, TARGET_MIN, TYPE_MIN, surface, text } from '../../theme';
+import { FIELD_FONT_MIN, TARGET_MIN, TYPE_MIN, brand, surface, text } from '../../theme';
 
 /**
  * The primitive set's invariants.
@@ -210,67 +210,69 @@ describe('pressed states', () => {
   });
 });
 
-describe('Button — the inverse variant', () => {
+describe('Button — one filled treatment', () => {
   /*
-    The treatment that lived as a private copy in six screens before it was a
-    variant: sign-in, add-vehicle, the wishlist, the advisor, the invoice scan
-    and the service milestone. Four tokens existed for it and no primitive
-    owned any of them, so the copies drifted — 15pt against 16, weight 600
-    against 700, letter-spacing on some and not others — on the app's most
-    important control.
-  */
-  it('wears the light fill a control that outranks everything gets', async () => {
-    const view = await render(
-      <Button label="Sign in" variant="inverse" onPress={jest.fn()} />
-    );
+    ── The white variant is retired, 23 Aug ──────────────────────────────────
 
-    expect(flat(view.getByLabelText('Sign in').props.style).backgroundColor).toBe(
-      surface.inverse
-    );
+    `inverse` was a sixth variant: white fill, near-black ink, four dedicated
+    tokens, four measured states. It was against the system the whole time —
+    the readme's override register says *"a white button is a foreign colour
+    here"* — and the v8.3 review found what that cost: `Take a photo`, `That is
+    right` and `Ask` were white while `See suggestions` was cyan, so the app had
+    two filled primaries and the commoner one was the forbidden one.
+
+    These cases replace its four. They are the same properties, asserted of the
+    treatment that survived, and they exist so the retirement is a fact a test
+    holds rather than a commit message.
+  */
+  it('wears the brand fill, not white', async () => {
+    const view = await render(<Button label="Sign in" onPress={jest.fn()} />);
+
+    const fill = flat(view.getByLabelText('Sign in').props.style).backgroundColor;
+    expect(fill).toBe(brand.primary);
+    // Named, because "not white" is the rule and `#FFFFFF` is the thing it bans.
+    expect(fill).not.toBe('#FFFFFF');
   });
 
-  it('stays light when disabled, and keeps its ink dark', async () => {
+  it('has no white fill left to reach for', async () => {
     /*
-      ⚠ The defect the rendered contrast suite caught within a minute of this
-      variant existing. The first version muffled the label to
-      `text.onInverseMuted`, which measures **4.17:1** on the disabled fill and
-      failed both sign-in states.
-
-      `surface.inverseDisabled`'s own note in the theme had the answer — it
-      "keeps its ink near 9:1 while reading as off". The dimmed fill is the
-      whole signal; the ink does not dim with it. WCAG 1.4.3 exempts disabled
-      controls, and taking that exemption is how one becomes unreadable rather
-      than unavailable.
+      The other direction, and the one with no visible symptom: a retired
+      variant whose tokens survive comes back one call site at a time, with its
+      argument already written beside it. So the theme must not still carry
+      them — asserted here rather than only in the source scan, because this is
+      where somebody restoring the variant would be working.
     */
-    const view = await render(
-      <Button label="Sign in" variant="inverse" disabled onPress={jest.fn()} />
-    );
+    const carried = surface as Record<string, unknown>;
+    expect(carried.inverse).toBeUndefined();
+    expect(carried.inverseDisabled).toBeUndefined();
+    expect((text as Record<string, unknown>).onInverse).toBeUndefined();
+  });
+
+  it('stays a fill swap when disabled, never a group opacity', async () => {
+    /*
+      An `opacity` on the container composites everything beneath it, including
+      ink that was compliant at full strength. This app put a near-black "Ask"
+      label at 1.61:1 exactly that way, invisible to both guards.
+    */
+    const view = await render(<Button label="Sign in" disabled onPress={jest.fn()} />);
     const control = view.getByLabelText('Sign in');
 
-    expect(flat(control.props.style).backgroundColor).toBe(surface.inverseDisabled);
+    expect(flat(control.props.style).backgroundColor).toBe(surface.disabled);
     expect(flat(control.props.style).opacity).toBeUndefined();
-    expect(flat(view.getByText('Sign in').props.style).color).toBe(text.onInverse);
+    expect(flat(view.getByText('Sign in').props.style).color).toBe(text.muted);
   });
 
   it('keeps its accessible name while working', async () => {
     // The label is swapped for a spinner, so a control named by its child goes
     // anonymous exactly when it has something to say.
-    const view = await render(
-      <Button label="Create account" variant="inverse" busy onPress={jest.fn()} />
-    );
+    const view = await render(<Button label="Create account" busy onPress={jest.fn()} />);
 
     const control = view.getByLabelText('Create account');
     expect(control.props.accessibilityState).toMatchObject({ busy: true, disabled: true });
   });
 
-  it('spins in ink that is visible on a white control', async () => {
-    /*
-      The platform default and `text.primary` are both white. On this fill that
-      is a control which looks empty at exactly the moment it is working.
-    */
-    const view = await render(
-      <Button label="Sign in" variant="inverse" busy onPress={jest.fn()} />
-    );
+  it('spins in ink that is visible on the fill it spins on', async () => {
+    const view = await render(<Button label="Sign in" busy onPress={jest.fn()} />);
 
     /*
       Walked out of the rendered tree rather than queried: RNTL v14 has no
@@ -289,7 +291,7 @@ describe('Button — the inverse variant', () => {
     walk(view.toJSON());
 
     expect(spinners).toHaveLength(1);
-    expect(spinners[0].color).toBe(text.onInverse);
+    expect(spinners[0].color).toBe(text.onPrimary);
   });
 });
 

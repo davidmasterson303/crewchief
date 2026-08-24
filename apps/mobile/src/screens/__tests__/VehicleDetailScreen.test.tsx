@@ -145,7 +145,6 @@ async function mount(metrics = REFERENCE) {
     onOpenWishlist: jest.fn(),
     onOpenHistory: jest.fn(),
     onOpenHealth: jest.fn(),
-    onOpenBuild: jest.fn(),
     onOpenMilestone: jest.fn(),
     onOpenProfile: jest.fn(),
   };
@@ -228,15 +227,42 @@ describe('recalls', () => {
 });
 
 describe('the ways out', () => {
-  it('reaches the wishlist', async () => {
+  it('reaches the plan', async () => {
+    /*
+      ⚠ **R15, 23 Aug.** The row reads "Plan" now — needs and mods are one
+      destination, opened on the segment the row named. The callback keeps its
+      name because it still opens the same list; only the place it opens *in*
+      changed.
+    */
     const user = userEvent.setup();
     respond();
     const { props, view } = await mount();
 
     await view.findAllByText(/2018 Honda Accord/);
-    await user.press(view.getByText(/wishlist/i));
+    await user.press(view.getByText('Plan'));
 
     expect(props.onOpenWishlist).toHaveBeenCalledTimes(1);
+  });
+
+  it('reaches service on one row, not two', async () => {
+    // R14. `Service due` and `Service history` were siblings answering one
+    // question; `Service` opens on `Due` and `History` on the other segment.
+    const user = userEvent.setup();
+    respond();
+    const { props, view } = await mount();
+
+    await view.findAllByText(/2018 Honda Accord/);
+
+    await user.press(view.getByText('Service'));
+    expect(props.onOpenMilestone).toHaveBeenCalledTimes(1);
+
+    await user.press(view.getByText('History'));
+    expect(props.onOpenHistory).toHaveBeenCalledTimes(1);
+
+    // And nothing on the hub still offers the two old destinations by name.
+    expect(view.queryByText('Service due')).toBeNull();
+    expect(view.queryByText('Wishlist')).toBeNull();
+    expect(view.queryByText('Build')).toBeNull();
   });
 });
 
@@ -373,11 +399,11 @@ describe('what this screen leads to stays reachable', () => {
       order.findIndex((line) => line.toLowerCase().includes(needle.toLowerCase()));
 
     /*
-      ⚠ Rewritten 23 Aug with the hub. The claim is the same one — the verb this
-      screen exists to lead to must not sit under a stack of instruments — but
-      the instruments are no longer on this screen at all, so the landmarks
-      changed. `Health` and `Build` are now rows in the hub rather than section
-      headings over dials, and the drivers and the chart are a route away.
+      ⚠ Rewritten 23 Aug with the hub, and again with the IA merge. The claim is
+      the same one — the verb this screen exists to lead to must not sit under a
+      stack of instruments — but the landmarks changed twice: the instruments
+      left this screen, and then five hub rows became three (R14, R15). `Plan`
+      is where `Wishlist` and `Build` went.
     */
     expect(at('This car')).toBeGreaterThan(-1);
     expect(at('Ask the advisor')).toBeGreaterThan(-1);
@@ -385,8 +411,8 @@ describe('what this screen leads to stays reachable', () => {
     // The reading, then the places to go, then the one thing to do, then the
     // answers the owner gave when they added the car.
     expect(at('Fair')).toBeLessThan(at('This car'));
-    expect(at('This car')).toBeLessThan(at('Wishlist'));
-    expect(at('Wishlist')).toBeLessThan(at('Ask the advisor'));
+    expect(at('This car')).toBeLessThan(at('Plan'));
+    expect(at('Plan')).toBeLessThan(at('Ask the advisor'));
     expect(at('Ask the advisor')).toBeLessThan(at('What you told us'));
   });
 
@@ -536,5 +562,179 @@ describe('the hero pullback', () => {
 
     expect(nav).toBeDefined();
     expect(titles.some((node) => node.props.numberOfLines === 1)).toBe(true);
+  });
+});
+
+/**
+ * ── The health verdict may not outrank the records beside it ────────────────
+ *
+ * 23 Aug, on the real M235i: the card read "a complete lack of documented
+ * maintenance … impossible to assess its current condition" while the service
+ * history one tap away listed five services and $1,461.
+ *
+ * Both were honest. The summary row was generated on 30 Jul, the invoice was
+ * filed on 6 Aug, and nothing on this read path recomputes it — so the screen
+ * was handed an out-of-date sentence and presented it as a current one.
+ *
+ * `healthVerdict` owns the rule; this is the screen actually applying it, with
+ * the live row's own values. The prose and the count arrive on **different
+ * requests**, so the mock is per-URL rather than one body for all three: the
+ * contradiction only exists where those two meet.
+ */
+describe('the health verdict, against what the screen is holding', () => {
+  const STALE_SUMMARY =
+    "Based on your provided service history, the vehicle's health is highly uncertain due to a complete lack of documented maintenance.";
+
+  /** Three requests go out together; each gets the body it would really get. */
+  function respondWith({
+    summary,
+    lastGenerated,
+    filedAt,
+  }: {
+    summary: string;
+    lastGenerated: string | null;
+    filedAt: string | null;
+  }) {
+    request.mockImplementation((path: string) => {
+      if (path.startsWith('/load-maintenance-data')) {
+        return Promise.resolve({
+          maintenanceLineItems:
+            filedAt === null ? [] : Array.from({ length: 5 }, () => ({ created_at: filedAt })),
+        }) as never;
+      }
+
+      if (path.startsWith('/wishlist')) return Promise.resolve({ wishlistItems: [] }) as never;
+
+      return Promise.resolve({
+        vehicle: {
+          id: 'v1',
+          year: 2015,
+          make: 'BMW',
+          model: 'M235i',
+          current_mileage: 66_000,
+          vehicle_health_summary: {
+            health_score: 70,
+            summary,
+            last_generated: lastGenerated,
+          },
+          nhtsa_data: {
+            recalls: [
+              {
+                NHTSACampaignNumber: '25V871000',
+                Component: 'AIR BAGS',
+                Summary: 'Inflator may rupture.',
+              },
+              {
+                NHTSACampaignNumber: '23V-441',
+                Component: 'FUEL SYSTEM',
+                Summary: 'Pump may fail.',
+              },
+            ],
+          },
+        },
+      }) as never;
+    });
+  }
+
+  it('does not show a sentence written before the records it contradicts', async () => {
+    respondWith({
+      summary: STALE_SUMMARY,
+      lastGenerated: '2026-07-30T01:05:47.583+00:00',
+      filedAt: '2026-08-06T02:43:11.903661+00:00',
+    });
+
+    const { view } = await mount();
+    await view.findAllByText(/2015 BMW M235i/);
+
+    // The sentence itself is gone, not captioned. Both halves are asserted:
+    // a card that simply stopped rendering anything would pass the first.
+    expect(view.queryByText(/complete lack of documented maintenance/)).toBeNull();
+    await view.findByText(/taken before your 5 service records were filed/i);
+  });
+
+  it('names what the reading was worked out from', async () => {
+    respondWith({
+      summary: 'Solid history, nothing overdue.',
+      lastGenerated: '2026-08-20T00:00:00+00:00',
+      filedAt: '2026-08-06T02:43:11.903661+00:00',
+    });
+
+    const { view } = await mount();
+    await view.findByText('Solid history, nothing overdue.');
+
+    // The provenance line is what makes a contradiction visible on the screen
+    // rather than only to somebody who opens the history and compares.
+    await view.findByText(/Based on 5 recorded services · 2 open recalls/);
+  });
+
+  it('leaves a current reading alone', async () => {
+    /*
+      The anti-vacuous half. A screen that suppressed every summary would pass
+      the first case here and be worse than the defect — so a reading that
+      postdates its records has to survive intact.
+    */
+    respondWith({
+      summary: STALE_SUMMARY,
+      lastGenerated: '2026-08-20T00:00:00+00:00',
+      filedAt: '2026-08-06T02:43:11.903661+00:00',
+    });
+
+    const { view } = await mount();
+    await view.findByText(new RegExp('complete lack of documented maintenance'));
+  });
+});
+
+/**
+ * ── R10 / R24 / R25: the chrome that persists ───────────────────────────────
+ *
+ * The nav pills and the score chip are on screen for the whole of this screen's
+ * scroll, which makes them the app's most-used controls and the ones where a
+ * missing hit area or a missing name costs the most.
+ */
+describe('the hero’s nav, as controls', () => {
+  it('gives the score chip a name that says where it goes', async () => {
+    respond();
+    const { view } = await mount();
+
+    /*
+      R10. It was `pointerEvents="none"` chrome announcing "Health score 61 out
+      of 100 — Fair" and offering nothing to do about it. A reading and a door
+      to a reading are different things, and the arc cannot distinguish them.
+    */
+    const chip = await view.findByLabelText('Health score 61, Fair. Opens health detail.');
+    expect(chip.props.accessibilityRole).toBe('button');
+  });
+
+  it('opens the health detail from the chip', async () => {
+    respond();
+    const { props, view } = await mount();
+
+    await userEvent.press(
+      await view.findByLabelText('Health score 61, Fair. Opens health detail.')
+    );
+    expect(props.onOpenHealth).toHaveBeenCalled();
+  });
+
+  it('grows both nav targets to 44pt without redrawing them', async () => {
+    /*
+      R25. The pills are drawn at 36 because that is what reads as a pill over a
+      photograph rather than as a bar. `hitSlop` is React Native's
+      `.tap-target-44`: the drawing is unchanged and the target grows around it.
+
+      Asserted as slop rather than as a measured box — RNTL lays nothing out, so
+      a height assertion here would be reading back the style it was given. What
+      is checkable is that the compensation is present on both, which is the
+      thing that goes missing.
+    */
+    respond();
+    const { view } = await mount();
+
+    for (const label of ['Back to the garage', 'Health score 61, Fair. Opens health detail.']) {
+      const slop = (await view.findByLabelText(label)).props.hitSlop as Record<string, number>;
+
+      expect(slop).toBeDefined();
+      // 36 drawn + 4 top + 4 bottom clears 44; anything less does not.
+      expect(slop.top + slop.bottom).toBeGreaterThanOrEqual(8);
+    }
   });
 });

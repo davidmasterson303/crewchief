@@ -48,6 +48,8 @@ import { text } from '../theme';
 export type IconName =
   | 'chevron-right'
   | 'chevron-left'
+  | 'chevron-down'
+  | 'chevron-up'
   | 'wrench'
   | 'heart'
   | 'clock'
@@ -75,6 +77,9 @@ type Element =
 const ICONS: Record<IconName, Element[]> = {
   'chevron-right': [{ tag: 'path', d: 'm9 18 6-6-6-6' }],
   'chevron-left': [{ tag: 'path', d: 'm15 18-6-6 6-6' }],
+  /* Lucide's own geometry, rotated the way Lucide rotates them. */
+  'chevron-down': [{ tag: 'path', d: 'm6 9 6 6 6-6' }],
+  'chevron-up': [{ tag: 'path', d: 'm18 15-6-6-6 6' }],
   wrench: [
     {
       tag: 'path',

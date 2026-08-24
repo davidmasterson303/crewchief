@@ -14,13 +14,13 @@ import { apiRequest, ApiRequestError } from '../api/client';
 import Button from '../components/Button';
 import AlertBanner from '../components/AlertBanner';
 import Chip from '../components/Chip';
+import Icon from '../components/Icon';
 import EmptyState from '../components/EmptyState';
 import FirstRun from '../components/FirstRun';
 import GarageBay from '../components/GarageBay';
 import Logo from '../components/Logo';
 import { SkeletonCard } from '../components/Skeleton';
 import { radius, space, status, surface, text, type, TARGET_MIN } from '../theme';
-import { AccountScreen } from './AccountScreen';
 import { PushPrimer } from '../notifications/PushPrimer';
 import {
   currentPushPermission,
@@ -31,8 +31,6 @@ import {
 import { shouldShowPushPrimer } from '@crewchief/core/push-priming';
 import { shouldShowFirstRun } from '@crewchief/core/first-run';
 import { everHadVehicle, recordEverHadVehicle } from '../onboarding/first-run-storage';
-import { uploadVehiclePhoto } from '../api/photos';
-import type { InvoiceFile } from '../api/documents';
 import { getHealthBandJudgement } from '@crewchief/core/health-band';
 import { normaliseRecalls } from '@crewchief/core/recalls';
 import { localToday } from '@crewchief/core/garage-next-service';
@@ -154,16 +152,15 @@ function VehicleBay({
   total,
   active,
   onOpen,
-  onAddPhoto,
-  uploading,
+  onOpenService,
 }: {
   vehicle: Vehicle;
   index: number;
   total: number;
   active: boolean;
   onOpen: () => void;
-  onAddPhoto?: () => void;
-  uploading?: boolean;
+  /** R21. Opens `Service → Due` for this car from the next-service row. */
+  onOpenService?: () => void;
 }) {
   const health = first(vehicle.vehicle_health_summary);
   const score = typeof health?.health_score === 'number' ? health.health_score : null;
@@ -224,18 +221,26 @@ function VehicleBay({
       subtitle={subtitle}
       active={active}
       onOpen={onOpen}
-      onAddPhoto={onAddPhoto}
-      uploading={uploading}
-      footer={
+      onOpenService={onOpenService}
+      alert={
         recallCount > 0 ? (
           /*
             Recalls stay on the bay rather than moving to the detail screen.
             They are the one thing on this payload that can be time-critical,
             and a garage that shows a car's condition but not its open safety
             defect is showing the reassuring half.
+
+            ⚠ **R19: `alert`, not `footer`, as of 23 Aug.** This was a 22pt chip
+            under a 110pt dial. A full-width critical row above the instrument
+            is the correction, and it is a hierarchy fix rather than a styling
+            one — the dial goes back to being the resting state of a car with
+            nothing wrong.
           */
-          <View style={styles.bayFooter}>
-            <Chip label={`${recallCount} recall${recallCount === 1 ? '' : 's'}`} tone="critical" />
+          <View style={styles.bayAlert}>
+            <Chip
+              label={`${recallCount} open recall${recallCount === 1 ? '' : 's'}`}
+              tone="critical"
+            />
           </View>
         ) : null
       }
@@ -243,37 +248,9 @@ function VehicleBay({
   );
 }
 
-/**
- * The access token, readable off the device — moved here from `SignedInScreen`
- * rather than lost with it.
- *
- * `scripts/verify-mobile-contract.mjs` needs MOBILE_TEST_TOKEN, and without it
- * the bearer happy path, the unowned-vehicle 404 and the garage-list assertions
- * all `skip()`. They have skipped across five pieces of work. The affordance
- * exists because the roadmap claimed signing in closed that gap and it could
- * not: there was no way to get the value off the phone.
- *
- * Deleting it along with the proof screen would reopen the gap the moment 3.2
- * landed, so it travels with whatever the signed-in screen happens to be.
- *
- * `__DEV__` only. A bearer token is a password for the API until it expires,
- * and a shipping build must not render one where a screenshot or a shoulder can
- * take it. Expo Go is always `__DEV__`; a release build compiles this out.
- */
-function DevToken({ token }: { token: string }) {
-  if (!__DEV__) return null;
-  return (
-    <View style={styles.devBlock}>
-      <Text style={styles.devHeading}>Access token — dev builds only</Text>
-      <Text style={styles.errorBody}>
-        Long-press to select and copy. Set as MOBILE_TEST_TOKEN to run the credentialed contract
-        checks.
-      </Text>
-      <Text selectable style={styles.devToken}>
-        {token}
-      </Text>
-    </View>
-  );
+/** The car's name, as the bay already draws it. */
+function bayTitle(vehicle: Vehicle): string {
+  return [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ') || 'Vehicle';
 }
 
 export function GarageScreen({
@@ -281,27 +258,34 @@ export function GarageScreen({
   email,
   onSignOut,
   onOpenVehicle,
+  onOpenService,
   onAddVehicle,
-  pickPhoto,
 }: {
   accessToken: string;
   email: string | null;
   onSignOut: () => void;
   /** Title travels with the id so the detail header is right during the fetch. */
   onOpenVehicle: (vehicleId: string, title: string) => void;
-  onAddVehicle: () => void;
   /**
-   * The picker, injected — this screen never imports `expo-image-picker`.
+   * Opens `Service → Due` for one car — R21.
    *
-   * `src/media/pick-image.ts` is the one module that does, for the reason set
-   * out there: it is a native module, and a build that lacks it crashes on
-   * launch the moment anything in the graph imports it. Taking it as a prop is
-   * the same seam `InvoiceScanScreen` uses, and it is what lets this screen
-   * mount in a test.
-   *
-   * Omitted means no photo control at all rather than a control that fails.
+   * Optional so the screen still mounts without it in a test; omitted, the
+   * next-service row is a readout rather than a target, which is the honest
+   * degradation. See `GarageBay`.
    */
-  pickPhoto?: () => Promise<InvoiceFile | null>;
+  onOpenService?: (vehicleId: string, title: string) => void;
+  onAddVehicle: () => void;
+  /*
+    ⚠ **No `pickPhoto` here as of 23 Aug (R18).** This screen used to take the
+    picker so each bay could carry a "Change photo" pill — a solid control on the
+    photograph at the top right, which made it the loudest thing on the home
+    screen for the least frequent action anyone takes.
+
+    On the garage the photograph is scenery and the affordance is "open this
+    car". The picker, the upload, its busy state and its error banner all moved
+    with the control to `VehicleDetailScreen`, where the hero's own note says it
+    is that hero's implied action.
+  */
 }) {
   /*
     App Store 5.1.1(v). The account surface is one tap from here because the
@@ -309,16 +293,7 @@ export function GarageScreen({
     and this is the only screen a signed-in user sees, so "buried" would be any
     number of taps greater than one.
   */
-  const [accountOpen, setAccountOpen] = useState(false);
   const [deletedNotice, setDeletedNotice] = useState<string | null>(null);
-  /*
-    Which car's photo is uploading, and what went wrong if it did.
-
-    Keyed by vehicle id rather than a single boolean: a garage is a list, and a
-    flag would put the spinner on every plate at once.
-  */
-  const [uploadingId, setUploadingId] = useState<string | null>(null);
-  const [photoError, setPhotoError] = useState<string | null>(null);
   /*
     Which bay is on screen. Drives the batten's "2 of 3" and, more importantly,
     which bay is allowed to run its door and its needle — see `GarageBay`.
@@ -437,13 +412,6 @@ export function GarageScreen({
     if (isRefresh) setRefreshing(true);
     else setState({ status: 'loading' });
 
-    /*
-      A photo error does not survive a reload. `AlertBanner` has no dismiss
-      affordance — it is an alert, not a dialog — so pull-to-refresh is the
-      gesture that clears it, alongside simply trying again.
-    */
-    setPhotoError(null);
-
     try {
       const body = await apiRequest<{ vehicles?: Vehicle[] }>('/vehicles');
       setState({ status: 'ok', vehicles: body.vehicles ?? [] });
@@ -478,27 +446,6 @@ export function GarageScreen({
    *     the next refresh overwrites is the kind of disagreement that reads as a
    *     photo flickering back to the plate.
    */
-  const onAddPhoto = useCallback(
-    async (vehicleId: string) => {
-      if (!pickPhoto) return;
-
-      setPhotoError(null);
-
-      try {
-        const file = await pickPhoto();
-        if (!file) return;
-
-        setUploadingId(vehicleId);
-        await uploadVehiclePhoto(vehicleId, file);
-        await load(true);
-      } catch (error) {
-        setPhotoError(error instanceof Error ? error.message : 'That photo could not be saved.');
-      } finally {
-        setUploadingId(null);
-      }
-    },
-    [pickPhoto, load],
-  );
 
   useEffect(() => {
     void load();
@@ -550,15 +497,30 @@ export function GarageScreen({
           and `lineHeight`, and both clear it horizontally on their own text, so
           the slop was buying nothing and paying for it with a collision.
         */}
-        <Pressable onPress={onAddVehicle} accessibilityRole="button" accessibilityLabel="Add a car">
-          <Text style={styles.headerAction}>Add car</Text>
-        </Pressable>
+        {/*
+          ── R22 · a `+`, and only a `+` ──────────────────────────────────────
+
+          Two plain text links of equal weight sat here — `Add car` and
+          `Account` — and only one of them was consequential. Text links in a
+          header are the weakest affordance the platform has, and giving the two
+          the same one said they were the same kind of thing.
+
+          `Account` is **gone from here entirely**, because R13 landed: it is a
+          tab, reachable from every screen rather than from this one. That is
+          also what makes App Store 5.1.1(v) structural instead of something
+          this screen has to remember on every return path — see
+          `mobile-account-reachable.test.ts`, which now checks the bar.
+
+          What is left is the one control this header owns, as a glyph on a 44pt
+          square. It is named, because a `+` alone is a shape.
+        */}
         <Pressable
-          onPress={() => setAccountOpen(true)}
+          onPress={onAddVehicle}
           accessibilityRole="button"
-          accessibilityLabel="Account"
+          accessibilityLabel="Add a car"
+          style={styles.headerAction}
         >
-          <Text style={styles.signOut}>Account</Text>
+          <Icon name="plus" size={22} color={text.primary} />
         </Pressable>
       </View>
     </View>
@@ -568,27 +530,6 @@ export function GarageScreen({
     <PushPrimer visible={primerOpen} onAccept={acceptPrimer} onDecline={declinePrimer} />
   );
 
-  const account = (
-    <AccountScreen
-      visible={accountOpen}
-      email={email}
-      onClose={() => setAccountOpen(false)}
-      onSignOut={() => {
-        setAccountOpen(false);
-        onSignOut();
-      }}
-      onDeleted={(summary) => {
-        /*
-          Order matters. The notice is set before the session is cleared,
-          because clearing it unmounts this screen — showing the confirmation
-          after would show it to nobody.
-        */
-        setDeletedNotice(summary);
-        setAccountOpen(false);
-        onSignOut();
-      }}
-    />
-  );
 
   if (state.status === 'loading') {
     return (
@@ -605,8 +546,7 @@ export function GarageScreen({
           <SkeletonCard lines={2} />
           <SkeletonCard lines={2} />
         </View>
-        {account}
-        {primer}
+          {primer}
       </View>
     );
   }
@@ -634,7 +574,6 @@ export function GarageScreen({
             style={styles.stateAction}
           />
         </View>
-        {account}
         {primer}
       </View>
     );
@@ -642,15 +581,6 @@ export function GarageScreen({
 
   return (
     <>
-      {photoError && (
-        /*
-          Above the list rather than replacing it. A failed photo is a nuisance,
-          not a state the garage has to stop for — and the most likely one, an
-          oversized capture, is fixed by choosing a different picture right
-          away. Cleared by trying again or by pulling to refresh.
-        */
-        <AlertBanner tone="critical" headline="That photo was not saved" body={photoError} />
-      )}
       {deletedNotice && (
         /*
         Apple asks for confirmation that deletion actually happened, and this
@@ -760,24 +690,20 @@ export function GarageScreen({
                   index={index}
                   total={state.vehicles.length}
                   active={index === bayIndex}
-                  onOpen={() =>
-                    onOpenVehicle(
-                      vehicle.id,
-                      [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ') ||
-                        'Vehicle',
-                    )
+                  onOpen={() => onOpenVehicle(vehicle.id, bayTitle(vehicle))}
+                  /* R21. The next-service row leads to what is due. */
+                  onOpenService={
+                    onOpenService
+                      ? () => onOpenService(vehicle.id, bayTitle(vehicle))
+                      : undefined
                   }
-                  onAddPhoto={pickPhoto ? () => void onAddPhoto(vehicle.id) : undefined}
-                  uploading={uploadingId === vehicle.id}
                 />
               </View>
             ))}
           </ScrollView>
         )}
 
-        <DevToken token={accessToken} />
       </ScrollView>
-      {account}
       {primer}
     </>
   );
@@ -797,7 +723,8 @@ const styles = StyleSheet.create({
    * instead. `flexGrow` is what lets the empty state centre itself.
    */
   page: { paddingTop: 68, paddingBottom: space.lg, gap: space.md, flexGrow: 1 },
-  bayFooter: { paddingHorizontal: space.lg, flexDirection: 'row' },
+  /* R19. Full width above the dial; the chip keeps its own intrinsic width. */
+  bayAlert: { paddingHorizontal: space.lg, flexDirection: 'row' },
   loadingList: { gap: space.md },
   /* Loading and error draw the same header as the list, at the same inset. */
   stateScreen: { flex: 1, padding: space.lg, paddingTop: 68 },
@@ -828,12 +755,6 @@ const styles = StyleSheet.create({
     color: text.secondary,
     ...type.value,
     fontFamily: interFace('600'), fontWeight: '600',
-    minHeight: TARGET_MIN,
-    lineHeight: TARGET_MIN,
-  },
-  signOut: {
-    color: text.muted,
-    ...type.value,
     minHeight: TARGET_MIN,
     lineHeight: TARGET_MIN,
   },
@@ -878,17 +799,4 @@ const styles = StyleSheet.create({
   */
   stateAction: { marginTop: space.md, paddingHorizontal: space.xxl },
 
-  devBlock: { marginTop: space.xxl, gap: space.xs },
-  devHeading: { ...type.label, color: text.muted, textTransform: 'uppercase' },
-  // Monospaced and small: a JWT is long, and it has to select as one run of
-  // text rather than reflow into something that copies back broken.
-  devToken: {
-    color: text.secondary,
-    fontSize: 10,
-    fontFamily: 'Courier',
-    marginTop: space.xs,
-    padding: space.sm,
-    borderRadius: radius.well,
-    backgroundColor: surface.well,
-  },
 });

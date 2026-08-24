@@ -101,13 +101,6 @@ const M235I = {
 function renderGarage(
   overrides: {
     onAddVehicle?: () => void;
-    /*
-      The picker seam. `src/media/pick-image.ts` is the only module that imports
-      `expo-image-picker`, and the screen takes the picker as a prop for exactly
-      this reason — a native module in the graph crashes a build that lacks it,
-      and there is no picker at all in a test runner.
-    */
-    pickPhoto?: () => Promise<unknown>;
   } = {}
 ) {
   return render(
@@ -117,7 +110,6 @@ function renderGarage(
       onSignOut={jest.fn()}
       onOpenVehicle={jest.fn()}
       onAddVehicle={overrides.onAddVehicle ?? jest.fn()}
-      pickPhoto={overrides.pickPhoto as never}
     />
   );
 }
@@ -154,7 +146,7 @@ describe('the recall chip counts what is still open', () => {
     const view = await renderGarage();
     await view.findByText('2015 BMW M235i');
 
-    expect(view.getByText('1 recall')).toBeTruthy();
+    expect(view.getByText('1 open recall')).toBeTruthy();
   });
 
   it('subtracts what the owner has marked repaired', async () => {
@@ -166,7 +158,7 @@ describe('the recall chip counts what is still open', () => {
     await view.findByText('2015 BMW M235i');
 
     // Two on record, one marked — and the chip is the count of what is left.
-    expect(view.getByText('1 recall')).toBeTruthy();
+    expect(view.getByText('1 open recall')).toBeTruthy();
   });
 
   it('shows no chip once every recall has been marked', async () => {
@@ -196,7 +188,7 @@ describe('the recall chip counts what is still open', () => {
     const view = await renderGarage();
     await view.findByText('2015 BMW M235i');
 
-    expect(view.getByText('2 recalls')).toBeTruthy();
+    expect(view.getByText('2 open recalls')).toBeTruthy();
   });
 });
 
@@ -223,77 +215,28 @@ describe('the garage', () => {
 
     // Recalls stay on the bay. A garage that shows condition but not an open
     // safety defect is showing the reassuring half.
-    expect(view.getByText('2 recalls')).toBeTruthy();
+    expect(view.getByText('2 open recalls')).toBeTruthy();
   });
 });
 
-describe('App Store 5.1.1(v) — account deletion stays reachable', () => {
-  /*
-    The three states the screen can be in. Deletion must be one tap away from
-    every one of them, because "buried" for a reviewer means "not present",
-    and the state a departing user is most likely to meet is the broken one.
-  */
-  it('offers Account while the garage is still loading', async () => {
-    // A request that never settles: the loading state, held open.
-    request.mockImplementation(() => new Promise(() => {}));
+/*
+  ── ⚠ R13 · these five cases moved, and moving them is the point ────────────
 
-    const view = await renderGarage();
+  They asserted that `GarageScreen` renders an "Account" control in every state
+  it can be in — loading, API failure, expired session, empty garage, first run
+  — because App Store 5.1.1(v) requires deletion to be genuinely reachable, and
+  because it had been lost in an early return once already.
 
-    expect(await view.findByLabelText('Account')).toBeTruthy();
-  });
+  Account is a **tab** now. It is one tap from every screen in the app rather
+  than from this one, so "does the garage render it in all five of its states"
+  is no longer the question — the garage renders it in none of them, correctly.
 
-  it('offers Account when the API fails — the defect that shipped', async () => {
-    // A server message distinct from the screen's own heading, so the
-    // assertion cannot pass by matching the title it sits under.
-    request.mockRejectedValue(
-      new ApiRequestError({ status: 500, message: 'Upstream is having a moment' })
-    );
-
-    const view = await renderGarage();
-
-    await waitFor(() => expect(view.getByText('Upstream is having a moment')).toBeTruthy());
-    expect(view.getByText('Could not load your garage')).toBeTruthy();
-
-    // The assertion the source scan can only approximate.
-    expect(view.getByLabelText('Account')).toBeTruthy();
-  });
-
-  it('offers Account when the session has expired', async () => {
-    request.mockRejectedValue(new ApiRequestError({ status: 401, message: 'Unauthorized' }));
-
-    const view = await renderGarage();
-
-    await waitFor(() => expect(view.getByText('Signed out')).toBeTruthy());
-    expect(view.getByLabelText('Account')).toBeTruthy();
-  });
-
-  it('offers Account to an account with no cars', async () => {
-    // An empty garage is the ordinary first-run state, and not a failure.
-    request.mockResolvedValue({ vehicles: [] });
-
-    const view = await renderGarage();
-
-    expect(await view.findByLabelText('Account')).toBeTruthy();
-  });
-
-  it('offers Account behind the opening explanation too', async () => {
-    /*
-      ⚠ The reason the first-run screen replaces the *body* and not the screen.
-
-      Somebody who has just signed up, cannot work out what this is, and wants
-      to sign out or delete the account they just made is the person most likely
-      to need Account and the one a full-screen takeover would hide it from —
-      the failure this screen's own header comment already warns about.
-    */
-    (everHadVehicle as jest.Mock).mockResolvedValue(false);
-    request.mockResolvedValue({ vehicles: [] });
-
-    const view = await renderGarage();
-
-    expect(await view.findByText('Start with one car')).toBeTruthy();
-    expect(view.getByLabelText('Account')).toBeTruthy();
-  });
-});
+  The guarantee is stronger and is checked where it now lives:
+  `TabBar.test.tsx` for the control, and `lib/__tests__/mobile-account-reachable.test.ts`
+  for the wiring that keeps the bar outside the navigator's screens. Neither can
+  be satisfied by an early return, which is what these five were guarding
+  against by hand.
+*/
 
 describe('which empty garage you get', () => {
   it('explains the product to an install that has never had a car', async () => {
@@ -410,100 +353,149 @@ describe('adding a car', () => {
   });
 });
 
-describe('adding a photograph', () => {
-  const PICKED = {
-    uri: 'file:///tmp/car.jpg',
-    name: 'car.jpg',
-    type: 'image/jpeg',
-    size: 400 * 1024,
-  };
+/*
+  ── ⚠ R18, 23 Aug: the garage has no photo control ─────────────────────────
 
-  it('offers no control when the build has no picker', async () => {
-    /*
-      Omitted means no control, never a control that fails. The picker is a
-      native module and a build without it cannot be asked for a photograph —
-      showing the button anyway would be a dead end dressed as an affordance.
-    */
-    request.mockResolvedValue({ vehicles: [M235I] });
+  `describe('adding a photograph')` lived here and is **deleted rather than
+  skipped**. A solid "Change photo" pill sat on the bay's photograph at the top
+  right — visually the loudest control on the home screen, for the least
+  frequent action anyone takes, on a screen whose one job is "open this car".
+
+  The picker prop, the upload, its busy state and its error banner went with it.
+  The behaviour those cases protected did not disappear: it is the vehicle
+  hero's, where v8.2 already ruled the control is that hero's implied action,
+  and `VehicleDetailScreen.test.tsx` is where it is now covered.
+*/
+
+/**
+ * ── R19 / R20: what the bay leads with ──────────────────────────────────────
+ *
+ * Both findings are about the same screen telling the reader the wrong thing
+ * first — the dial dominating an open safety recall, and a pager counting to
+ * one.
+ */
+describe('the bay’s hierarchy', () => {
+  it('puts an open recall above the dial, not under it', async () => {
+    request.mockResolvedValue({
+      vehicles: [
+        {
+          ...M235I,
+          vehicle_health_summary: { health_score: 70 },
+          nhtsa_data: {
+            recalls: [
+              { NHTSACampaignNumber: '25V871000', Component: 'AIR BAGS', Summary: 'May rupture.' },
+            ],
+          },
+        },
+      ],
+    });
 
     const view = await renderGarage();
-    await view.findByText('2015 BMW M235i');
+    const chip = await view.findByText('1 open recall');
 
-    expect(view.queryByLabelText('Add photo')).toBeNull();
+    /*
+      Order in the rendered tree, which is what a sighted reader scans and what
+      a screen reader walks. Asserted as *position* rather than as a style: the
+      finding was hierarchy, and a chip that merely got bigger under the dial
+      would still be under the dial.
+    */
+    const order = view.toJSON();
+    const flat: string[] = [];
+    const walk = (node: unknown) => {
+      if (typeof node === 'string') return flat.push(node);
+      if (!node || typeof node !== 'object') return;
+      const host = node as { children?: unknown[] };
+      for (const child of host.children ?? []) walk(child);
+    };
+    walk(order);
+
+    const recallAt = flat.findIndex((line) => line.includes('open recall'));
+    const dialAt = flat.findIndex((line) => line === '70');
+
+    expect(chip).toBeTruthy();
+    expect(recallAt).toBeGreaterThan(-1);
+    expect(dialAt).toBeGreaterThan(-1);
+    expect(recallAt).toBeLessThan(dialAt);
   });
 
-  it('offers Add photo on a car that has none', async () => {
-    /*
-      ⚠ The defect David found on 15 Aug. The identity plate is a finished
-      design for a car with no photograph, and it was the only reachable state —
-      a plate you cannot replace is a dead end rather than a fallback.
-    */
+  it('does not page a garage of one', async () => {
     request.mockResolvedValue({ vehicles: [M235I] });
+    const view = await renderGarage();
 
-    const view = await renderGarage({ pickPhoto: jest.fn() });
-    await view.findByText('2015 BMW M235i');
-
-    expect(view.getByLabelText('Add photo')).toBeTruthy();
+    await view.findByText(/M235i/);
+    // R20. "1 of 1" is a pager for a list that cannot be paged.
+    expect(view.queryByText('1 of 1')).toBeNull();
   });
 
-  it('says nothing at all when the picker is dismissed', async () => {
-    /*
-      Dismissal is not a failure, and it must stay distinguishable from one.
-      Showing "cancelled" after a deliberate tap on Cancel is how an app feels
-      accusatory.
-    */
-    request.mockResolvedValue({ vehicles: [M235I] });
-    const pickPhoto = jest.fn().mockResolvedValue(null);
-
-    const view = await renderGarage({ pickPhoto });
-    await view.findByText('2015 BMW M235i');
-
-    await userEvent.setup().press(view.getByLabelText('Add photo'));
-
-    await waitFor(() => expect(pickPhoto).toHaveBeenCalled());
-    expect(view.queryByText('That photo was not saved')).toBeNull();
-  });
-
-  it('shows the refusal the owner can act on', async () => {
-    /*
-      The size ceiling is genuinely reachable from a phone — there is no image
-      manipulator in this build to cap a dimension with — so its message names
-      the numbers and reaches the screen intact rather than becoming a generic
-      failure.
-    */
-    request.mockResolvedValue({ vehicles: [M235I] });
-    const pickPhoto = jest
-      .fn()
-      .mockResolvedValue({ ...PICKED, size: 3 * 1024 * 1024 });
-
-    const view = await renderGarage({ pickPhoto });
-    await view.findByText('2015 BMW M235i');
-
-    await userEvent.setup().press(view.getByLabelText('Add photo'));
-
-    expect(await view.findByText(/the limit is 1\.5 MB/)).toBeTruthy();
-  });
-
-  it('refetches the garage after a photo lands, rather than patching the row', async () => {
-    /*
-      The upload returns a signed URL, but the garage row carries a `photo_url`
-      the server signs its own way. Writing one into a row the next refresh
-      overwrites is the disagreement that reads as a photo flickering back to
-      the plate.
-    */
-    request.mockResolvedValue({ vehicles: [M235I] });
-    const pickPhoto = jest.fn().mockResolvedValue(PICKED);
-
-    const view = await renderGarage({ pickPhoto });
-    await view.findByText('2015 BMW M235i');
-
-    const before = request.mock.calls.length;
-    await userEvent.setup().press(view.getByLabelText('Add photo'));
-
-    await waitFor(() => {
-      const paths = request.mock.calls.slice(before).map((call) => call[0]);
-      expect(paths).toContain('/upload-photo');
-      expect(paths).toContain('/vehicles');
+  it('still pages a garage of two', async () => {
+    // The anti-vacuous half: suppressing the pager everywhere would pass above.
+    request.mockResolvedValue({
+      vehicles: [M235I, { ...M235I, id: 'v2', year: 2018, make: 'Honda', model: 'Accord' }],
     });
+    const view = await renderGarage();
+
+    await view.findByText(/M235i/);
+    view.getByText('1 of 2');
+  });
+});
+
+/**
+ * ── R21: the next-service row leads somewhere ───────────────────────────────
+ *
+ * "Engine oil and filter · in 420 mi" is the single most actionable string on
+ * the home screen, and it was a readout. It opens `Service → Due` now.
+ */
+describe('the next-service row', () => {
+  it('opens what is due when there is an answer', async () => {
+    const onOpenService = jest.fn();
+    request.mockResolvedValue({
+      vehicles: [
+        {
+          ...M235I,
+          next_service_label: 'Engine oil and filter',
+          next_service_at_miles: 70_000,
+        },
+      ],
+    });
+
+    const view = await render(
+      <GarageScreen
+        accessToken="test-token"
+        email="owner@example.test"
+        onSignOut={jest.fn()}
+        onOpenVehicle={jest.fn()}
+        onOpenService={onOpenService}
+        onAddVehicle={jest.fn()}
+      />
+    );
+
+    await view.findByText('Engine oil and filter');
+    await userEvent.press(view.getByLabelText(/^Next service: Engine oil and filter/));
+
+    expect(onOpenService).toHaveBeenCalledWith('db143cdc-e68c-46f0-849e-69f7a1873f58', '2015 BMW M235i');
+  });
+
+  it('is a readout, not a target, when there is no schedule', async () => {
+    /*
+      ⚠ "No schedule yet" is a statement, not a destination. A pressable row
+      leading to a screen that says the same thing is worse than an unpressable
+      one — and it would be the common case, because most cars in this product
+      have no `next_service_*` yet.
+    */
+    request.mockResolvedValue({ vehicles: [M235I] });
+
+    const view = await render(
+      <GarageScreen
+        accessToken="test-token"
+        email="owner@example.test"
+        onSignOut={jest.fn()}
+        onOpenVehicle={jest.fn()}
+        onOpenService={jest.fn()}
+        onAddVehicle={jest.fn()}
+      />
+    );
+
+    await view.findByText(/M235i/);
+    expect(view.queryByLabelText(/^Next service:/)).toBeNull();
   });
 });

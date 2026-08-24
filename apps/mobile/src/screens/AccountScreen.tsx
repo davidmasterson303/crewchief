@@ -7,7 +7,7 @@ import Field from '../components/Field';
 
 import { deleteAccount, getSubscription } from '../api/account';
 import { ApiRequestError } from '../api/client';
-import { border, brand, radius, space, status, surface, text } from '../theme';
+import { PAGE_BODY, border, brand, radius, space, status, surface, text, type } from '../theme';
 import {
   DELETION_CONFIRM_PHRASE,
   DELETION_INVENTORY,
@@ -49,13 +49,24 @@ import { interFace } from '../theme/fonts';
 export function AccountScreen({
   visible,
   email,
+  accessToken,
   onClose,
   onSignOut,
   onDeleted,
 }: {
-  visible: boolean;
+  /**
+   * Present it as a modal.
+   *
+   * ⚠ `undefined` means "render as a screen" — not "hidden". A boolean with
+   * three meanings would be the bug; the absence of the prop is the third
+   * state, and it is the one the tab uses.
+   */
+  visible?: boolean;
   email: string | null;
-  onClose: () => void;
+  /** Rendered by `DevToken`, and only in a dev build — see its docblock. */
+  accessToken: string;
+  /** Only meaningful as a modal. Omitted as a route — the stack header goes back. */
+  onClose?: () => void;
   onSignOut: () => void;
   /** Called after the account is gone, so the app can clear the session. */
   onDeleted: (summary: string) => void;
@@ -82,7 +93,7 @@ export function AccountScreen({
     failure rather than an unknown entitlement.
   */
   useEffect(() => {
-    if (!visible) return;
+    if (visible === false) return;
 
     let cancelled = false;
     void getSubscription().then((subscription) => {
@@ -124,139 +135,236 @@ export function AccountScreen({
     if (deleting) return;
     setConfirmText('');
     setError(null);
-    onClose();
+    onClose?.();
   }
 
-  return (
-    <Modal visible={visible} animationType="slide" onRequestClose={handleClose} transparent={false}>
-      <View style={styles.root}>
-        <View style={styles.bar}>
-          <Text style={styles.title}>Account</Text>
+  /*
+    ── ⚠ R13 · a destination, and only a modal when someone asks for one ─────
+
+    This screen was a `Modal` owned by `GarageScreen`, which is why
+    `mobile-account-reachable.test.ts` exists: "deletion is one tap from the
+    garage" was a thing somebody had to remember to render on **every** return
+    path, and it had been got wrong once already — the loading and error states
+    returned early and took the way into the account with them.
+
+    On the tab bar it is one tap from every screen in the app, and App Store
+    5.1.1(v) is satisfied structurally rather than by vigilance.
+
+    `visible` is optional now. Given, it wraps in a `Modal` and keeps the old
+    behaviour for any caller that still presents it that way; omitted, it is
+    just a screen. Two shells, one body — rather than a second copy of the
+    deletion flow, which is the one flow in this product that must not have two
+    implementations.
+  */
+  const body = (
+    <View style={styles.root}>
+      {/*
+        The bar carries the close control only when there is something to close.
+        As a route, the stack header is the way back and a second "Done" beside
+        it is a second answer to one question.
+      */}
+      <View style={styles.bar}>
+        <Text style={styles.title}>Account</Text>
+        {onClose ? (
           <Pressable onPress={handleClose} hitSlop={12} disabled={deleting}>
             <Text style={[styles.close, deleting && styles.disabledText]}>Done</Text>
           </Pressable>
+        ) : null}
+      </View>
+
+      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+        {email && (
+          <View style={styles.section}>
+            <Text style={styles.label}>Signed in as</Text>
+            <Text style={styles.value}>{email}</Text>
+          </View>
+        )}
+
+        {/*
+          An exact variant match, not an approximation: this was transparent
+          with a `border.field` edge, pressing to `surface.raised` — which is
+          `Button`'s `outline` down to the token.
+        */}
+        <Button label="Sign out" variant="outline" onPress={onSignOut} disabled={deleting} />
+
+        {/*
+          ── Why these are in the binary rather than only on the website ────
+
+          Guideline 3.1.2 requires an app selling auto-renewable subscriptions
+          to carry functional links to both documents. Neither existed
+          anywhere in this product until 14 Aug — not missing links, missing
+          pages — so this is the half that makes them reachable.
+
+          Above the delete section on purpose. Somebody reading the account
+          screen to work out what happens to their data should meet the policy
+          *before* the irreversible control, not after it.
+        */}
+        <View style={styles.legal}>
+          <Text style={styles.label}>Legal</Text>
+          <Pressable
+            onPress={() => void Linking.openURL(`${API_BASE_URL}/privacy`)}
+            disabled={deleting}
+            accessibilityRole="link"
+            accessibilityLabel="Privacy Policy, opens in your browser"
+            style={styles.legalRow}
+          >
+            <Text style={styles.legalText}>Privacy Policy</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => void Linking.openURL(`${API_BASE_URL}/terms`)}
+            disabled={deleting}
+            accessibilityRole="link"
+            accessibilityLabel="Terms of Use, opens in your browser"
+            style={styles.legalRow}
+          >
+            <Text style={styles.legalText}>Terms of Use</Text>
+          </Pressable>
         </View>
 
-        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-          {email && (
-            <View style={styles.section}>
-              <Text style={styles.label}>Signed in as</Text>
-              <Text style={styles.value}>{email}</Text>
+        <View style={styles.danger}>
+          <Text style={styles.dangerTitle}>Delete account</Text>
+
+          {/*
+            Above the inventory, not below it: somebody who has decided to
+            delete stops reading once they find the confirm field, and this
+            is the one item on the screen that costs money to miss.
+          */}
+          {notice && (
+            <View style={styles.notice}>
+              <Text style={styles.noticeHeadline}>{notice.headline}</Text>
+              <Text style={styles.noticeBody}>{notice.action}</Text>
             </View>
           )}
 
-          {/*
-            An exact variant match, not an approximation: this was transparent
-            with a `border.field` edge, pressing to `surface.raised` — which is
-            `Button`'s `outline` down to the token.
-          */}
-          <Button label="Sign out" variant="outline" onPress={onSignOut} disabled={deleting} />
+          <Text style={styles.dangerBody}>
+            This cannot be undone. Deleting your account permanently removes:
+          </Text>
 
-          {/*
-            ── Why these are in the binary rather than only on the website ────
-
-            Guideline 3.1.2 requires an app selling auto-renewable subscriptions
-            to carry functional links to both documents. Neither existed
-            anywhere in this product until 14 Aug — not missing links, missing
-            pages — so this is the half that makes them reachable.
-
-            Above the delete section on purpose. Somebody reading the account
-            screen to work out what happens to their data should meet the policy
-            *before* the irreversible control, not after it.
-          */}
-          <View style={styles.legal}>
-            <Text style={styles.label}>Legal</Text>
-            <Pressable
-              onPress={() => void Linking.openURL(`${API_BASE_URL}/privacy`)}
-              disabled={deleting}
-              accessibilityRole="link"
-              accessibilityLabel="Privacy Policy, opens in your browser"
-              style={styles.legalRow}
-            >
-              <Text style={styles.legalText}>Privacy Policy</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => void Linking.openURL(`${API_BASE_URL}/terms`)}
-              disabled={deleting}
-              accessibilityRole="link"
-              accessibilityLabel="Terms of Use, opens in your browser"
-              style={styles.legalRow}
-            >
-              <Text style={styles.legalText}>Terms of Use</Text>
-            </Pressable>
-          </View>
-
-          <View style={styles.danger}>
-            <Text style={styles.dangerTitle}>Delete account</Text>
-
-            {/*
-              Above the inventory, not below it: somebody who has decided to
-              delete stops reading once they find the confirm field, and this
-              is the one item on the screen that costs money to miss.
-            */}
-            {notice && (
-              <View style={styles.notice}>
-                <Text style={styles.noticeHeadline}>{notice.headline}</Text>
-                <Text style={styles.noticeBody}>{notice.action}</Text>
-              </View>
-            )}
-
-            <Text style={styles.dangerBody}>
-              This cannot be undone. Deleting your account permanently removes:
+          {DELETION_INVENTORY.map((item) => (
+            <Text key={item} style={styles.inventoryItem}>
+              {'•'}  {item}
             </Text>
+          ))}
 
-            {DELETION_INVENTORY.map((item) => (
-              <Text key={item} style={styles.inventoryItem}>
-                {'•'}  {item}
-              </Text>
-            ))}
+          {/*
+            One label doing both jobs, and it takes the **longer** wording.
 
-            {/*
-              One label doing both jobs, and it takes the **longer** wording.
+            The visible text read "Type DELETE to confirm" while the spoken
+            name was "…to confirm account deletion". `Field` speaks the label
+            it shows, so one of the two had to win — and on the single
+            irreversible control in this product, the more explicit one does.
+            It is three words of redundancy inside a section already titled
+            "Delete account"; that is the safe direction to be redundant in.
+          */}
+          <Field
+            label={`Type ${DELETION_CONFIRM_PHRASE} to confirm account deletion`}
+            value={confirmText}
+            onChangeText={setConfirmText}
+            placeholder={DELETION_CONFIRM_PHRASE}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            editable={!deleting}
+          />
 
-              The visible text read "Type DELETE to confirm" while the spoken
-              name was "…to confirm account deletion". `Field` speaks the label
-              it shows, so one of the two had to win — and on the single
-              irreversible control in this product, the more explicit one does.
-              It is three words of redundancy inside a section already titled
-              "Delete account"; that is the safe direction to be redundant in.
-            */}
-            <Field
-              label={`Type ${DELETION_CONFIRM_PHRASE} to confirm account deletion`}
-              value={confirmText}
-              onChangeText={setConfirmText}
-              placeholder={DELETION_CONFIRM_PHRASE}
-              autoCapitalize="characters"
-              autoCorrect={false}
-              editable={!deleting}
-            />
+          {error && <Text style={styles.error}>{error}</Text>}
 
-            {error && <Text style={styles.error}>{error}</Text>}
+          {/*
+            The `delete` variant, matched token for token — `status.danger`,
+            pressing to `status.dangerPressed`, disabling to `surface.disabled`.
+            The primitive also keeps the accessible name through the spinner,
+            which this screen was already doing by hand and for the same
+            reason: the `<Text>` naming it is what gets replaced.
+          */}
+          <Button
+            label="Delete my account"
+            variant="delete"
+            onPress={() => void handleDelete()}
+            disabled={!confirmed}
+            busy={deleting}
+            style={styles.deleteAction}
+          />
+        </View>
 
-            {/*
-              The `delete` variant, matched token for token — `status.danger`,
-              pressing to `status.dangerPressed`, disabling to `surface.disabled`.
-              The primitive also keeps the accessible name through the spinner,
-              which this screen was already doing by hand and for the same
-              reason: the `<Text>` naming it is what gets replaced.
-            */}
-            <Button
-              label="Delete my account"
-              variant="delete"
-              onPress={() => void handleDelete()}
-              disabled={!confirmed}
-              busy={deleting}
-              style={styles.deleteAction}
-            />
-          </View>
-        </ScrollView>
-      </View>
+        <DevToken token={accessToken} />
+      </ScrollView>
+    </View>
+  );
+
+  if (visible === undefined) return body;
+
+  return (
+    <Modal visible={visible} animationType="slide" onRequestClose={handleClose} transparent={false}>
+      {body}
     </Modal>
+  );
+}
+
+/**
+ * The access token, readable off the device. **Dev builds only.**
+ *
+ * ── Why it exists ───────────────────────────────────────────────────────────
+ *
+ * `scripts/verify-mobile-contract.mjs` needs `MOBILE_TEST_TOKEN`, and without
+ * it the bearer happy path, the unowned-vehicle 404 and the garage-list
+ * assertions all `skip()`. They skipped across five pieces of work because
+ * there was no way to get the value off the phone. Deleting this would reopen
+ * that gap, so it travels — it just stops travelling on the home screen.
+ *
+ * ── Why it is here and not on `GarageScreen` ────────────────────────────────
+ *
+ * It shipped at the foot of the garage, which is the first screen every user
+ * sees and the first screenshot anybody takes of this app. `__DEV__` meant no
+ * release build ever rendered it, so nothing was leaked — but a dev-only block
+ * on the home screen is still a decision *about the home screen*, and it was
+ * the last thing on the product's front page in every capture taken for review.
+ *
+ * Account is one tap from the garage and is already where the app keeps the
+ * things about the account rather than about the car. Same reachability, off
+ * the front page.
+ *
+ * ⚠ `__DEV__` is not decoration. A bearer token is a password for the API until
+ * it expires, and a shipping build must not render one where a screenshot or a
+ * shoulder can take it. Expo Go is always `__DEV__`; a release build compiles
+ * the branch out, which `lib/__tests__/mobile-dev-session-stripped.test.ts`
+ * holds this app to.
+ */
+function DevToken({ token }: { token: string }) {
+  if (!__DEV__) return null;
+
+  return (
+    <View style={styles.devBlock}>
+      <Text style={styles.devHeading}>Access token — dev builds only</Text>
+      <Text style={styles.devBody}>
+        Long-press to select and copy. Set as MOBILE_TEST_TOKEN to run the credentialed contract
+        checks.
+      </Text>
+      <Text selectable style={styles.devToken}>
+        {token}
+      </Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: surface.page },
+
+  /* ── The dev token block, moved here from `GarageScreen` ────────────────── */
+  devBlock: { marginTop: space.xl, gap: space.xs },
+  devHeading: { ...type.label, color: text.muted, textTransform: 'uppercase' },
+  devBody: { ...type.value, color: text.muted },
+  /*
+    Monospaced and small: a JWT is long, and it has to select as one run of text
+    rather than reflow into something that copies back broken.
+  */
+  devToken: {
+    color: text.secondary,
+    fontSize: 10,
+    fontFamily: 'Courier',
+    marginTop: space.xs,
+    padding: space.sm,
+    borderRadius: radius.well,
+    backgroundColor: surface.well,
+  },
   bar: {
     paddingTop: 64,
     paddingHorizontal: 20,
@@ -271,7 +379,7 @@ const styles = StyleSheet.create({
   close: { color: brand.accent, fontSize: 16, minHeight: 44, lineHeight: 44 },
   disabledText: { color: text.disabled },
 
-  body: { padding: 20, gap: 24 },
+  body: { ...PAGE_BODY, gap: space.xxl },
   section: { gap: 4 },
   label: {
     color: text.muted,

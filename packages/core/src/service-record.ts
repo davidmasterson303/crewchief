@@ -105,7 +105,18 @@ export interface ServiceRecord {
  * printing "Unknown" in a history list is worse than printing nothing — it
  * reads as a fact about the shop rather than as an absence of one.
  */
-export function describeRecord(record: ServiceRecord): string {
+export function describeRecord(
+  record: ServiceRecord,
+  /**
+   * ⚠ `withShop: false` when the shop is already named above the row.
+   *
+   * **R34.** Grouped into visits, the shop is the visit's own heading — so
+   * repeating it on every line item printed `BLACKMARKET MOTORSPORTS` twice per
+   * row and up to six times per invoice. The caller that has a heading turns it
+   * off; the caller that does not, does not.
+   */
+  { withShop = true }: { withShop?: boolean } = {}
+): string {
   const parts: string[] = [];
 
   const date = formatRecordDate(record.service_date);
@@ -116,8 +127,10 @@ export function describeRecord(record: ServiceRecord): string {
     parts.push(`${mileage.toLocaleString('en-US')} miles`);
   }
 
-  const shop = (record.shop_name ?? '').trim();
-  if (shop && shop.toLowerCase() !== 'unknown') parts.push(shop);
+  if (withShop) {
+    const shop = displayShopName(record.shop_name);
+    if (shop) parts.push(shop);
+  }
 
   return parts.join(' · ');
 }
@@ -196,4 +209,120 @@ export function totalRecorded(records: ServiceRecord[]): { total: number; counte
   }
 
   return { total, counted };
+}
+
+/**
+ * ── A visit, not a line item ────────────────────────────────────────────────
+ *
+ * **R17.** The history screen rendered one card per `maintenance_line_items`
+ * row, so a five-line invoice from one afternoon at one shop drew five cards,
+ * each repeating *"From a scan of 5 lines · BLACKMARKET MOTORSPORTS · $1,461
+ * total"*. The screen was rendering the child records and repeating the parent
+ * five times — ten redundant lines, and no way to see that scanning an invoice
+ * had produced **a visit**.
+ *
+ * The parent is already derivable from the payload: rows sharing a
+ * `source_document_id` *are* that invoice. No route, no join, no second
+ * request — the grouping was always available and the screen simply was not
+ * doing it.
+ *
+ * ⚠ **A row without a document is its own visit, not a bucket of orphans.**
+ * Marking something done on the wishlist writes a line with no source document,
+ * and those are genuinely separate events — collapsing them under one "no
+ * invoice" heading would claim they happened together.
+ */
+export interface ServiceVisit {
+  /** Stable across renders: the document id, or the row's own id. */
+  key: string;
+  /** The shop, tidied for display. `null` when nothing usable was recorded. */
+  shop: string | null;
+  /** ISO date of the visit, from the first line that carries one. */
+  date: string | null;
+  /** Summed across the lines that carry a cost. */
+  total: number;
+  /** How many lines carried one — so "of 5" can be said honestly. */
+  counted: number;
+  records: ServiceRecord[];
+  /** True when these lines were read off one scanned document. */
+  scanned: boolean;
+}
+
+/**
+ * Words that stay lower-case inside a name, and the length below which an
+ * all-caps word is assumed to be an acronym rather than shouting.
+ *
+ * ⚠ This is a **display** tidy applied only to a name that is entirely
+ * upper-case, which is what OCR returns from a printed invoice header. A name
+ * the owner typed with any lower-case letter in it is left exactly alone: it is
+ * theirs, and second-guessing it is how "BMW of Sterling" becomes "Bmw Of
+ * Sterling".
+ */
+const LOWER_IN_NAME = new Set(['of', 'and', 'the', 'at', 'on', 'for', 'to', 'in']);
+const ACRONYM_MAX = 3;
+
+/** `BLACKMARKET MOTORSPORTS` → `Blackmarket Motorsports`. `BMW OF X` → `BMW of X`. */
+export function displayShopName(value: string | null | undefined): string | null {
+  const name = (value ?? '').trim();
+  if (!name || name.toLowerCase() === 'unknown') return null;
+
+  // Anything with a lower-case letter was written by a person. Leave it.
+  if (/[a-z]/.test(name)) return name;
+
+  return name
+    .split(/\s+/)
+    .map((word) => {
+      const bare = word.replace(/[^A-Za-z]/g, '');
+      if (LOWER_IN_NAME.has(bare.toLowerCase())) return word.toLowerCase();
+      if (bare.length > 0 && bare.length <= ACRONYM_MAX) return word;
+
+      return word.charAt(0) + word.slice(1).toLowerCase();
+    })
+    .join(' ');
+}
+
+export function groupIntoVisits(records: readonly ServiceRecord[]): ServiceVisit[] {
+  const order: string[] = [];
+  const visits = new Map<string, ServiceVisit>();
+
+  records.forEach((record, index) => {
+    /*
+      A row with neither a document nor an id still has to land somewhere, and
+      it has to land somewhere *stable* — the index is the only thing left that
+      does not collide with the row beside it.
+    */
+    const key = record.source_document_id ?? record.id ?? `row-${index}`;
+
+    let visit = visits.get(key);
+    if (!visit) {
+      visit = {
+        key,
+        shop: null,
+        date: null,
+        total: 0,
+        counted: 0,
+        records: [],
+        scanned: Boolean(record.source_document_id),
+      };
+      visits.set(key, visit);
+      order.push(key);
+    }
+
+    visit.records.push(record);
+
+    /*
+      First non-empty wins. Every line off one invoice should carry the same
+      shop and date; taking the first rather than the last means a row with a
+      blank field cannot erase what a sibling knew.
+    */
+    visit.shop = visit.shop ?? displayShopName(record.shop_name);
+    visit.date = visit.date ?? (record.service_date ?? null);
+
+    const cost = record.total_cost;
+    if (typeof cost === 'number' && Number.isFinite(cost) && cost > 0) {
+      visit.total += cost;
+      visit.counted += 1;
+    }
+  });
+
+  return order.map((key) => visits.get(key)!);
 }

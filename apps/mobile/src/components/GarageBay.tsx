@@ -16,7 +16,7 @@ import {
   UNKNOWN_TIMING,
   describeNextService,
 } from '@crewchief/core/garage-next-service';
-import { TABULAR, bay, space, surface, text, type } from '../theme';
+import { TABULAR, TARGET_MIN, bay, space, surface, text, type } from '../theme';
 import { useReducedMotion } from '../motion/reduced-motion';
 import { interFace } from '../theme/fonts';
 
@@ -94,9 +94,10 @@ export default function GarageBay({
   subtitle,
   active = true,
   onOpen,
-  onAddPhoto,
   uploading,
+  alert,
   footer,
+  onOpenService,
   today,
 }: {
   vehicle: BayVehicle;
@@ -126,10 +127,20 @@ export default function GarageBay({
   active?: boolean;
   /** Opens the car. The room and its lockup are the target — not the dial. */
   onOpen?: () => void;
-  onAddPhoto?: () => void;
   uploading?: boolean;
-  /** The next-service row, or anything else the screen hangs under the dial. */
+  /**
+   * What is **wrong** with this car, above the instrument — R19.
+   *
+   * ⚠ Above and not below, and that is the whole of the finding: an open recall
+   * outranks a health reading, and it used to render as a small chip under a
+   * 110pt dial. A bay with nothing in this slot is a bay whose dial is rightly
+   * the headline.
+   */
+  alert?: React.ReactNode;
+  /** Anything else the screen hangs under the dial. */
   footer?: React.ReactNode;
+  /** Opens `Service → Due` for this car — R21. Omitted means the row is a readout. */
+  onOpenService?: () => void;
 }) {
   const reduced = useReducedMotion();
   const [open, setOpen] = useState(false);
@@ -224,18 +235,32 @@ export default function GarageBay({
       */}
       <View style={styles.batten}>
         <Text style={styles.bayNumber}>BAY {String(index + 1).padStart(2, '0')}</Text>
-        <Text style={styles.position}>
-          {index + 1} of {total}
-        </Text>
+        {/*
+          ⚠ **R20.** Suppressed at one car. "1 of 1" is a pager for a list that
+          cannot be paged — it takes up the batten's right half to tell somebody
+          with one car that they have one car. Most garages in this product are
+          one car, so this was the common render.
+        */}
+        {total > 1 ? (
+          <Text style={styles.position}>
+            {index + 1} of {total}
+          </Text>
+        ) : null}
       </View>
 
       {/*
         The room and the name are one target, and the dial is not part of it.
 
         A whole-bay Pressable would swallow the dial, which is an instrument to
-        be read rather than a button — and it would make the "Add photo" control
-        a nested tap inside a target the size of the screen. Tapping the car
-        opens the car; that is the whole rule.
+        be read rather than a button. Tapping the car opens the car; that is the
+        whole rule.
+
+        ⚠ **R18, 23 Aug: there is no photo control here any more.** A solid
+        "Change photo" pill sat on the photograph at the top right — visually the
+        loudest control on the home screen, for the least frequent action anyone
+        takes. On the garage the photograph is *scenery*; the affordance is
+        "open this car". The control lives on the vehicle hero, where v8.2
+        already ruled it is the hero's implied action.
       */}
       <Pressable
         onPress={onOpen}
@@ -248,7 +273,6 @@ export default function GarageBay({
           <BayRoom
             photo={vehicle.photo_url}
             make={vehicle.make}
-            onAddPhoto={onAddPhoto}
             busy={uploading}
             height={heroHeight}
           />
@@ -311,12 +335,49 @@ export default function GarageBay({
         sits below its provenance line: this is a fact about the car, and the
         dial is a reading of it.
       */}
-      <View style={styles.nextService}>
+      {/*
+        ── R21 · the row is a way in, not only a readout ─────────────────────
+
+        "Engine Oil & Filter Change · in 4,000 mi" is the single most actionable
+        string on the home screen, and it led nowhere — the only way to act on it
+        was to open the car, scroll the hub and find `Service`. It opens
+        `Service → Due` directly now.
+
+        ⚠ Only when there is an answer. `No schedule yet` is a statement, not a
+        destination, and a pressable row that leads to a screen saying the same
+        thing is worse than an unpressable one.
+      */}
+      <Pressable
+        onPress={nextService.kind === 'known' ? onOpenService : undefined}
+        disabled={nextService.kind !== 'known' || !onOpenService}
+        accessibilityRole={nextService.kind === 'known' && onOpenService ? 'button' : undefined}
+        accessibilityLabel={
+          nextService.kind === 'known' && onOpenService
+            ? `Next service: ${nextService.service}, ${nextService.timing}. Opens what is due.`
+            : undefined
+        }
+        style={({ pressed }) => [styles.nextService, pressed && styles.nextServicePressed]}
+      >
         <Text style={styles.nextServiceLabel}>NEXT SERVICE</Text>
         {nextService.kind === 'known' ? (
-          <Text style={styles.nextServiceValue} numberOfLines={1}>
-            {nextService.service} · {nextService.timing}
-          </Text>
+          /*
+            ── R21 · the job and the timing are two facts, not one string ────
+
+            It read `Engine Oil & Filter Change · in 4,000 mi` as a single run
+            at one weight — the most actionable string on the home screen,
+            rendered as a label-plus-run-on. The job is what you do; the timing
+            is when. Splitting them lets the eye take the job at a glance and
+            the number when it wants it, and it puts the figure on tabular
+            digits (R11) so a stack of bays does not shimmer.
+          */
+          <View style={styles.nextServiceValue}>
+            <Text style={styles.nextServiceJob} numberOfLines={1}>
+              {nextService.service}
+            </Text>
+            <Text style={styles.nextServiceTiming} numberOfLines={1}>
+              {nextService.timing}
+            </Text>
+          </View>
         ) : (
           /*
             Muted, and phrased to match the "No score yet" beneath it. Two
@@ -327,7 +388,22 @@ export default function GarageBay({
             {UNKNOWN_TIMING}
           </Text>
         )}
-      </View>
+      </Pressable>
+
+      {/*
+        ── ⚠ R19 · the recall sits above the dial, not under it ──────────────
+
+        The hierarchy was inverted: a ~110pt dial reading 70 dominated the bay
+        and "2 recalls" was a ~22pt chip below it. **An open airbag recall
+        outranks a fair score** — one is a defect the manufacturer has admitted
+        and will fix for nothing, the other is a summary.
+
+        So the alert comes first, full width, and the dial becomes what a dial
+        should be: the resting state of a car with nothing wrong. On a car with
+        no open recall nothing changes, which is the point — the instrument is
+        the headline exactly when it deserves to be.
+      */}
+      {alert}
 
       <View style={styles.instrument}>
         {band && typeof score === 'number' ? (
@@ -361,8 +437,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: space.md,
     paddingHorizontal: space.lg,
-    paddingTop: space.sm,
+    paddingVertical: space.sm,
+    /* R21. It is a target now, so it clears the floor on its own. */
+    minHeight: TARGET_MIN,
   },
+  /* A fill swap on press. Never a group opacity — see `Button`. */
+  nextServicePressed: { backgroundColor: surface.raised },
   /** 12/600 at 0.6 tracking — the label role, and the floor. Never smaller. */
   nextServiceLabel: { ...type.label, color: text.muted },
   /*
@@ -370,7 +450,10 @@ const styles = StyleSheet.create({
     across a stack of bays. A value that started at a different x on every card
     would make the list read as unaligned rather than as a set.
   */
-  nextServiceValue: { ...type.ui, color: text.primary, flex: 1, textAlign: 'right' },
+  nextServiceValue: { flex: 1, alignItems: 'flex-end' },
+  nextServiceJob: { ...type.ui, color: text.primary, textAlign: 'right' },
+  /* R11. "in 4,000 mi" is a figure, and figures do not reflow between bays. */
+  nextServiceTiming: { ...type.value, color: text.muted, textAlign: 'right', ...TABULAR },
   /*
     The same size, one step quieter. Not italic and not a different face: this
     is a real answer to the question, not an apology for one.

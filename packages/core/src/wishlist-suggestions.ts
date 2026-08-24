@@ -42,6 +42,19 @@ import { wishlistItemIdentifier, type WishlistItemType } from './wishlist-identi
  *
  * A product that colours half its list amber has taught its owner that amber
  * means nothing.
+ *
+ * ── ⚠ 23 Aug (R40): the chip names the **kind**, never the priority ─────────
+ *
+ * `chip` used to read `Do first` whenever `urgent` was true. The list is sorted
+ * urgent-first, so every row on the first screenful carried it — reported as
+ * *"`Do first` on four consecutive rows says nothing. A priority chip that every
+ * visible row carries is decoration."* And it was true twice over: the chip was
+ * redundant with the row's **position**, and it cost the row the one fact the
+ * chip is for, which is what kind of thing this is.
+ *
+ * Urgency is carried by the order and by the section the row sits in. The chip
+ * says `Known issue`, `Service` or `Modification`, and `urgent` still colours
+ * it — so an exception in a long scrolled list is still visible on its own.
  */
 
 export interface WishlistSuggestion {
@@ -51,9 +64,13 @@ export interface WishlistSuggestion {
   /** One line saying why it is worth doing. Never empty — see `reasonOf`. */
   reason: string;
   /**
-   * The chip: what kind of thing this is, or that it should be done first.
+   * The chip: what **kind** of thing this is — `Known issue`, `Service`,
+   * `Modification`.
    *
-   * `urgent` is the only value that may be coloured. See the header.
+   * ⚠ Never the priority. See the header: a chip that repeats the sort order is
+   * decoration, and it displaces the one fact only the chip can carry.
+   *
+   * `urgent` is the only value that may colour it.
    */
   chip: string;
   urgent: boolean;
@@ -115,7 +132,7 @@ function fromIssues(rows: unknown): WishlistSuggestion[] {
         name,
         type: 'issue' as const,
         reason: reasonOf(text(record.description), 'A known problem on this engine.'),
-        chip: urgent ? 'Do first' : 'Known issue',
+        chip: 'Known issue',
         urgent,
         identifier: wishlistItemIdentifier('issue', name),
         note: window ? `Typically ${window}` : null,
@@ -152,7 +169,7 @@ function fromSchedule(rows: unknown): WishlistSuggestion[] {
         name,
         type: 'maintenance' as const,
         reason: reasonOf(text(record.description), 'Part of this car’s service schedule.'),
-        chip: urgent ? 'Do first' : 'Service',
+        chip: 'Service',
         urgent,
         identifier: wishlistItemIdentifier('maintenance', name),
         note: interval,
