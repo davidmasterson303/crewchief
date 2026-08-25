@@ -19,6 +19,7 @@ import { Label } from '@/components/ui/label';
 import { Upload, FileText, Camera, X, TriangleAlert as AlertTriangle, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import InvoiceProcessingLoader from './InvoiceProcessingLoader';
+import type { ScanProgress } from '@crewchief/core/scan-progress';
 import { invalidateDashboardCache } from '@crewchief/core/query-invalidation';
 import { generateVehicleHealthSummary } from '@/app/actions';
 import { downscaleImage } from '@/lib/image-downscale';
@@ -40,7 +41,31 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
   const [vehicleMismatchData, setVehicleMismatchData] = useState<{extractedVehicle: string, expectedVehicle: string} | null>(null);
   const [currentFileForMismatch, setCurrentFileForMismatch] = useState<File | null>(null);
   const [remainingFiles, setRemainingFiles] = useState<File[]>([]);
-  const [currentProcessingFile, setCurrentProcessingFile] = useState<string>('');
+  /*
+    ⚠ `currentProcessingFile` used to live here as a second copy of the file
+    name, written in four places and read in one — the loader's `fileName` prop.
+    `scan.fileName` carries it now, alongside the position and the count it was
+    always missing, so the two cannot disagree about which file is on screen.
+  */
+  /*
+    ── ⚠ UX-15 · the loader used to invent this ──────────────────────────────
+
+    `InvoiceProcessingLoader` took a boolean and ran a four-stage `setInterval`
+    over it, wrapping with a modulo so a slow upload announced the whole
+    sequence complete two or three times. Every figure it needed was already in
+    this component and none of it was being passed down.
+
+    ⚠ `itemsExtracted` counts only files that have **come back**. It is
+    deliberately not incremented optimistically when a request goes out — a
+    count that runs ahead of its answers is the same defect one field over.
+  */
+  const [scan, setScan] = useState<ScanProgress>({
+    stage: 'preparing',
+    fileName: null,
+    fileIndex: 1,
+    fileCount: 1,
+    itemsExtracted: 0,
+  });
   const [isDragging, setIsDragging] = useState(false);
 
   /**
@@ -203,9 +228,23 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
         // their `invoice.jpg` failed as `invoice.webp` is a small lie in the
         // one message they are reading closely.
         const original = selectedFiles[i];
-        setCurrentProcessingFile(original.name);
+
+        /*
+          Two stages, two awaits. `prepareForUpload` reduces the image locally;
+          the `fetch` below is the long one, and everything the server does
+          inside it is a single opaque wait from here.
+        */
+        setScan({
+          stage: 'preparing',
+          fileName: original.name,
+          fileIndex: i + 1,
+          fileCount: selectedFiles.length,
+          itemsExtracted: totalItemsExtracted,
+        });
 
         const file = await prepareForUpload(original);
+
+        setScan((prev) => ({ ...prev, stage: 'reading' }));
         const formData = new FormData();
         formData.append('file', file);
         formData.append('vehicleId', vehicleId);
@@ -252,11 +291,17 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
         if (result.itemsExtracted) {
           totalItemsExtracted += result.itemsExtracted;
         }
+
+        /*
+          The count lands as the work lands — handoff §1.4, "show the fields
+          extracted as they land". Written after the response rather than
+          before, so it can only ever report answers already received.
+        */
+        setScan((prev) => ({ ...prev, itemsExtracted: totalItemsExtracted }));
       }
 
       setSelectedFiles([]);
       setError('');
-      setCurrentProcessingFile('');
       onOpenChange(false);
 
       if (successCount > 0) {
@@ -292,7 +337,6 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
       toast.error('Upload failed');
     } finally {
       setUploading(false);
-      setCurrentProcessingFile('');
     }
   };
 
@@ -300,7 +344,6 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
     if (!uploading) {
       setSelectedFiles([]);
       setError('');
-      setCurrentProcessingFile('');
       onOpenChange(false);
     }
   };
@@ -311,6 +354,24 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
     setShowVehicleMismatchDialog(false);
     setVehicleMismatchData(null);
     setUploading(true);
+
+    /*
+      The retry re-sends a file already reduced, so it skips `preparing` and
+      goes straight to the long wait. Saying "Preparing the file" here would be
+      describing a step that is not about to happen — small, and exactly the
+      class of thing this finding is about.
+
+      ⚠ `itemsExtracted` restarts at 0 because this is a fresh run: the count
+      belongs to the files this pass answers for, and carrying a total across
+      a mismatch dialog would report work the user is no longer watching.
+    */
+    setScan({
+      stage: 'reading',
+      fileName: currentFileForMismatch.name,
+      fileIndex: 1,
+      fileCount: 1 + remainingFiles.length,
+      itemsExtracted: 0,
+    });
 
     try {
       const formData = new FormData();
@@ -334,6 +395,11 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
       }
 
       toast.success(`Successfully processed ${currentFileForMismatch.name}`);
+
+      setScan((prev) => ({
+        ...prev,
+        itemsExtracted: prev.itemsExtracted + (result.itemsExtracted ?? 0),
+      }));
 
       if (remainingFiles.length > 0) {
         setSelectedFiles(remainingFiles);
@@ -378,7 +444,7 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
                   We&apos;re analyzing your document and extracting the details
                 </DialogDescription>
               </DialogHeader>
-              <InvoiceProcessingLoader isProcessing={uploading} fileName={currentProcessingFile} />
+              <InvoiceProcessingLoader isProcessing={uploading} progress={scan} />
             </>
           ) : (
             <>

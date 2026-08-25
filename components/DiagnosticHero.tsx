@@ -3,7 +3,8 @@
 import { useRef } from 'react';
 import { VehicleIdentity } from '@/components/VehicleIdentity';
 import { ClusterGauge } from '@/components/ClusterGauge';
-import { describeReadWork, type ReadWork } from '@crewchief/core/work-narration';
+import { describeReadWork, readWorkCount, type ReadWork } from '@crewchief/core/work-narration';
+import { useCountUp } from '@/hooks/use-count-up';
 
 interface DiagnosticHeroProps {
   /** A renderable photo URL, already signed by the caller. Null is expected. */
@@ -109,22 +110,27 @@ export default function DiagnosticHero({
     animation measured nothing but itself and the caption asserted a diagnostic
     that had not happened. `work-narration.ts` carries the full argument.
 
-    ── The beat was not replaced with another beat ───────────────────────────
+    ── ⚠ The beat stays, and counts something true ───────────────────────────
 
-    D13 leaves the door open — *"if you want the beat, make it show something
-    true — the actual records it read, counting up"* — and `readWorkCount` is
-    exported for exactly that. It is deliberately not taken here.
+    `CODE_HANDOFF_2026-08-24.md` §1.4 is explicit, and it corrects an earlier
+    reading of this decision that removed the count entirely: *"not to remove
+    the beat but to make it narrate something real — count up the records
+    actually read… Same reassurance, no fiction."*
 
-    Animating the count inside "Read 12 service records." means re-rendering a
-    sentence while its subject changes, which reads as a glitch rather than as
-    assembly, and it re-introduces motion whose only job is to make an instant
-    result feel earned. That instinct is what produced the 900ms timer. The
-    sentence is already the substantial thing; a car with twelve invoices says
-    twelve, and that lands without being counted out loud.
+    That is the better call. The moment of assembly was never the dishonest
+    part — an instant answer does feel unearned, and deleting the moment throws
+    away real reassurance to fix a problem the moment did not cause. What was
+    wrong was the *subject*: a timer counting itself.
 
-    If the beat is wanted later it belongs on the count alone, in its own
-    element, not threaded through prose.
+    So the sweep runs over `readWorkCount` — the real number of records on file.
+    A car with twelve invoices counts to twelve because there are twelve, and a
+    car with none has nothing to count and shows no caption at all.
+
+    ⚠ The sentence's shape comes from `work`, not from `counted`. Only the
+    numeral is substituted, so the caption never passes through the "no records"
+    phrasing on its way up. `work-narration.ts` carries why that matters.
   */
+  const counted = useCountUp(work ? readWorkCount(work) : 0, 700);
 
   /**
    * ⚠ `null`, not `0`. `??` here would resurrect the exact defect: `0` is a
@@ -132,6 +138,25 @@ export default function DiagnosticHero({
    */
   const score = healthScore ?? null;
   const unknownScore = score === null;
+
+  /*
+    ── ⚠ What this line says is now checkable ────────────────────────────────
+
+    It read `!photo ? 'No photo yet' : scanDone ? 'Diagnostics complete' :
+    'Scanning…'` — a caption whose only inputs were a photograph and a timer,
+    announcing a completed diagnostic over a car with no records, no recall
+    lookup and no assessment.
+
+    It names the records the assessment was built from instead. Every figure in
+    it is a row somebody can go and count in the service log, which is the
+    standard `health-drivers.ts` holds its own inputs to.
+
+    The photo state survives as a fallback because it is still true and still
+    the most useful thing to say when there is nothing else — but it is the last
+    resort now rather than the first branch, since what the app read matters
+    more than whether there is a picture of the car.
+  */
+  const caption = work ? describeReadWork(work, counted) : !photo ? 'No photo yet' : null;
 
   return (
     <section
@@ -192,25 +217,13 @@ export default function DiagnosticHero({
           was never the problem, the third copy of it was.
         */}
         {/*
-          ── ⚠ D13 · what this line says is now checkable ───────────────────────
-
-          It read `!photo ? 'No photo yet' : scanDone ? 'Diagnostics complete' :
-          'Scanning…'` — a caption whose only input was a photograph and a
-          timer, announcing a completed diagnostic over a car with no records,
-          no recall lookup and no assessment.
-
-          It names the records the assessment was built from instead. Every
-          figure in it is a row somebody can go and count in the service log,
-          which is the same standard `health-drivers.ts` holds its inputs to.
-
-          The photo state survives as a fallback because it is still true and
-          still the most useful thing to say when there is nothing else — but it
-          is now the *last* resort rather than the first branch, since what the
-          app read matters more than whether there is a picture of the car.
+          ⚠ Rendered only when there is something to say — handoff §1.4, *"show
+          nothing rather than a timer"*. `describeReadWork` returns `null` when
+          neither read resolved, and the element goes with it rather than
+          holding an empty slot open. A caption that fills its slot to avoid
+          looking unfinished is the same reflex that produced the timer.
         */}
-        <p className="label-uppercase mb-6">
-          {work ? describeReadWork(work) : !photo ? 'No photo yet' : null}
-        </p>
+        {caption && <p className="label-uppercase mb-6">{caption}</p>}
 
         {/*
           One instrument, where there used to be a numeral and a separate

@@ -166,20 +166,65 @@ describe('the score', () => {
     expect(screen.queryByText(/scanning/i)).not.toBeInTheDocument();
   });
 
+  /*
+    ── ⚠ Handoff §1.4 · the beat stays, and counts something true ────────────
+
+    An earlier pass deleted the count-up outright. David's call is the opposite:
+    keep the moment of assembly, change what it counts. So this asserts the
+    settled sentence *and* that the sweep never renders a phrasing the settled
+    state would not use — the failure mode of re-deriving the caption from the
+    animated value each frame would be "No service records on file" flashing
+    under a car with twelve.
+  */
   it('names the records it actually read', () => {
     render(<DiagnosticHero {...M235i} healthScore={74} work={{ serviceRecords: 12, recalls: 3 }} />);
+
+    settle();
 
     expect(screen.getByText('Read 12 service records and 3 recall campaigns.')).toBeInTheDocument();
   });
 
-  it('says so plainly when it read nothing', () => {
+  it('never shows an absence phrasing while counting up to a real figure', () => {
+    render(<DiagnosticHero {...M235i} healthScore={74} work={{ serviceRecords: 12, recalls: 3 }} />);
+
+    // Before the sweep settles: still the "Read …" shape, whatever the numeral.
+    expect(screen.queryByText(/no service records/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/^Read \d+ service record/)).toBeInTheDocument();
+
+    settle();
+    expect(screen.queryByText(/no service records/i)).not.toBeInTheDocument();
+  });
+
+  it('says so plainly when a check ran and found nothing', () => {
     render(<DiagnosticHero {...M235i} work={{ serviceRecords: 0, recalls: 0 }} />);
+    settle();
 
     expect(
       screen.getByText(
         'No service records on file, and no recalls found for this year, make and model.'
       )
     ).toBeInTheDocument();
+  });
+
+  /*
+    ── ⚠ Handoff §1.4 · "show nothing rather than a timer" ───────────────────
+
+    Neither read resolved, so there is nothing true to say and no caption is
+    rendered. The earlier pass printed "Nothing read for this car yet." — a slot
+    filled to avoid looking unfinished, which is the reflex that produced the
+    timer in the first place.
+  */
+  it('renders no caption at all when nothing resolved', () => {
+    const { container } = render(
+      <DiagnosticHero {...M235i} photo="https://example.test/car.jpg" work={{ serviceRecords: null, recalls: null }} />
+    );
+    settle();
+
+    expect(container.querySelector('.label-uppercase')).toBeNull();
+
+    // Anti-vacuous: the same selector finds a caption when there is one to find.
+    const withWork = render(<DiagnosticHero {...M235i} work={{ serviceRecords: 4, recalls: null }} />);
+    expect(withWork.container.querySelector('.label-uppercase')).not.toBeNull();
   });
 
   /*

@@ -88,6 +88,50 @@ describe('the disclosure itself', () => {
     expect(adviceDisclosure('consultant').toLowerCase()).not.toMatch(/not advice|no advice/);
   });
 
+  /*
+    ── ⚠ Handoff §1.3 · the claim the other clauses cannot make ──────────────
+
+    "Written by AI" says what produced the text; "from this car's records" says
+    what it had. Neither says what it **lacked**, and the gap between reading a
+    service history and inspecting a vehicle is the whole of what an owner risks
+    misunderstanding when a confident paragraph recommends a repair.
+
+    Lifted verbatim from the Terms, so this also guards the two from drifting.
+  */
+  it('says the AI has never seen the car, on both surfaces §1.3 names', () => {
+    for (const surface of ['consultant', 'health'] as const) {
+      expect([surface, /never seen your car/.test(adviceDisclosure(surface))]).toEqual([
+        surface,
+        true,
+      ]);
+    }
+  });
+
+  it('uses the Terms’ own sentence rather than a paraphrase', () => {
+    const terms = read('app', 'terms', 'page.tsx');
+    expect(terms).toMatch(/It has never seen your car\./);
+  });
+
+  /*
+    ── ⚠ The advisor's name is blocked, and must not be guessed ──────────────
+
+    §1.3's suggested copy reads "Written by [advisor name]'s AI…". The advisor
+    *is* "CrewChief" — the persona's name in the system prompt and the label
+    transcripts are formatted with — and the product is renaming to Well Kept,
+    which is not a person. The shortlist is with David.
+
+    This asserts the placeholder never shipped and that no old name was
+    hard-coded into the disclosure in the meantime. When the persona is chosen,
+    this test is the thing that should fail and be updated deliberately.
+  */
+  it('ships no placeholder and no guessed persona name', () => {
+    for (const surface of ['consultant', 'health', 'estimate', 'plan'] as const) {
+      const copy = adviceDisclosure(surface);
+      expect([surface, /\[advisor name\]|\{advisor/i.test(copy)]).toEqual([surface, false]);
+      expect([surface, /CrewChief|Well Kept/i.test(copy)]).toEqual([surface, false]);
+    }
+  });
+
   it('keeps recalls out of it', () => {
     /*
       ⚠ A recall is **not** generated advice — it is NHTSA's own record, quoted.

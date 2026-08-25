@@ -31,7 +31,11 @@ import {
   recallDriver,
   type HealthDriver,
 } from '@crewchief/core/health-drivers';
-import { describeReadWork, readWorkCount } from '@crewchief/core/work-narration';
+import {
+  describeReadWork,
+  hasReadWorkToNarrate,
+  readWorkCount,
+} from '@crewchief/core/work-narration';
 
 const driver = (score: number | null): HealthDriver => ({
   key: 'maintenance',
@@ -175,21 +179,72 @@ describe('the hero says what it read', () => {
 
     for (const state of states) {
       const line = describeReadWork(state);
-      expect(line).not.toMatch(/diagnos|scanning|complete|analysing|analyzing/i);
-      // Never empty: the caption's slot is fixed, and an empty one reads as
-      // the loading state this module exists to abolish.
-      expect(line.length).toBeGreaterThan(0);
+      // `null` is a legitimate answer — see the next test — and a null caption
+      // cannot claim anything, so only the rendered ones are checked.
+      if (line !== null) {
+        expect(line).not.toMatch(/diagnos|scanning|complete|analysing|analyzing/i);
+        expect(line.length).toBeGreaterThan(0);
+      }
     }
   });
 
-  it('separates a failed read from an empty one', () => {
-    // `null` is about us, `0` is about the car. Collapsing them is how "we
-    // could not look" would come to read as "there is nothing there".
-    expect(describeReadWork({ serviceRecords: null, recalls: null })).toBe(
-      'Nothing read for this car yet.'
-    );
+  /*
+    ── ⚠ Handoff §1.4 · "show nothing rather than a timer" ───────────────────
+
+    This asserted a consolation sentence — "Nothing read for this car yet." —
+    for the state where neither read resolved. That filled the caption's slot to
+    avoid an empty one, which is the same reflex that produced the timer: the
+    layout would rather say something than look unfinished.
+
+    `null` now, and the hero renders no caption at all.
+  */
+  it('says nothing when there is nothing true to say', () => {
+    expect(describeReadWork({ serviceRecords: null, recalls: null })).toBeNull();
+    expect(hasReadWorkToNarrate({ serviceRecords: null, recalls: null })).toBe(false);
+  });
+
+  it('still speaks for a check that ran and found nothing', () => {
+    /*
+      ⚠ The anti-vacuous half, and the distinction the whole module turns on. A
+      completed check that found nothing is a **result**; not having looked is
+      not. Collapsing them to `null` would be as wrong as the old sentence, in
+      the other direction.
+    */
     expect(describeReadWork({ serviceRecords: 0, recalls: null })).toBe(
       'No service records on file yet.'
+    );
+    expect(describeReadWork({ serviceRecords: 0, recalls: 0 })).toBe(
+      'No service records on file, and no recalls found for this year, make and model.'
+    );
+    expect(hasReadWorkToNarrate({ serviceRecords: 0, recalls: 0 })).toBe(true);
+  });
+
+  /*
+    ── ⚠ Handoff §1.4 · the beat counts, and counts something true ───────────
+
+    David's call was to keep the moment of assembly and change its subject, not
+    to delete it. The sentence's *shape* comes from the settled figures and only
+    the numeral is substituted, so a sweep toward 12 never passes through the
+    "no records" phrasing on its way up — which is exactly what would happen if
+    the caption were re-derived from the animated value each frame.
+  */
+  it('substitutes the animated count without changing the sentence', () => {
+    const work = { serviceRecords: 12, recalls: 3 };
+
+    expect(describeReadWork(work, 0)).toBe('Read 0 service records and 3 recall campaigns.');
+    expect(describeReadWork(work, 1)).toBe('Read 1 service record and 3 recall campaigns.');
+    expect(describeReadWork(work, 7)).toBe('Read 7 service records and 3 recall campaigns.');
+    expect(describeReadWork(work, 12)).toBe('Read 12 service records and 3 recall campaigns.');
+
+    // At rest it agrees with the un-parameterised form.
+    expect(describeReadWork(work, readWorkCount(work))).toBe(describeReadWork(work));
+  });
+
+  it('pluralises on the displayed count, not the real one', () => {
+    // "Read 1 service records" mid-sweep is the kind of wrong that makes an
+    // honest caption look broken.
+    expect(describeReadWork({ serviceRecords: 40, recalls: null }, 1)).toBe(
+      'Read 1 service record.'
     );
   });
 

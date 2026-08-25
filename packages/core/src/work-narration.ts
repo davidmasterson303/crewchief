@@ -19,14 +19,26 @@
  * real — and it sits directly above a dial that was independently inventing a
  * reading (D10). Two fabrications, one screen, reinforcing each other.
  *
- * ── The beat survives; only the lie is removed ──────────────────────────────
+ * ── ⚠ The beat survives, and that is David's call rather than a concession ──
  *
- * The instinct behind the animation was sound: an instant answer feels
- * unearned, and a moment of assembly makes it feel considered. So this does not
- * delete the beat, it gives it something true to count — *the records actually
- * read*. A car with 12 invoices counts to 12 because there were twelve; a car
- * with none counts to nothing and says so, which is precisely the case the old
- * caption congratulated itself over.
+ * `CODE_HANDOFF_2026-08-24.md` §1.4 is explicit and it corrects an earlier
+ * reading of this decision: *"not to remove the beat but to make it narrate
+ * something real — count up the records actually read… Same reassurance, no
+ * fiction."*
+ *
+ * The instinct behind the animation was sound. An instant answer feels
+ * unearned, and a moment of assembly makes it feel considered; deleting the
+ * moment throws that away to fix a problem that was never the moment's fault.
+ * What was wrong was the *subject* — a timer counting itself. So the beat keeps
+ * its job and changes what it counts: a car with 12 invoices counts to 12
+ * because there were twelve.
+ *
+ * ⚠ **Where there is nothing to narrate, narrate nothing.** The same section
+ * says so — *"show nothing rather than a timer"* — which is why
+ * `describeReadWork` returns `null` rather than a consolation sentence. A
+ * caption that fills its slot with "nothing read yet" is still a slot being
+ * filled to avoid looking empty, and that is the instinct this whole finding is
+ * about.
  *
  * ── Why counts and not a percentage ────────────────────────────────────────
  *
@@ -72,20 +84,47 @@ export function readWorkCount(work: ReadWork): number {
 }
 
 /**
- * One line naming what this assessment was built from.
+ * Whether there is anything true to say about this vehicle's records.
  *
- * ⚠ Always says something. There is no state in which this returns an empty
- * string, because the caption's slot on the hero is fixed and an empty one
- * would collapse the layout into the shape it has while "loading" — reviving,
- * visually, the ambiguity this module exists to end.
+ * ⚠ The caller renders **no caption at all** when this is false. See the
+ * docblock: an empty slot is the honest shape for "we have nothing to report",
+ * and filling it with a sentence about having nothing is the same reflex that
+ * produced a timer.
  */
-export function describeReadWork(work: ReadWork): string {
+export function hasReadWorkToNarrate(work: ReadWork): boolean {
+  return describeReadWork(work) !== null;
+}
+
+/**
+ * One line naming what this assessment was built from, or `null` for nothing.
+ *
+ * ── ⚠ `shown` is how the beat counts without a second copy of the sentence ──
+ *
+ * The caller animates a number from 0 to `readWorkCount(work)` and passes each
+ * frame's value here. The **shape** of the sentence is decided from `work` —
+ * the real, settled figures — and only the numeral is substituted, so a car
+ * with twelve invoices reads "Read 3 service records" mid-sweep and "Read 12
+ * service records" at rest. It never passes through the *no records* phrasing
+ * on its way up, which is what would happen if the sentence were re-derived
+ * from the animated value each frame.
+ *
+ * That is the whole reason this takes a parameter rather than the hero
+ * assembling its own string around a number: one sentence, one place, and the
+ * animation cannot invent a phrasing the settled state would not use.
+ */
+export function describeReadWork(work: ReadWork, shown?: number): string | null {
   const { serviceRecords, recalls } = work;
 
   const parts: string[] = [];
 
   if (serviceRecords !== null && serviceRecords > 0) {
-    parts.push(plural(serviceRecords, 'service record'));
+    /*
+      ⚠ Pluralised on the **displayed** count, not the real one. "Read 1 service
+      records" during a sweep toward 12 is the kind of wrong that makes an
+      honest caption look broken.
+    */
+    const count = shown === undefined ? serviceRecords : Math.max(0, Math.round(shown));
+    parts.push(plural(count, 'service record'));
   }
 
   /*
@@ -108,6 +147,10 @@ export function describeReadWork(work: ReadWork): string {
     complete", and it is the one the owner most needs the truth about — it is
     also the only one they can fix, which is why the hero pairs this line with
     an action rather than leaving it as a complaint.
+
+    ⚠ Both branches below describe a **completed check that found nothing**,
+    which is a real result and worth saying. They are not the "nothing to
+    narrate" case.
   */
   if (serviceRecords === 0 && recalls === 0) {
     return 'No service records on file, and no recalls found for this year, make and model.';
@@ -115,5 +158,10 @@ export function describeReadWork(work: ReadWork): string {
 
   if (serviceRecords === 0) return 'No service records on file yet.';
 
-  return 'Nothing read for this car yet.';
+  /*
+    ⚠ Neither read resolved — we did not look, or looking failed. There is
+    nothing true to say, so nothing is said. Handoff §1.4: "Where there is
+    genuinely nothing to narrate, show nothing rather than a timer."
+  */
+  return null;
 }
