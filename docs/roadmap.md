@@ -1,6 +1,193 @@
 # CrewChief roadmap — image pipeline, backdrop, cockpit direction, and responsive web
 
-> ### ⚠ START HERE — handoff into the device-testing thread
+> ### ⚠ START HERE — 25 Aug 2026, into the feedback thread
+>
+> Written at the start of the 25 Aug session, for the thread where **David uses the app and
+> reports what is wrong with it**. Everything below this block is history; the two blocks
+> under it are the 22–23 Aug device handoff and are superseded on every fact that moved.
+>
+> The plan of record for launch is **not in this repo** — it is
+> `~/Documents/Claude/Projects/davidmasterson.co/`:
+>
+> | | |
+> |---|---|
+> | `LAUNCH_RUNBOOK_2026-08-24.md` | the five phases, who does each step, and the submission gate |
+> | `CREWCHIEF_QA_AUDIT_2026-08-24.md` | 119 findings; the register every `SEC-`/`FN-`/`IAP-` id in a commit message points at |
+> | `CODE_HANDOFF_2026-08-24.md` | the four decisions that changed audit fixes, and what is blocked on David |
+> | `WELLKEPT_RENAME_PACKAGE_2026-08-24.md` | the rename, file by file, blocked on the name |
+> | `CREWCHIEF_DECISION_REGISTER_2026-08-24.md` | D-numbered product calls; D10, D11 and D13 are shipped |
+>
+> ---
+>
+> #### ⚠ The one fact that changes how feedback gets handled: both hostnames are frozen at 23 Aug
+>
+> ```
+> crewchief.davidmasterson.co        02b36c6e   23 Aug   ← the app's API and the App Store URL
+> crewchief-demo.davidmasterson.co   9b789a87   23 Aug
+> main                               0a2dd9a    27 commits ahead, and this time it is real code
+> ```
+>
+> Read off `/api/version` on both hostnames on 25 Aug, not inferred from a push. `git diff
+> --stat web-live..main` is **191 files**, so the "docs-only means both hosts are current"
+> check below now says the opposite: they are not.
+>
+> ⚠ **The phone is newer than the API it talks to.** `app.json` → `extra.apiBaseUrl` is
+> `crewchief.davidmasterson.co`, and Metro serves the phone whatever is in this working tree.
+> So a screen can be correct in the repo and wrong on the device, because the route it calls
+> is 23 Aug. Everything in this batch that changed a payload is in that gap — the profile
+> branch of `PATCH /api/v1/vehicles` (`6560f1b`), `lookup_status` on the recall payloads,
+> the nullable health score, `last_generated` on the garage embed. **When a device report
+> looks impossible, check whether it needs an unpromoted route before debugging the screen.**
+>
+> ⚠ **`crewchief.davidmasterson.co` still renders "Coming soon"** — curled today. `65e9377`
+> removes it on the product host and is unpromoted. That is the page App Review opens.
+>
+> Promoting is not free and is not cosmetic (§8): it publishes the API shipped apps depend
+> on, and a Netlify build is real money. Three things must be true first, and the first two
+> are David's:
+>
+> 1. **Run `scripts/sql/reconcile-rls-2026-08-24.sql`** in the SQL editor — six queries, and
+>    `DB-01` (whether `invoice_line_items`' `EXISTS`-only DELETE policy is a live cross-tenant
+>    read) **cannot be settled without it**. Nothing in the DB lane should change first.
+> 2. **Set `AI_HEALTH_SECRET` on both Netlify sites** (it falls back to
+>    `CONSULTANT_HEALTH_SECRET`, which `docs/qa-script.md` records as unset on prod). Once
+>    this batch lands, `/api/health/ai` answers 404 to everyone without it — §7, two places.
+> 3. **`web-live` before the next mobile build**, or the build ships calling routes that are
+>    not there.
+>
+> `promote-web` now runs `next build` before it merges, and `promote-demo` waits for the
+> deploy and confirms the hostname is serving the merge commit rather than printing an
+> instruction. `verify-demo` **warns** rather than failing when the AI-health secret is
+> missing locally — the credential is checked on the deployment, so this machine not having
+> it says nothing about the deployment.
+>
+> Six commits are also **unpushed to `origin/main`** (`9b061c4`..`0a2dd9a`). Pushing `main`
+> costs nothing and publishes nothing.
+>
+> #### ⛔ Seven migrations pending — one SQL trip, and two of them back live fixes
+>
+> ```
+> node scripts/check-migrations.mjs --pending      # verified 25 Aug: 47 applied · 7 pending
+> ```
+>
+> | | |
+> |---|---|
+> | `20260729060000` | ⛔ **still the live defect.** `modification_details.performance_goal` does not exist, the upsert fails `42703`, and every mod analysis is billed and discarded |
+> | `20260824100000` | `nhtsa_data.lookup_status` — until it lands, a recall lookup cannot record what it concluded. The write tolerates the absence and logs at error level naming the migration |
+> | `20260824120000` | `orphaned_apple_subscriptions` — until it lands, deleting an account still orphans a live Apple subscription with nothing to reconcile against |
+> | `20260821140000` | the mod-detail content cache |
+> | `20260822120000` | the sweep heartbeat |
+> | `20260104022655` · `20260314143627` | older drift; the first is a column whose last reader was deleted 7 Aug |
+>
+> #### What landed 23–25 Aug, in three waves
+>
+> **23 Aug — the phone became a product, off David's own device notes.** The garage photo is
+> the screen rather than a 112pt panel; the vehicle screen is a hub of pushed routes rather
+> than ten stacked read-outs; Build became a place, with the three rungs' reasoning that had
+> been computed and discarded; the wishlist got the research catalogue it already had on the
+> payload; add-a-car got year/make/model lists and live vPIC VIN decode; recalls can be marked
+> repaired (`recall_actions`, never "Repaired" — "you marked this on 23 Aug"); the four
+> onboarding answers became editable, which matters because `performance_mindedness = 'stock'`
+> hides the Build route and had no way back on.
+>
+> ⚠ The hero pullback's travelling dial was built that afternoon and **deliberately deleted
+> the same day** (`59cbe30`) on David's note that it covers the car — taking three hard-won
+> guards with it, recorded in the test file and the drift register rather than left dormant.
+>
+> **24 Aug — the QA audit wave, `0e01f81`..`4e3bb5e`.** Fourteen commits, thematic labels on
+> one progressive file state (`app/actions.ts` is 6,500 lines), each typechecking standalone.
+> The ones worth knowing as a tester:
+>
+> - **Every health score this app ever generated was 70.** The prompt says `healthScore`,
+>   the parser read `health_score`, and the neutral default went into the column a gauge
+>   reads. `maintenance` separately scored 100 — "Nothing overdue" — for a car with no records.
+> - **Recalls were fetched once per vehicle, ever**, and a make NHTSA does not recognise
+>   returns `Count: 0` — byte-identical to a clean car. Only a confirmed match permits an
+>   all-clear now; existing rows backfill to `unknown`, never `matched`.
+> - **A failed invoice extraction was stored as a completed $0 invoice**, so the advisor
+>   answered "$0" for a real bill and nothing would ever retry it.
+> - Security: a cross-tenant service-role DELETE on an unchecked id, four unguarded
+>   `'use server'` exports, an open redirect on the App Store hostname, a rate limiter two
+>   parallel requests could switch off, eleven Gemini call sites with no ceiling.
+> - IAP: the chain proved "Apple signed this", never "for CrewChief"; deleting an account
+>   orphaned a live subscription permanently.
+> - iOS: a cold-start notification tap trapped you with no back button, and **nothing
+>   refetched on focus** — every write succeeded and returned to a screen saying it had not.
+> - Design v8.3: ten flat screens became five, the white filled primary is retired, and the
+>   three-tab bar is hand-rolled (installing `bottom-tabs` would re-split the jest majors).
+> - Version is `1.0.0` in all three files, and `/api/version` reports it beside the commit.
+>
+> **24–25 Aug — the product decisions, applied.** A null score is now an unknown state on all
+> three clients (dashed track, em dash, "No score yet") rather than a red dial reading 0; the
+> dashboard hero's fake 900ms "diagnostic" is gone and the beat now counts records actually
+> read; the AI disclosure reaches all four surfaces it was written for; **pricing moved from a
+> token allowance to three named features** — free is everything the product stores or looks
+> up, paid is the advisor, invoice scanning and the dossier, which are exactly the three that
+> call a model.
+>
+> #### Verified on 25 Aug, not assumed
+>
+> - `176 web suites / 3098 tests` and `26 mobile / 451` green on a clean tree.
+> - Both hostnames' `/api/version`; 7 pending migrations; product host still says "Coming
+>   soon"; the demo masthead renders and the product host carries none of it.
+> - ⚠ **The rename package's own verification command cannot pass.** It says
+>   `grep -o "PORTFOLIO DEMO"`; the string in `DemoBanner.tsx` is "Portfolio Demo", uppercased
+>   by CSS. Grep for that, or the check reads as a missing masthead on a correct build.
+>
+> #### Known and deliberate — do not re-report these
+>
+> - **"Failed to save details" on a modification** — the `20260729060000` migration.
+> - **A dashed dial reading "No score yet"** is D10 working, not a broken gauge.
+> - **Nothing can be bought.** `PAID_FEATURES_ENFORCED` is off, `PaywallScreen` is mounted by
+>   no navigator, and no StoreKit library is installed. The flag is not a rollout switch: a
+>   feature may only be gated behind a purchase the app can actually make. Turning it on
+>   withdraws three features from every existing account with no way back.
+> - **The AI disclosure says "AI" unqualified** — the persona name is blocked on David, and a
+>   test asserts no placeholder and no guessed name shipped. That test is what should fail
+>   when the name is chosen.
+> - **The floating gear in device screenshots is `expo-dev-client`'s dev menu**, not the app.
+> - **`QuoteGenerationProgress.tsx` is still a fake progress bar** — a 7.5s timer to 100% with
+>   a step claiming to check regional labour rates the app has no location data for. Known,
+>   flagged, deliberately outside the scope that named the invoice scanner.
+> - `VehicleDetailScreen` says nothing about recalls when a car has none, and
+>   `ServiceMilestoneScreen` titles both empty states alike — **still David's calls**.
+> - **`verify:mobile` reports PARTIAL**: `MOBILE_TEST_TOKEN` expired 2 Aug.
+>
+> #### Next, in order
+>
+> | # | What | Who |
+> |---|---|---|
+> | **1** | Feedback from using the app — screenshots, not video | **David** |
+> | **2** | ⚠ **Switch the Gemini billing account to prepay.** Google shows *Action Required*; if it lapses the advisor, invoice scanning and the dossier all stop — and the Terms sentence that says content is not used for training stops being true with it | **David · 10 min** |
+> | **3** | The SQL trip: seven migrations + `reconcile-rls-2026-08-24.sql` | **David · one editor session** |
+> | **4** | **The name.** LEG-11 blocks the rename, the bundle id, the App Store Connect record and the advisor persona — everything downstream | **David · decision** |
+> | **5** | Promote `web-live` (then `demo-live`), once 2 and 3 are done | Claude Code · on David's word |
+> | **6** | E8 — `expo-iap` and the store adapter, then `PAID_FEATURES_ENFORCED` | Claude Code · costs a build |
+> | 7 | IAP-02 (a sandbox purchase still grants the paid tier on a fresh account), and LEG-01's project-id comment in `lib/gemini.ts` | Claude Code |
+>
+> Also David's, unchanged: `AI_HEALTH_SECRET` on both Netlify sites, `MOBILE_TEST_TOKEN`,
+> the reviewer account's password, and registering `southmoordigital.com` before any App
+> Store Connect record exists.
+>
+> #### The rename is coming, and it renames this file's subject
+>
+> **CrewChief → Well Kept**, company **Southmoor Digital LLC** (not yet formed — keep it out
+> of `lib/legal.ts` until Colorado accepts the filing), bundle `com.southmoordigital.wellkept`,
+> scheme `wellkept://`, npm scope `@wellkept/core`. Two commits, never one: the mechanical
+> rename, then the persona rewrite, which needs reading for voice. Blocked on the name.
+>
+> ⚠ `lib/site-role.ts` treats an unset variable as "this is the product" — deliberately, so
+> the App Store hostname can never accidentally serve the demo masthead. That is also exactly
+> what makes a missed rename **invisible on the demo host**, which is why the curl check above
+> matters and why it has to be spelled correctly.
+>
+
+> ### 22–23 Aug — handoff into the device-testing thread. **Superseded by the block above.**
+>
+> Its deploy block reads "both hostnames level with `main`", which was true on 23 Aug and is
+> not now; its three pending migrations are seven; and its "next" table is closed except for
+> the migrations and E8. What it still carries correctly is the iteration loop, the Apple
+> team trap, and the measured dossier cost.
 >
 > Written at the end of the 22 Aug session. **CrewChief is installed and signed in on
 > David's iPhone**, and he is about to test it by hand and make changes. This block is
