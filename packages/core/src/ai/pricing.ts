@@ -95,13 +95,30 @@ export const APPLE_COMMISSION = 0.15;
  * guarantee — which is the argument for checking them together.
  */
 export const PRICING = {
-  monthlyUsd: 4.99,
   /**
-   * ⚠ At $39.99 the annual plan is 8.0 months of the monthly price, and it is
-   * the plan that sets every ceiling below. A conventional 10-month annual
-   * ($49.90) would raise the ceiling by 25% at the same monthly price.
+   * ⚠ **The monthly price does not affect the ceiling, and that is not an
+   * accident of these particular numbers.**
+   *
+   * One ceiling is applied to every subscriber, whichever plan they bought, so
+   * it has to be safe for the worst-paying one — and the annual plan always
+   * earns less per month than the monthly plan, or nobody would buy it. The
+   * monthly price is therefore free to move for commercial reasons without
+   * touching the safety argument at all.
+   *
+   * $4.99 → $3.99 on 30 Aug, David's call: a lower advertised price at
+   * identical worst-case exposure. What it costs is 20% of the revenue from
+   * monthly subscribers, which is an income question rather than a risk one.
    */
-  annualUsd: 39.99,
+  monthlyUsd: 3.99,
+  /**
+   * ⚠ **This is the number that sets every ceiling below.** It is the plan that
+   * earns least per month, so it is the one the fuse has to be safe for.
+   *
+   * $39.90 is ten months of the monthly price. Design's placeholder was $39.99
+   * against a $4.99 monthly — a different ratio, an indistinguishable annual
+   * price, and therefore the same ceiling to within 600 tokens.
+   */
+  annualUsd: 39.90,
 } as const;
 
 /**
@@ -200,6 +217,35 @@ export function paidMonthlyOutputTokens(): number {
  * cars. Measure one and this stops being an estimate.
  */
 export const FREE_MONTHLY_COST_USD = 0.25;
+
+/**
+ * ── ⚠ SUPERSEDED 30 Aug: there is to be no free tier ────────────────────────
+ *
+ * David: *"I don't want a free tier. I think we should have a demo view/mode
+ * without real LLM calls so prospects can explore the app without costing
+ * anything."*
+ *
+ * That answers the question above by removing it. A prospect who has not paid
+ * makes no model call at all, so their worst case is **exactly zero** rather
+ * than an acquisition cost somebody has to price. It is a better answer than
+ * any number that could have gone in `FREE_MONTHLY_COST_USD`, and it closes the
+ * one hole this file could not: health summary generation sits outside the
+ * feature gate, so a free account was always going to cost something.
+ *
+ * The constants above are kept until the change lands, because deleting the
+ * free tier is a product build — a demo mode with answers that are not
+ * generated, a paywall that is now the front door, and a decision about lapse —
+ * not a constant edit. `budget.ts` still ships `TIERS.free`, and it still has to
+ * mean something until nothing reads it.
+ *
+ * ⛔ **The open question is not new users, it is lapsed ones.** `paid-features.ts`
+ * argues that a garage which stops working when a subscription ends is a
+ * hostage, and the records in it are the owner's own. That argument is about
+ * somebody who *did* pay, so "no free tier" does not settle it: a lapsed
+ * account still needs to reach its own service history, even if it makes no
+ * model calls ever again. Until David answers that, this file describes the
+ * pricing and not the entitlement.
+ */
 
 /**
  * What the free ceiling becomes once the feature gate is enforced.

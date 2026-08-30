@@ -65,6 +65,29 @@ describe('which plan sets the ceiling', () => {
     expect(cents(netMonthlyFloorUsd())).toBe(cents(netAnnualPerMonthUsd()));
   });
 
+  it('does not move when the monthly price does', () => {
+    /*
+      ⚠ The regression this exists for is a simplification, not a bug: somebody
+      reads `netMonthlyFloorUsd`, sees a `Math.min` over two nearly-equal
+      numbers, and replaces it with the monthly price because that is the price
+      the product advertises.
+
+      That would raise the ceiling by half and reopen the hole under the annual
+      plan, and nothing else in the suite would notice — the derivation would
+      still be internally consistent and still "breakeven", against the wrong
+      revenue. So this asserts the ceiling is specifically *not* the one the
+      monthly price would give.
+
+      It is also why $4.99 → $3.99 on 30 Aug cost nothing in safety: one ceiling
+      serves every subscriber, so it is sized for the worst-paying plan, and the
+      monthly price is not it.
+    */
+    const asIfMonthlyBound = Math.floor(netMonthlyUsd() / OUTPUT_USD_PER_TOKEN.pro);
+
+    expect(paidMonthlyOutputTokens()).toBeLessThan(asIfMonthlyBound);
+    expect(cents(netMonthlyFloorUsd())).not.toBe(cents(netMonthlyUsd()));
+  });
+
   it('takes Apple’s cut off the top', () => {
     expect(cents(netMonthlyUsd())).toBe(cents(PRICING.monthlyUsd * (1 - APPLE_COMMISSION)));
 
