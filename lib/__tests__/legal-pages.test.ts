@@ -266,17 +266,26 @@ describe('who operates the service, and who to write to about it', () => {
 
   it('names a contact address somebody actually reads', () => {
     /*
-      `crewchief.support@gmail.com` — deliberately not a domain address, and
-      that is worth recording because it looks like a compromise and is not.
+      ⚠ Moved 30 Aug: `crewchief.support@gmail.com` → `support@southmoordigital.com`,
+      iCloud Mail on the company's own domain, verified receiving from an
+      external sender that day.
 
-      `support@davidmasterson.co` carries David's name, which gives back most of
-      what a dedicated address was for, and `crewchief.co` is not his. Apple
-      requires a support *URL* in the listing, not a domain-based address, so a
-      customer is pointed at the site either way. The property that matters on a
-      privacy policy is that the address is answered — this one is verified
-      receiving and delegated to his own mailbox.
+      The old address was a considered choice rather than a compromise, and its
+      reasoning still governs: a *product* address rather than
+      `support@davidmasterson.co`, which carries David's name and gives back
+      most of what the separation was for. What changed is that the entity and
+      the domain that make a better answer possible now exist.
+
+      The part that could not wait is the name. The rename went through the copy
+      on 30 Aug, and this string would otherwise have been the last "crewchief"
+      rendering on a public legal page — under a policy signed by an LLC.
     */
-    expect(CONTACT_EMAIL).toBe('crewchief.support@gmail.com');
+    expect(CONTACT_EMAIL).toBe('support@southmoordigital.com');
+
+    // It has to be on the operator's domain, or the policy and the address are
+    // signed by different parties. Asserted as a property, not just a literal.
+    expect(CONTACT_EMAIL.endsWith('@southmoordigital.com')).toBe(true);
+    expect(CONTACT_EMAIL).not.toMatch(/gmail|crewchief/i);
   });
 
   it('would still catch a placeholder or an unreachable address coming back', () => {

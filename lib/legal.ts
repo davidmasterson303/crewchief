@@ -37,22 +37,37 @@
  * The company does not change this and it was checked rather than assumed: the
  * argument below is about what a *customer* can reach, and a gmail an LLC
  * monitors is reachable in exactly the way a gmail a person monitors is. What
- * an entity does add is somewhere for `support@` to live once a domain exists
- * — that is on the launch runbook, not blocking, and it is not this constant's
- * decision to make on its own.
+ * an entity does add is somewhere for `support@` to live once a domain exists.
  *
- * `crewchief.support@gmail.com`. A dedicated address rather than a personal
- * one, because this renders on a page App Review reads and gets scraped
- * permanently; and a *product* address rather than `support@davidmasterson.co`,
- * which carries David's name and so gives back most of what the separation was
- * for. `crewchief.co` is not his.
+ * ── The domain arrived, so it moved: 30 Aug ────────────────────────────────
  *
- * The free-mail form is a deliberate acceptance, not a shortcut. Apple requires
- * a support **URL** in the listing and does not require the contact address to
- * be domain-based, so the thing a customer is pointed at is the site either
- * way. It is verified receiving and delegated to David's own mailbox, so it is
- * answered rather than merely existing — which is the only property of a
- * contact address on a privacy policy that actually matters.
+ * **`support@southmoordigital.com`** — iCloud Mail on the company's own domain,
+ * live and verified from an external sender on 30 Aug. It replaces
+ * `crewchief.support@gmail.com`, which still receives and is no longer the
+ * public identity.
+ *
+ * Three reasons, and the third is the one that made it urgent rather than
+ * tidy. It carries the **operator's** name now that the operator is a company,
+ * so the address and `OPERATOR` above agree instead of a policy signed by an
+ * LLC pointing at a free mailbox named after a product that no longer exists.
+ * It is not free-mail on a page App Review reads and scrapes permanently. And
+ * it does not carry the old product name — which is the part that could not
+ * wait, because the rename went through the copy on 30 Aug and this string
+ * would have been the last "crewchief" on a public legal page.
+ *
+ * The argument this replaces is kept because it was right at the time and its
+ * reasoning still governs the choice: a *product* address rather than
+ * `support@davidmasterson.co`, which carries David's name and gives back most
+ * of what the separation was for. Apple requires a support **URL** in the
+ * listing and does not require the contact address to be domain-based, so the
+ * free-mail form was a deliberate acceptance rather than a shortcut. What
+ * changed is not that the old answer became wrong; it is that the entity and
+ * the domain that made a better one possible now exist.
+ *
+ * ⚠ The property that actually matters on a privacy policy is unchanged and was
+ * re-checked rather than assumed: the address is **verified receiving from an
+ * outside sender**. An address that exists and is not answered is worse than a
+ * free-mail one that is.
  *
  * These live here rather than in the pages because a privacy policy and terms
  * of service that disagree about who is operating the service is a defect that
@@ -67,8 +82,11 @@
 /** The legal name the service is operated under — confirmed by David, 30 Aug. */
 export const OPERATOR = 'Southmoor Digital LLC';
 
-/** A monitored address, delegated so replies come from CrewChief Support. */
-export const CONTACT_EMAIL = 'crewchief.support@gmail.com';
+/**
+ * A monitored address on the operator's own domain — confirmed by David, 30 Aug,
+ * and verified receiving from an external sender the same day.
+ */
+export const CONTACT_EMAIL = 'support@southmoordigital.com';
 
 /**
  * The date the substance of these documents last changed.
@@ -88,6 +106,11 @@ export const CONTACT_EMAIL = 'crewchief.support@gmail.com';
  * **So: if the promote slips past 30 August, move this line to the day it
  * runs.** It is one edit, and it is the difference between a date that means
  * something and one that teaches people it does not.
+ *
+ * ⚠ It does not move again for the contact address changing later the same day.
+ * Two substance changes shipping together are one publication, and a date that
+ * ticks per edit rather than per publication is the same defect in the other
+ * direction.
  */
 export const LAST_UPDATED = '30 August 2026';
 

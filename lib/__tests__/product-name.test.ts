@@ -76,10 +76,6 @@ const EXEMPT: Exemption[] = [
     pattern: /NASCAR crew chief/i,
   },
   {
-    reason: 'the support mailbox, which exists and is monitored',
-    pattern: /crewchief\.support@gmail\.com/i,
-  },
-  {
     reason:
       'dead feedback address on a domain nobody here owns — flagged 30 Aug, David to decide whether it goes or moves',
     pattern: /feedback@crewchief\.app/i,
