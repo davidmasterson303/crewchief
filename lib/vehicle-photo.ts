@@ -1,11 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { logger } from '@crewchief/core/logger';
+import { logger } from '@wellkept/core/logger';
 import {
   STORED_URL_SCHEME,
   storagePathFromStoredUrl,
   vehicleIdFromStoragePath,
-} from '@crewchief/core/storage-paths';
-import { isUnphotographedDemoVehicle } from '@crewchief/core/demo';
+} from '@wellkept/core/storage-paths';
+import { isUnphotographedDemoVehicle } from '@wellkept/core/demo';
 
 /** Matches the web's signed-URL lifetime (app/actions.ts). */
 export const SIGNED_URL_TTL_SECONDS = 3600;

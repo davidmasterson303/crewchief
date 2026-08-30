@@ -1,5 +1,5 @@
 import { apiRequest } from './client';
-import type { DeletionCounts } from '@crewchief/core/account-deletion';
+import type { DeletionCounts } from '@wellkept/core/account-deletion';
 
 /**
  * Account operations. Currently one, and it is the one Apple reviews.

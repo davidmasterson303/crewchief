@@ -9,7 +9,7 @@ const customJestConfig = {
   testEnvironment: 'jest-environment-jsdom',
   moduleNameMapper: {
     // Order matters: the scoped alias must be tried before the '@/' catch-all.
-    '^@crewchief/core/(.*)$': '<rootDir>/packages/core/src/$1',
+    '^@wellkept/core/(.*)$': '<rootDir>/packages/core/src/$1',
     '^@/(.*)$': '<rootDir>/$1',
   },
   testMatch: [
@@ -39,11 +39,15 @@ const customJestConfig = {
     `jest-haste-map` crawling them, and the crawler reads every package.json it
     finds — so each run printed:
 
-      Haste module naming collision: crewchief
+      Haste module naming collision: wellkept
         * <rootDir>/package.json
         * <rootDir>/.claude/worktrees/…/package.json
 
-    once for the root package and once for @crewchief/core. Noise rather than a
+    (it read `crewchief` before the 30 Aug rename, and the worktrees still hold
+    checkouts from before it — so the names collide differently now, and the
+    reason to ignore the path has not changed.)
+
+    once for the root package and once for @wellkept/core. Noise rather than a
     failure, which is the problem: a real warning appearing above 50 passing
     suites is invisible next to two that always fire. Every verification today
     started by reading past them.

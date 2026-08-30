@@ -66,7 +66,7 @@ describe('the permission prompt is no longer raised uninvited', () => {
     const source = code(GARAGE);
 
     expect(source).toContain('shouldShowPushPrimer');
-    expect(source).toContain('@crewchief/core/push-priming');
+    expect(source).toContain('@wellkept/core/push-priming');
     // The vehicle count is why this lives in the garage at all.
     expect(source).toMatch(/vehicleCount/);
   });

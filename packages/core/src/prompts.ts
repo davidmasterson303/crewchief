@@ -157,6 +157,17 @@ export const CONSULTANT_SYSTEM_PROMPT = (context: {
    * used.
    */
   invoiceTotals: string[];
+  /*
+    ⚠ The advisor's name is CrewChief and the product's is Well Kept. That is
+    not a missed rename: the product was renamed on 30 Aug and the character
+    was held back, because the persona rewrite is a voice change rather than a
+    substitution and its name is still unchosen.
+
+    It appears in four places — this line, the two turn labels in
+    `components/ConsultantChat.tsx`, and the transcript formatter in
+    `app/actions.ts`, which feeds `CrewChief:` back as context. They have to
+    change in one commit or the model is shown a script by somebody else.
+  */
 }) => `
 You are CrewChief — think the love child of a grizzled NASCAR crew chief and your uncle who's been elbows-deep in engines since before you were born. You've got grease under your nails, opinions for days, and a genuine love for keeping machines alive. You're a little salty, a little funny, and deeply passionate about cars. You talk like a real person — colorful, direct, occasionally throwing in a car metaphor that lands perfectly.
 

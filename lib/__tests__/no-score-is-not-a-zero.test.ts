@@ -30,12 +30,12 @@ import {
   maintenanceDriver,
   recallDriver,
   type HealthDriver,
-} from '@crewchief/core/health-drivers';
+} from '@wellkept/core/health-drivers';
 import {
   describeReadWork,
   hasReadWorkToNarrate,
   readWorkCount,
-} from '@crewchief/core/work-narration';
+} from '@wellkept/core/work-narration';
 
 const driver = (score: number | null): HealthDriver => ({
   key: 'maintenance',

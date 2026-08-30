@@ -17,12 +17,12 @@ import { apiRequest, ApiRequestError } from '../api/client';
 import { Skeleton, SkeletonCard } from '../components/Skeleton';
 import { uploadVehiclePhoto } from '../api/photos';
 import type { InvoiceFile } from '../api/documents';
-import type { HealthDriver } from '@crewchief/core/health-drivers';
-import { buildPosition } from '@crewchief/core/build-progress';
-import { showsModifications } from '@crewchief/core/mod-progression';
-import { UNKNOWN_TIMING, describeNextService, localToday } from '@crewchief/core/garage-next-service';
-import { componentPlainName, normaliseRecalls } from '@crewchief/core/recalls';
-import { healthVerdict } from '@crewchief/core/health-claims';
+import type { HealthDriver } from '@wellkept/core/health-drivers';
+import { buildPosition } from '@wellkept/core/build-progress';
+import { showsModifications } from '@wellkept/core/mod-progression';
+import { UNKNOWN_TIMING, describeNextService, localToday } from '@wellkept/core/garage-next-service';
+import { componentPlainName, normaliseRecalls } from '@wellkept/core/recalls';
+import { healthVerdict } from '@wellkept/core/health-claims';
 import AlertBanner from '../components/AlertBanner';
 import Button from '../components/Button';
 import Card from '../components/Card';
@@ -49,7 +49,7 @@ import {
   heroBands,
 } from '../theme/hero-motion';
 import { TABULAR, border, brand, hero, plinth, radius, space, surface, text, type } from '../theme';
-import { getHealthBandJudgement, healthBandHex } from '@crewchief/core/health-band';
+import { getHealthBandJudgement, healthBandHex } from '@wellkept/core/health-band';
 
 /*
   ⚠ `PHOTO_HERO = 196` is gone. The hero is no longer a band with a number on
@@ -93,7 +93,7 @@ import { getHealthBandJudgement, healthBandHex } from '@crewchief/core/health-ba
  *
  * ── Why the shared health band, again ───────────────────────────────────────
  *
- * Same reasoning as the garage: `@crewchief/core/health-band` holds the
+ * Same reasoning as the garage: `@wellkept/core/health-band` holds the
  * thresholds and the wording, the web dashboard reads it, and a local copy of
  * "80 is good" drifts silently. This screen and the row it came from must
  * agree, and the only way to guarantee that is to not have a second opinion.
@@ -658,7 +658,7 @@ export function VehicleDetailScreen({
   /*
     ── The verdict, and why it is not `health.summary` ───────────────────────
 
-    See `healthVerdict` in `@crewchief/core/health-claims` for the defect: this
+    See `healthVerdict` in `@wellkept/core/health-claims` for the defect: this
     screen read "a complete lack of documented maintenance" over a car with five
     filed services, because the stored sentence was written before they arrived
     and nothing on this path recomputes it.

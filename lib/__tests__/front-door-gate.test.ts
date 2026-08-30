@@ -15,8 +15,8 @@
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { decideFrontDoorGate, tooFastMessage } from '@crewchief/core/front-door';
-import { decideFrontDoor, frontDoorClosedMessage } from '@crewchief/core/ai/budget';
+import { decideFrontDoorGate, tooFastMessage } from '@wellkept/core/front-door';
+import { decideFrontDoor, frontDoorClosedMessage } from '@wellkept/core/ai/budget';
 
 const OPEN = decideFrontDoor({ usedToday: 0, manuallyDisabled: false });
 const EXHAUSTED = decideFrontDoor({ usedToday: Number.MAX_SAFE_INTEGER, manuallyDisabled: false });

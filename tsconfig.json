@@ -26,7 +26,7 @@
       "@/*": [
         "./*"
       ],
-      "@crewchief/core/*": [
+      "@wellkept/core/*": [
         "./packages/core/src/*"
       ]
     }

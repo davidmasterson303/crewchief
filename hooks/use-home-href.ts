@@ -1,10 +1,10 @@
 'use client';
 
 import { useAuth } from '@/components/AuthProvider';
-import { DEMO_GARAGE_ROUTE, SIGNED_IN_HOME } from '@crewchief/core/routes';
+import { DEMO_GARAGE_ROUTE, SIGNED_IN_HOME } from '@wellkept/core/routes';
 
 /**
- * Where the CrewChief mark should take you.
+ * Where the Well Kept mark should take you.
  *
  * Every nav in the app pointed its logo at `/`, which is the demo garage. For a
  * signed-in user that meant the most obvious control on the screen led out of

@@ -19,7 +19,7 @@ import * as Notifications from 'expo-notifications';
  * There is deliberately **no second routing table**: notifications and links
  * land on the same screens by the same rules, so a route added to one is
  * reachable from the other without anyone remembering to update a mapping.
- * That is the same argument as `@crewchief/core`'s shared modules, applied to
+ * That is the same argument as `@wellkept/core`'s shared modules, applied to
  * navigation — two implementations of one rule is what this codebase keeps
  * finding.
  *
@@ -85,7 +85,7 @@ export function configureNotificationHandler(): void {
  * So this function is no longer called from anywhere that raises the dialog
  * uninvited: `GarageScreen` offers the primer once someone has a car, and
  * `registerForPush` runs from its accept path. `shouldShowPushPrimer` in
- * `@crewchief/core/push-priming` owns the rule, and
+ * `@wellkept/core/push-priming` owns the rule, and
  * `push-primer-wiring.test.ts` fails if a caller reintroduces the old shape.
  */
 export async function requestPushPermission(): Promise<boolean> {

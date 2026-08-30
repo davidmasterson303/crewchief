@@ -14,7 +14,7 @@
  * product does. The most likely answer to a dialog you did not expect is no.
  *
  * `push.ts`'s own docblock has said this since it was written: *"the better
- * pattern is a screen explaining what CrewChief would tell them before the
+ * pattern is a screen explaining what Well Kept would tell them before the
  * system dialog appears… That screen is worth building before submission and is
  * not built."* This is the rule half of building it.
  *
@@ -152,7 +152,7 @@ function daysBetween(from: string, to: string): number | null {
  */
 export const PUSH_PRIMER_COPY = {
   title: 'Two kinds of alert, and nothing else',
-  body: 'CrewChief can tell you when a service is coming due for your car, and when a safety recall is issued for it. Nothing else — no offers, no news, no reminders to open the app.',
+  body: 'Well Kept can tell you when a service is coming due for your car, and when a safety recall is issued for it. Nothing else — no offers, no news, no reminders to open the app.',
   detail: 'A service reminder arrives at most once a month per car. A recall arrives when the manufacturer issues one, which for most cars is never.',
   accept: 'Turn on alerts',
   decline: 'Not now',

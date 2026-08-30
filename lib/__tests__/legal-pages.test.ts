@@ -21,7 +21,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { SUBSCRIPTION_CANCEL_PATH } from '@crewchief/core/account-deletion';
+import { SUBSCRIPTION_CANCEL_PATH } from '@wellkept/core/account-deletion';
 
 import { CONTACT_EMAIL, LAST_UPDATED, OPERATOR } from '@/lib/legal';
 
@@ -116,7 +116,7 @@ describe('the two documents cannot contradict the app', () => {
   it('agrees with the app that deleting an account does not cancel billing', () => {
     // `subscriptionNotice` says this in the app. Both documents say it too,
     // because it is the one thing here that costs money to get wrong.
-    expect(termsText).toMatch(/deleting your crewchief account does not stop the/i);
+    expect(termsText).toMatch(/deleting your well kept account does not stop the/i);
     expect(privacyText).toMatch(/does not cancel an App Store subscription/i);
   });
 });

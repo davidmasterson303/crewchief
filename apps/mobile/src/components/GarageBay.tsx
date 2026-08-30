@@ -8,14 +8,14 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { getHealthBandJudgement } from '@crewchief/core/health-band';
+import { getHealthBandJudgement } from '@wellkept/core/health-band';
 
 import BayRoom, { BayLightPool, bayHeroHeight } from './BayRoom';
 import ClusterGauge from './ClusterGauge';
 import {
   UNKNOWN_TIMING,
   describeNextService,
-} from '@crewchief/core/garage-next-service';
+} from '@wellkept/core/garage-next-service';
 import { TABULAR, TARGET_MIN, bay, space, surface, text, type } from '../theme';
 import { useReducedMotion } from '../motion/reduced-motion';
 import { interFace } from '../theme/fonts';

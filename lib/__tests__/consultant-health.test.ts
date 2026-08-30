@@ -23,8 +23,8 @@ import {
   classifyRoundTrip,
   isRetryable,
   CLIENT_ERROR_FALLBACK,
-} from '@crewchief/core/consultant-health';
-import { CONSULTANT_ROUND_TRIP } from '@crewchief/core/demo-contract';
+} from '@wellkept/core/consultant-health';
+import { CONSULTANT_ROUND_TRIP } from '@wellkept/core/demo-contract';
 
 const TOKENS = CONSULTANT_ROUND_TRIP.expectedTokens;
 const good = (answer: string) => classifyRoundTrip({ httpStatus: 200, answer }, TOKENS);

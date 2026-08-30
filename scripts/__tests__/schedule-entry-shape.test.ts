@@ -17,7 +17,7 @@
  * a description rather than a countdown.
  */
 
-import { VehicleDataSchema } from '@crewchief/core/vehicle-utils';
+import { VehicleDataSchema } from '@wellkept/core/vehicle-utils';
 import { ScheduleEntrySchema, validateEntry } from '../lib/schedule-entry-shape.mjs';
 
 const OIL = {

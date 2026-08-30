@@ -21,7 +21,7 @@ import {
 } from '@/components/vehicle-illustrations';
 import { GRID } from '@/components/vehicle-illustrations/shapes';
 import { ROOF, SILL, WHEEL_R, GROUND_Y } from '@/components/vehicle-illustrations/VehicleIllustration';
-import type { VehicleBodyStyle } from '@crewchief/core/vehicle-body-style';
+import type { VehicleBodyStyle } from '@wellkept/core/vehicle-body-style';
 
 interface Point {
   x: number;

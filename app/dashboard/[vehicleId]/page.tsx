@@ -1,9 +1,9 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { recallsWereChecked } from '@crewchief/core/nhtsa-lookup';
-import { driversForVehicle, driversSupportAScore } from '@crewchief/core/health-drivers';
-import type { ServiceHistoryRow } from '@crewchief/core/service-history';
+import { recallsWereChecked } from '@wellkept/core/nhtsa-lookup';
+import { driversForVehicle, driversSupportAScore } from '@wellkept/core/health-drivers';
+import type { ServiceHistoryRow } from '@wellkept/core/service-history';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
 import DashboardContent from '@/components/DashboardContent';

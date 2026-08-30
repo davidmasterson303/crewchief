@@ -1,10 +1,10 @@
-# Runbook — put CrewChief on `crewchief.davidmasterson.co`
+# Runbook — put Well Kept on `crewchief.davidmasterson.co`
 
 **For: Cowork.** Everything here is browser work in David's own accounts. Nothing
 in this runbook touches the repository — the app-side change is Claude Code's and
 is described at the end so you know what you are unblocking, not so you do it.
 
-**Status: interim.** David expects to move CrewChief to a different domain before
+**Status: interim.** David expects to move Well Kept to a different domain before
 launch. Do not buy a domain, do not rename anything, and do not tidy up adjacent
 DNS records. This is the smallest change that gets a real hostname in front of
 the App Store listing.
@@ -28,7 +28,7 @@ because it is one.
 
 `davidmasterson.co` **is already live and already on Netlify.** Its apex resolves
 to `75.2.60.5`, and the response carries a `server: Netlify` header. That is
-David's personal site, and it is a *different* Netlify site from CrewChief.
+David's personal site, and it is a *different* Netlify site from Well Kept.
 
 So:
 
@@ -36,7 +36,7 @@ So:
   takes the personal site down. You are adding one new record for one new
   subdomain, alongside what is already there.
 - **Do not add `crewchief.davidmasterson.co` to the personal site** in Netlify.
-  It goes on the CrewChief site — the one that serves
+  It goes on the Well Kept site — the one that serves
   `effulgent-blancmange-6adfdf.netlify.app`. Confirm you are on the right site
   before adding anything; the site list will show the generated URL.
 - If Netlify offers to **manage DNS for the whole domain** (it will suggest
@@ -87,7 +87,7 @@ rather than removing and re-adding the domain.
 
 All three must be true:
 
-1. `https://crewchief.davidmasterson.co` loads CrewChief — **not** David's
+1. `https://crewchief.davidmasterson.co` loads Well Kept — **not** David's
    personal site, and not a Netlify 404.
 2. `https://crewchief.davidmasterson.co/privacy` returns **200** and shows the
    privacy policy.

@@ -6,7 +6,7 @@ import {
   VEHICLE_BODY_STYLES,
   BODY_STYLE_LABEL,
 } from '@/components/vehicle-illustrations';
-import { resolveBodyStyle } from '@crewchief/core/vehicle-body-style';
+import { resolveBodyStyle } from '@wellkept/core/vehicle-body-style';
 
 /**
  * Review gallery for the default vehicle illustration set.

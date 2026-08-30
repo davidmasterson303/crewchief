@@ -3,7 +3,7 @@
  *
  * @jest-environment node
  *
- * `checkSharedCore()` calls real `@crewchief/core` code with known inputs
+ * `checkSharedCore()` calls real `@wellkept/core` code with known inputs
  * inside the React Native runtime and asserts known outputs. It is the only
  * check that can catch core relying on something the phone's engine does not
  * have — and it spent from Phase 3.2 until 5 Aug **exported and imported by

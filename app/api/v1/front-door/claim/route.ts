@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { logger } from '@crewchief/core/logger';
+import { logger } from '@wellkept/core/logger';
 import { requireSession } from '@/lib/api-auth';
 import { readVisitorId } from '@/lib/funnel-visitor';
 import { recordFunnelStepInBackground } from '@/lib/funnel';

@@ -72,18 +72,18 @@ const QUALITY = 0.7;
 /**
  * The wording each caller needs when permission is refused.
  *
- * Split out because "CrewChief needs the camera to photograph an invoice" is
+ * Split out because "Well Kept needs the camera to photograph an invoice" is
  * wrong when someone is adding a picture of their car, and a generic sentence
  * covering both would tell nobody what they were doing.
  */
 const PROMPTS = {
   invoice: {
-    camera: 'CrewChief needs the camera to photograph an invoice.',
-    library: 'CrewChief needs access to your photos to attach an invoice.',
+    camera: 'Well Kept needs the camera to photograph an invoice.',
+    library: 'Well Kept needs access to your photos to attach an invoice.',
   },
   vehicle: {
-    camera: 'CrewChief needs the camera to photograph your car.',
-    library: 'CrewChief needs access to your photos to add a picture of your car.',
+    camera: 'Well Kept needs the camera to photograph your car.',
+    library: 'Well Kept needs access to your photos to add a picture of your car.',
   },
 } as const;
 
@@ -158,7 +158,7 @@ async function pickImage(
       throw new ImagePickerUnavailable(
         permission.canAskAgain
           ? PROMPTS[purpose].camera
-          : 'Camera access is off for CrewChief. You can turn it on in Settings, or choose a photo from your library instead.',
+          : 'Camera access is off for Well Kept. You can turn it on in Settings, or choose a photo from your library instead.',
       );
     }
   } else {
@@ -167,7 +167,7 @@ async function pickImage(
       throw new ImagePickerUnavailable(
         permission.canAskAgain
           ? PROMPTS[purpose].library
-          : 'Photo access is off for CrewChief. You can turn it on in Settings.',
+          : 'Photo access is off for Well Kept. You can turn it on in Settings.',
       );
     }
   }

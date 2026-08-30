@@ -40,7 +40,7 @@ import {
   isWorthKeeping,
   shouldAcceptEncoding,
   downscaledFileName,
-} from '@crewchief/core/image-resize';
+} from '@wellkept/core/image-resize';
 
 /** WebP where available, JPEG otherwise. Decided once, by asking the canvas. */
 function pickEncoding(canvas: HTMLCanvasElement): string {

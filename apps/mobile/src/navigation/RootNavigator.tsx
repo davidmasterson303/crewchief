@@ -13,7 +13,7 @@ import {
   subscribeToNotificationTaps,
 } from '../notifications/push';
 import { currentPushPermission, registerForPush } from '../notifications/register';
-import { shouldRegisterSilently } from '@crewchief/core/push-priming';
+import { shouldRegisterSilently } from '@wellkept/core/push-priming';
 
 import { AdvisorScreen } from '../screens/AdvisorScreen';
 import { HealthScreen } from '../screens/HealthScreen';

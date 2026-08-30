@@ -1,6 +1,28 @@
 /**
  * The two facts these documents cannot be written without, and one date.
  *
+ * ── ⚠ OPEN, 30 Aug: neither of the two facts below has been re-decided ──────
+ *
+ * The product was renamed to **Well Kept** on 30 Aug. Nothing in this file
+ * moved with it, deliberately:
+ *
+ *   `OPERATOR`        David says **Southmoor Digital LLC now exists**. If the
+ *                     LLC operates the service, this constant is wrong on a
+ *                     page Apple reads — and the docblock below already says
+ *                     an entity is "a substance change that bumps
+ *                     `LAST_UPDATED` on its own terms". Who the operator is
+ *                     is David's answer, not a rename's.
+ *   `CONTACT_EMAIL`   a real mailbox that exists and is delegated. Renaming
+ *                     the string would point customers at nothing.
+ *   `LAST_UPDATED`    must become the day the change reaches a live hostname,
+ *                     not the day it was edited — see the note on it below.
+ *
+ * ⚠ And one thing that does not resolve itself: the reasoning below turns on
+ * the Apple membership being **Individual**, so the store's seller name is
+ * David's personal name. A policy naming an LLC beside a listing naming a
+ * person is a disagreement in public, and closing it means enrolling as an
+ * Organization — D-U-N-S, fresh enrolment, app transfer.
+ *
  * ── `OPERATOR` — settled 18 Aug, and Apple settled it ───────────────────────
  *
  * This was a placeholder until 18 Aug because CrewChief has no legal entity
@@ -67,4 +89,4 @@ export const LAST_UPDATED = '19 August 2026';
  * is whichever they happened to open. Importing makes that impossible; a test
  * asserting two copies match only tells you afterwards.
  */
-export { SUBSCRIPTION_CANCEL_PATH } from '@crewchief/core/account-deletion';
+export { SUBSCRIPTION_CANCEL_PATH } from '@wellkept/core/account-deletion';

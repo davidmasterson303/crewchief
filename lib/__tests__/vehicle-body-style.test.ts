@@ -14,7 +14,7 @@ import {
   resolveBodyStyle,
   VEHICLE_BODY_STYLES,
   BODY_STYLE_LABEL,
-} from '@crewchief/core/vehicle-body-style';
+} from '@wellkept/core/vehicle-body-style';
 
 describe('the values vPIC actually returns', () => {
   it.each([

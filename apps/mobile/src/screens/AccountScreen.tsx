@@ -14,7 +14,7 @@ import {
   subscriptionNotice,
   describeDeletion,
   isDeletionConfirmed,
-} from '@crewchief/core/account-deletion';
+} from '@wellkept/core/account-deletion';
 import { interFace } from '../theme/fonts';
 
 /**

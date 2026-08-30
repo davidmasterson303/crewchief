@@ -13,7 +13,7 @@
  * Postgres. RLS itself is verified separately against the live database.
  */
 
-import { DEMO_VEHICLE_IDS } from '@crewchief/core/demo';
+import { DEMO_VEHICLE_IDS } from '@wellkept/core/demo';
 
 const REAL_VEHICLE_ID = 'd4e8b2a1-0000-4000-8000-000000000abc';
 const OTHER_VEHICLE_ID = 'f1c3a5e7-0000-4000-8000-000000000def';
@@ -44,7 +44,7 @@ jest.mock('@/lib/supabase', () => ({
   getServiceRoleClient: () => serviceRoleClient,
 }));
 
-jest.mock('@crewchief/core/logger', () => ({
+jest.mock('@wellkept/core/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));
 

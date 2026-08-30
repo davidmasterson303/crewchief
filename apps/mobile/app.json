@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "CrewChief",
+    "name": "Well Kept",
     "slug": "crewchief",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -11,8 +11,8 @@
       "bundleIdentifier": "co.davidmasterson.crewchief",
       "supportsTablet": false,
       "infoPlist": {
-        "NSCameraUsageDescription": "CrewChief uses the camera so you can photograph a service invoice and have its line items read for you.",
-        "NSPhotoLibraryUsageDescription": "CrewChief needs your photo library so you can choose a picture of your car, or attach a service invoice you have already photographed.",
+        "NSCameraUsageDescription": "Well Kept uses the camera so you can photograph a service invoice and have its line items read for you.",
+        "NSPhotoLibraryUsageDescription": "Well Kept needs your photo library so you can choose a picture of your car, or attach a service invoice you have already photographed.",
         "ITSAppUsesNonExemptEncryption": false
       },
       "privacyManifests": {
@@ -83,8 +83,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "CrewChief needs your photo library so you can attach an invoice you have already photographed.",
-          "cameraPermission": "CrewChief uses the camera so you can photograph a service invoice and have its line items read for you."
+          "photosPermission": "Well Kept needs your photo library so you can attach an invoice you have already photographed.",
+          "cameraPermission": "Well Kept uses the camera so you can photograph a service invoice and have its line items read for you."
         }
       ],
       "expo-notifications"

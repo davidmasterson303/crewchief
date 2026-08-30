@@ -23,7 +23,7 @@ import {
   readUsageMetadata,
   isWorthRecording,
   billableTokens,
-} from '@crewchief/core/ai/usage';
+} from '@wellkept/core/ai/usage';
 
 const ROOT = join(__dirname, '..', '..');
 const MIGRATION = readFileSync(

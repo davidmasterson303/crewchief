@@ -1,11 +1,11 @@
-import { logger } from '@crewchief/core/logger';
+import { logger } from '@wellkept/core/logger';
 import { type NextRequest } from 'next/server';
-import type { ApiResponse } from '@crewchief/core/types';
+import type { ApiResponse } from '@wellkept/core/types';
 import { checkRateLimit, getClientIdentifier, rateLimitResponse } from '@/lib/rate-limit';
 import { deleteAccount } from '@/lib/account-data';
 import { requireSession } from '@/lib/api-auth';
 import { getServiceRoleClient } from '@/lib/supabase';
-import { hasLiveEntitlement, readFailureMeansNoSubscription } from '@crewchief/core/entitlement';
+import { hasLiveEntitlement, readFailureMeansNoSubscription } from '@wellkept/core/entitlement';
 
 export const dynamic = 'force-dynamic';
 

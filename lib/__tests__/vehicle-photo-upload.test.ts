@@ -21,7 +21,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { MAX_STORED_PHOTO_BYTES } from '@crewchief/core/image-resize';
+import { MAX_STORED_PHOTO_BYTES } from '@wellkept/core/image-resize';
 
 const ROOT = join(__dirname, '..', '..');
 

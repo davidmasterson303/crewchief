@@ -6,7 +6,7 @@ import { secureStorage } from '../auth/secure-storage';
  * ── ⚠ Why this exists: Guideline 5.1.2(i), amended November 2025 ────────────
  *
  * Apple now requires **explicit permission** before personal data is shared
- * with a third-party AI — not disclosure, permission. CrewChief has the
+ * with a third-party AI — not disclosure, permission. Well Kept has the
  * disclosure: the privacy policy names Google and says what goes there. The
  * only *consent* was sign-up wrap, which is not what the amendment asks for.
  *

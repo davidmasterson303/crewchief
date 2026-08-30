@@ -17,7 +17,7 @@
  */
 
 /**
- * Copied from `@crewchief/core/storage-paths` rather than imported: this file
+ * Copied from `@wellkept/core/storage-paths` rather than imported: this file
  * is plain ESM run by `node` with no build step, and the package is TypeScript.
  *
  * A copied constant is a constant that drifts, so it does not stand on its own

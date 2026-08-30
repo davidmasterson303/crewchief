@@ -43,7 +43,7 @@ import { ImageResponse } from 'next/server';
  */
 
 export const runtime = 'nodejs';
-export const alt = 'CrewChief — an AI consultant that knows your car';
+export const alt = 'Well Kept — an AI consultant that knows your car';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
@@ -159,7 +159,7 @@ export default async function OpengraphImage() {
             <circle cx="50" cy="50" r="5.5" fill="#22D3EE" />
           </svg>
           <div style={{ marginLeft: 16, fontSize: 32, fontWeight: 700, color: '#F5F3F0', letterSpacing: '-0.035em' }}>
-            CrewChief
+            Well Kept
           </div>
         </div>
 

@@ -31,7 +31,7 @@ interface FeaturesDrawerProps {
  * Nine features, rewritten.
  *
  * The previous copy had one rhythm and used it nine times: a promise, then
- * "CrewChief" as the subject of a sentence explaining the promise, then a
+ * "Well Kept" as the subject of a sentence explaining the promise, then a
  * closing flourish about darkness or gloveboxes. Read end to end it flattened —
  * every item sounded equally important, which is the same as none of them being.
  *
@@ -125,7 +125,7 @@ export default function FeaturesDrawer({ open, onOpenChange }: FeaturesDrawerPro
         <div className="sticky top-0 z-10 bg-gray-950/95 backdrop-blur-sm border-b border-gray-800 px-4 sm:px-6 py-5">
           <SheetHeader>
             <SheetTitle className="text-white text-xl font-bold tracking-tight">
-              What CrewChief Does
+              What Well Kept Does
             </SheetTitle>
             <p className="text-gray-400 text-sm leading-relaxed mt-1">
               Nine things it does, and what each one actually gives you.
@@ -163,7 +163,7 @@ export default function FeaturesDrawer({ open, onOpenChange }: FeaturesDrawerPro
           <div className="mt-2 p-4 rounded-xl bg-info-wash border border-info-border">
             <p className="text-xs text-gray-400 leading-relaxed">
               <span className="text-info font-medium">Built for the long haul.</span>{' '}
-              CrewChief grows with your car. Every service record, every conversation, every decision you log makes future recommendations sharper and more personalized.
+              Well Kept grows with your car. Every service record, every conversation, every decision you log makes future recommendations sharper and more personalized.
             </p>
           </div>
 

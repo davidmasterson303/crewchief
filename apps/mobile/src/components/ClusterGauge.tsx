@@ -10,8 +10,8 @@ import {
   VIEW_W,
   angleFor,
   pointAt,
-} from '@crewchief/core/cluster-geometry';
-import { getHealthBandJudgement, healthBandHex } from '@crewchief/core/health-band';
+} from '@wellkept/core/cluster-geometry';
+import { getHealthBandJudgement, healthBandHex } from '@wellkept/core/health-band';
 
 import { DIAL_MIN, TABULAR, surface, text, type } from '../theme';
 import { useReducedMotion } from '../motion/reduced-motion';
@@ -30,7 +30,7 @@ import { interFace } from '../theme/fonts';
  *
  * ── 1. The geometry is imported, not re-typed ───────────────────────────────
  *
- * `@crewchief/core/cluster-geometry` already exists for exactly this reason —
+ * `@wellkept/core/cluster-geometry` already exists for exactly this reason —
  * `BuildGauge` needed the same dial and a second copy of
  * `M 50.5 149.5 A 70 70 0 1 1 149.5 149.5` is a second copy. A third client
  * hand-copying it is the same mistake at worse odds, because the drift would be

@@ -3,7 +3,7 @@ import { render, userEvent, waitFor } from '@testing-library/react-native';
 import { AccountScreen } from '../AccountScreen';
 import { deleteAccount, getSubscription } from '../../api/account';
 import { ApiRequestError } from '../../api/client';
-import { DELETION_CONFIRM_PHRASE } from '@crewchief/core/account-deletion';
+import { DELETION_CONFIRM_PHRASE } from '@wellkept/core/account-deletion';
 
 /**
  * The one irreversible thing this app can do.
@@ -20,7 +20,7 @@ import { DELETION_CONFIRM_PHRASE } from '@crewchief/core/account-deletion';
  *
  * ── Why the confirm phrase is imported, not typed ───────────────────────────
  *
- * `DELETION_CONFIRM_PHRASE` comes from `@crewchief/core/account-deletion`, the
+ * `DELETION_CONFIRM_PHRASE` comes from `@wellkept/core/account-deletion`, the
  * same module the screen uses. Writing `'DELETE'` as a literal here would let
  * the phrase change in core and leave this suite green against a screen asking
  * for something else — a test that passes while the product it describes has
@@ -303,7 +303,7 @@ describe('the subscription warning — Guideline 3.1.2 / E5', () => {
     is no obvious way left to stop it.
 
     This is the surface Apple reviews, which is why the rule lives in
-    `@crewchief/core/account-deletion` and both clients read it — two
+    `@wellkept/core/account-deletion` and both clients read it — two
     implementations let the reviewed one drift weaker without anything saying so.
   */
 

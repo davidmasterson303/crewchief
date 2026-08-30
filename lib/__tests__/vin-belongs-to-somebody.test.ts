@@ -128,7 +128,7 @@ describe('a VIN held by another account', () => {
 
     const result = await decodeVIN(VIN);
 
-    expect(result.error).toMatch(/another CrewChief account/i);
+    expect(result.error).toMatch(/This VIN is already registered to another Well Kept account\./i);
     // Somebody who has just bought the car needs a path, not a closed door.
     expect(result.error).toMatch(/@/);
   });

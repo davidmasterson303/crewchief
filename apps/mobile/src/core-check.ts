@@ -1,11 +1,11 @@
 /**
- * Does `@crewchief/core` actually work inside Metro?
+ * Does `@wellkept/core` actually work inside Metro?
  *
  * The monorepo decision rests on shared logic being genuinely shared. Four
  * separate things have to hold for that, and only the first is obvious:
  *
  *   1. Metro resolves the workspace symlink at all.
- *   2. The modules it resolves are Next-free and Node-free. `@crewchief/core`
+ *   2. The modules it resolves are Next-free and Node-free. `@wellkept/core`
  *      promises this in its own package.json — "No Next, no Supabase, no Node
  *      built-ins" — and React Native is where that promise gets tested, since
  *      an accidental `node:crypto` import throws at runtime rather than
@@ -38,10 +38,10 @@
  * here, and this proves it *works* here. Deleting either leaves a real gap.
  */
 
-import { isDemoVehicleId } from '@crewchief/core/demo';
-import { storedUrl, storagePathFromStoredUrl } from '@crewchief/core/storage-paths';
-import { vehicleIdSchema } from '@crewchief/core/validation';
-import { formatMileage } from '@crewchief/core/formatting-utils';
+import { isDemoVehicleId } from '@wellkept/core/demo';
+import { storedUrl, storagePathFromStoredUrl } from '@wellkept/core/storage-paths';
+import { vehicleIdSchema } from '@wellkept/core/validation';
+import { formatMileage } from '@wellkept/core/formatting-utils';
 
 export interface CoreCheck {
   label: string;

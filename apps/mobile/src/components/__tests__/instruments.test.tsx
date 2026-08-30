@@ -1,9 +1,9 @@
 import { act, render, userEvent, waitFor } from '@testing-library/react-native';
 import { AccessibilityInfo, Dimensions, StyleSheet, processColor } from 'react-native';
-import { R } from '@crewchief/core/cluster-geometry';
-import { getHealthBandJudgement, healthBandHex } from '@crewchief/core/health-band';
-import { REDLINE_FROM, buildPosition } from '@crewchief/core/build-progress';
-import { vehicleFieldStops } from '@crewchief/core/vehicle-identity';
+import { R } from '@wellkept/core/cluster-geometry';
+import { getHealthBandJudgement, healthBandHex } from '@wellkept/core/health-band';
+import { REDLINE_FROM, buildPosition } from '@wellkept/core/build-progress';
+import { vehicleFieldStops } from '@wellkept/core/vehicle-identity';
 
 import BuildGauge from '../BuildGauge';
 import ClusterGauge from '../ClusterGauge';
@@ -14,7 +14,7 @@ import GarageBay from '../GarageBay';
 import { BAY_HERO_MAX, BAY_HERO_MIN, bayHeroHeight } from '../BayRoom';
 import HealthDrivers from '../HealthDrivers';
 import Plinth from '../Plinth';
-import type { HealthDriver } from '@crewchief/core/health-drivers';
+import type { HealthDriver } from '@wellkept/core/health-drivers';
 import { DIAL_MIN, build, plinth, text } from '../../theme';
 
 /**

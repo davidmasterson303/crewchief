@@ -43,7 +43,7 @@ import {
   FLASH_VISION_MODEL,
   LITE_MODEL,
   PRO_MODEL,
-} from '@crewchief/core/ai/models';
+} from '@wellkept/core/ai/models';
 import { withThinking, flashConfig } from '@/lib/gemini';
 
 const ROOT = join(__dirname, '..', '..');

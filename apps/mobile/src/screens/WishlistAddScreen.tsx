@@ -13,8 +13,8 @@ import {
   learnMoreQuestion,
   suggestionsFor,
   type WishlistSuggestion,
-} from '@crewchief/core/wishlist-suggestions';
-import { wishlistItemIdentifier, type WishlistItemType } from '@crewchief/core/wishlist-identifier';
+} from '@wellkept/core/wishlist-suggestions';
+import { wishlistItemIdentifier, type WishlistItemType } from '@wellkept/core/wishlist-identifier';
 import {
   FIELD_FONT_MIN,
   TABULAR,

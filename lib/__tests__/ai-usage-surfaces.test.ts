@@ -26,7 +26,7 @@
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { AI_USAGE_SURFACES } from '@crewchief/core/ai/usage';
+import { AI_USAGE_SURFACES } from '@wellkept/core/ai/usage';
 import { deriveSurface } from '@/lib/ai-usage';
 
 const ROOT = join(__dirname, '..', '..');

@@ -12,7 +12,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { evaluateSchedule, nextService } from '@crewchief/core/service-due';
+import { evaluateSchedule, nextService } from '@wellkept/core/service-due';
 
 const ROOT = join(__dirname, '..', '..');
 

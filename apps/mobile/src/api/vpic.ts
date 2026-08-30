@@ -5,16 +5,16 @@ import {
   vpicDecodeUrl,
   vpicModelsUrl,
   type DecodedVin,
-} from '@crewchief/core/vehicle-catalog';
+} from '@wellkept/core/vehicle-catalog';
 
 /**
  * NHTSA's vehicle catalogue, called from the phone.
  *
- * ── ⚠ This is the one place the app talks to something that is not CrewChief ─
+ * ── ⚠ This is the one place the app talks to something that is not Well Kept ─
  *
  * `api/client.ts` opens by saying it is "the only way this app talks to
- * CrewChief", and it still is. This is a different sentence: vPIC is a public,
- * unauthenticated, read-only US government API, and nothing about a CrewChief
+ * Well Kept", and it still is. This is a different sentence: vPIC is a public,
+ * unauthenticated, read-only US government API, and nothing about a Well Kept
  * account is sent to it. The request carries a make and a model year, or a VIN
  * the owner has just typed and has not yet saved anywhere.
  *

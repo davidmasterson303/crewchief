@@ -1,4 +1,4 @@
-# @crewchief/core
+# @wellkept/core
 
 Logic shared by the Next web app and, in time, the Expo client.
 
@@ -8,7 +8,7 @@ built-in, no browser global. Enforced two ways —
 this package's own `tsconfig.json` omits the `dom` lib so a stray `document`
 fails to compile here rather than in a mobile bundle later.
 
-Import from the app as `@crewchief/core/<module>`. The alias is declared in the
+Import from the app as `@wellkept/core/<module>`. The alias is declared in the
 root `tsconfig.json`; npm workspaces links the package itself.
 
 See `CREWCHIEF_PHASE_2_PLAN.md` task 2.4.

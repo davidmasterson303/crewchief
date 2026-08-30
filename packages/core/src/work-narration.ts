@@ -12,7 +12,7 @@
  *
  * Simulated progress is a common and defensible pattern, and that is genuinely
  * why this is a judgement call rather than a bug report. It is wrong *here* for
- * a reason specific to this product: the entire proposition is that CrewChief
+ * a reason specific to this product: the entire proposition is that Well Kept
  * tells you the truth about your car, including when the truth is "I do not
  * know yet". A fake diagnostic animation, on the screen whose job is to look
  * like it did diagnostic work, is the one place the pattern costs something

@@ -293,7 +293,7 @@ dial stops being a dial. Under ~88pt the ticks stop resolving and the instrument
 is decoration."* A 26pt `ClusterGauge` resolves to `row` and returns two lines
 of text at the wrong size for a nav bar.
 
-The build draws the arc in `DialChip` from `@crewchief/core/cluster-geometry` —
+The build draws the arc in `DialChip` from `@wellkept/core/cluster-geometry` —
 the same `TRACK` path and viewBox the real dial uses, so it cannot drift — and
 does not touch `ClusterGauge`. `DIAL_MIN` is not being dodged: that floor
 governs a dial somebody reads a value *from*, and this arc has no needle, no
@@ -612,3 +612,33 @@ generation would retry on every read — `checkRateLimit(userId, 'ai')` bounds
 that, and it is the same limiter `uploadInvoice` uses before recomputing stats.
 
 Not implemented on a review line. It is a cost decision, not a design one.
+
+---
+
+## 7. The rename — two things Design owns, added 30 Aug
+
+The product became **Well Kept** on 30 Aug. The name is drawn in two places and
+only one of them was safe to change without Design.
+
+**7.1 · The wordmark is now two words in a slot cut for one.** `Logo.tsx` on
+both clients renders the name as real text beside the mark, so it now reads
+"Well Kept". The tracking beside it does not follow: `-0.035em` horizontal and
+`-0.03em` stacked were cut for *CrewChief* — one nine-letter word with two
+capital humps and no space to hold open. They are untouched rather than
+re-guessed, because tightening a two-word mark is the decision that closes the
+gap between the words, and that is a drawing judgement.
+
+**7.2 · ⚠ `public/brand/crewchief-lockup-{horizontal,stacked}.svg` still spell
+the old name, and are unchanged on purpose.** Both draw the wordmark as vector
+outlines, not text, so there is no string to rename — the letters are paths.
+Their `aria-label` is left saying "CrewChief" with them: relabelling artwork
+that visibly reads *CrewChief* would make the accessible name disagree with the
+render, which is the one failure this project keeps paying for.
+
+The five mark-only assets (`mark`, `mark-small`, `mark-mono`, `favicon`,
+`icon-1024`) draw the dial and no letterforms, so their labels moved to
+"Well Kept" and nothing about them is stale.
+
+**What Design owns:** a new lockup in the new name, and the tracking that goes
+with it. Until then the app's own `Logo` is correct and the two lockup files in
+`public/brand` are the old brand.

@@ -2,7 +2,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 
 import Button from './Button';
 import { PAGE_BODY, border, radius, space, surface, text, type } from '../theme';
-import type { AiConsentCopy } from '@crewchief/core/ai-consent-copy';
+import type { AiConsentCopy } from '@wellkept/core/ai-consent-copy';
 
 /**
  * Explicit permission before a person's data reaches Google.
@@ -29,7 +29,7 @@ import type { AiConsentCopy } from '@crewchief/core/ai-consent-copy';
  *
  * A consent whose wording differs between the phone and the web upload dialog
  * is two different consents, and only one of them is the one somebody actually
- * gave. `@crewchief/core/ai-consent-copy` holds both sheets' text.
+ * gave. `@wellkept/core/ai-consent-copy` holds both sheets' text.
  */
 export default function AiConsentSheet({
   visible,

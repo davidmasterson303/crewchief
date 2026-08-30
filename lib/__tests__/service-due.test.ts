@@ -26,7 +26,7 @@ import {
   nextDueMileage,
   nextMilestone,
   type ScheduleEntry,
-} from '@crewchief/core/service-due';
+} from '@wellkept/core/service-due';
 
 const OIL: ScheduleEntry = {
   service: 'Engine oil and filter',

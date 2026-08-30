@@ -33,7 +33,7 @@ export const AUTH_ROUTES = ['/login', '/signup'] as const;
  * `/` shows three seeded cars that belong to nobody. Someone with their own
  * garage landing on it has been taken somewhere strictly less useful than where
  * they were, and the two surfaces look near enough alike that it reads as their
- * data having vanished. Clicking the CrewChief mark in the nav did exactly that.
+ * data having vanished. Clicking the Well Kept mark in the nav did exactly that.
  *
  * Deliberately *only* the garage, not every public demo path. A demo vehicle's
  * dashboard is a shareable link — someone may well send one to a signed-in user,

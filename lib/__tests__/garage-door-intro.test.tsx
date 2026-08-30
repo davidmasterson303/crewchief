@@ -24,7 +24,7 @@
 import { StrictMode } from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import GarageDoor from '@/components/GarageDoor';
-import { INTRO_PLAYED_KEY, INTRO_PLAYED_VALUE } from '@crewchief/core/intro-gate';
+import { INTRO_PLAYED_KEY, INTRO_PLAYED_VALUE } from '@wellkept/core/intro-gate';
 
 function renderDoor(strict: boolean) {
   const tree = (

@@ -2,7 +2,7 @@ import { API_BASE_URL, API_PREFIX } from '../config';
 import { getAccessToken } from '../auth/session';
 
 /**
- * The only way this app talks to CrewChief.
+ * The only way this app talks to Well Kept.
  *
  * Everything goes through `/api/v1` with a bearer token, because that is the
  * path `lib/api-auth.ts` authorizes — one implementation of who may see what,
@@ -20,7 +20,7 @@ import { getAccessToken } from '../auth/session';
  *
  * **A 401 means two completely different things and they were indistinguishable
  * until 5 Aug.** `device` is this client refusing to send at all because it
- * holds no session; `server` is CrewChief rejecting a token that *was* sent.
+ * holds no session; `server` is Well Kept rejecting a token that *was* sent.
  * Both produced "Your session ended", so a real upload failure could not be
  * told from a request that never left the phone — which is exactly the
  * question that mattered when the invoice upload started 401ing while every
@@ -31,7 +31,7 @@ export type FailureOrigin = 'device' | 'server';
 /**
  * What actually went wrong, when `status` cannot say.
  *
- * **"Could not reach CrewChief" covered three different fixes**: genuinely
+ * **"Could not reach Well Kept" covered three different fixes**: genuinely
  * offline, a request that ran out of patience, and a server that accepted the
  * request and never answered. On 5 Aug that ambiguity sent a tester to check
  * their Wi-Fi while the real cause was a cold serverless function — and then
@@ -269,12 +269,12 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       cause,
       message:
         kind === 'timeout'
-          ? `CrewChief did not answer within ${Math.round(timeoutMs / 1000)} seconds.`
+          ? `Well Kept did not answer within ${Math.round(timeoutMs / 1000)} seconds.`
           : kind === 'offline'
-            ? 'Could not reach CrewChief. Check your connection.'
+            ? 'Could not reach Well Kept. Check your connection.'
             : // Deliberately does not mention the connection. This is our bug,
               // and telling someone to check their Wi-Fi wastes their time.
-              'CrewChief could not send that request.',
+              'Well Kept could not send that request.',
     });
   } finally {
     clearTimeout(abandon);
@@ -393,7 +393,7 @@ function sendMultipart<T>({
           kind: 'timeout',
           elapsedMs: Date.now() - startedAt,
           cause: 'XMLHttpRequest timeout',
-          message: `CrewChief did not answer within ${Math.round(timeoutMs / 1000)} seconds.`,
+          message: `Well Kept did not answer within ${Math.round(timeoutMs / 1000)} seconds.`,
         })
       );
 
@@ -405,7 +405,7 @@ function sendMultipart<T>({
           kind: 'offline',
           elapsedMs: Date.now() - startedAt,
           cause: 'XMLHttpRequest error',
-          message: 'Could not reach CrewChief. Check your connection.',
+          message: 'Could not reach Well Kept. Check your connection.',
         })
       );
 
@@ -420,7 +420,7 @@ function sendMultipart<T>({
           kind: 'request',
           elapsedMs: Date.now() - startedAt,
           cause: (error as Error)?.message,
-          message: 'CrewChief could not send that request.',
+          message: 'Well Kept could not send that request.',
         })
       );
     }

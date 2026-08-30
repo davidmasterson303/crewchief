@@ -311,14 +311,14 @@ describe('EmptyState', () => {
     const view = await render(
       <EmptyState
         headline="No vehicles yet"
-        body="Add your first car and CrewChief gets to work on it."
+        body="Add your first car and Well Kept gets to work on it."
         actionLabel="Add a car"
         onAction={onAction}
       />
     );
 
     view.getByText('No vehicles yet');
-    view.getByText('Add your first car and CrewChief gets to work on it.');
+    view.getByText('Add your first car and Well Kept gets to work on it.');
     await userEvent.setup().press(view.getByLabelText('Add a car'));
     expect(onAction).toHaveBeenCalled();
   });

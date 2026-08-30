@@ -194,7 +194,7 @@ function resolveVerified(verify: VerifyOutcome | null): PurchaseResolution {
           fixed by knowing which it is.
         */
         message:
-          'That purchase belongs to a different CrewChief account. Sign in as that account to use it.',
+          'That purchase belongs to a different Well Kept account. Sign in as that account to use it.',
         offerRestore: false,
       };
 

@@ -16,7 +16,7 @@
  */
 
 import { downloadStoredFile } from '../storage-objects';
-import { storedUrl } from '@crewchief/core/storage-paths';
+import { storedUrl } from '@wellkept/core/storage-paths';
 
 const VEHICLE_ID = '11111111-1111-4111-8111-111111111111';
 const OTHER_VEHICLE_ID = '22222222-2222-4222-8222-222222222222';

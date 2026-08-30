@@ -315,7 +315,7 @@ describe('when it works', () => {
  *
  * Apple amended Guideline 5.1.2(i) in November 2025 to require **explicit
  * permission** before personal data is shared with a third-party AI — not
- * disclosure, permission. CrewChief had the disclosure in its privacy policy;
+ * disclosure, permission. Well Kept had the disclosure in its privacy policy;
  * the only consent was sign-up wrap.
  *
  * This is the screen where it mattered most and was least visible: it

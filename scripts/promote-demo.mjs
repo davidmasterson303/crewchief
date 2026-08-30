@@ -2,7 +2,7 @@
  * Promote the current `main` to the public demo — and to the app's backend.
  *
  * ⚠ **Read this first if you have not run it since 17 Aug — the candidate
- * moved.** Nothing deploys from `main` any more. Both CrewChief hostnames sit
+ * moved.** Nothing deploys from `main` any more. Both Well Kept hostnames sit
  * behind their own release branch:
  *
  *     web-live   -> crewchief.davidmasterson.co   App Store URL + the app's API

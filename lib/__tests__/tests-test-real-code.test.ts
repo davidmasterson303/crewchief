@@ -343,6 +343,12 @@ const STATIC_ANALYSIS_SUITES = [
   // backdrop — the rendered evidence is a browser measurement recorded in that
   // component's docblock. What regresses is which classes are declared.
   'button-primitive.test.ts',
+  // Sweeps app/, components/, core and the mobile source for the product's old
+  // name after the 30 Aug rename. There is nothing to import: the subject is
+  // the *absence* of a string across ~400 files, and the exemptions — the
+  // scheme, the bundle id, the persisted keys, the advisor's own name — are
+  // about what a literal means, which no runtime can answer.
+  'product-name.test.ts',
 ];
 
 /**
@@ -357,13 +363,13 @@ const DECLARED_SIMULATIONS = ['rls-ownership.test.ts'];
 /*
   App code is `@/…`, a relative path, or the shared workspace package.
 
-  The `@crewchief/` arm was added when Phase 2.4 moved the first module into
+  The `@wellkept/` arm was added when Phase 2.4 moved the first module into
   packages/core — and this suite failed the moment it did, which is the
   behaviour to keep. A suite whose subject moves out from under it should stop
   the build, not quietly start passing for the wrong reason.
 */
 const IMPORTS_APP_CODE =
-  /(?:from\s+|require\()\s*['"](?:@crewchief\/|@\/|\.\.?\/)(?!.*__tests__)/;
+  /(?:from\s+|require\()\s*['"](?:@wellkept\/|@\/|\.\.?\/)(?!.*__tests__)/;
 
 /*
   `.tsx` as well as `.ts`.

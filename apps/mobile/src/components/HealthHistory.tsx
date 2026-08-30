@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Polygon, Polyline, Stop } from 'react-native-svg';
-import { getHealthBandJudgement, healthBandHex } from '@crewchief/core/health-band';
+import { getHealthBandJudgement, healthBandHex } from '@wellkept/core/health-band';
 
 import { TABULAR, space, text, type } from '../theme';
 
@@ -12,7 +12,7 @@ import { TABULAR, space, text, type } from '../theme';
  *
  * `components/HealthHistoryChart.tsx` picks its line colour from four hexes
  * written into the component: `#4ade80`, `#22d3ee`, `#fb923c`, `#f87171` at 80
- * / 60 / 40. The thresholds happen to match `@crewchief/core/health-band`; **the
+ * / 60 / 40. The thresholds happen to match `@wellkept/core/health-band`; **the
  * colours do not.** The band's own are `127,206,156`, `95,174,192`,
  * `224,164,104`, `224,136,130`.
  *

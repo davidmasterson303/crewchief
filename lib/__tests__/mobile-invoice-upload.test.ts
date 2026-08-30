@@ -363,7 +363,7 @@ describe('describeUploadError', () => {
 
 describe('the three failures that shared one sentence', () => {
   /*
-    "Could not reach CrewChief. Check your connection." covered genuinely
+    "Could not reach Well Kept. Check your connection." covered genuinely
     offline, a request abandoned by us, and a server that never answered —
     three different fixes behind one line. It cost three rounds of testing and
     sent a tester to check their Wi-Fi while a serverless function was merely
@@ -372,7 +372,7 @@ describe('the three failures that shared one sentence', () => {
   it('says "too long" for a timeout, not "check your connection"', () => {
     const timedOut = new ApiRequestError({
       status: 0,
-      message: 'CrewChief did not answer within 45 seconds.',
+      message: 'Well Kept did not answer within 45 seconds.',
       origin: 'device',
       kind: 'timeout',
       elapsedMs: 45_000,
@@ -388,7 +388,7 @@ describe('the three failures that shared one sentence', () => {
   it('keeps "check your connection" for a genuine offline failure', () => {
     const offline = new ApiRequestError({
       status: 0,
-      message: 'Could not reach CrewChief. Check your connection.',
+      message: 'Could not reach Well Kept. Check your connection.',
       origin: 'device',
       kind: 'offline',
       elapsedMs: 120,
@@ -469,7 +469,7 @@ describe('a failure before the socket opens is not "offline"', () => {
     // app. Reporting it as connectivity is what hid it for three rounds.
     const unsendable = new ApiRequestError({
       status: 0,
-      message: 'CrewChief could not send that request.',
+      message: 'Well Kept could not send that request.',
       origin: 'device',
       kind: 'request',
       elapsedMs: 4,

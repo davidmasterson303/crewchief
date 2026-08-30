@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { logger } from '@crewchief/core/logger';
+import { logger } from '@wellkept/core/logger';
 import { checkRateLimit, getClientIdentifier, rateLimitResponse } from '@/lib/rate-limit';
 import { authorizeVehicleAccess } from '@/lib/api-auth';
 

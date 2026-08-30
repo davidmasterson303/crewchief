@@ -7,7 +7,7 @@ import { resetPassword, signIn, signUp } from '../../auth/session';
  * The front door.
  *
  * This is the first screen an App Store reviewer sees and, since 8 Aug, the
- * only place a person can become a CrewChief user at all — the web no longer
+ * only place a person can become a Well Kept user at all — the web no longer
  * carries enrollment. A defect here is not a degraded experience, it is a
  * product nobody can enter.
  *
@@ -36,7 +36,7 @@ jest.mock('../../auth/session', () => ({
 }));
 
 /*
-  Not mocked in `jest.setup.js` because it is CrewChief's own module, and that
+  Not mocked in `jest.setup.js` because it is Well Kept's own module, and that
   file's rule is to stub only what the host platform provides. Stubbed here,
   where a reader can see it: `hasDevCredentials` reads an EXPO_PUBLIC value
   behind a `__DEV__` guard, and a dev build with credentials in `.env` would
@@ -418,7 +418,7 @@ describe('the way back in when the password is gone', () => {
       The one assertion in this block that is about security rather than
       behaviour. Supabase answers identically for a known and an unknown
       address; if this screen ever starts distinguishing them, anyone who
-      downloads the app can enumerate CrewChief's users.
+      downloads the app can enumerate Well Kept's users.
     */
     const user = userEvent.setup();
     const view = await render(<SignInScreen />);

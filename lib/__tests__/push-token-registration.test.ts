@@ -9,14 +9,14 @@
  *
  * A push token is not a credential — it addresses a device and authenticates
  * nobody — but it is enough to *send* to that device, so a leaked or
- * mis-scoped row is a spam channel wearing CrewChief's name. That is what most
+ * mis-scoped row is a spam channel wearing Well Kept's name. That is what most
  * of this file is about.
  */
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { isExpoPushToken } from '@crewchief/core/push-tokens';
+import { isExpoPushToken } from '@wellkept/core/push-tokens';
 
 const ROOT = join(__dirname, '..', '..');
 

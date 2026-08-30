@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { readFunnel } from '@/lib/funnel';
-import { FUNNEL_STEPS } from '@crewchief/core/funnel';
+import { FUNNEL_STEPS } from '@wellkept/core/funnel';
 
 export const dynamic = 'force-dynamic';
 

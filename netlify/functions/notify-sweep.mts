@@ -4,7 +4,7 @@
  * Deliberately the thinnest thing that could work: it holds a time and a
  * secret, and calls the route. Every decision about who gets notified lives in
  * `app/api/internal/notify-sweep/route.ts` and, below that, in
- * `@crewchief/core/notification-sweep` — which is testable without a scheduler,
+ * `@wellkept/core/notification-sweep` — which is testable without a scheduler,
  * a database, or a deploy.
  *
  * Putting logic here would put it somewhere that only runs in production, on a

@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { ROLE_LADDER, roleLabel, type ModRole } from '@crewchief/core/mod-progression';
+import { ROLE_LADDER, roleLabel, type ModRole } from '@wellkept/core/mod-progression';
 
 import { border, radius, register, space, surface, text, type } from '../theme';
 

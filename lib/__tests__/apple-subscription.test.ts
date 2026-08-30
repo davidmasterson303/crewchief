@@ -14,8 +14,8 @@ import {
   PRODUCT_TIERS,
   type AppleSubscriptionEvent,
   type StoredEntitlement,
-} from '@crewchief/core/apple-subscription';
-import { resolveEntitledTier } from '@crewchief/core/entitlement';
+} from '@wellkept/core/apple-subscription';
+import { resolveEntitledTier } from '@wellkept/core/entitlement';
 
 const MONTHLY = 'co.davidmasterson.crewchief.paid.monthly';
 

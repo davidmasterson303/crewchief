@@ -1,6 +1,6 @@
 'use client';
 
-import { healthClaim } from '@crewchief/core/health-claims';
+import { healthClaim } from '@wellkept/core/health-claims';
 import IssueCard from '@/components/IssueCard';
 
 interface Issue {

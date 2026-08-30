@@ -92,7 +92,7 @@ jest.mock('@/lib/api-auth', () => ({
   requireSession: jest.fn(async () => sessionResult),
 }));
 
-jest.mock('@crewchief/core/logger', () => ({
+jest.mock('@wellkept/core/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));
 
@@ -331,7 +331,7 @@ describe('subscriptionNotice — Guideline 3.1.2 and the E5 rejection reason', (
     server-side call that ends an App Store subscription on someone's behalf.
     So the only honest remedy is to say so before the confirmation.
   */
-  const { subscriptionNotice, SUBSCRIPTION_CANCEL_PATH } = require('@crewchief/core/account-deletion');
+  const { subscriptionNotice, SUBSCRIPTION_CANCEL_PATH } = require('@wellkept/core/account-deletion');
 
   it('says nothing when there is no live subscription', () => {
     /*
@@ -422,7 +422,7 @@ describe('both delete surfaces show the subscription notice', () => {
     const source = read(file);
 
     expect(source).toContain('subscriptionNotice');
-    expect(source).toContain('@crewchief/core/account-deletion');
+    expect(source).toContain('@wellkept/core/account-deletion');
   });
 
   it.each(SURFACES)('%s renders the notice it computed', (file) => {

@@ -5,7 +5,7 @@
  *
  * ── ⚠ The defect, and why nothing caught it ─────────────────────────────────
  *
- * **Every health score CrewChief ever generated was 70.** The prompt asked the
+ * **Every health score Well Kept ever generated was 70.** The prompt asked the
  * model for `healthScore`; the parser read `healthData.health_score`; the value
  * was therefore always `undefined`, and the next line substituted a documented
  * neutral. `redFlags` met the same fate and was forced to `[]`.

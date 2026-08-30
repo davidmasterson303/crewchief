@@ -10,7 +10,7 @@
  * does, including an App Store reviewer.
  */
 
-import { withTimeout, TimeoutError } from '@crewchief/core/retry';
+import { withTimeout, TimeoutError } from '@wellkept/core/retry';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

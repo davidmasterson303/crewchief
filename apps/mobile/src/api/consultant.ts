@@ -1,7 +1,7 @@
 import { apiRequest } from './client';
-import { isContextKind, type ContextKind } from '@crewchief/core/consultant-context-kinds';
-import type { AdviceRange } from '@crewchief/core/advice-range';
-import type { ConsultantEstimate, EstimateLine } from '@crewchief/core/consultant-estimate';
+import { isContextKind, type ContextKind } from '@wellkept/core/consultant-context-kinds';
+import type { AdviceRange } from '@wellkept/core/advice-range';
+import type { ConsultantEstimate, EstimateLine } from '@wellkept/core/consultant-estimate';
 
 /**
  * The advisor — Phase 3.4, and the flow carrying the App Store 4.2 argument.

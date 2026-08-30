@@ -57,7 +57,7 @@
  *
  * §1.3's suggested copy reads *"Written by [advisor name]'s AI from your
  * records."* The name is **blocked on David** — see `WELLKEPT_RENAME_PACKAGE`:
- * the advisor *is* "CrewChief", it is the persona's name in the system prompt's
+ * the advisor *is* "Well Kept", it is the persona's name in the system prompt's
  * voice instructions and the label transcripts are formatted with, and the
  * product is renaming to Well Kept, which is not a person. Three options are
  * with him and none has been chosen.

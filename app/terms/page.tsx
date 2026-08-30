@@ -4,8 +4,8 @@ import LegalDocument, { LegalSection } from '@/components/legal/LegalDocument';
 import { CONTACT_EMAIL, OPERATOR, SUBSCRIPTION_CANCEL_PATH } from '@/lib/legal';
 
 export const metadata: Metadata = {
-  title: 'Terms of Use · CrewChief',
-  description: 'What CrewChief is, what it is not, and the terms of using it.',
+  title: 'Terms of Use · Well Kept',
+  description: 'What Well Kept is, what it is not, and the terms of using it.',
 };
 
 /**
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
  *
  * ── The section that is not boilerplate ─────────────────────────────────────
  *
- * "What CrewChief is not." A product that tells people things about the safety
+ * "What Well Kept is not." A product that tells people things about the safety
  * of a two-tonne object they drive their family around in has a real duty to be
  * clear about what its answers are worth, and that duty is not discharged by a
  * limitation-of-liability clause nobody reads.
@@ -37,17 +37,17 @@ export default function TermsPage() {
   return (
     <LegalDocument
       title="Terms of Use"
-      summary="CrewChief helps you understand and look after your car. It is not a mechanic, and nothing it tells you is a substitute for someone qualified looking at the actual vehicle."
+      summary="Well Kept helps you understand and look after your car. It is not a mechanic, and nothing it tells you is a substitute for someone qualified looking at the actual vehicle."
     >
       <p>
-        These terms cover your use of the CrewChief app and website, operated by {OPERATOR}. Using
-        CrewChief means you accept them.
+        These terms cover your use of the Well Kept app and website, operated by {OPERATOR}. Using
+        Well Kept means you accept them.
       </p>
 
-      <LegalSection>What CrewChief is not</LegalSection>
+      <LegalSection>What Well Kept is not</LegalSection>
 
       <p>
-        CrewChief produces estimates, ranges and comparisons from the information you give it and
+        Well Kept produces estimates, ranges and comparisons from the information you give it and
         from public data about your vehicle. It has never seen your car.
       </p>
 
@@ -68,7 +68,7 @@ export default function TermsPage() {
       <p>
         <strong className="text-white/90">Modification guidance is not a legality check.</strong>
         Emissions rules, inspection requirements and insurance consequences vary by where you live,
-        and CrewChief does not check any of them. Modifying a vehicle may void warranties and may be
+        and Well Kept does not check any of them. Modifying a vehicle may void warranties and may be
         illegal on public roads where you are.
       </p>
 
@@ -84,7 +84,7 @@ export default function TermsPage() {
 
       <p>
         Your photographs, invoices and notes stay yours. You give us permission to store and process
-        them for the sole purpose of operating CrewChief for you — including sending the relevant
+        them for the sole purpose of operating Well Kept for you — including sending the relevant
         details to the AI provider described in the Privacy Policy in order to answer your questions.
         We do not use your content to train models, and we do not publish it.
       </p>
@@ -112,7 +112,7 @@ export default function TermsPage() {
       <p>
         <strong className="text-white/90">You cancel through Apple, not through us</strong> — in{' '}
         {SUBSCRIPTION_CANCEL_PATH}. We cannot cancel it on your behalf, and{' '}
-        <strong className="text-white/90">deleting your CrewChief account does not stop the
+        <strong className="text-white/90">deleting your Well Kept account does not stop the
         billing.</strong> Cancel first, or you will keep being charged after the account is gone.
         Refunds are handled by Apple under their terms.
       </p>
@@ -120,7 +120,7 @@ export default function TermsPage() {
       <LegalSection>Availability</LegalSection>
 
       <p>
-        CrewChief is provided as it is. We do not promise it will always be available, that its
+        Well Kept is provided as it is. We do not promise it will always be available, that its
         answers will always be right, or that it will never lose data — though we try hard at all
         three. To the fullest extent the law allows, we are not liable for indirect or consequential
         loss arising from your use of it, and nothing in these terms limits liability that cannot
@@ -130,7 +130,7 @@ export default function TermsPage() {
       <LegalSection>Ending it</LegalSection>
 
       <p>
-        You can stop using CrewChief and delete your account whenever you like. We may suspend or
+        You can stop using Well Kept and delete your account whenever you like. We may suspend or
         close an account that breaks these terms.
       </p>
 

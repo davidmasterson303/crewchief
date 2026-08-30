@@ -26,7 +26,7 @@
  * that: it pins actual numbers, so a change to the model has to be deliberate.
  */
 
-import { calculateTCO, estimateResaleValue, type TCOVehicle } from '@crewchief/core/tco-calculator';
+import { calculateTCO, estimateResaleValue, type TCOVehicle } from '@wellkept/core/tco-calculator';
 
 describe('TCO Calculator', () => {
   const mockVehicle: TCOVehicle = {
@@ -181,7 +181,7 @@ describe('TCO Calculator', () => {
       // The old private copy returned 0.80 at one year and floored at 0.20.
       // If someone reinstates that model, it is a product decision that
       // changes every TCO figure in the app — it must not arrive as a
-      // silent refactor. See @crewchief/core/tco-calculator.
+      // silent refactor. See @wellkept/core/tco-calculator.
       expect(estimateResaleValue(atAge(1))).not.toBeCloseTo(40000 * 0.8, 1);
       expect(estimateResaleValue(atAge(20))).not.toBeCloseTo(40000 * 0.2, 1);
     });

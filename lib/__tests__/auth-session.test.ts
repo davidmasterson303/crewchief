@@ -13,8 +13,8 @@
  * So these tests are mostly about what must *not* happen.
  */
 
-import { resolveAuthEvent, loginUrlFor } from '@crewchief/core/auth-session';
-import { PUBLIC_DEMO_ROUTES } from '@crewchief/core/demo-contract';
+import { resolveAuthEvent, loginUrlFor } from '@wellkept/core/auth-session';
+import { PUBLIC_DEMO_ROUTES } from '@wellkept/core/demo-contract';
 import { PROTECTED_ROUTES } from '@/middleware';
 
 describe('a session that expires', () => {
@@ -129,7 +129,7 @@ describe('an anonymous visitor is never redirected', () => {
       event: 'SIGNED_OUT',
       hasSession: false,
       hadSession: true,
-      pathname: `/dashboard/${require('@crewchief/core/demo').DEMO_VEHICLE_IDS[0]}`,
+      pathname: `/dashboard/${require('@wellkept/core/demo').DEMO_VEHICLE_IDS[0]}`,
     });
 
     expect(decision).toEqual({ type: 'session-lost', redirectTo: null });

@@ -18,8 +18,8 @@ import Chip from '../components/Chip';
 import EmptyState from '../components/EmptyState';
 import { apiRequest, ApiRequestError } from '../api/client';
 import { Skeleton, SkeletonCard } from '../components/Skeleton';
-import { formatCurrency } from '@crewchief/core/formatting-utils';
-import { completionPayload, type CompletionDraft } from '@crewchief/core/wishlist-completion';
+import { formatCurrency } from '@wellkept/core/formatting-utils';
+import { completionPayload, type CompletionDraft } from '@wellkept/core/wishlist-completion';
 import { MarkDoneSheet } from './MarkDoneSheet';
 import {
   OPTICAL_CENTRE,
@@ -79,7 +79,7 @@ import { interFace } from '../theme/fonts';
  * you can do to a row. Adding moved off it entirely — the composer used to sit
  * above the first item and made this a data-entry form with a list underneath.
  *
- * The identifier still comes from `@crewchief/core/wishlist-identifier`, which
+ * The identifier still comes from `@wellkept/core/wishlist-identifier`, which
  * exists because three call sites once built it three different ways and
  * produced duplicates, a lying "already added" state, and deletes that silently
  * matched nothing. A fourth spelling anywhere reintroduces all three.

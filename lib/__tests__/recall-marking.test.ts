@@ -77,7 +77,7 @@ function client(rows: unknown[] = []): Seen {
 }
 
 function post(body: unknown): NextRequest {
-  return new NextRequest('https://crewchief.test/api/v1/recalls', {
+  return new NextRequest('https://wellkept.test/api/v1/recalls', {
     method: 'POST',
     body: JSON.stringify(body),
     headers: { 'content-type': 'application/json' },
@@ -113,7 +113,7 @@ describe('authorization comes first', () => {
 
     await DELETE(
       new NextRequest(
-        `https://crewchief.test/api/v1/recalls?vehicleId=${VEHICLE}&campaignNumber=23V-441`,
+        `https://wellkept.test/api/v1/recalls?vehicleId=${VEHICLE}&campaignNumber=23V-441`,
         { method: 'DELETE' }
       )
     );
@@ -128,7 +128,7 @@ describe('authorization comes first', () => {
       special case in here.
     */
     client();
-    await GET(new NextRequest(`https://crewchief.test/api/v1/recalls?vehicleId=${VEHICLE}`));
+    await GET(new NextRequest(`https://wellkept.test/api/v1/recalls?vehicleId=${VEHICLE}`));
 
     expect(authorize).toHaveBeenCalledWith(VEHICLE, { intent: 'read' });
   });
@@ -170,7 +170,7 @@ describe('the mark itself', () => {
 
     await DELETE(
       new NextRequest(
-        `https://crewchief.test/api/v1/recalls?vehicleId=${VEHICLE}&campaignNumber=23V-441`,
+        `https://wellkept.test/api/v1/recalls?vehicleId=${VEHICLE}&campaignNumber=23V-441`,
         { method: 'DELETE' }
       )
     );
@@ -185,7 +185,7 @@ describe('the mark itself', () => {
     client([{ campaign_number: '23V-441', addressed_at: '2026-08-23' }]);
 
     const body = await (
-      await GET(new NextRequest(`https://crewchief.test/api/v1/recalls?vehicleId=${VEHICLE}`))
+      await GET(new NextRequest(`https://wellkept.test/api/v1/recalls?vehicleId=${VEHICLE}`))
     ).json();
 
     expect(body.addressed).toEqual([
@@ -231,7 +231,7 @@ describe('the campaign number, which is the one string a client controls', () =>
   it('refuses a body that is not JSON at all', async () => {
     client();
     const response = await POST(
-      new NextRequest('https://crewchief.test/api/v1/recalls', { method: 'POST', body: 'nope' })
+      new NextRequest('https://wellkept.test/api/v1/recalls', { method: 'POST', body: 'nope' })
     );
 
     expect(response.status).toBe(400);

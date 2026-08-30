@@ -1,5 +1,5 @@
 {
-  "name": "@crewchief/core",
+  "name": "@wellkept/core",
   "version": "0.0.0",
   "private": true,
   "description": "Logic shared by the web app and the mobile client. No Next, no Supabase, no Node built-ins.",

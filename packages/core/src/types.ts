@@ -1,5 +1,5 @@
 /**
- * CrewChief - Comprehensive Type Definitions
+ * Well Kept - Comprehensive Type Definitions
  *
  * This file contains all TypeScript interfaces and types used throughout the application.
  * Eliminates the use of 'any' and provides strong type safety.

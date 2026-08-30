@@ -20,8 +20,8 @@ import {
   resolveEntitledTier,
   hasLiveEntitlement,
   readFailureMeansNoSubscription,
-} from '@crewchief/core/entitlement';
-import { TIERS } from '@crewchief/core/ai/budget';
+} from '@wellkept/core/entitlement';
+import { TIERS } from '@wellkept/core/ai/budget';
 
 const NOW = new Date('2026-08-12T12:00:00Z');
 const FUTURE = '2026-09-12T12:00:00Z';

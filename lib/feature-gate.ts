@@ -1,7 +1,7 @@
 import { getServiceRoleClient } from './supabase';
-import { logger } from '@crewchief/core/logger';
-import { entitlesFeature } from '@crewchief/core/entitlement';
-import { type FeatureDecision, type PaidFeature } from '@crewchief/core/paid-features';
+import { logger } from '@wellkept/core/logger';
+import { entitlesFeature } from '@wellkept/core/entitlement';
+import { type FeatureDecision, type PaidFeature } from '@wellkept/core/paid-features';
 
 /**
  * The server-side half of the feature gate — the pricing decision of 24 Aug.

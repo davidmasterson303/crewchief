@@ -1,8 +1,8 @@
 import { getServiceRoleClient } from '@/lib/supabase';
 import { requireSession } from '@/lib/api-auth';
-import { vehicleStoragePrefixes } from '@crewchief/core/storage-paths';
-import { logger } from '@crewchief/core/logger';
-import { hasLiveEntitlement, readFailureMeansNoSubscription } from '@crewchief/core/entitlement';
+import { vehicleStoragePrefixes } from '@wellkept/core/storage-paths';
+import { logger } from '@wellkept/core/logger';
+import { hasLiveEntitlement, readFailureMeansNoSubscription } from '@wellkept/core/entitlement';
 
 const DOCUMENTS_BUCKET = 'vehicle-documents';
 

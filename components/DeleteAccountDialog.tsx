@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { deleteAccount } from '@/app/account-actions';
 import { createBrowserSupabaseClient } from '@/lib/supabase';
-import { queryClient } from '@crewchief/core/query-client';
+import { queryClient } from '@wellkept/core/query-client';
 import { signOutAndClearCache } from '@/lib/sign-out';
 import { toast } from 'sonner';
 import {
@@ -24,7 +24,7 @@ import {
   describeDeletion,
   isDeletionConfirmed,
   subscriptionNotice,
-} from '@crewchief/core/account-deletion';
+} from '@wellkept/core/account-deletion';
 
 /*
   Imported rather than declared. App Store 5.1.1(v) is reviewed against the

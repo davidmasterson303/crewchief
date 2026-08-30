@@ -14,7 +14,7 @@ import { Plus, CircleCheck as CheckCircle, Clock, Wrench, TrendingUp, Mail, File
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { createServiceItem, updateServiceItem, deleteServiceItem, moveServiceItemToHistory, getWishlistItems, getQuoteRequestHistory } from '@/app/actions';
-import { logger } from '@crewchief/core/logger';
+import { logger } from '@wellkept/core/logger';
 import { QuoteRequestDialogV2 } from './QuoteRequestDialogV2';
 import { QuoteDetailDialog } from './QuoteDetailDialog';
 import CompletionDetailsDialog, { CompletionDetails } from './CompletionDetailsDialog';

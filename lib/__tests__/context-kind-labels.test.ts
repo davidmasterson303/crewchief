@@ -12,7 +12,7 @@
  * Phase 3.4 put a second renderer on the same claim — the Expo advisor screen —
  * and a phone and a laptop describing one answer differently is the same defect
  * at two-clients scale, invisible until someone holds them side by side. So the
- * labels moved to `@crewchief/core/consultant-context-kinds` and these are the
+ * labels moved to `@wellkept/core/consultant-context-kinds` and these are the
  * three things that keep them there.
  *
  * ── Why this is a static scan and not a render test ─────────────────────────
@@ -30,7 +30,7 @@ import {
   CONTEXT_KIND_LABELS,
   isContextKind,
   type ContextKind,
-} from '@crewchief/core/consultant-context-kinds';
+} from '@wellkept/core/consultant-context-kinds';
 
 const REPO_ROOT = join(__dirname, '..', '..');
 

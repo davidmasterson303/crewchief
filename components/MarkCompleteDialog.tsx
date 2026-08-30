@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader as Loader2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
-import { logger } from '@crewchief/core/logger';
+import { logger } from '@wellkept/core/logger';
 
 interface WishlistItem {
   id: string;

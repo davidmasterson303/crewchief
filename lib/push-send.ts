@@ -1,5 +1,5 @@
-import { logger } from '@crewchief/core/logger';
-import type { NotificationContent } from '@crewchief/core/notifications';
+import { logger } from '@wellkept/core/logger';
+import type { NotificationContent } from '@wellkept/core/notifications';
 import { getServiceRoleClient } from '@/lib/supabase';
 
 /**
@@ -7,7 +7,7 @@ import { getServiceRoleClient } from '@/lib/supabase';
  *
  * Phase 5's last piece of plumbing. The device asks permission, handles alerts
  * and routes a tap; the table records where to send. This is the part that
- * sends, and it is server-only — hence `lib/` rather than `@crewchief/core`,
+ * sends, and it is server-only — hence `lib/` rather than `@wellkept/core`,
  * which is for what both clients agree on. The mobile app receives pushes and
  * has no reason to be able to originate one.
  *

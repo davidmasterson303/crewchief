@@ -17,7 +17,7 @@ import {
   MINDEDNESS,
   OBJECTIVE_MAX,
   validateProfileUpdate,
-} from '@crewchief/core/vehicle-profile';
+} from '@wellkept/core/vehicle-profile';
 
 describe('what may be written', () => {
   it('takes only the fields that were supplied', () => {

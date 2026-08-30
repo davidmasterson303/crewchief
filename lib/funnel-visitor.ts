@@ -5,7 +5,7 @@ import {
   isPrefetchRequest,
   isRecordableVisitorId,
   visitorCookieOptions,
-} from '@crewchief/core/funnel';
+} from '@wellkept/core/funnel';
 
 /**
  * Reading and issuing the anonymous visitor id.

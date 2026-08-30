@@ -1,7 +1,7 @@
 'use client';
 
-import { CX, CY, R, TRACK, VIEW_H, VIEW_W, angleFor, pointAt } from '@crewchief/core/cluster-geometry';
-import type { BuildPosition } from '@crewchief/core/build-progress';
+import { CX, CY, R, TRACK, VIEW_H, VIEW_W, angleFor, pointAt } from '@wellkept/core/cluster-geometry';
+import type { BuildPosition } from '@wellkept/core/build-progress';
 
 /**
  * Where the redline starts, on the same 0-100 scale as the reading.
@@ -24,7 +24,7 @@ const REDLINE_FROM = 82;
  * stock.** Reusing it would render an unmodified car as a critical failure and
  * announce it to a screen reader as one.
  *
- * So the geometry is shared through `@crewchief/core/cluster-geometry` and the
+ * So the geometry is shared through `@wellkept/core/cluster-geometry` and the
  * *meaning* is not. Two gauges in one cluster, one set of numbers describing
  * the glass.
  *

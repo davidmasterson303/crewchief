@@ -16,14 +16,14 @@ import Icon from '../components/Icon';
 import ListGroup from '../components/ListGroup';
 import { SkeletonCard } from '../components/Skeleton';
 import { apiRequest, ApiRequestError } from '../api/client';
-import { USAGE_PROFILES, type UsageProfile } from '@crewchief/core/usage-profile';
+import { USAGE_PROFILES, type UsageProfile } from '@wellkept/core/usage-profile';
 import {
   MINDEDNESS,
   MINDEDNESS_LABELS,
   OBJECTIVE_MAX,
   validateProfileUpdate,
   type Mindedness,
-} from '@crewchief/core/vehicle-profile';
+} from '@wellkept/core/vehicle-profile';
 import { TARGET_MIN, border, brand, radius, space, surface, text, type } from '../theme';
 
 /**

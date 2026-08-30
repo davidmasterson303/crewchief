@@ -1,6 +1,6 @@
 import { getServiceRoleClient } from './supabase';
-import { logger } from '@crewchief/core/logger';
-import { platformClientIp } from '@crewchief/core/client-ip';
+import { logger } from '@wellkept/core/logger';
+import { platformClientIp } from '@wellkept/core/client-ip';
 
 export type RateLimitTier = 'ai' | 'upload' | 'default';
 

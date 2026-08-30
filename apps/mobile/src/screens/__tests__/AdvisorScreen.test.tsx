@@ -264,7 +264,7 @@ describe('the advisor before anyone has asked anything', () => {
  * ── LEG-02: explicit permission before a question reaches Google ────────────
  *
  * Apple amended Guideline 5.1.2(i) in November 2025 to require **explicit
- * permission** before personal data is shared with a third-party AI. CrewChief
+ * permission** before personal data is shared with a third-party AI. Well Kept
  * had the disclosure in its privacy policy; the only consent was sign-up wrap.
  */
 describe('asking before a question goes to Google', () => {
@@ -333,7 +333,7 @@ describe('asking before a question goes to Google', () => {
 
     const view = await render(<AdvisorScreen vehicleId="v1" onSignOut={jest.fn()} />);
 
-    await view.findByText(/Everything else in CrewChief works the same/);
+    await view.findByText(/Everything else in Well Kept works the same/);
     view.getByLabelText('Ask about this car');
     view.getByText('Change that');
   });

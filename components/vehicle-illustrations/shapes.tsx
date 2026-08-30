@@ -1,6 +1,6 @@
 'use client';
 
-import type { VehicleBodyStyle } from '@crewchief/core/vehicle-body-style';
+import type { VehicleBodyStyle } from '@wellkept/core/vehicle-body-style';
 import {
   IllustrationFrame,
   Glass,

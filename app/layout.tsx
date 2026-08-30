@@ -12,7 +12,7 @@ import { isDemoSite, shareDescription, siteOrigin } from '@/lib/site-role';
 const IS_DEMO = isDemoSite(process.env.CREWCHIEF_DEMO_SITE);
 import { AuthProvider } from '@/components/AuthProvider';
 import { SiteRoleProvider } from '@/components/SiteRoleProvider';
-import { INTRO_PLAYED_KEY, INTRO_PLAYED_VALUE } from '@crewchief/core/intro-gate';
+import { INTRO_PLAYED_KEY, INTRO_PLAYED_VALUE } from '@wellkept/core/intro-gate';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -46,7 +46,7 @@ export const metadata: Metadata = {
      so each deployment claims itself.
   */
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || siteOrigin(IS_DEMO)),
-  title: 'CrewChief — Your Personal Auto Ownership Consultant',
+  title: 'Well Kept — Your Personal Auto Ownership Consultant',
   /*
      The favicon, apple-touch-icon and SVG icon are NOT declared here — they
      are app/favicon.ico, app/icon.svg and app/apple-icon.png, served by the
@@ -65,12 +65,12 @@ export const metadata: Metadata = {
   */
   alternates: { canonical: '/' },
   openGraph: {
-    title: 'CrewChief — Your Personal Auto Ownership Consultant',
+    title: 'Well Kept — Your Personal Auto Ownership Consultant',
     // Per-deployment. The product must never describe itself as a demo — see
     // `lib/site-role.ts` for why that sentence is expensive on this hostname.
     description: shareDescription(IS_DEMO),
     url: siteOrigin(IS_DEMO),
-    siteName: 'CrewChief',
+    siteName: 'Well Kept',
     /*
        No `images` key. `app/opengraph-image.tsx` is the card now, and Next
        emits its tags — absolute URL, real dimensions, correct content-type —
@@ -98,7 +98,7 @@ export default function RootLayout({
         />
         {/*
           Decides the garage-door intro before the first paint. See
-          components/GarageDoor.tsx and @crewchief/core/intro-gate.
+          components/GarageDoor.tsx and @wellkept/core/intro-gate.
 
           It has to be a blocking inline script, and the two alternatives are
           both visibly wrong. Deciding in an effect means the page paints

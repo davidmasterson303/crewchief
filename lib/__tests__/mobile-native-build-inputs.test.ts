@@ -96,12 +96,23 @@ describe('iOS usage descriptions exist before the build is spent', () => {
   });
 
   it('explains what the app does with the permission, not that it wants one', () => {
-    // App Store review rejects strings that restate the permission ("needs
-    // camera access"). Each has to name the thing the person gets.
+    /*
+      App Store review rejects strings that restate the permission ("needs
+      camera access"). Each has to name the thing the person gets.
+
+      ⚠ The app's name is read from `app.json` rather than written here. It was
+      the literal `crewchief` until 30 Aug, and the rename to Well Kept would
+      have left this line matching a string that no longer exists anywhere —
+      green forever, checking nothing, on the exact assertion that exists to
+      stop a rejection. Deriving it means the next rename cannot do that.
+    */
+    const restatesPermission = new RegExp(
+      `^${appJson.name.toLowerCase()} (needs|requires) (the )?(camera|photo)`
+    );
     for (const [, key] of required) {
       const text = infoPlist[key] as string;
       expect(text).toMatch(/invoice/i);
-      expect(text.toLowerCase()).not.toMatch(/^crewchief (needs|requires) (the )?(camera|photo)/);
+      expect(text.toLowerCase()).not.toMatch(restatesPermission);
     }
   });
 
@@ -178,7 +189,7 @@ describe('declarations that only bite after the build', () => {
 
       `false` is the correct answer and not a shortcut: the app's encryption is
       HTTPS/TLS to Supabase and Netlify, plus Keychain via `expo-secure-store`,
-      and both are exempt. It would have to become `true` only if CrewChief
+      and both are exempt. It would have to become `true` only if Well Kept
       shipped its own cryptography.
     */
     const infoPlist = appJson.ios?.infoPlist ?? {};

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
-import { vehicleFieldStops } from '@crewchief/core/vehicle-identity';
+import { vehicleFieldStops } from '@wellkept/core/vehicle-identity';
 
 import { TARGET_MIN, border, radius, space, surface, text, type } from '../theme';
 

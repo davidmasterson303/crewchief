@@ -8,7 +8,7 @@
  * ever see your own account, and yours has cars in it.
  */
 
-import { shouldShowFirstRun } from '@crewchief/core/first-run';
+import { shouldShowFirstRun } from '@wellkept/core/first-run';
 
 describe('an empty garage has two readings', () => {
   it('explains the product to someone who has never had a car', () => {

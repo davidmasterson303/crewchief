@@ -1,5 +1,5 @@
 /**
- * Which of the two CrewChief sites this build is.
+ * Which of the two Well Kept sites this build is.
  *
  * One codebase, two Netlify projects, two hostnames:
  *
@@ -101,7 +101,7 @@ export function siteOrigin(demo: boolean): string {
 /**
  * The share-card description.
  *
- * ⚠ The product copy must not describe CrewChief as a demo, and
+ * ⚠ The product copy must not describe Well Kept as a demo, and
  * `site-role.test.ts` asserts the word is absent. That is not stylistic: it is
  * the sentence Apple would quote back.
  *

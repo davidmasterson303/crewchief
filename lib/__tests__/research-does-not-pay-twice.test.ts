@@ -45,7 +45,7 @@ import {
   SWEEP_RESEARCH_TIMEOUT_MS,
   researchVehicleDossier,
 } from '@/lib/vehicle-research';
-import { SWEEP_GENERATE_CAP } from '@crewchief/core/notification-sweep';
+import { SWEEP_GENERATE_CAP } from '@wellkept/core/notification-sweep';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 

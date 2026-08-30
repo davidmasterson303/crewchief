@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 
 import AlertBanner from '../components/AlertBanner';
-import { adviceDisclosure } from '@crewchief/core/advice-disclosure';
+import { adviceDisclosure } from '@wellkept/core/advice-disclosure';
 import BuildGauge from '../components/BuildGauge';
 import Button from '../components/Button';
 import Card from '../components/Card';
@@ -19,7 +19,7 @@ import ProgressionLadder from '../components/ProgressionLadder';
 import SectionHeader from '../components/SectionHeader';
 import { Skeleton, SkeletonCard } from '../components/Skeleton';
 import { apiRequest, ApiRequestError } from '../api/client';
-import { buildPosition } from '@crewchief/core/build-progress';
+import { buildPosition } from '@wellkept/core/build-progress';
 import {
   nextRungs,
   progressionSummary,
@@ -27,8 +27,8 @@ import {
   showsModifications,
   type ModCandidate,
   type ModRung,
-} from '@crewchief/core/mod-progression';
-import { wishlistItemIdentifier } from '@crewchief/core/wishlist-identifier';
+} from '@wellkept/core/mod-progression';
+import { wishlistItemIdentifier } from '@wellkept/core/wishlist-identifier';
 import { declineMod, declinedMods, restoreMod } from '../onboarding/declined-mods';
 import { TARGET_MIN, border, radius, space, surface, text, type } from '../theme';
 

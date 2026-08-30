@@ -6,7 +6,7 @@
  * This is the most abusable surface in the product if its authorization is
  * ever wrong — not because it leaks anything, but because it **sends a push
  * notification to every account in the app**. A push cannot be recalled, and
- * the recovery from "CrewChief spammed everyone" is people uninstalling it.
+ * the recovery from "Well Kept spammed everyone" is people uninstalling it.
  *
  * So the properties below are pinned in the source rather than trusted to
  * review. Executing the route needs a live Supabase, a service-role key and a

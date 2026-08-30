@@ -8,7 +8,7 @@
  * banded independently, with DiagnosticHero missing the ≥40 boundary entirely,
  * so the same score could be styled two different ways on one screen.
  *
- * **The thresholds and wording now live in `@crewchief/core/health-band`**, so
+ * **The thresholds and wording now live in `@wellkept/core/health-band`**, so
  * the Expo garage bands a score the same way this does. Neither of the two
  * fields added here can cross that boundary: `color` is a CSS custom property
  * resolved by globals.css, and `textClass` is a Tailwind class. This module is
@@ -24,7 +24,7 @@ import {
   getHealthBandJudgement,
   type HealthBandJudgement,
   type HealthBandName,
-} from '@crewchief/core/health-band';
+} from '@wellkept/core/health-band';
 
 export type { HealthBandName };
 

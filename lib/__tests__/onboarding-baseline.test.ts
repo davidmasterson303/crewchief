@@ -16,9 +16,9 @@ import {
   baselineDate,
   buildBaselineRow,
   isBaselineAge,
-} from '@crewchief/core/onboarding-baseline';
-import { categoryFor, historyLookups } from '@crewchief/core/service-history';
-import { evaluateSchedule, type ScheduleEntry } from '@crewchief/core/service-due';
+} from '@wellkept/core/onboarding-baseline';
+import { categoryFor, historyLookups } from '@wellkept/core/service-history';
+import { evaluateSchedule, type ScheduleEntry } from '@wellkept/core/service-due';
 
 const TODAY = '2026-08-08';
 

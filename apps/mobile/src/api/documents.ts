@@ -1,5 +1,5 @@
 import { apiRequest, ApiRequestError } from './client';
-import { MAX_FILE_SIZE, ALLOWED_DOCUMENT_TYPES } from '@crewchief/core/validation';
+import { MAX_FILE_SIZE, ALLOWED_DOCUMENT_TYPES } from '@wellkept/core/validation';
 
 /**
  * Invoice upload — Phase 3.3's half that needs no camera.
@@ -38,7 +38,7 @@ import { MAX_FILE_SIZE, ALLOWED_DOCUMENT_TYPES } from '@crewchief/core/validatio
  * connection: uploading eight megabytes in order to be told it is over the
  * limit spends someone's data and a minute of their time to learn something
  * knowable before the first byte leaves. The limits are imported from
- * `@crewchief/core/validation` rather than restated, so the two cannot drift.
+ * `@wellkept/core/validation` rather than restated, so the two cannot drift.
  */
 
 /** What the caller hands over — the shape React Native's FormData accepts. */
@@ -282,11 +282,11 @@ export function describeUploadError(error: unknown): string {
       different fix: nothing was sent, or nothing came back.
     */
     if (error.kind === 'timeout') {
-      return 'CrewChief took too long to read that invoice. Your photo was not lost — try again.';
+      return 'Well Kept took too long to read that invoice. Your photo was not lost — try again.';
     }
 
     if (error.kind === 'offline') {
-      return 'Could not reach CrewChief. Check your connection.';
+      return 'Could not reach Well Kept. Check your connection.';
     }
 
     /*
@@ -295,7 +295,7 @@ export function describeUploadError(error: unknown): string {
       blamed. The `__DEV__` diagnostic beside this carries the detail.
     */
     if (error.kind === 'request') {
-      return 'CrewChief could not send that invoice. This is a bug on our side, not a problem with your photo.';
+      return 'Well Kept could not send that invoice. This is a bug on our side, not a problem with your photo.';
     }
 
     if (error.status === 401) {
@@ -312,7 +312,7 @@ export function describeUploadError(error: unknown): string {
       */
       return error.isLocallySignedOut
         ? 'This device is signed out. Sign in again to upload this.'
-        : 'CrewChief would not accept this upload on your current session.';
+        : 'Well Kept would not accept this upload on your current session.';
     }
     if (error.status === 404) return 'That vehicle is no longer in your garage.';
     if (error.status === 413) return 'That file is too large to upload.';

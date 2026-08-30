@@ -14,7 +14,7 @@ import {
   verifyOutcomeFromStatus,
   type StoreOutcome,
   type VerifyOutcome,
-} from '@crewchief/core/purchase-flow';
+} from '@wellkept/core/purchase-flow';
 
 const STORE_OUTCOMES: StoreOutcome[] = [
   { kind: 'purchased', jwsRepresentation: 'jws' },
@@ -148,7 +148,9 @@ describe('never tell someone a completed payment failed', () => {
       { kind: 'purchased', jwsRepresentation: 'j' },
       { kind: 'belongs-to-another-account' }
     );
-    expect(result.message).toMatch(/different CrewChief account/i);
+    expect(result.message).toMatch(
+      /That purchase belongs to a different Well Kept account\. Sign in as that account to use it\./i
+    );
     expect(result.grantsAccess).toBe(false);
   });
 });

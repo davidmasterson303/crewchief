@@ -21,12 +21,12 @@ const sendToAccount = jest.fn();
 
 jest.mock('@/lib/supabase', () => ({ getServiceRoleClient: () => ({ from }) }));
 jest.mock('@/lib/push-send', () => ({ sendToAccount: (...args: unknown[]) => sendToAccount(...args) }));
-jest.mock('@crewchief/core/logger', () => ({
+jest.mock('@wellkept/core/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
 }));
 
 import { recallsWorthRaising } from '@/lib/notification-triggers';
-import { normaliseRecalls } from '@crewchief/core/recalls';
+import { normaliseRecalls } from '@wellkept/core/recalls';
 
 const RAW = [
   {

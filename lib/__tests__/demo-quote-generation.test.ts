@@ -9,7 +9,7 @@
  * `authorizeVehicleAccess(..., { intent: 'write' })` → *"Demo vehicles are
  * read-only"*. That blocked the most convincing thing the product does — a
  * wishlist turned into priced work with an email a shop can answer — so anyone
- * evaluating CrewChief saw the setup and never the payoff.
+ * evaluating Well Kept saw the setup and never the payoff.
  *
  * The block was right about the database and wrong about the feature.
  * **Generating** costs an AI call; **storing** is what would let an anonymous

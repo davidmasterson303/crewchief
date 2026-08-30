@@ -1,7 +1,7 @@
 import { Modal, StyleSheet, Text, View } from 'react-native';
 
 import Button from '../components/Button';
-import { PUSH_PRIMER_COPY } from '@crewchief/core/push-priming';
+import { PUSH_PRIMER_COPY } from '@wellkept/core/push-priming';
 import { surface, text } from '../theme';
 import { interFace } from '../theme/fonts';
 
@@ -22,7 +22,7 @@ import { interFace } from '../theme/fonts';
  *
  * ── The copy is not mine ────────────────────────────────────────────────────
  *
- * Every string comes from `PUSH_PRIMER_COPY` in `@crewchief/core/push-priming`,
+ * Every string comes from `PUSH_PRIMER_COPY` in `@wellkept/core/push-priming`,
  * marked as a placeholder for David in Phase 5.5. Nothing is written inline
  * here, so replacing the wording is one edit in one file, needs no build, and
  * cannot leave this component saying something the shared copy does not.

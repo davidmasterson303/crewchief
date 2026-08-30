@@ -6,7 +6,7 @@
  * ── 1. Finding the workspace ────────────────────────────────────────────────
  *
  * Metro does not follow npm workspace symlinks on its own. Without
- * `watchFolders` it neither resolves `@crewchief/core` nor notices when it
+ * `watchFolders` it neither resolves `@wellkept/core` nor notices when it
  * changes, so an edit to shared logic would silently not reach the phone.
  *
  * ── 2. Two majors of React in one repo ──────────────────────────────────────
@@ -54,7 +54,7 @@ config.resolver.nodeModulesPaths = [
 /*
   Exactly one copy of each of these, whoever asks and from wherever.
 
-  React and react-native break loudly when duplicated. `@crewchief/core` is
+  React and react-native break loudly when duplicated. `@wellkept/core` is
   here for a different reason: it is the shared package, and two copies of it
   resolving differently on web and mobile would be the silent version of the
   same bug — the drift the monorepo was chosen to prevent.
@@ -62,7 +62,7 @@ config.resolver.nodeModulesPaths = [
 config.resolver.extraNodeModules = {
   react: path.resolve(projectRoot, 'node_modules/react'),
   'react-native': path.resolve(projectRoot, 'node_modules/react-native'),
-  '@crewchief/core': path.resolve(workspaceRoot, 'packages/core'),
+  '@wellkept/core': path.resolve(workspaceRoot, 'packages/core'),
 };
 
 /*
@@ -90,7 +90,7 @@ config.resolver.extraNodeModules = {
 
   Because the *other* alias in that file is load-bearing at runtime.
   `packages/core` declares `main: src/index.ts` and no `exports` map, so
-  `@crewchief/core/health-band` resolves through `@crewchief/core/*` →
+  `@wellkept/core/health-band` resolves through `@wellkept/core/*` →
   `../../packages/core/src/*` — a tsconfig path. Turning tsconfig paths off
   fixes React and breaks every shared-module import in the app.
 

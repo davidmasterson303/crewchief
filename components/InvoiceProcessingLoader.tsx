@@ -7,7 +7,7 @@ import {
   scanFilePosition,
   scanStageLabel,
   type ScanProgress,
-} from '@crewchief/core/scan-progress';
+} from '@wellkept/core/scan-progress';
 
 /**
  * What the invoice scanner is doing, while it does it.

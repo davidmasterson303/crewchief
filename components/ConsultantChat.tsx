@@ -7,10 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Loader as Loader2, Send, Plus, Search, MessageSquare, Paperclip, X, FileText, ExternalLink, Heart, Check, Wrench, TriangleAlert, Sparkles, PanelLeft, Copy } from 'lucide-react';
-import { logger } from '@crewchief/core/logger';
-import { isDemoVehicleId } from '@crewchief/core/demo';
+import { logger } from '@wellkept/core/logger';
+import { isDemoVehicleId } from '@wellkept/core/demo';
 import { isDemoMode } from '@/lib/demo-mode';
-import { wishlistItemIdentifier } from '@crewchief/core/wishlist-identifier';
+import { wishlistItemIdentifier } from '@wellkept/core/wishlist-identifier';
 import {
   sendConsultantMessage,
   createConsultantSession,
@@ -21,11 +21,11 @@ import {
 } from '@/app/actions';
 import { QuoteRequestDialogV2 } from './QuoteRequestDialogV2';
 import { toast } from 'sonner';
-import { invalidateDashboardCache } from '@crewchief/core/query-invalidation';
+import { invalidateDashboardCache } from '@wellkept/core/query-invalidation';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
-import { CONTEXT_KIND_LABELS, type ContextKind } from '@crewchief/core/consultant-context-kinds';
+import { CONTEXT_KIND_LABELS, type ContextKind } from '@wellkept/core/consultant-context-kinds';
 import { AnswerLine } from '@/components/AnswerLine';
-import { adviceDisclosure } from '@crewchief/core/advice-disclosure';
+import { adviceDisclosure } from '@wellkept/core/advice-disclosure';
 
 /*
  * These are the four collections this component *renders*, and no longer the
@@ -172,7 +172,7 @@ function getFollowUps(lastMessage: string): string[] {
  *
  * ── Where the words themselves live ────────────────────────────────────────
  *
- * `@crewchief/core/consultant-context-kinds`, since the Expo advisor screen
+ * `@wellkept/core/consultant-context-kinds`, since the Expo advisor screen
  * renders this same row. The labels are a provenance claim, so a second copy on
  * the phone would let the two clients describe one answer differently. Only the
  * icons below are web — Lucide has no React Native build here.
@@ -772,6 +772,17 @@ export default function ConsultantChat({
                 <div className="w-14 h-14 rounded-2xl bg-info-wash border border-info-border flex items-center justify-center mx-auto mb-5">
                   <MessageSquare className="h-7 w-7 text-info" />
                 </div>
+                {/*
+                  ⚠ The advisor is still called CrewChief, on purpose. The
+                  product was renamed to Well Kept on 30 Aug; the character was
+                  not, because its new name is not chosen yet. A product is not
+                  a person, and naming the advisor after the app would be a
+                  decision made by a find-and-replace.
+
+                  Three places say this name and they must move together: here,
+                  the turn labels below, `prompts.ts`, and the transcript
+                  formatter in `app/actions.ts`.
+                */}
                 <h3 className="text-lg font-bold mb-2 text-white">Hey, CrewChief here.</h3>
                 <p className="text-white/55 mb-5 text-sm leading-relaxed">
                   I know your {vehicle.year} {vehicle.make} {vehicle.model} inside and out. What&apos;s on your mind?

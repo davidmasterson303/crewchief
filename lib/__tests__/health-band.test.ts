@@ -3,7 +3,7 @@
  *
  * @jest-environment node
  *
- * The banding thresholds moved into `@crewchief/core/health-band` so the Expo
+ * The banding thresholds moved into `@wellkept/core/health-band` so the Expo
  * garage (Phase 3.2) reads the same ramp as the web dashboard. That move is
  * only worth anything if the web layer stays a *presentation* of the shared
  * judgement rather than quietly reintroducing its own.
@@ -22,7 +22,7 @@ import {
   getHealthBandJudgement,
   healthBandHex,
   type HealthBandName,
-} from '@crewchief/core/health-band';
+} from '@wellkept/core/health-band';
 import { getHealthBand } from '@/hooks/use-health-band';
 
 const ROOT = join(__dirname, '..', '..');
@@ -136,7 +136,7 @@ describe('the web layer', () => {
     // The regression this whole split exists to prevent: a local BANDS array
     // reappearing beside the shared one.
     const source = code(join('hooks', 'use-health-band.ts'));
-    expect(source).toContain('@crewchief/core/health-band');
+    expect(source).toContain('@wellkept/core/health-band');
     expect(source).not.toMatch(/min:\s*80/);
   });
 });

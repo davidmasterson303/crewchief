@@ -45,7 +45,7 @@ export interface SignInResult {
  *
  * Every function below maps Supabase's error onto a sentence a person can act
  * on, which is right for the product and blinding for whoever is debugging it:
- * "Could not reach CrewChief" is emitted for *any* message matching
+ * "Could not reach Well Kept" is emitted for *any* message matching
  * `network|fetch|timeout`, and the original never reaches anyone.
  *
  * That cost an hour on 13 Aug. A sign-in failed repeatedly on the simulator and
@@ -87,7 +87,7 @@ function logAuthFailure(where: string, error: { message: string; status?: number
  * ── Why this had to exist before launch ─────────────────────────────────────
  *
  * `SignInScreen` could only sign in. There was no account creation anywhere in
- * the app, and no onboarding either — so the only way to become a CrewChief
+ * the app, and no onboarding either — so the only way to become a Well Kept
  * user was to open the web app, sign up, add a car, and *then* install this.
  * Fine for a companion. Fatal for a mobile-first product sold on the App Store:
  * a reviewer downloads it and cannot reach the product at all.
@@ -122,7 +122,7 @@ export async function signUp(
     if (isNetwork) {
       return {
         ok: false,
-        error: 'Could not reach CrewChief. Check your connection and try again.',
+        error: 'Could not reach Well Kept. Check your connection and try again.',
       };
     }
 
@@ -157,7 +157,7 @@ export async function signIn(email: string, password: string): Promise<SignInRes
     return {
       ok: false,
       error: isNetwork
-        ? 'Could not reach CrewChief. Check your connection and try again.'
+        ? 'Could not reach Well Kept. Check your connection and try again.'
         : 'That email and password did not match.',
     };
   }
@@ -194,7 +194,7 @@ export async function signIn(email: string, password: string): Promise<SignInRes
  *
  * Supabase returns the same result whether or not the address has an account,
  * and this passes that through unchanged. Reporting "no such account" would
- * make an unauthenticated screen answer "does this person use CrewChief" — the
+ * make an unauthenticated screen answer "does this person use Well Kept" — the
  * account-existence oracle `signIn` is written to avoid, reachable by anyone who
  * downloads the app. So the copy says what was *sent*, never what was *found*.
  */
@@ -215,7 +215,7 @@ export async function resetPassword(email: string): Promise<SignInResult> {
     return {
       ok: false,
       error: isNetwork
-        ? 'Could not reach CrewChief. Check your connection and try again.'
+        ? 'Could not reach Well Kept. Check your connection and try again.'
         : 'Could not send the reset email. Try again in a moment.',
     };
   }
@@ -282,7 +282,7 @@ export async function resendConfirmation(email: string): Promise<void> {
  * there is nothing here to clear.
  *
  * **When one is added, this function is where it must be cleared**, and the
- * shared rule belongs in `@crewchief/core` rather than being written a third
+ * shared rule belongs in `@wellkept/core` rather than being written a third
  * time. Recorded here because the third implementation is exactly how the web
  * bug happened.
  */

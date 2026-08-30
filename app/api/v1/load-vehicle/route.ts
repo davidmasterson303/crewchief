@@ -1,10 +1,10 @@
-import { logger } from '@crewchief/core/logger';
+import { logger } from '@wellkept/core/logger';
 import { type NextRequest } from 'next/server';
-import type { ApiResponse } from '@crewchief/core/types';
+import type { ApiResponse } from '@wellkept/core/types';
 import { checkRateLimit, getClientIdentifier, rateLimitResponse } from '@/lib/rate-limit';
 import { authorizeVehicleAccess } from '@/lib/api-auth';
 import { resolveVehiclePhoto } from '@/lib/vehicle-photo';
-import { driversForVehicle } from '@crewchief/core/health-drivers';
+import { driversForVehicle } from '@wellkept/core/health-drivers';
 
 export const dynamic = 'force-dynamic';
 

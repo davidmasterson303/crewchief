@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 import { uploadVehiclePhoto, removeVehiclePhoto } from '@/app/actions';
 import { downscaleImage } from '@/lib/image-downscale';
 import { useRouter } from 'next/navigation';
-import { queryClient } from '@crewchief/core/query-client';
+import { queryClient } from '@wellkept/core/query-client';
 
 /**
  * `router.refresh()` alone was not enough, and the reason is worth stating.

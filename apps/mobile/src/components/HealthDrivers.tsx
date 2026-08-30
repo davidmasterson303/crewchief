@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { getHealthBandJudgement, healthBandHex } from '@crewchief/core/health-band';
-import type { HealthDriver } from '@crewchief/core/health-drivers';
+import { getHealthBandJudgement, healthBandHex } from '@wellkept/core/health-band';
+import type { HealthDriver } from '@wellkept/core/health-drivers';
 
 import { TABULAR, border, space, text, type } from '../theme';
 import { interFace } from '../theme/fonts';

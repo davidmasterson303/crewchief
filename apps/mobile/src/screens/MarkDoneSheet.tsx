@@ -9,7 +9,7 @@ import {
   emptyCompletion,
   type CompletionDraft,
   type CompletionProblem,
-} from '@crewchief/core/wishlist-completion';
+} from '@wellkept/core/wishlist-completion';
 import { interFace } from '../theme/fonts';
 
 /**
@@ -33,7 +33,7 @@ import { interFace } from '../theme/fonts';
  * ── Everything it decides lives in core ─────────────────────────────────────
  *
  * What is required, what a blank cost means, whether a date is allowed:
- * `@crewchief/core/wishlist-completion`. This file collects and displays. The
+ * `@wellkept/core/wishlist-completion`. This file collects and displays. The
  * web dialog can adopt the same rules without either surface drifting, which
  * matters because both write to the same history table.
  */

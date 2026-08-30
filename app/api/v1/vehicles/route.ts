@@ -1,11 +1,11 @@
-import { logger } from '@crewchief/core/logger';
+import { logger } from '@wellkept/core/logger';
 import { type NextRequest } from 'next/server';
-import type { ApiResponse } from '@crewchief/core/types';
+import type { ApiResponse } from '@wellkept/core/types';
 import { checkRateLimit, getClientIdentifier, rateLimitResponse } from '@/lib/rate-limit';
 import { authorizeVehicleAccess, requireCaller } from '@/lib/api-auth';
-import { validateMileageUpdate } from '@crewchief/core/mileage-tracking';
-import { validateProfileUpdate } from '@crewchief/core/vehicle-profile';
-import { buildBaselineRow, isBaselineAge } from '@crewchief/core/onboarding-baseline';
+import { validateMileageUpdate } from '@wellkept/core/mileage-tracking';
+import { validateProfileUpdate } from '@wellkept/core/vehicle-profile';
+import { buildBaselineRow, isBaselineAge } from '@wellkept/core/onboarding-baseline';
 import { getServiceRoleClient } from '@/lib/supabase';
 import { resolveVehiclePhotos } from '@/lib/vehicle-photo';
 

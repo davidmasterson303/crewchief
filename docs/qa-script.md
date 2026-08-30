@@ -1,4 +1,4 @@
-# CrewChief — QA script and report format
+# Well Kept — QA script and report format
 
 For an agent or a person testing the live demo. Written 2 Aug 2026 against
 `demo-live @ e729ee96` (promoted from `main @ d3aae46`).

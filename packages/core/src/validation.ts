@@ -1,5 +1,5 @@
 /**
- * CrewChief - Comprehensive Validation Schemas
+ * Well Kept - Comprehensive Validation Schemas
  *
  * Uses Zod for runtime validation of all user inputs, API requests,
  * and database operations. Provides type-safe validation with clear error messages.

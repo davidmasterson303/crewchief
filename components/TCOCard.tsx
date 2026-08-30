@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DollarSign, TrendingDown, Fuel, Wrench, ShieldCheck, ChevronRight, ToggleLeft, ToggleRight, Info, SlidersHorizontal } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { calculateTCO } from '@crewchief/core/tco-calculator';
+import { calculateTCO } from '@wellkept/core/tco-calculator';
 
 interface TCOCardProps {
   vehicle: any;
@@ -163,7 +163,7 @@ export default function TCOCard({ vehicle, vehicleId, onEditInputs }: TCOCardPro
   const purchasePrice = vehicle.purchase_price || 0;
   const extraYears = whatIfMode === 'keep2' ? 2 : 0;
 
-  // The math lives in @crewchief/core so the numbers on this card are the
+  // The math lives in @wellkept/core so the numbers on this card are the
   // numbers the tests assert — they were two separate implementations with
   // two different depreciation models until this was extracted.
   const {

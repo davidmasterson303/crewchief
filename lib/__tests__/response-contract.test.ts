@@ -18,7 +18,7 @@ import {
   findLeakedFields,
   STORED_URL_SCHEME as SCRIPT_SCHEME,
 } from '../../scripts/lib/response-contract.mjs';
-import { STORED_URL_SCHEME } from '@crewchief/core/storage-paths';
+import { STORED_URL_SCHEME } from '@wellkept/core/storage-paths';
 
 describe('the copied scheme constant', () => {
   it('still matches the one the app uses', () => {

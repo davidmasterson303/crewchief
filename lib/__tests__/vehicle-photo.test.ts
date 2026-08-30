@@ -14,8 +14,8 @@
  */
 
 import { resolveVehiclePhoto, resolveVehiclePhotos } from '../vehicle-photo';
-import { STORED_URL_SCHEME, storedUrl } from '@crewchief/core/storage-paths';
-import { DEMO_UNPHOTOGRAPHED_VEHICLE_IDS } from '@crewchief/core/demo';
+import { STORED_URL_SCHEME, storedUrl } from '@wellkept/core/storage-paths';
+import { DEMO_UNPHOTOGRAPHED_VEHICLE_IDS } from '@wellkept/core/demo';
 
 const VEHICLE_ID = '11111111-1111-4111-8111-111111111111';
 const OTHER_VEHICLE_ID = '22222222-2222-4222-8222-222222222222';

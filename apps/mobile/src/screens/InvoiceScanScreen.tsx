@@ -12,7 +12,7 @@ import Button from '../components/Button';
 import { ApiRequestError } from '../api/client';
 import { OPTICAL_CENTRE, PAGE_BODY, border, radius, space, surface, text, type } from '../theme';
 import AiConsentSheet from '../components/AiConsentSheet';
-import { INVOICE_AI_CONSENT } from '@crewchief/core/ai-consent-copy';
+import { INVOICE_AI_CONSENT } from '@wellkept/core/ai-consent-copy';
 import { readAiConsent, recordAiConsent, type AiConsent } from '../onboarding/ai-consent';
 import { interFace } from '../theme/fonts';
 

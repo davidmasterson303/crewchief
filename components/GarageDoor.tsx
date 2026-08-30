@@ -17,7 +17,7 @@ import {
   INTRO_PLAYED_KEY,
   INTRO_PLAYED_VALUE,
   type IntroDecision,
-} from '@crewchief/core/intro-gate';
+} from '@wellkept/core/intro-gate';
 
 /**
  * The first-load intro curtain: a garage door that lifts to reveal the page.

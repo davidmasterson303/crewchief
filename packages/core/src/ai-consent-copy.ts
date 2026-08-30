@@ -4,7 +4,7 @@
  * ── ⚠ Guideline 5.1.2(i), amended November 2025 (LEG-02) ────────────────────
  *
  * Apple now requires **explicit permission** before personal data is shared
- * with a third-party AI — not disclosure, permission. CrewChief has the
+ * with a third-party AI — not disclosure, permission. Well Kept has the
  * disclosure: the privacy policy names Google and says what goes there. The
  * only *consent* was sign-up wrap, which is not what the amendment asks for.
  *
@@ -48,7 +48,7 @@ export interface AiConsentCopy {
 export const INVOICE_AI_CONSENT: AiConsentCopy = {
   title: 'Reading an invoice uses Google’s AI',
   body:
-    'To pull the line items off a photograph, CrewChief sends the image to Google’s Gemini service. Before that happens, it is worth knowing what is in it.',
+    'To pull the line items off a photograph, Well Kept sends the image to Google’s Gemini service. Before that happens, it is worth knowing what is in it.',
   points: [
     'The photograph goes to Google, not just the text we read from it.',
     'An invoice usually carries the shop’s name and address as well as your car’s.',
@@ -57,7 +57,7 @@ export const INVOICE_AI_CONSENT: AiConsentCopy = {
   accept: 'Scan invoices',
   decline: 'Not now',
   declineNote:
-    'You can still add services by hand, and everything else in CrewChief works the same. Ask again any time from a scan.',
+    'You can still add services by hand, and everything else in Well Kept works the same. Ask again any time from a scan.',
 };
 
 /**
@@ -71,7 +71,7 @@ export const INVOICE_AI_CONSENT: AiConsentCopy = {
 export const ADVISOR_AI_CONSENT: AiConsentCopy = {
   title: 'The advisor is Google’s AI',
   body:
-    'CrewChief sends your question and this car’s records — its service history, its open recalls, the mileage you have recorded — to Google’s Gemini service to answer.',
+    'Well Kept sends your question and this car’s records — its service history, its open recalls, the mileage you have recorded — to Google’s Gemini service to answer.',
   points: [
     'Your question and this car’s records go to Google.',
     'No photographs and no documents are sent from here.',
@@ -80,5 +80,5 @@ export const ADVISOR_AI_CONSENT: AiConsentCopy = {
   accept: 'Ask the advisor',
   decline: 'Not now',
   declineNote:
-    'Everything else in CrewChief works the same without it. Ask again any time from this screen.',
+    'Everything else in Well Kept works the same without it. Ask again any time from this screen.',
 };

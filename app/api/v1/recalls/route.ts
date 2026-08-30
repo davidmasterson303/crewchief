@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { logger } from '@crewchief/core/logger';
+import { logger } from '@wellkept/core/logger';
 import { authorizeVehicleAccess } from '@/lib/api-auth';
 import { getServiceRoleClient } from '@/lib/supabase';
 import { checkRateLimit, getClientIdentifier, rateLimitResponse } from '@/lib/rate-limit';

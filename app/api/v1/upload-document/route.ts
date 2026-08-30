@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { uploadInvoice } from '@/app/actions';
-import { logger } from '@crewchief/core/logger';
-import { MAX_FILE_SIZE, ALLOWED_DOCUMENT_TYPES } from '@crewchief/core/validation';
-import type { ApiResponse } from '@crewchief/core/types';
+import { logger } from '@wellkept/core/logger';
+import { MAX_FILE_SIZE, ALLOWED_DOCUMENT_TYPES } from '@wellkept/core/validation';
+import type { ApiResponse } from '@wellkept/core/types';
 import { checkRateLimit, getClientIdentifier, rateLimitResponse } from '@/lib/rate-limit';
 import { authorizeVehicleAccess } from '@/lib/api-auth';
 

@@ -307,7 +307,7 @@ describe('a bare StoreKit transaction, as the purchase path sends it', () => {
  * never compared — a repo-wide search returned exactly one hit, `app.json:11`,
  * the Expo config. Apple's WWDR chain signs transactions for **every app in the
  * store**, so a verified chain proved *"Apple signed this"*, not *"Apple signed
- * this for CrewChief"*. The only product gate was a name lookup in
+ * this for Well Kept"*. The only product gate was a name lookup in
  * `PRODUCT_TIERS` — an accident of naming, not a control.
  */
 describe('a transaction has to be for this app', () => {

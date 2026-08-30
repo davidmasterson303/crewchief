@@ -2,14 +2,14 @@ import { ApiRequestError, apiRequest } from './client';
 import {
   verifyOutcomeFromStatus,
   type VerifyOutcome,
-} from '@crewchief/core/purchase-flow';
+} from '@wellkept/core/purchase-flow';
 
 /**
  * Turning a completed StoreKit purchase into an entitlement.
  *
  * Phase 6, E8. StoreKit hands the app a signed transaction; this sends it to
  * `POST /api/v1/iap/verify`, which is the only place the association between a
- * subscription and a CrewChief account is ever made.
+ * subscription and a Well Kept account is ever made.
  *
  * ── Why this returns an outcome instead of throwing ─────────────────────────
  *
@@ -25,7 +25,7 @@ import {
  * recorded" is exactly the difference between a customer who buys again and one
  * who does not.
  *
- * The mapping itself lives in `@crewchief/core/purchase-flow` beside the route
+ * The mapping itself lives in `@wellkept/core/purchase-flow` beside the route
  * contract it mirrors, so the two cannot drift in separate files.
  */
 export async function verifyPurchase(jwsRepresentation: string): Promise<VerifyOutcome> {

@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Calendar, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { uploadInvoiceForCompletion } from '@/app/actions';
-import { logger } from '@crewchief/core/logger';
+import { logger } from '@wellkept/core/logger';
 
 interface CompletionDetailsDialogProps {
   open: boolean;

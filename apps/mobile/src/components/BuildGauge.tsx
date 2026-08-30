@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
-import { CX, CY, R, TRACK, VIEW_H, VIEW_W, pointAt } from '@crewchief/core/cluster-geometry';
+import { CX, CY, R, TRACK, VIEW_H, VIEW_W, pointAt } from '@wellkept/core/cluster-geometry';
 import {
   REDLINE_FROM,
   buildRampFor,
   isRedlined,
   type BuildPosition,
-} from '@crewchief/core/build-progress';
+} from '@wellkept/core/build-progress';
 
 import { DIAL_MIN, build, surface, text, type } from '../theme';
 import { useReducedMotion } from '../motion/reduced-motion';
@@ -24,8 +24,8 @@ import { useReducedMotion } from '../motion/reduced-motion';
  * health gauge would render an unmodified car as a critical failure and
  * announce it to a screen reader as one.
  *
- * So the geometry is shared through `@crewchief/core/cluster-geometry`, the
- * region is shared through `@crewchief/core/build-progress`, and the *meaning*
+ * So the geometry is shared through `@wellkept/core/cluster-geometry`, the
+ * region is shared through `@wellkept/core/build-progress`, and the *meaning*
  * is not shared with health at all. Two gauges in one cluster, one set of
  * numbers describing the glass.
  *

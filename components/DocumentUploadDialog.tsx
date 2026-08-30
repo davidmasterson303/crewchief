@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { INVOICE_AI_CONSENT } from '@crewchief/core/ai-consent-copy';
+import { INVOICE_AI_CONSENT } from '@wellkept/core/ai-consent-copy';
 
 /**
  * Where this browser's answer lives — LEG-02.
@@ -19,11 +19,11 @@ import { Label } from '@/components/ui/label';
 import { Upload, FileText, Camera, X, TriangleAlert as AlertTriangle, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import InvoiceProcessingLoader from './InvoiceProcessingLoader';
-import type { ScanProgress } from '@crewchief/core/scan-progress';
-import { invalidateDashboardCache } from '@crewchief/core/query-invalidation';
+import type { ScanProgress } from '@wellkept/core/scan-progress';
+import { invalidateDashboardCache } from '@wellkept/core/query-invalidation';
 import { generateVehicleHealthSummary } from '@/app/actions';
 import { downscaleImage } from '@/lib/image-downscale';
-import { DOC_MAX_EDGE, DOC_TARGET_BYTES, isDownscalableImage } from '@crewchief/core/image-resize';
+import { DOC_MAX_EDGE, DOC_TARGET_BYTES, isDownscalableImage } from '@wellkept/core/image-resize';
 
 interface DocumentUploadDialogProps {
   vehicleId: string;
@@ -74,7 +74,7 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
    * ⚠ **Guideline 5.1.2(i), amended November 2025**, requires explicit
    * permission before personal data reaches a third-party AI. The audit's fix
    * asks for the sheet on the phone **and mirrored on the web upload dialog**,
-   * and mirrored means the same words: `@crewchief/core/ai-consent-copy` holds
+   * and mirrored means the same words: `@wellkept/core/ai-consent-copy` holds
    * them, so the two clients cannot end up asking for two different consents.
    *
    * `localStorage` here rather than a server column, matching the phone's
@@ -598,7 +598,7 @@ export default function DocumentUploadDialog({ vehicleId, open, onOpenChange, on
       {/*
         ── ⚠ LEG-02 · the same consent the phone asks for, in the same words ──
 
-        `@crewchief/core/ai-consent-copy` holds the text so the two clients
+        `@wellkept/core/ai-consent-copy` holds the text so the two clients
         cannot end up asking for two different consents — which is what a
         second, hand-written copy on this side would be.
 

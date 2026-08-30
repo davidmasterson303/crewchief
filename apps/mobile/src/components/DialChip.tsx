@@ -1,8 +1,8 @@
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
-import { R, TRACK, VIEW_H, VIEW_W } from '@crewchief/core/cluster-geometry';
-import { getHealthBandJudgement, healthBandHex } from '@crewchief/core/health-band';
+import { R, TRACK, VIEW_H, VIEW_W } from '@wellkept/core/cluster-geometry';
+import { getHealthBandJudgement, healthBandHex } from '@wellkept/core/health-band';
 import { TABULAR, border, plinth, radius, space, surface } from '../theme';
 import { interFace } from '../theme/fonts';
 
@@ -29,7 +29,7 @@ import { interFace } from '../theme/fonts';
  *
  * The design system's own `row` variant evidently draws a small arc; this
  * app's does not. Rather than change a shared instrument to settle it, the arc
- * is drawn here from **`@crewchief/core/cluster-geometry`** — the same `TRACK`
+ * is drawn here from **`@wellkept/core/cluster-geometry`** — the same `TRACK`
  * path and viewBox the real dial uses — so it cannot drift from the instrument
  * it is standing in for.
  *

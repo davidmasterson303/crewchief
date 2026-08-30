@@ -1,7 +1,7 @@
-import { logger } from '@crewchief/core/logger';
+import { logger } from '@wellkept/core/logger';
 import type { NextRequest } from 'next/server';
 
-import type { ApiResponse } from '@crewchief/core/types';
+import type { ApiResponse } from '@wellkept/core/types';
 import { checkRateLimit, getClientIdentifier, rateLimitResponse } from '@/lib/rate-limit';
 import { requireSession } from '@/lib/api-auth';
 import { getAppleRootCertificates, APPLE_BUNDLE_ID } from '@/lib/apple-root-ca';
@@ -24,7 +24,7 @@ export const dynamic = 'force-dynamic';
  *
  * Apple's later notifications carry an `original_transaction_id` and **no
  * user** — Apple has no idea who our accounts are. The link between "this
- * subscription" and "this CrewChief account" exists only because this route saw
+ * subscription" and "this Well Kept account" exists only because this route saw
  * a signed-in session and a signed transaction at the same moment. Everything
  * the webhook does afterwards is a lookup against what happened here.
  *
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     /*
       ⚠ IAP-03. Apple's chain signs transactions for **every app in the
       store**, so anchoring proves "Apple signed this", not "Apple signed this
-      for CrewChief".
+      for Well Kept".
     */
     bundleId: APPLE_BUNDLE_ID,
   });

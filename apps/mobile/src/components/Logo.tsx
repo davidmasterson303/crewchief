@@ -1,5 +1,5 @@
 /**
- * The CrewChief mark — "Sweep" — and its two lockups, native cut.
+ * The Well Kept mark — "Sweep" — and its two lockups, native cut.
  *
  * This is the only place the mark's path data exists in `apps/mobile`;
  * the web twin is `components/brand/Logo.tsx` at the repo root. Placements
@@ -83,7 +83,7 @@ export function Logo({
 }: LogoProps) {
   if (variant === 'mark') {
     return (
-      <View accessibilityRole="image" accessibilityLabel="CrewChief">
+      <View accessibilityRole="image" accessibilityLabel="Well Kept">
         <Mark size={size} color={color} mono={mono} />
       </View>
     );
@@ -94,8 +94,13 @@ export function Logo({
   const nameSize = size * (horizontal ? H_NAME : S_NAME);
 
   /* The name is real text beside the mark, so a screen reader says
-     "CrewChief" once, as a word. One word, mixed case — never "Crew Chief",
-     never all-caps, never a colour split across the two C's. */
+     "Well Kept" once, as words. Two words, both capitalised — never
+     "WellKept", never all-caps, never a colour split between them.
+
+     ⚠ The tracking below was cut for "CrewChief", a single nine-letter word.
+     It has not been re-cut for a two-word mark, and `public/brand`'s lockups
+     still draw the old wordmark as outlines. Design's call; logged in
+     docs/design-system-drift.md. */
   return (
     <View
       style={{
@@ -114,7 +119,7 @@ export function Logo({
           color: nameColor,
         }}
       >
-        CrewChief
+        Well Kept
       </Text>
     </View>
   );

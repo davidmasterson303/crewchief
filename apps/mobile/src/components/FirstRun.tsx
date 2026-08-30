@@ -4,7 +4,7 @@ import EmptyState from './EmptyState';
 import { border, space, text, type } from '../theme';
 
 /**
- * What CrewChief does, said once, to someone who has never had a car in it.
+ * What Well Kept does, said once, to someone who has never had a car in it.
  *
  * ── ⚠ Not a route, and that is deliberate ───────────────────────────────────
  *
@@ -61,11 +61,11 @@ export default function FirstRun({ onAddVehicle }: { onAddVehicle: () => void })
       headline="Start with one car"
       /*
         What happens *after* the tap, in one sentence, because that is the thing
-        being asked for on trust. "Add your first car and CrewChief gets to work
+        being asked for on trust. "Add your first car and Well Kept gets to work
         on it" — the copy this replaces — described the button rather than the
         product.
       */
-      body="Add it and CrewChief researches it: what it needs, what has been recalled, and what the work should cost."
+      body="Add it and Well Kept researches it: what it needs, what has been recalled, and what the work should cost."
       actionLabel="Add your first car"
       onAction={onAddVehicle}
     >

@@ -40,9 +40,9 @@ import {
   normaliseRecalls,
   type NormalisedRecall,
   type RecallSeverity,
-} from '@crewchief/core/recalls';
-import { RECALL_MATCH_CAVEAT } from '@crewchief/core/advice-disclosure';
-import { healthClaim } from '@crewchief/core/health-claims';
+} from '@wellkept/core/recalls';
+import { RECALL_MATCH_CAVEAT } from '@wellkept/core/advice-disclosure';
+import { healthClaim } from '@wellkept/core/health-claims';
 import { interFace } from '../theme/fonts';
 
 /**

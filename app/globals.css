@@ -188,7 +188,7 @@ nav {
         #0E7490 + #06181C             = 3.39:1  — FAILS. Never ship this pair.
         #0E7490 + #F2FBFD (light ink) = 5.10:1  — what this is now
       The old pairing already passed, so this is a design change rather than an
-      AA fix: every other surface in CrewChief is light-on-dark, and dark ink on
+      AA fix: every other surface in Well Kept is light-on-dark, and dark ink on
       the one filled CTA reads as a highlighter — the v4 failure where three
       competing CTAs on a screen meant no primary at all. It also keeps real
       distance between the fill and the reserved cyan-400 accent.

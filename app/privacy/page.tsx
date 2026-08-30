@@ -4,8 +4,8 @@ import LegalDocument, { LegalSection } from '@/components/legal/LegalDocument';
 import { CONTACT_EMAIL, OPERATOR } from '@/lib/legal';
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy · CrewChief',
-  description: 'What CrewChief collects, why, who else sees it, and how to delete it.',
+  title: 'Privacy Policy · Well Kept',
+  description: 'What Well Kept collects, why, who else sees it, and how to delete it.',
 };
 
 /**
@@ -55,10 +55,10 @@ export default function PrivacyPolicyPage() {
   return (
     <LegalDocument
       title="Privacy Policy"
-      summary="CrewChief keeps records about your car so it can give you useful answers about it. It does not track you, does not show advertising, and does not sell anything about you to anybody."
+      summary="Well Kept keeps records about your car so it can give you useful answers about it. It does not track you, does not show advertising, and does not sell anything about you to anybody."
     >
       <p>
-        This policy describes what {OPERATOR} collects through the CrewChief app and website, why,
+        This policy describes what {OPERATOR} collects through the Well Kept app and website, why,
         who else is involved, and how to get rid of it.
       </p>
 
@@ -67,7 +67,7 @@ export default function PrivacyPolicyPage() {
       <p>
         <strong className="text-white/90">Your account.</strong> An email address and a password.
         The password is held by our authentication provider and is never visible to us. A display
-        name is optional, free text, and never required — CrewChief does not ask for your legal
+        name is optional, free text, and never required — Well Kept does not ask for your legal
         name.
       </p>
 
@@ -123,7 +123,7 @@ export default function PrivacyPolicyPage() {
       <LegalSection>Who else sees it</LegalSection>
 
       <p>
-        CrewChief is built on services that necessarily process your data to work:
+        Well Kept is built on services that necessarily process your data to work:
       </p>
 
       {/*
@@ -181,7 +181,7 @@ export default function PrivacyPolicyPage() {
       <LegalSection>Children</LegalSection>
 
       <p>
-        CrewChief is not directed at children under 13 and we do not knowingly collect information
+        Well Kept is not directed at children under 13 and we do not knowingly collect information
         from them.
       </p>
 

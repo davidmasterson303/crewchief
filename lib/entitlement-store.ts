@@ -37,12 +37,12 @@
  * nothing unguarded is ever stored.
  */
 
-import { logger } from '@crewchief/core/logger';
+import { logger } from '@wellkept/core/logger';
 import {
   applyAppleNotification,
   type AppleSubscriptionEvent,
   type StoredEntitlement,
-} from '@crewchief/core/apple-subscription';
+} from '@wellkept/core/apple-subscription';
 
 import { getServiceRoleClient } from '@/lib/supabase';
 

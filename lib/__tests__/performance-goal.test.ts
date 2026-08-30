@@ -3,7 +3,7 @@
  *
  * ── The bug this pins ───────────────────────────────────────────────────────
  *
- * CrewChief has two columns for one concept:
+ * Well Kept has two columns for one concept:
  *
  *   performance_mindedness  enum  stock | mild | aggressive     (owner picks it)
  *   performance_goal        text  mild | moderate | aggressive  (default 'moderate')

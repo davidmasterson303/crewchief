@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Car } from 'lucide-react';
-import { vehicleField } from '@crewchief/core/vehicle-identity';
-import { vehicleBlurData } from '@crewchief/core/vehicle-blur';
-import { cardSlotSource } from '@crewchief/core/photo-slots';
+import { vehicleField } from '@wellkept/core/vehicle-identity';
+import { vehicleBlurData } from '@wellkept/core/vehicle-blur';
+import { cardSlotSource } from '@wellkept/core/photo-slots';
 
 /**
  * What a vehicle looks like — one component, two variants.

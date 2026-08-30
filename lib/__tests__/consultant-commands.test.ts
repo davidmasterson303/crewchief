@@ -3,7 +3,7 @@ import {
   parsePerformanceCommands,
   parseStatusCommands,
   parseInvoiceFlag,
-} from '@crewchief/core/consultant-commands';
+} from '@wellkept/core/consultant-commands';
 
 describe('parseWishlistCommands', () => {
   it('parses a well-formed command and strips it from the response', () => {

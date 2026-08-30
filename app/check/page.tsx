@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Camera, Loader2 } from 'lucide-react';
-import { formatCurrency } from '@crewchief/core/formatting-utils';
+import { formatCurrency } from '@wellkept/core/formatting-utils';
 
 /**
  * The anonymous front door. Phase 2.97b, decision D9.

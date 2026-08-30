@@ -10,27 +10,27 @@ import {
 } from '@/lib/gemini';
 import { checkDemoBudget, checkMonthlyBudget } from '@/lib/ai-budget';
 import { checkFeatureAccess, featureRefusal } from '@/lib/feature-gate';
-import { checkStoredPhotoSize } from '@crewchief/core/image-resize';
-import { budgetMessage, demoBudgetMessage } from '@crewchief/core/ai/budget';
-import { POWERTRAIN_OPTIONS_PROMPT, CONSULTANT_SYSTEM_PROMPT, CONSULTANT_DOCUMENT_VALIDATION_PROMPT } from '@crewchief/core/prompts';
+import { checkStoredPhotoSize } from '@wellkept/core/image-resize';
+import { budgetMessage, demoBudgetMessage } from '@wellkept/core/ai/budget';
+import { POWERTRAIN_OPTIONS_PROMPT, CONSULTANT_SYSTEM_PROMPT, CONSULTANT_DOCUMENT_VALIDATION_PROMPT } from '@wellkept/core/prompts';
 import { researchVehicleDossier } from '@/lib/vehicle-research';
-import { showsModifications } from '@crewchief/core/mod-progression';
-import { logger } from '@crewchief/core/logger';
-import { healthClaim, recallEvidenceForPrompt } from '@crewchief/core/health-claims';
+import { showsModifications } from '@wellkept/core/mod-progression';
+import { logger } from '@wellkept/core/logger';
+import { healthClaim, recallEvidenceForPrompt } from '@wellkept/core/health-claims';
 import {
   firstNumber,
   firstString,
   firstStringArray,
   scoreInRange,
-} from '@crewchief/core/model-json';
-import { recallsWereChecked } from '@crewchief/core/nhtsa-lookup';
+} from '@wellkept/core/model-json';
+import { recallsWereChecked } from '@wellkept/core/nhtsa-lookup';
 import { CONTACT_EMAIL } from '@/lib/legal';
 import { checkRateLimit } from '@/lib/rate-limit';
 import {
   isModDetailCacheFresh,
   modDetailCacheKey,
-} from '@crewchief/core/mod-detail-cache';
-import { platformClientIp } from '@crewchief/core/client-ip';
+} from '@wellkept/core/mod-detail-cache';
+import { platformClientIp } from '@wellkept/core/client-ip';
 import { recomputePerformanceStats } from '@/lib/performance-stats';
 import { recordAiUsageInBackground } from '@/lib/ai-usage';
 import { downloadStoredFile } from '@/lib/storage-objects';
@@ -41,20 +41,20 @@ import {
   NOT_FOUND_MESSAGE,
   requireSession,
 } from '@/lib/api-auth';
-import { isDemoVehicleId } from '@crewchief/core/demo';
+import { isDemoVehicleId } from '@wellkept/core/demo';
 import {
   vehicleStoragePath,
   vehicleIdFromStoragePath,
   storedUrl,
   storagePathFromStoredUrl,
-} from '@crewchief/core/storage-paths';
-import { parseWishlistCommands, parsePerformanceCommands, parseStatusCommands, parseInvoiceFlag } from '@crewchief/core/consultant-commands';
-import { parseEstimate } from '@crewchief/core/consultant-estimate';
-import { validateData, vehicleIdSchema, serviceItemSchema, maintenanceLineItemSchema, quoteRequestSchema } from '@crewchief/core/validation';
-import { withRetry } from '@crewchief/core/retry';
-import type { Vehicle, ServiceItem, MaintenanceLineItem, KnowledgeBase, ApiResponse, ConsultantContext } from '@crewchief/core/types';
+} from '@wellkept/core/storage-paths';
+import { parseWishlistCommands, parsePerformanceCommands, parseStatusCommands, parseInvoiceFlag } from '@wellkept/core/consultant-commands';
+import { parseEstimate } from '@wellkept/core/consultant-estimate';
+import { validateData, vehicleIdSchema, serviceItemSchema, maintenanceLineItemSchema, quoteRequestSchema } from '@wellkept/core/validation';
+import { withRetry } from '@wellkept/core/retry';
+import type { Vehicle, ServiceItem, MaintenanceLineItem, KnowledgeBase, ApiResponse, ConsultantContext } from '@wellkept/core/types';
 import { z } from 'zod';
-import { FLASH_MODEL, LITE_MODEL, FLASH_VISION_MODEL } from '@crewchief/core/ai/models';
+import { FLASH_MODEL, LITE_MODEL, FLASH_VISION_MODEL } from '@wellkept/core/ai/models';
 
 import {
   addItemToWishlist as _addItemToWishlist,
@@ -86,7 +86,7 @@ export async function getWishlistItems(vehicleId: string) {
 
 /*
   The schema this file validates the research response against lives in
-  `@crewchief/core/vehicle-utils`, and used to be **defined twice** — here and
+  `@wellkept/core/vehicle-utils`, and used to be **defined twice** — here and
   there, identically, both parsing the output of one prompt.
 
   Two copies of one contract is a drift hazard rather than a tidiness
@@ -199,7 +199,7 @@ export async function decodeVIN(vin: string) {
 
       ⚠ The message says a VIN is registered and nothing else. No owner, no id,
       no "belongs to <someone>". It is a real if small disclosure — you can
-      learn a given VIN is in CrewChief — and the alternative is a dead end
+      learn a given VIN is in Well Kept — and the alternative is a dead end
       with no explanation, which is worse for the one person who has a genuine
       reason to be here: somebody who has just bought the car.
 
@@ -224,7 +224,7 @@ export async function decodeVIN(vin: string) {
       });
       return {
         success: false,
-        error: `This VIN is already registered to another CrewChief account. If you have just bought this vehicle, contact ${CONTACT_EMAIL} and we will transfer it.`,
+        error: `This VIN is already registered to another Well Kept account. If you have just bought this vehicle, contact ${CONTACT_EMAIL} and we will transfer it.`,
       };
     }
 
@@ -1281,6 +1281,16 @@ export async function sendConsultantMessage(params: {
         .filter((line: string | null): line is string => line !== null),
     });
 
+    /*
+      ⚠ `CrewChief` is the ADVISOR'S name, not the product's, and it stays
+      until the persona is renamed. The product became Well Kept on 30 Aug;
+      the character did not, because nobody has chosen what it is called yet.
+
+      This label and the one below have to match the name in `prompts.ts` —
+      the transcript is fed back as context, so a model told it is one
+      character and shown a script attributed to another has been handed a
+      third party mid-conversation. Rename all three together or none.
+    */
     const conversationHistory = messageHistory.slice(-20);
     const conversationText = conversationHistory
       .map((msg: any) => `${msg.role === 'user' ? 'Owner' : 'CrewChief'}: ${msg.content}`)
@@ -2154,7 +2164,7 @@ Format as valid JSON only, no markdown.`;
     /*
       ── ⚠ FN-01 · the prompt asks camelCase and this read snake_case ─────────
 
-      **Every health score CrewChief has ever generated was 70.** The prompt
+      **Every health score Well Kept has ever generated was 70.** The prompt
       above asks for `healthScore`, `redFlags`, `maintenanceStatus`,
       `recallStatus` and `issuesOverview`; this block read `health_score`,
       `red_flags` and the rest in snake_case. `healthData.health_score` was
@@ -2944,7 +2954,7 @@ export async function updateVehicleAvgMileage(vehicleId: string, avgMilesPerMont
  * A truer word for "interested" would need `ALTER TYPE` and a hand-applied
  * migration, which is not worth spending on a label. `mild` means interested;
  * `aggressive` is legacy and read-only. Nothing branches on the difference —
- * `showsModifications` in `@crewchief/core/mod-progression` is the whole rule,
+ * `showsModifications` in `@wellkept/core/mod-progression` is the whole rule,
  * and this writes the values that rule reads.
  */
 export async function setModificationsVisible(vehicleId: string, visible: boolean) {
@@ -6522,7 +6532,7 @@ export async function generateQuoteRequestV2(
       A quote is the most convincing thing this product does — it turns a
       wishlist into priced work with an email a shop can answer — and until
       17 Aug the public demo refused it outright with "Demo vehicles are
-      read-only". Someone evaluating CrewChief saw the setup and not the payoff.
+      read-only". Someone evaluating Well Kept saw the setup and not the payoff.
 
       The block was right about the database and wrong about the feature.
       Generating costs nothing but an AI call; **storing** is what would let an

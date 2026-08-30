@@ -29,7 +29,7 @@
 
   Keying on `vehicle_id` is what makes the existing cache unable to help a
   second owner. This one is keyed on the *content of the question*, computed by
-  `modDetailCacheKey` in `@crewchief/core/mod-detail-cache`, so the first person
+  `modDetailCacheKey` in `@wellkept/core/mod-detail-cache`, so the first person
   to open a mod on a 2018 Accord pays for it and everybody after them does not.
 
   ⚠ The key must contain **every value the prompt interpolates**. A key narrower

@@ -31,9 +31,9 @@
 
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { DEMO_UNPHOTOGRAPHED_VEHICLE_IDS } from '@crewchief/core/demo';
-import { cardSlotSource } from '@crewchief/core/photo-slots';
-import { VEHICLE_BLUR_DATA } from '@crewchief/core/vehicle-blur';
+import { DEMO_UNPHOTOGRAPHED_VEHICLE_IDS } from '@wellkept/core/demo';
+import { cardSlotSource } from '@wellkept/core/photo-slots';
+import { VEHICLE_BLUR_DATA } from '@wellkept/core/vehicle-blur';
 
 const ROOT = join(__dirname, '..', '..');
 const PUBLIC = join(ROOT, 'public');

@@ -1,5 +1,5 @@
 /**
- * CrewChief - Error Boundary Component
+ * Well Kept - Error Boundary Component
  *
  * React error boundary that catches component errors and displays
  * a user-friendly fallback UI. Logs all errors for debugging.
@@ -19,7 +19,7 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
-import { logger } from '@crewchief/core/logger';
+import { logger } from '@wellkept/core/logger';
 
 interface Props {
   children: ReactNode;

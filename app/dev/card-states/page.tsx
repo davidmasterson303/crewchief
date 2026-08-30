@@ -30,7 +30,7 @@ export default function CardStatesPage() {
    *
    * The first version of this page reused the Accord's demo UUID, and every
    * card rendered the Accord photograph under "2019 BMW M3" text — because
-   * VehicleCard hard-overrides demo vehicles from @crewchief/core/demo's DEMO_IMAGES and
+   * VehicleCard hard-overrides demo vehicles from @wellkept/core/demo's DEMO_IMAGES and
    * ignores image_url entirely for them. Useful accident: it is a live
    * demonstration of the two-sources-of-truth problem that A6 exists to delete.
    *

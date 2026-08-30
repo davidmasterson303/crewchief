@@ -1,6 +1,6 @@
 {
-  "name": "CrewChief",
-  "short_name": "CrewChief",
+  "name": "Well Kept",
+  "short_name": "Well Kept",
   "description": "An AI consultant that knows your car.",
   "start_url": "/",
   "display": "standalone",

@@ -16,8 +16,8 @@
  * judgements are the half worth reading.
  */
 
-import { MIN_SPREAD_FRACTION } from '@crewchief/core/advice-range';
-import { parseEstimate } from '@crewchief/core/consultant-estimate';
+import { MIN_SPREAD_FRACTION } from '@wellkept/core/advice-range';
+import { parseEstimate } from '@wellkept/core/consultant-estimate';
 
 /** The board's own worked example, as the model would emit it. */
 const BOARD_EXAMPLE = `Brake fluid's looking tired. Here's the damage:

@@ -17,7 +17,7 @@
  *
  * It catches **drift**: a named function, table or path that no longer exists.
  * That is the failure mode that produced ten stale `lib/` paths after the
- * Phase 2.4 move into `@crewchief/core` — including `lib/onboarding.ts`, which
+ * Phase 2.4 move into `@wellkept/core` — including `lib/onboarding.ts`, which
  * the knowledge base corrected on 28 Jul while this file kept the old path.
  *
  * It cannot catch a **false capability claim**, which is a semantic statement

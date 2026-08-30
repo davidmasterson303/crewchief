@@ -1,5 +1,5 @@
 /**
- * CrewChief - API route authorization
+ * Well Kept - API route authorization
  *
  * Every API route that touches vehicle-scoped data must run through
  * `authorizeVehicleAccess` before it reaches for a privileged client.
@@ -25,9 +25,9 @@ import {
   getServerClient,
   getServiceRoleClient,
 } from '@/lib/supabase';
-import { isDemoVehicleId } from '@crewchief/core/demo';
-import { vehicleIdSchema } from '@crewchief/core/validation';
-import { logger } from '@crewchief/core/logger';
+import { isDemoVehicleId } from '@wellkept/core/demo';
+import { vehicleIdSchema } from '@wellkept/core/validation';
+import { logger } from '@wellkept/core/logger';
 
 export type AccessIntent = 'read' | 'write';
 

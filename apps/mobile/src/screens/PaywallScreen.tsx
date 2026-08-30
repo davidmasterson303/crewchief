@@ -6,13 +6,13 @@ import Button from '../components/Button';
 import Well from '../components/Well';
 import { API_BASE_URL } from '../config';
 import { border, radius, space, surface, text, type } from '../theme';
-import type { PurchaseResolution } from '@crewchief/core/purchase-flow';
+import type { PurchaseResolution } from '@wellkept/core/purchase-flow';
 import {
   FREE_FEATURES,
   FREE_FEATURE_COPY,
   PAID_FEATURES,
   PAID_FEATURE_COPY,
-} from '@crewchief/core/paid-features';
+} from '@wellkept/core/paid-features';
 
 /**
  * One thing somebody can buy.
@@ -39,7 +39,7 @@ export interface SubscriptionOption {
  *
  * Phase 6, E8. Presentational and orchestrating only: it renders what it is
  * given and calls back. Every decision about what a purchase *means* is in
- * `@crewchief/core/purchase-flow`, which is why this screen can be tested
+ * `@wellkept/core/purchase-flow`, which is why this screen can be tested
  * without StoreKit, a sandbox account or a network.
  *
  * ── ⚠ It never decides that somebody is entitled ────────────────────────────
@@ -106,7 +106,7 @@ export default function PaywallScreen({
     <Modal visible={visible} animationType="slide" onRequestClose={onClose} transparent={false}>
       <View style={styles.root}>
         <View style={styles.bar}>
-          <Text style={styles.barTitle}>CrewChief Plus</Text>
+          <Text style={styles.barTitle}>Well Kept Plus</Text>
           <Pressable
             onPress={onClose}
             hitSlop={12}
@@ -246,7 +246,7 @@ export default function PaywallScreen({
             <Text style={styles.termsText}>
               Payment is taken by Apple when you confirm. A subscription renews automatically for
               the same period unless you turn renewal off at least 24 hours before it ends. You can
-              cancel any time in your Apple ID settings — deleting your CrewChief account does not
+              cancel any time in your Apple ID settings — deleting your Well Kept account does not
               stop the billing.
             </Text>
           </View>

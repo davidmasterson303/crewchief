@@ -32,7 +32,7 @@ import { StyleSheet, Text } from 'react-native';
  */
 
 /**
- * Every CrewChief screen renders on this.
+ * Every Well Kept screen renders on this.
  *
  * ⚠ **Moved from `#080808` to `#100F0D` on 14 Aug** with the v8 token layer.
  * The old value was a flat neutral black this app invented; `surface.page` is

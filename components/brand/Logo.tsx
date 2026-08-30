@@ -1,5 +1,5 @@
 /**
- * The CrewChief mark — "Sweep" — and its two lockups.
+ * The Well Kept mark — "Sweep" — and its two lockups.
  *
  * This file is the only place the mark's path data exists, on either
  * platform's web side. Placements render <Logo/>; nothing loads an SVG file.
@@ -64,7 +64,7 @@ function Mark({
 }) {
   const small = size < 24;
   const a11y = standalone
-    ? ({ role: 'img', 'aria-label': 'CrewChief' } as const)
+    ? ({ role: 'img', 'aria-label': 'Well Kept' } as const)
     : ({ 'aria-hidden': true } as const);
   return (
     <svg
@@ -121,8 +121,13 @@ export function Logo({
   const nameSize = size * (horizontal ? H_NAME : S_NAME);
 
   /* The name is real text beside an aria-hidden mark, so assistive tech reads
-     "CrewChief" once, as words. One word, mixed case — never "Crew Chief",
-     never all-caps, never a colour split across the two C's. */
+     "Well Kept" once, as words. Two words, both capitalised — never
+     "WellKept", never all-caps, never a colour split between them.
+
+     ⚠ The tracking below was cut for "CrewChief", a single nine-letter word.
+     It has not been re-cut for a two-word mark, and `public/brand`'s lockups
+     still draw the old wordmark as outlines. Design's call; logged in
+     docs/design-system-drift.md. */
   return (
     <span
       className={`inline-flex ${horizontal ? 'flex-row items-center' : 'flex-col items-center'}${
@@ -140,7 +145,7 @@ export function Logo({
           color: nameColor,
         }}
       >
-        CrewChief
+        Well Kept
       </span>
     </span>
   );

@@ -19,7 +19,7 @@ import {
   statesVerdict,
   verdictTermsIn,
   widenToHonestSpread,
-} from '@crewchief/core/advice-range';
+} from '@wellkept/core/advice-range';
 
 describe('statesVerdict', () => {
   it.each([...VERDICT_TERMS.shop])('catches the verdict term %s', (term) => {

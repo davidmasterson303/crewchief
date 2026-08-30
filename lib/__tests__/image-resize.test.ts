@@ -21,7 +21,7 @@ import {
   QUALITY_LADDER,
   DOC_MAX_EDGE,
   DOC_TARGET_BYTES,
-} from '@crewchief/core/image-resize';
+} from '@wellkept/core/image-resize';
 
 describe('fitWithin', () => {
   it('scales a landscape phone photo down to the long edge', () => {

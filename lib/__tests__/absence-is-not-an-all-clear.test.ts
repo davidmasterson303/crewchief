@@ -55,7 +55,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { healthClaim } from '@crewchief/core/health-claims';
+import { healthClaim } from '@wellkept/core/health-claims';
 
 const ROOT = join(__dirname, '..', '..');
 

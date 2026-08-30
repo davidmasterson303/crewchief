@@ -1,6 +1,6 @@
 'use client';
 
-import { RECALL_MATCH_CAVEAT } from '@crewchief/core/advice-disclosure';
+import { RECALL_MATCH_CAVEAT } from '@wellkept/core/advice-disclosure';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ShieldAlert, ExternalLink, X, ChevronDown, ChevronUp, Check, Loader as Loader2 } from 'lucide-react';

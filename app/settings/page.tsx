@@ -135,7 +135,7 @@ export default function SettingsPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `crewchief-export-${new Date().toISOString().slice(0, 10)}.json`;
+    link.download = `well-kept-export-${new Date().toISOString().slice(0, 10)}.json`;
     link.click();
     URL.revokeObjectURL(url);
     toast.success('Export downloaded');
@@ -242,7 +242,7 @@ export default function SettingsPage() {
 
           <SettingsSection
             title="Your data"
-            description="Download everything CrewChief holds about you."
+            description="Download everything Well Kept holds about you."
             icon={Download}
             index={2}
           >

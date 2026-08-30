@@ -175,7 +175,7 @@ describe('Middleware: route protection', () => {
       there has been moved somewhere strictly less useful than where they were,
       and because the demo garage and their own garage look alike it reads as
       their vehicles having disappeared. Every "Garage" control in the app used to
-      push `/`, so the CrewChief mark in the nav did exactly that.
+      push `/`, so the Well Kept mark in the nav did exactly that.
     */
     it('sends a signed-in visitor from / to their own garage', () => {
       const decision = decisionFor('/', true);

@@ -1,7 +1,7 @@
 'use client';
 
 import InvoiceProcessingLoader from '@/components/InvoiceProcessingLoader';
-import type { ScanProgress } from '@crewchief/core/scan-progress';
+import type { ScanProgress } from '@wellkept/core/scan-progress';
 
 /*
  * Visual states for the invoice scanner's progress panel. Development only.

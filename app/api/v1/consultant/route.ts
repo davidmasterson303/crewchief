@@ -1,9 +1,9 @@
-import { logger } from '@crewchief/core/logger';
+import { logger } from '@wellkept/core/logger';
 import { type NextRequest } from 'next/server';
-import type { ApiResponse } from '@crewchief/core/types';
+import type { ApiResponse } from '@wellkept/core/types';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
 import { authorizeVehicleAccess } from '@/lib/api-auth';
-import { isDemoVehicleId } from '@crewchief/core/demo';
+import { isDemoVehicleId } from '@wellkept/core/demo';
 import {
   sendConsultantMessage,
   createConsultantSession,

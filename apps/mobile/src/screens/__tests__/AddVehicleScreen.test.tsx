@@ -140,7 +140,7 @@ describe('adding a car', () => {
 describe('the mileage rule', () => {
   it('refuses an implausible reading without spending a round trip', async () => {
     /*
-      The rule lives in `@crewchief/core/mileage-tracking` precisely so the
+      The rule lives in `@wellkept/core/mileage-tracking` precisely so the
       phone can refuse before the network. The server refuses too, because a
       client is not a guarantee — but a person who typed a wrong number should
       find out immediately.

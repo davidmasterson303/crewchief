@@ -1,4 +1,4 @@
-import { eventBus } from '@crewchief/core/event-bus';
+import { eventBus } from '@wellkept/core/event-bus';
 
 export interface FailedDeletion {
   vehicleId: string;

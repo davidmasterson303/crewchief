@@ -3,7 +3,7 @@ import { render, userEvent, waitFor } from '@testing-library/react-native';
 
 import { WishlistScreen } from '../WishlistScreen';
 import { apiRequest, ApiRequestError } from '../../api/client';
-import { wishlistItemIdentifier } from '@crewchief/core/wishlist-identifier';
+import { wishlistItemIdentifier } from '@wellkept/core/wishlist-identifier';
 
 /**
  * The wishlist, on the phone.
@@ -13,7 +13,7 @@ import { wishlistItemIdentifier } from '@crewchief/core/wishlist-identifier';
  *
  * ── The identifier ──────────────────────────────────────────────────────────
  *
- * `@crewchief/core/wishlist-identifier` exists because three call sites once
+ * `@wellkept/core/wishlist-identifier` exists because three call sites once
  * built the identifier three different ways, and produced duplicate rows, an
  * "already added" state that lied, and deletes that silently matched nothing. A
  * fourth spelling on this screen would reintroduce all three — so the test
@@ -180,7 +180,7 @@ describe('marking an item done', () => {
     row and deletes the wishlist entry. No undo.
 
     The rules about what a completion needs live in
-    `@crewchief/core/wishlist-completion` and are tested there. These are about
+    `@wellkept/core/wishlist-completion` and are tested there. These are about
     the screen obeying them: that the sheet is a deliberate step rather than a
     row tap, and that nothing is sent until it is confirmed.
   */

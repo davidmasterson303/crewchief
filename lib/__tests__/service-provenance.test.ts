@@ -21,8 +21,8 @@ import {
   isServiceBasis,
   milestoneBasis,
   serviceBasis,
-} from '@crewchief/core/service-provenance';
-import { evaluateSchedule, type ScheduleEntry } from '@crewchief/core/service-due';
+} from '@wellkept/core/service-provenance';
+import { evaluateSchedule, type ScheduleEntry } from '@wellkept/core/service-due';
 
 const OIL: ScheduleEntry = {
   service: 'Engine oil and filter',

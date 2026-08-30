@@ -105,7 +105,7 @@ export default function LandingHero({ onEnter }: LandingHeroProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15, duration: 0.45, ease: 'easeOut' }}
         >
-          CrewChief researches your exact year, make and trim — what fails, when it fails, and what
+          Well Kept researches your exact year, make and trim — what fails, when it fails, and what
           to bundle so one shop visit does the work of three.
         </motion.p>
 
@@ -232,7 +232,7 @@ export default function LandingHero({ onEnter }: LandingHeroProps) {
             onClick={() => setDrawerOpen(true)}
             className="group inline-flex items-center gap-1.5 text-sm font-normal text-white/50 hover:text-white/75 underline decoration-white/20 hover:decoration-white/50 decoration-1 underline-offset-[5px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 rounded"
           >
-            What CrewChief does
+            What Well Kept does
             <ChevronDown className="h-3.5 w-3.5 opacity-60 transition-transform duration-300 group-hover:translate-y-0.5" />
           </button>
         </motion.div>

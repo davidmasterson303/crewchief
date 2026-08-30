@@ -35,7 +35,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { logger } from '@crewchief/core/logger';
+import { logger } from '@wellkept/core/logger';
 
 /*
   `any` throughout, matching the parameters this replaces and the prompt
@@ -82,14 +82,14 @@ export type ConsultantContextResult =
  * behind it no longer substantiated.
  */
 /*
-  Declared in `@crewchief/core/consultant-context-kinds` since the Expo advisor
+  Declared in `@wellkept/core/consultant-context-kinds` since the Expo advisor
   screen began rendering the same provenance row and cannot reach this file.
   Re-exported rather than moved outright so the existing `@/lib/consultant-context`
   import path keeps working — this module is still where the kinds are *computed*,
   which is the half that needs a Supabase client.
 */
-export type { ContextKind } from '@crewchief/core/consultant-context-kinds';
-import type { ContextKind } from '@crewchief/core/consultant-context-kinds';
+export type { ContextKind } from '@wellkept/core/consultant-context-kinds';
+import type { ContextKind } from '@wellkept/core/consultant-context-kinds';
 
 function nonEmpty(v: any): boolean {
   if (!v) return false;

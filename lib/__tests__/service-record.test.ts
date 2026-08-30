@@ -21,7 +21,7 @@ import {
   isRecollection,
   recordSourceLabel,
   totalRecorded,
-} from '@crewchief/core/service-record';
+} from '@wellkept/core/service-record';
 
 describe('recordSourceLabel', () => {
   it('names every source the schema permits', () => {

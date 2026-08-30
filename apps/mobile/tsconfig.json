@@ -11,7 +11,7 @@
     "types": ["jest"],
     "typeRoots": ["../../node_modules/@types", "./node_modules/@types"],
     "paths": {
-      "@crewchief/core/*": ["../../packages/core/src/*"],
+      "@wellkept/core/*": ["../../packages/core/src/*"],
 
       // The type-level half of the problem metro.config.js solves for the
       // bundler. The web app is React 18 and Expo SDK 57 requires 19, so npm

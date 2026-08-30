@@ -26,8 +26,8 @@ import {
   totalRecorded,
   type ServiceRecord,
   type ServiceVisit,
-} from '@crewchief/core/service-record';
-import { formatCurrency } from '@crewchief/core/formatting-utils';
+} from '@wellkept/core/service-record';
+import { formatCurrency } from '@wellkept/core/formatting-utils';
 import Icon from '../components/Icon';
 import {
   FIELD_FONT_MIN,

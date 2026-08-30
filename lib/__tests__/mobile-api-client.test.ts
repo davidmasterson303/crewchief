@@ -1,5 +1,5 @@
 /**
- * The only way the phone talks to CrewChief.
+ * The only way the phone talks to Well Kept.
  *
  * @jest-environment node
  *
@@ -156,7 +156,7 @@ describe('failures a phone actually hits', () => {
 
     await expect(apiRequest('/vehicles')).rejects.toMatchObject({
       status: 0,
-      message: 'Could not reach CrewChief. Check your connection.',
+      message: 'Could not reach Well Kept. Check your connection.',
     });
   });
 

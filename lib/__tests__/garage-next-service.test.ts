@@ -20,7 +20,7 @@ import {
   UNKNOWN_TIMING,
   describeNextService,
   type StoredNextService,
-} from '@crewchief/core/garage-next-service';
+} from '@wellkept/core/garage-next-service';
 
 const TODAY = '2026-08-16';
 

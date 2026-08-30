@@ -2,7 +2,7 @@ import { render, userEvent, waitFor } from '@testing-library/react-native';
 
 import { ServiceMilestoneScreen } from '../ServiceMilestoneScreen';
 import { apiRequest } from '../../api/client';
-import { SERVICE_BASIS_LABELS } from '@crewchief/core/service-provenance';
+import { SERVICE_BASIS_LABELS } from '@wellkept/core/service-provenance';
 
 /**
  * Where a service notification lands.

@@ -16,7 +16,7 @@ import {
   vehicleStoragePrefixes,
   storedUrl,
   storagePathFromStoredUrl,
-} from '@crewchief/core/storage-paths';
+} from '@wellkept/core/storage-paths';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 

@@ -4,7 +4,7 @@ import type { ComponentType } from 'react';
 import {
   resolveBodyStyle,
   type VehicleBodyStyle,
-} from '@crewchief/core/vehicle-body-style';
+} from '@wellkept/core/vehicle-body-style';
 import type { VehicleIllustrationProps } from './VehicleIllustration';
 import {
   SedanIllustration,
@@ -21,8 +21,8 @@ import {
   GenericVehicleIllustration,
 } from './shapes';
 
-export { VEHICLE_BODY_STYLES, BODY_STYLE_LABEL } from '@crewchief/core/vehicle-body-style';
-export type { VehicleBodyStyle } from '@crewchief/core/vehicle-body-style';
+export { VEHICLE_BODY_STYLES, BODY_STYLE_LABEL } from '@wellkept/core/vehicle-body-style';
+export type { VehicleBodyStyle } from '@wellkept/core/vehicle-body-style';
 export type { VehicleIllustrationProps } from './VehicleIllustration';
 
 /**

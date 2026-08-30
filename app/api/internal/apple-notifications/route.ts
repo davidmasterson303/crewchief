@@ -1,4 +1,4 @@
-import { logger } from '@crewchief/core/logger';
+import { logger } from '@wellkept/core/logger';
 import type { NextRequest } from 'next/server';
 
 import { getAppleRootCertificates, APPLE_BUNDLE_ID } from '@/lib/apple-root-ca';
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     /*
       ⚠ IAP-03. Apple's chain signs transactions for **every app in the
       store**, so anchoring proves "Apple signed this", not "Apple signed this
-      for CrewChief".
+      for Well Kept".
     */
     bundleId: APPLE_BUNDLE_ID,
   });

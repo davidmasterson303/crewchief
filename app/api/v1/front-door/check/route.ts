@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { logger } from '@crewchief/core/logger';
-import { MAX_FILE_SIZE } from '@crewchief/core/validation';
-import { decideFrontDoorGate } from '@crewchief/core/front-door';
-import { describeQuote } from '@crewchief/core/advice-range';
-import { visitorCookieOptions, VISITOR_COOKIE } from '@crewchief/core/funnel';
+import { logger } from '@wellkept/core/logger';
+import { MAX_FILE_SIZE } from '@wellkept/core/validation';
+import { decideFrontDoorGate } from '@wellkept/core/front-door';
+import { describeQuote } from '@wellkept/core/advice-range';
+import { visitorCookieOptions, VISITOR_COOKIE } from '@wellkept/core/funnel';
 import { checkFrontDoorBudget } from '@/lib/ai-budget';
 import { checkRateLimit } from '@/lib/rate-limit';
-import { platformClientIp } from '@crewchief/core/client-ip';
+import { platformClientIp } from '@wellkept/core/client-ip';
 import { resolveVisitor } from '@/lib/funnel-visitor';
 import { recordFunnelStepInBackground } from '@/lib/funnel';
 import { holdScanInBackground, runQuoteCheck } from '@/lib/quote-check';

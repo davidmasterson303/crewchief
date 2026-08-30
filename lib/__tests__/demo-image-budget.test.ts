@@ -23,8 +23,8 @@ import { join } from 'node:path';
 import {
   DEMO_UNPHOTOGRAPHED_VEHICLE_IDS,
   DEMO_VEHICLE_IDS,
-} from '@crewchief/core/demo';
-import { cardSlotSource } from '@crewchief/core/photo-slots';
+} from '@wellkept/core/demo';
+import { cardSlotSource } from '@wellkept/core/photo-slots';
 
 const MIGRATION = join(
   __dirname, '..', '..', 'supabase', 'migrations',

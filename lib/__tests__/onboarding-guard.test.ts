@@ -18,7 +18,7 @@
  * therefore true of a brand-new user.
  */
 
-import { resolveOnboardingEntry } from '@crewchief/core/onboarding';
+import { resolveOnboardingEntry } from '@wellkept/core/onboarding';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 

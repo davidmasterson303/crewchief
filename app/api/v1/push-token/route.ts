@@ -1,10 +1,10 @@
 import { NextRequest } from 'next/server';
-import { logger } from '@crewchief/core/logger';
-import type { ApiResponse } from '@crewchief/core/types';
+import { logger } from '@wellkept/core/logger';
+import type { ApiResponse } from '@wellkept/core/types';
 import { checkRateLimit, getClientIdentifier, rateLimitResponse } from '@/lib/rate-limit';
 import { requireCaller } from '@/lib/api-auth';
 import { getServiceRoleClient } from '@/lib/supabase';
-import { isExpoPushToken } from '@crewchief/core/push-tokens';
+import { isExpoPushToken } from '@wellkept/core/push-tokens';
 
 export const dynamic = 'force-dynamic';
 

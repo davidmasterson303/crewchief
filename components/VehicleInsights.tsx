@@ -24,14 +24,14 @@ import {
 import { useWishlistData } from '@/hooks/useWishlistData';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
-import { invalidateDashboardCache } from '@crewchief/core/query-invalidation';
+import { invalidateDashboardCache } from '@wellkept/core/query-invalidation';
 import IssueFixDialog from './IssueFixDialog';
 import MaintenanceHistoryDialog from './MaintenanceHistoryDialog';
 import IssuesTab from './insights/IssuesTab';
 import MaintenanceTab from './insights/MaintenanceTab';
 import ModificationsTab from './insights/ModificationsTab';
 import RegisterSwitch from './RegisterSwitch';
-import { showsModifications } from '@crewchief/core/mod-progression';
+import { showsModifications } from '@wellkept/core/mod-progression';
 
 interface VehicleInsightsProps {
   vehicle: any;
@@ -465,7 +465,7 @@ const VehicleInsights = forwardRef<{ getSavedItemNames: () => Set<string> }, Veh
           <CardHeader>
             <CardTitle>Limited Data Available</CardTitle>
             <CardDescription>
-              We couldn&apos;t find enough information about your specific vehicle, but you can still use CrewChief
+              We couldn&apos;t find enough information about your specific vehicle, but you can still use Well Kept
               to track maintenance and get general advice.
             </CardDescription>
           </CardHeader>

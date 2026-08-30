@@ -25,8 +25,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { adviceDisclosure, RECALL_MATCH_CAVEAT } from '@crewchief/core/advice-disclosure';
-import { ADVISOR_AI_CONSENT, INVOICE_AI_CONSENT } from '@crewchief/core/ai-consent-copy';
+import { adviceDisclosure, RECALL_MATCH_CAVEAT } from '@wellkept/core/advice-disclosure';
+import { ADVISOR_AI_CONSENT, INVOICE_AI_CONSENT } from '@wellkept/core/ai-consent-copy';
 
 const ROOT = join(__dirname, '..', '..');
 

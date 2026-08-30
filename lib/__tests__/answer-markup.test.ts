@@ -9,12 +9,12 @@
  * health band and the context-kind labels, on the screen that carries the App
  * Store 4.2 argument.
  *
- * The tokenising is in `@crewchief/core/answer-markup` so both clients agree on
+ * The tokenising is in `@wellkept/core/answer-markup` so both clients agree on
  * what a line *means*; only the drawing is per-platform, since React Native has
  * no `<strong>` and the web has no `<Text>`.
  */
 
-import { parseAnswer, parseAnswerLine } from '@crewchief/core/answer-markup';
+import { parseAnswer, parseAnswerLine } from '@wellkept/core/answer-markup';
 
 /** The bold runs of a line, in order — what a renderer will emphasise. */
 function boldRuns(line: string): string[] {

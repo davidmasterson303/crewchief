@@ -1,8 +1,8 @@
 import { genAI, flashStructuredConfig, withThinking } from './gemini';
 import { recordAiUsageInBackground } from './ai-usage';
-import { logger } from '@crewchief/core/logger';
-import { extractJSON } from '@crewchief/core/vehicle-utils';
-import { FLASH_VISION_MODEL } from '@crewchief/core/ai/models';
+import { logger } from '@wellkept/core/logger';
+import { extractJSON } from '@wellkept/core/vehicle-utils';
+import { FLASH_VISION_MODEL } from '@wellkept/core/ai/models';
 import { getServiceRoleClient } from './supabase';
 import {
   QUOTE_CHECK_PROMPT,
@@ -10,7 +10,7 @@ import {
   unreadableMessage,
   type QuoteCheck,
   type QuoteCheckResult,
-} from '@crewchief/core/quote-check';
+} from '@wellkept/core/quote-check';
 
 /**
  * Run the anonymous quote check. Phase 2.97b, decision D9.

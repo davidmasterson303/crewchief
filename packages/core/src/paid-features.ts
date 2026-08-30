@@ -11,7 +11,7 @@
  * Three things go wrong with selling an allowance, and they compound:
  *
  *   1. **Nobody can tell what they are buying.** "A monthly allowance for
- *      CrewChief's AI features" is a unit the customer has never seen, cannot
+ *      Well Kept's AI features" is a unit the customer has never seen, cannot
  *      observe while using the app, and has no way to relate to their own use.
  *   2. **The number invites a claim, and the claim was wrong.** The screen said
  *      the paid tier *"raises that allowance five times over"*; 400k → 1M is
@@ -86,7 +86,7 @@ export const PAID_FEATURE_COPY: Record<PaidFeature, FeatureCopy> = {
  *
  * A garage that stops working when a subscription lapses is a hostage, not a
  * free tier — and the records in it are the owner's own. Everything here is
- * something CrewChief stores or looks up rather than generates: the car, its
+ * something Well Kept stores or looks up rather than generates: the car, its
  * history, its mileage, and NHTSA's recall list. None of it costs a model call,
  * so none of it needs to be paid for, and a lapsed subscriber still has their
  * service book.
@@ -199,5 +199,5 @@ export function decideFeatureAccess(params: {
  * put the old model back in the one place the customer actually reads.
  */
 export function featureUpsellMessage(feature: PaidFeature): string {
-  return `${PAID_FEATURE_COPY[feature].label} is part of CrewChief Plus. Your garage, service log, mileage and recall alerts stay free.`;
+  return `${PAID_FEATURE_COPY[feature].label} is part of Well Kept Plus. Your garage, service log, mileage and recall alerts stay free.`;
 }

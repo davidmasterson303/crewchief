@@ -31,7 +31,7 @@ import {
   verifyAppleSignedPayload,
   type JwsFailureReason,
 } from '@/lib/apple-jws';
-import type { AppleEnvironment, AppleSubscriptionEvent } from '@crewchief/core/apple-subscription';
+import type { AppleEnvironment, AppleSubscriptionEvent } from '@wellkept/core/apple-subscription';
 
 export type ParseFailureReason =
   | `envelope:${JwsFailureReason}`
@@ -82,7 +82,7 @@ interface TransactionInfo {
    * compared** (IAP-03). A repo-wide search for `bundleId` returned exactly one
    * hit — `app.json:11`, the Expo config. Apple's WWDR chain signs transactions
    * for **every app in the store**, so a verified chain proves *"Apple signed
-   * this"*, not *"Apple signed this for CrewChief"*.
+   * this"*, not *"Apple signed this for Well Kept"*.
    *
    * The only thing standing between a signed transaction from an unrelated app
    * and a paid entitlement here was a product-id lookup in `PRODUCT_TIERS` — an

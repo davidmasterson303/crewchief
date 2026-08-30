@@ -1,4 +1,4 @@
-# CrewChief roadmap — image pipeline, backdrop, cockpit direction, and responsive web
+# Well Kept roadmap — image pipeline, backdrop, cockpit direction, and responsive web
 
 > ### ⚠ START HERE — 25 Aug 2026, into the feedback thread
 >
@@ -1211,7 +1211,7 @@
 >   delivery loop `dryRun` skips.
 > - **`account_entitlements` must never become user-writable.** A scoped `FOR ALL` policy is
 >   correct on every other table in this schema and is a free subscription on that one.
-> - **`resolveTier` is deleted.** Use `resolveEntitledTier` from `@crewchief/core/entitlement`.
+> - **`resolveTier` is deleted.** Use `resolveEntitledTier` from `@wellkept/core/entitlement`.
 > - **A new table in `public` does not inherit the 1 Aug TRUNCATE revoke.** Carry its own
 >   `REVOKE TRUNCATE … FROM authenticated`; `truncate-revoked.test.ts` fails the build otherwise.
 > - **`/load-maintenance-data` returns two things that look like history.** `lineItems` is
@@ -1344,7 +1344,7 @@ this file** — read those first if you are picking this up cold.
 > **Verified before closing:** `fetchpriority` ships on the hero's request
 > (`VehicleIdentity.tsx:296`, spelled lowercase and cast — React 18.2 has no
 > camelCase prop and warns), the same treatment is on `GarageDoor.tsx:253`, and
-> the blur-up fill is `vehicleBlurData` from `@crewchief/core/vehicle-blur`.
+> the blur-up fill is `vehicleBlurData` from `@wellkept/core/vehicle-blur`.
 >
 > **The residue, stated as its own thing:** a real `<link rel=preload>` for the
 > dashboard hero is blocked on the dashboard server-rendering its vehicle, which
@@ -2189,7 +2189,7 @@ capability claim found in that file.
 
 An audit of the whole file — 109 symbols named in `how:`/`pitch:` lines, checked
 against the tree — found **no third false capability claim**, but **ten stale
-`lib/` paths** left over from the Phase 2.4 move into `@crewchief/core`.
+`lib/` paths** left over from the Phase 2.4 move into `@wellkept/core`.
 `lib/onboarding.ts` was among them, and the knowledge base corrected exactly that
 path on 28 July: the fix reached the KB and never reached the features file. All
 ten now resolve.
@@ -2421,7 +2421,7 @@ at once, and `tsc` is perfectly happy about it. Always go through
    takes it to a shop.
 8. **Bundle output is real evidence when a screen cannot be run.** `expo export`
    plus `strings` on the `.hbc` proved the new Account screen *and* its
-   cross-package `@crewchief/core` import are genuinely in the iOS binary. It is
+   cross-package `@wellkept/core` import are genuinely in the iOS binary. It is
    not a substitute for rendering it, and the roadmap says so.
 
 ## Decisions waiting on David — nothing else is blocked on code

@@ -21,7 +21,7 @@ jest.mock('@/lib/supabase', () => ({
   getServiceRoleClient: () => ({ from }),
 }));
 
-jest.mock('@crewchief/core/logger', () => ({
+jest.mock('@wellkept/core/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
 }));
 

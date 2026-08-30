@@ -226,7 +226,7 @@ describe('signIn distinguishes the one failure the user can act on', () => {
       const result = await signIn('a@b.co', 'pw');
 
       expect(result.error).toBe(
-        'Could not reach CrewChief. Check your connection and try again.'
+        'Could not reach Well Kept. Check your connection and try again.'
       );
     }
   );

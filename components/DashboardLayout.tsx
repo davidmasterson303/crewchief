@@ -5,14 +5,14 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Clock, MessageSquare, Wrench, CreditCard as Edit2, Check, X, Info, ChevronLeft, ChevronRight, Tag } from 'lucide-react';
 import Logo from '@/components/brand/Logo';
-import { isDemoVehicleId } from '@crewchief/core/demo';
+import { isDemoVehicleId } from '@wellkept/core/demo';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { updateVehicleAvgMileage, updateVehicleMileage, updateVehicleStatus } from '@/app/actions';
-import { USAGE_PROFILES, usageProfileChip } from '@crewchief/core/usage-profile';
-import { invalidateDashboardCache } from '@crewchief/core/query-invalidation';
+import { USAGE_PROFILES, usageProfileChip } from '@wellkept/core/usage-profile';
+import { invalidateDashboardCache } from '@wellkept/core/query-invalidation';
 import { AccountMenu } from '@/components/AccountMenu';
 import { useHomeHref } from '@/hooks/use-home-href';
 

@@ -3,7 +3,7 @@
  *
  * ── ⚠ The defect this exists to end ─────────────────────────────────────────
  *
- * **Every health score CrewChief ever generated was 70.** The prompt asked for
+ * **Every health score Well Kept ever generated was 70.** The prompt asked for
  * `healthScore`; the parser read `health_score`; the value was therefore always
  * `undefined`, and the line under it substituted a documented neutral. Nothing
  * failed. The number was written to the column a gauge reads, and the gauge

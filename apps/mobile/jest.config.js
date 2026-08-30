@@ -32,17 +32,17 @@ module.exports = {
   /*
     React Native and the Expo packages ship untranspiled ESM, so the default
     "ignore everything in node_modules" leaves Jest parsing `import` statements
-    it cannot read. This is jest-expo's documented list plus `@crewchief/core`,
+    it cannot read. This is jest-expo's documented list plus `@wellkept/core`,
     which is a workspace of raw TypeScript rather than a built package.
   */
   transformIgnorePatterns: [
-    'node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg|@crewchief/core)',
+    'node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg|@wellkept/core)',
   ],
 
   moduleNameMapper: {
     // Mirrors the root config's alias. Without it the shared modules resolve
     // to nothing and every screen that imports one fails at collection time.
-    '^@crewchief/core/(.*)$': '<rootDir>/../../packages/core/src/$1',
+    '^@wellkept/core/(.*)$': '<rootDir>/../../packages/core/src/$1',
 
     /*
       npm nested `expo-modules-core` inside `expo` rather than hoisting it, so

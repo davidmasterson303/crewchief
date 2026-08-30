@@ -1,6 +1,6 @@
-import { logger } from '@crewchief/core/logger';
-import { recallNotification, type NotificationContent } from '@crewchief/core/notifications';
-import { normaliseRecalls, type NormalisedRecall, type RecallSeverity } from '@crewchief/core/recalls';
+import { logger } from '@wellkept/core/logger';
+import { recallNotification, type NotificationContent } from '@wellkept/core/notifications';
+import { normaliseRecalls, type NormalisedRecall, type RecallSeverity } from '@wellkept/core/recalls';
 import { sendToAccount } from '@/lib/push-send';
 import { getServiceRoleClient } from '@/lib/supabase';
 

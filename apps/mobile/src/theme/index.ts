@@ -1,7 +1,7 @@
 import { EDITORIAL_FACE, interFace } from './fonts';
 
 /**
- * The mobile token layer — CrewChief v8, native.
+ * The mobile token layer — Well Kept v8, native.
  *
  * Source: `HANDOFF_mobile_baseline.md` (14 Aug) and the `Mobile Baseline`
  * board, cross-checked against `app/globals.css`. **Nothing here is invented
@@ -18,7 +18,7 @@ import { EDITORIAL_FACE, interFace } from './fonts';
  * cannot be judged when every screen is a different product.
  *
  * The one legitimate exception is a colour the *data* chooses: a health band is
- * owned by `@crewchief/core/health-band` and read at runtime, not stored here.
+ * owned by `@wellkept/core/health-band` and read at runtime, not stored here.
  * The phone must not hold a second opinion about what "Fair" looks like.
  */
 
@@ -154,7 +154,7 @@ export const register = {
  * Status colours.
  *
  * ⚠ **The health band is not here.** Thresholds, wording and colour are owned
- * by `@crewchief/core/health-band` and read at runtime.
+ * by `@wellkept/core/health-band` and read at runtime.
  *
  * ── ⚠ 23 Aug: "happen to share hues" was doing a lot of work ────────────────
  *
@@ -327,7 +327,7 @@ export const plinth = {
   catchLight: 'rgba(255,255,255,0.16)',
 } as const;
 
-/** Build continuum paint. Zone selection lives in `@crewchief/core/build-progress`. */
+/** Build continuum paint. Zone selection lives in `@wellkept/core/build-progress`. */
 export const build = {
   stock: '#7D8794',
   mild: '#9FC8D8',

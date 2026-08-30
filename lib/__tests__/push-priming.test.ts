@@ -21,8 +21,8 @@ import {
   PRIMER_MIN_VEHICLES,
   PUSH_PRIMER_COPY,
   type PrimingInput,
-} from '@crewchief/core/push-priming';
-import { SERVICE_COOLDOWN_DAYS } from '@crewchief/core/notification-sweep';
+} from '@wellkept/core/push-priming';
+import { SERVICE_COOLDOWN_DAYS } from '@wellkept/core/notification-sweep';
 
 const TODAY = '2026-08-12';
 

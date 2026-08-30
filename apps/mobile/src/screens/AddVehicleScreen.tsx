@@ -14,7 +14,7 @@ import Field from '../components/Field';
 import Suggest from '../components/Suggest';
 import { apiRequest, ApiRequestError } from '../api/client';
 import { decodeVin, fetchModels } from '../api/vpic';
-import { validateMileageUpdate } from '@crewchief/core/mileage-tracking';
+import { validateMileageUpdate } from '@wellkept/core/mileage-tracking';
 import {
   PAGE_BODY,
   TARGET_MIN,
@@ -30,7 +30,7 @@ import {
 import {
   BASELINE_AGE_OPTIONS,
   type BaselineAge,
-} from '@crewchief/core/onboarding-baseline';
+} from '@wellkept/core/onboarding-baseline';
 import {
   COMMON_MAKES,
   VIN_LENGTH,
@@ -41,7 +41,7 @@ import {
   suggestNames,
   vinCheckDigitMatches,
   vinProblem,
-} from '@crewchief/core/vehicle-catalog';
+} from '@wellkept/core/vehicle-catalog';
 import { interFace } from '../theme/fonts';
 
 /**
@@ -51,7 +51,7 @@ import { interFace } from '../theme/fonts';
  * ── Why this is the launch blocker ──────────────────────────────────────────
  *
  * `SignInScreen` could only sign in and there was no add-vehicle anywhere in
- * `apps/mobile`, so becoming a CrewChief user meant opening the web app,
+ * `apps/mobile`, so becoming a Well Kept user meant opening the web app,
  * creating an account, onboarding a car, and *then* installing this. Fine while
  * mobile was a companion. Fatal once it is the product: an App Store reviewer
  * downloads the app and cannot reach anything.
@@ -122,7 +122,7 @@ import { interFace } from '../theme/fonts';
  * produce an error — it produces a car whose recalls, dossier and service
  * schedule all come back empty, looking like a product that knows nothing.
  *
- * `@crewchief/core/vehicle-catalog` carries the lists and the judgements;
+ * `@wellkept/core/vehicle-catalog` carries the lists and the judgements;
  * `api/vpic.ts` carries the two network calls. What is decided *here* is the
  * shape of the form:
  *

@@ -25,8 +25,8 @@
  *      the time is the wrong standard for telling someone to spend money.
  */
 
-import { VehicleDataSchema, isUsableScheduleEntry } from '@crewchief/core/vehicle-utils';
-import { VEHICLE_RESEARCH_PROMPT } from '@crewchief/core/prompts';
+import { VehicleDataSchema, isUsableScheduleEntry } from '@wellkept/core/vehicle-utils';
+import { VEHICLE_RESEARCH_PROMPT } from '@wellkept/core/prompts';
 
 /** A research response with only the field under test filled in. */
 function research(maintenance: unknown) {

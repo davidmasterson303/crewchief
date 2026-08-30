@@ -29,7 +29,7 @@ import {
   serviceDueNotification,
   serviceUrl,
   vehicleUrl,
-} from '@crewchief/core/notifications';
+} from '@wellkept/core/notifications';
 
 const ROOT = join(__dirname, '..', '..');
 

@@ -3,8 +3,8 @@ import Constants from 'expo-constants';
 
 import { apiRequest } from '../api/client';
 import { secureStorage } from '../auth/secure-storage';
-import type { PushPermission } from '@crewchief/core/push-priming';
-import { isExpoPushToken } from '@crewchief/core/push-tokens';
+import type { PushPermission } from '@wellkept/core/push-priming';
+import { isExpoPushToken } from '@wellkept/core/push-tokens';
 import { requestPushPermission } from './push';
 
 /**
@@ -128,7 +128,7 @@ export async function registerForPush(): Promise<RegistrationResult> {
   } catch (error) {
     // Swallowed deliberately — see the header. Push is an enhancement.
     console.warn('[Push] Could not register this device:', error);
-    return { status: 'unavailable', reason: 'Could not reach CrewChief.' };
+    return { status: 'unavailable', reason: 'Could not reach Well Kept.' };
   }
 }
 

@@ -22,8 +22,8 @@ import {
   buildSummary,
   effortOf,
   needleFor,
-} from '@crewchief/core/build-progress';
-import { CX, CY, R, TRACK, VIEW_H, VIEW_W, angleFor, pointAt } from '@crewchief/core/cluster-geometry';
+} from '@wellkept/core/build-progress';
+import { CX, CY, R, TRACK, VIEW_H, VIEW_W, angleFor, pointAt } from '@wellkept/core/cluster-geometry';
 
 /** The WRX's five parts — Easy, Moderate ×3, Hard. 1 + 9 + 6 = 16. */
 const WRX = [
@@ -132,7 +132,7 @@ describe('buildSummary', () => {
 /**
  * The build dial and the health dial must stay the same instrument.
  *
- * `BuildGauge` reads its geometry from `@crewchief/core/cluster-geometry`.
+ * `BuildGauge` reads its geometry from `@wellkept/core/cluster-geometry`.
  * `ClusterGauge` still carries its own literals, deliberately — it works, it is
  * covered, and rewriting a shipped component to prove a point about duplication
  * is how a working thing breaks.

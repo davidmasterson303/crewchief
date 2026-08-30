@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
-import { logger } from '@crewchief/core/logger';
+import { logger } from '@wellkept/core/logger';
 import { readVisitorId } from '@/lib/funnel-visitor';
 import { recordFunnelStepInBackground } from '@/lib/funnel';
 import { claimScansForVisitor } from '@/lib/quote-check';

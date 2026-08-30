@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usageProfileChip } from '@crewchief/core/usage-profile';
+import { usageProfileChip } from '@wellkept/core/usage-profile';
 import { useVehicleImage } from '@/hooks/useSignedUrl';
 import { VehicleIdentity } from '@/components/VehicleIdentity';
 import { ClusterGauge } from '@/components/ClusterGauge';
@@ -47,13 +47,13 @@ import {
   TriangleAlert,
 } from 'lucide-react';
 import { deleteVehicle, updateVehicleMileage } from '@/app/actions';
-import { logger } from '@crewchief/core/logger';
-import { isDemoVehicleId } from '@crewchief/core/demo';
+import { logger } from '@wellkept/core/logger';
+import { isDemoVehicleId } from '@wellkept/core/demo';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { invalidateDashboardCache } from '@crewchief/core/query-invalidation';
-import { queryClient } from '@crewchief/core/query-client';
+import { invalidateDashboardCache } from '@wellkept/core/query-invalidation';
+import { queryClient } from '@wellkept/core/query-client';
 import { MileageUpdatePrompt } from './MileageUpdatePrompt';
 import { VehiclePhotoUploadDialog } from './VehiclePhotoUploadDialog';
 

@@ -14,8 +14,8 @@ import {
   maintenanceDriver,
   mileageLoadDriver,
   recallDriver,
-} from '@crewchief/core/health-drivers';
-import type { ServiceDue } from '@crewchief/core/service-due';
+} from '@wellkept/core/health-drivers';
+import type { ServiceDue } from '@wellkept/core/service-due';
 
 /** A `ServiceDue` with only the fields the drivers read. */
 const due = (

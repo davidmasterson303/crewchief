@@ -33,7 +33,7 @@ import {
   INTRO_PLAYED_KEY,
   INTRO_PLAYED_VALUE,
   type IntroConditions,
-} from '@crewchief/core/intro-gate';
+} from '@wellkept/core/intro-gate';
 
 /** Nothing standing in the way: the case that should actually animate. */
 const FIRST_LOAD: IntroConditions = {

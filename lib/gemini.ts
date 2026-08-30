@@ -1,10 +1,10 @@
 import { GoogleGenAI, ThinkingLevel, type GenerateContentConfig } from '@google/genai';
-import { acceptsThinkingLevel, type ThinkingLevelName } from '@crewchief/core/ai/models';
+import { acceptsThinkingLevel, type ThinkingLevelName } from '@wellkept/core/ai/models';
 
 const apiKey = process.env.GEMINI_API_KEY || '';
 
 if (!apiKey) {
-  const msg = '[CrewChief] GEMINI_API_KEY is not set. Set it in your .env file (see .env.example). AI features will not work.';
+  const msg = '[Well Kept] GEMINI_API_KEY is not set. Set it in your .env file (see .env.example). AI features will not work.';
   if (process.env.NODE_ENV === 'development') {
     throw new Error(msg);
   } else {
@@ -19,7 +19,7 @@ export const genAI = new GoogleGenAI({
 /*
   Generation settings, by how much freedom the job should have.
 
-  These pair with the model tiers in `@crewchief/core/ai/models`: the model
+  These pair with the model tiers in `@wellkept/core/ai/models`: the model
   decides how much capability is brought to bear, these decide how much rope it
   gets. Both were previously flat — every call ran at temperature 0.3 or 0.7
   with an 8192-token ceiling, including a yes/no classification.
@@ -97,7 +97,7 @@ export const classificationConfig = {
  * re-tune every other caller.
  *
  * The level crosses from a plain name to the SDK's enum here, and only here.
- * `@crewchief/core` states the *policy* — which job gets how much thinking —
+ * `@wellkept/core` states the *policy* — which job gets how much thinking —
  * and must not take a dependency on Google's client to do it.
  */
 export function withThinking<T extends GenerateContentConfig>(

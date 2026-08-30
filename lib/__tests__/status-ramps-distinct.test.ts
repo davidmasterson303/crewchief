@@ -34,7 +34,7 @@
  * two ramps currently hold — which is the half that stays true across exports.
  */
 
-import { getHealthBandJudgement, healthBandHex } from '@crewchief/core/health-band';
+import { getHealthBandJudgement, healthBandHex } from '@wellkept/core/health-band';
 import { status } from '../../apps/mobile/src/theme';
 
 /**

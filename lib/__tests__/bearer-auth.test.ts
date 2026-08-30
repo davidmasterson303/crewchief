@@ -91,7 +91,7 @@ jest.mock('@/lib/supabase', () => ({
 }));
 
 const { requireSession, authorizeVehicleAccess } = require('@/lib/api-auth');
-const { DEMO_VEHICLE_IDS } = require('@crewchief/core/demo');
+const { DEMO_VEHICLE_IDS } = require('@wellkept/core/demo');
 
 const OWNED_VEHICLE_ID = 'b2000000-0000-4000-8000-000000000001';
 

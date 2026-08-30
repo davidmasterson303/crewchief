@@ -21,7 +21,7 @@ import {
   FLASH_MODEL,
   LITE_MODEL,
   FLASH_VISION_MODEL,
-} from '@crewchief/core/ai/models';
+} from '@wellkept/core/ai/models';
 
 const ROOT = join(__dirname, '..', '..');
 const ACTIONS = readFileSync(join(ROOT, 'app/actions.ts'), 'utf8');

@@ -13,8 +13,8 @@ import {
   filterSuggestions,
   learnMoreQuestion,
   suggestionsFor,
-} from '@crewchief/core/wishlist-suggestions';
-import { wishlistItemIdentifier } from '@crewchief/core/wishlist-identifier';
+} from '@wellkept/core/wishlist-suggestions';
+import { wishlistItemIdentifier } from '@wellkept/core/wishlist-identifier';
 
 /** The Accord's row, trimmed. Field names as PostgREST returns them. */
 const KNOWLEDGE = {
