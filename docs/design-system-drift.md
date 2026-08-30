@@ -666,7 +666,23 @@ caps beside it, and the type outlined at PNG-export time because every SVG in
 the package declares `Newsreader, Georgia, serif` and a rasteriser without the
 webfont silently substitutes Georgia.
 
-### 7.4 · ✅ Resolved by Design's second pass, 30 Aug — recalls stay free
+### 7.4 · ⚠ Reversed again — David overruled both, recalls are paid
+
+**Final, 30 Aug: recalls sit behind the subscription.** Design gated them, then
+reversed and endorsed `paid-features.ts`; David overruled both. `PaidFeature`
+carries `recalls` now and the test asserts it in the opposite direction.
+
+⚠ The argument against is deliberately kept in the module and in the test rather
+than deleted, because it is the instinct the next reader will have: a federal
+defect notice an owner cannot see because their card expired. What it costs, in
+one sentence, is that a lapsed owner stops getting new recall notifications for a
+car they still own and keeps every recall already stored against it.
+
+Design's §4.5 gate list is otherwise unchanged. The three sections below record
+how the question moved, because a decision that reversed twice is one somebody
+will try to reverse a third time.
+
+### 7.4b · Design's second pass, 30 Aug — superseded within the hour
 
 Design revised `REBRAND_PROMPT.md` the same afternoon and reversed this one
 themselves: *"Recalls are free, and `paid-features.ts` is right. The first pass

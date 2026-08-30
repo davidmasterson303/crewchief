@@ -43,6 +43,8 @@ import {
   netMonthlyFloorUsd,
   netMonthlyUsd,
   paidMonthlyOutputTokens,
+  trialOutputTokens,
+  TRIAL_DAYS,
   worstCaseMonthlyCostUsd,
 } from '@wellkept/core/ai/pricing';
 
@@ -129,6 +131,28 @@ describe('the derived ceiling is breakeven by construction', () => {
   });
 });
 
+describe('⚠ the trial is a subscription nobody has paid for yet', () => {
+  it('is bounded by its share of the month, not by a second tunable number', () => {
+    /*
+      A 7-day trial can spend and may never earn. Left unbounded it is the free
+      tier arriving through a different door, four days after the free tier was
+      deleted for that exact reason.
+
+      Proportional rather than a fixed figure, so it follows the price and the
+      trial length without either being restated — the class of drift this whole
+      file exists to remove.
+    */
+    expect(trialOutputTokens()).toBe(Math.floor((paidMonthlyOutputTokens() * TRIAL_DAYS) / 30));
+    expect(trialOutputTokens()).toBeLessThan(paidMonthlyOutputTokens());
+  });
+
+  it('costs less than a dollar at its worst', () => {
+    // The acquisition cost of a trial taken and cancelled. Small enough to be
+    // one, and stated in money because that is the form the decision is in.
+    expect(worstCaseMonthlyCostUsd(trialOutputTokens())).toBeLessThan(1);
+  });
+});
+
 describe('⛔ the gap between what is shipped and what was asked for', () => {
   it('the live paid ceiling is still above breakeven, and by how much', () => {
     /*
@@ -137,7 +161,7 @@ describe('⛔ the gap between what is shipped and what was asked for', () => {
       somebody wrote on purpose.
     */
     expect(TIERS.paid.monthlyOutputTokens).toBe(1_000_000);
-    expect(Math.round(ceilingOverRevenue(TIERS.paid.monthlyOutputTokens) * 10) / 10).toBe(3.5);
+    expect(Math.round(ceilingOverRevenue(TIERS.paid.monthlyOutputTokens) * 10) / 10).toBe(4.7);
   });
 
   it('the live free ceiling is what blocks applying the derived one', () => {

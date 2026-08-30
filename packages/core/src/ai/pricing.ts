@@ -114,12 +114,39 @@ export const PRICING = {
    * ⚠ **This is the number that sets every ceiling below.** It is the plan that
    * earns least per month, so it is the one the fuse has to be safe for.
    *
-   * $39.90 is ten months of the monthly price. Design's placeholder was $39.99
-   * against a $4.99 monthly — a different ratio, an indistinguishable annual
-   * price, and therefore the same ceiling to within 600 tokens.
+   * $29.99 is **7.5 months** of the monthly price — an unusually generous
+   * annual, and generosity here lands entirely on the ceiling: it nets $2.12 a
+   * month against the monthly plan's $3.39, and the ceiling is sized for the
+   * lower one. Moving from $39.90 to $29.99 cost 70,000 tokens of headroom.
+   *
+   * Recorded, not reopened. David, 30 Aug: decided, do not re-open.
    */
-  annualUsd: 39.90,
+  annualUsd: 29.99,
 } as const;
+
+/**
+ * The free trial, and ⚠ the one path in this file that can cost money and earn
+ * none.
+ *
+ * A 7-day trial is a subscription that has not been paid for yet. Somebody can
+ * take one, spend a month's ceiling inside the week, cancel, and owe nothing —
+ * which is the free tier arriving through a different door, four days after it
+ * was deleted for exactly that reason.
+ *
+ * **The bound is proportional rather than a second number to tune.** A trial is
+ * 7/30 of a month, so it gets 7/30 of the month's ceiling: at today's prices
+ * ~49,500 output-equivalent tokens, a worst case of about **$0.50 per trial
+ * taken**. That is a real acquisition cost and it is deliberately small enough
+ * to be one — it is roughly twice the *normal* month measured on real per-call
+ * figures, so a trialist doing ordinary things never meets it.
+ *
+ * ⚠ **This is not yet enforced anywhere.** `decideBudget` takes a `Tier`, and a
+ * trial is not a tier — it is a state in `access.ts`. Wiring it is E8 work,
+ * because nothing can start a trial until StoreKit exists. Until then this
+ * function is the number that wiring should use, and the gap is named here
+ * rather than discovered when the first trial runs.
+ */
+export const TRIAL_DAYS = 7;
 
 /**
  * Output-equivalent token rates, US dollars per token.
@@ -255,6 +282,16 @@ export const FREE_MONTHLY_COST_USD = 0.25;
  */
 export function freeMonthlyOutputTokensWhenGated(): number {
   return Math.floor(FREE_MONTHLY_COST_USD / OUTPUT_USD_PER_TOKEN.pro);
+}
+
+/**
+ * What a trial may spend before it has paid for anything.
+ *
+ * Proportional to the ceiling, so it follows the price and the trial length
+ * without either being restated. See `TRIAL_DAYS`.
+ */
+export function trialOutputTokens(): number {
+  return Math.floor((paidMonthlyOutputTokens() * TRIAL_DAYS) / 30);
 }
 
 /**

@@ -52,10 +52,10 @@
  * paid feature that costs nothing to run would be a price rise wearing a
  * feature's clothes.
  */
-export type PaidFeature = 'advisor' | 'invoice-scanning' | 'dossier';
+export type PaidFeature = 'advisor' | 'invoice-scanning' | 'dossier' | 'recalls';
 
 /** What stays free, named so the paywall can say it without inventing a list. */
-export type FreeFeature = 'garage' | 'service-log' | 'mileage' | 'recalls';
+export type FreeFeature = 'garage' | 'service-log' | 'mileage';
 
 export interface FeatureCopy {
   /** The name on the paywall. Title case, no trailing punctuation. */
@@ -73,6 +73,10 @@ export const PAID_FEATURE_COPY: Record<PaidFeature, FeatureCopy> = {
     label: 'Invoice scanning',
     blurb: 'Photograph a receipt and have the work read off it into your service log.',
   },
+  recalls: {
+    label: 'Recall alerts',
+    blurb: 'Open safety recalls from NHTSA, with a notification when a new one lands.',
+  },
   dossier: {
     label: 'The vehicle dossier',
     blurb: 'Known issues, a typical service schedule and modification guidance for your car.',
@@ -82,19 +86,34 @@ export const PAID_FEATURE_COPY: Record<PaidFeature, FeatureCopy> = {
 /**
  * What an account keeps without paying, and it is deliberately a real product.
  *
- * ── ⚠ Why the free tier has to stay useful ──────────────────────────────────
+ * ── ⚠ These are the *readable* features, not a free tier ────────────────────
  *
- * A garage that stops working when a subscription lapses is a hostage, not a
- * free tier — and the records in it are the owner's own. Everything here is
- * something Well Kept stores or looks up rather than generates: the car, its
- * history, its mileage, and NHTSA's recall list. None of it costs a model call,
- * so none of it needs to be paid for, and a lapsed subscriber still has their
- * service book.
+ * There is no free tier as of 30 Aug. What this list is now is what a **lapsed**
+ * account keeps: a garage that stops working when a subscription ends is a
+ * hostage, and the records in it are the owner's own. Everything here is
+ * something Well Kept stored rather than generated, so none of it costs
+ * anything to keep showing somebody.
  *
- * ⚠ **Recalls stay free, and that one is not a pricing decision.** They are
- * safety notices from a federal database. Putting an open recall behind a
- * paywall would mean a defect notice an owner could not see because their card
- * expired, and there is no version of this product where that is acceptable.
+ * ── ⚠ Recalls moved to paid on 30 Aug, and the argument against is kept ─────
+ *
+ * This list held `recalls` and this docblock argued hard that it must: they are
+ * safety notices from a federal database, and a defect notice an owner cannot
+ * see because their card expired is not a version of this product that should
+ * exist. Design's rebrand package first gated them, then reversed and endorsed
+ * that argument.
+ *
+ * **David overruled both.** It is his call and it is made; the argument is kept
+ * here rather than deleted because the next person to read this file will have
+ * the same instinct, and they should be able to see it was considered rather
+ * than missed.
+ *
+ * ⚠ What it costs, stated plainly so nobody has to rediscover it: an owner
+ * whose subscription has ended stops receiving new recall notifications for a
+ * car they still own. `RECALL_ALERTS_AFTER_LAPSE` in `access.ts` is the switch,
+ * and it is `false` for the same reason — David, 30 Aug: no features that incur
+ * costs for a lapsed account. What a lapsed owner keeps is every recall already
+ * stored against their vehicles, which stays readable like the rest of the
+ * record.
  */
 export const FREE_FEATURE_COPY: Record<FreeFeature, FeatureCopy> = {
   garage: { label: 'Your garage', blurb: 'Every vehicle you own, with photos and details.' },
@@ -103,10 +122,6 @@ export const FREE_FEATURE_COPY: Record<FreeFeature, FeatureCopy> = {
     blurb: 'Everything that has been done, entered by hand or scanned in while you had Plus.',
   },
   mileage: { label: 'Mileage tracking', blurb: 'Odometer readings and what is due by distance.' },
-  recalls: {
-    label: 'Recall alerts',
-    blurb: 'Open safety recalls from NHTSA, with a notification when a new one lands.',
-  },
 };
 
 const PAID: ReadonlySet<string> = new Set(Object.keys(PAID_FEATURE_COPY));
@@ -121,14 +136,14 @@ export const PAID_FEATURES: readonly PaidFeature[] = [
   'advisor',
   'invoice-scanning',
   'dossier',
+  'recalls',
 ] as const;
 
-/** The free features, in the order a paywall should list them. */
+/** What a lapsed account keeps, in the order a paywall should list them. */
 export const FREE_FEATURES: readonly FreeFeature[] = [
   'garage',
   'service-log',
   'mileage',
-  'recalls',
 ] as const;
 
 /**

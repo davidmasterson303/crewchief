@@ -68,26 +68,41 @@ const LIVE = { tier: 'paid', expiresAt: '2099-01-01T00:00:00.000Z' };
 const LAPSED = { tier: 'paid', expiresAt: '2020-01-01T00:00:00.000Z' };
 
 describe('what is sold', () => {
-  it('is exactly the advisor, invoice scanning and the dossier', () => {
-    expect([...PAID_FEATURES]).toEqual(['advisor', 'invoice-scanning', 'dossier']);
+  it('is the advisor, invoice scanning, the dossier and recalls', () => {
+    expect([...PAID_FEATURES]).toEqual(['advisor', 'invoice-scanning', 'dossier', 'recalls']);
   });
 
-  it('leaves the owner’s own records free', () => {
+  it('leaves the owner’s own records readable', () => {
     /*
-      A garage that stops working when a subscription lapses is a hostage, not a
-      free tier. Everything free is stored or looked up rather than generated.
+      ⚠ This list is no longer "the free tier" — there is not one as of 30 Aug.
+      It is what a **lapsed** account keeps, and the argument is unchanged: a
+      garage that stops working when a subscription ends is a hostage, and the
+      records in it are the owner's own. Everything on it is stored rather than
+      generated, so showing it costs nothing.
     */
-    expect([...FREE_FEATURES]).toEqual(['garage', 'service-log', 'mileage', 'recalls']);
+    expect([...FREE_FEATURES]).toEqual(['garage', 'service-log', 'mileage']);
   });
 
-  it('never puts a safety recall behind the paywall', () => {
+  it('puts recalls behind the paywall — David’s call, 30 Aug', () => {
     /*
-      ⚠ Not a pricing decision. A federal defect notice an owner cannot see
-      because their card expired is not a version of this product that should
-      exist, so this is asserted rather than left to a list somebody edits.
+      ⚠ This assertion is the reverse of what it said this morning, and the
+      reversal is deliberate rather than a drift.
+
+      It read "never puts a safety recall behind the paywall", and the argument
+      was strong: a federal defect notice an owner cannot see because their card
+      expired. Design's rebrand package gated recalls, then reversed and
+      endorsed that argument. **David overruled both**, and it is his call.
+
+      Kept as an explicit assertion rather than deleted, because the next person
+      to read this file will have the same instinct the old test encoded — and
+      an unasserted list is one somebody "fixes" back on a quiet afternoon.
+
+      What it costs is written at `FREE_FEATURE_COPY` in the module: a lapsed
+      owner stops receiving new recall notifications for a car they still own,
+      and keeps every recall already stored against it.
     */
-    expect(FREE_FEATURES).toContain('recalls');
-    expect(isPaidFeature('recalls')).toBe(false);
+    expect(isPaidFeature('recalls')).toBe(true);
+    expect(FREE_FEATURES).not.toContain('recalls');
   });
 
   it('gives every feature copy a customer can act on', () => {
