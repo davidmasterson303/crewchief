@@ -163,7 +163,13 @@
 > | **4** | **The advisor's name.** LEG-11's product half is settled — Well Kept, renamed in the tree on 30 Aug. What is still blocked is the *character*, and with it the persona rewrite; the bundle id and the App Store Connect record wait on `southmoordigital.com` | **David · decision** |
 > | **5** | Promote `web-live` (then `demo-live`), once 2 and 3 are done | Claude Code · on David's word |
 > | **6** | E8 — `expo-iap` and the store adapter, then `PAID_FEATURES_ENFORCED` | Claude Code · costs a build |
-> | 7 | IAP-02 (a sandbox purchase still grants the paid tier on a fresh account), and LEG-01's project-id comment in `lib/gemini.ts` | Claude Code |
+> | 7 | **IAP-02** — a sandbox purchase still grants the paid tier on a fresh account. ⚠ Its stated fix is per-profile `env` in `eas.json` pointing non-production builds at a **different backend**, which does not exist; standing one up is a spend decision, not a code change | **David · decision**, then Claude Code |
+>
+> Closed 30 Aug: LEG-01's project-id comment in `lib/gemini.ts`, with a guard tying the
+> Terms' training promise to a dated billing check; the web cost breakdown's missing AI
+> disclosure (D11's fifth surface — the guard's table had a mobile row and no web one); the
+> quote panel's fake progress bar, the last of the three; and the dashboard footer's
+> `feedback@crewchief.app` link, which pointed at a domain nobody here owns.
 >
 > Also David's, unchanged: `AI_HEALTH_SECRET` on both Netlify sites, `MOBILE_TEST_TOKEN`,
 > the reviewer account's password, and registering `southmoordigital.com` before any App
@@ -192,6 +198,20 @@
 > policy names the LLC. Closing that is a D-U-N-S, a fresh enrolment and an app transfer —
 > not a code change. And no company address appears in either document, because nobody has
 > given one.
+>
+> #### ⏳ Incoming from Design — a six-part Well Kept package
+>
+> Announced 30 Aug, **not yet delivered**: the brand (mark, construction grid, clear space,
+> the full iOS icon set with reduction rules, voice, and the rename as a diff), the store
+> listing and paywall, the landing site, the onboarding and garage templates rebranded (new
+> nav lockup, the truck glyph retired), and `WELL_KEPT_REBRAND_PROMPT.md` as the handoff.
+>
+> Tagline: **"An AI that keeps the record, so the care keeps itself."** Store subtitle:
+> **"AI-kept service records"** (23 chars, inside Apple's 30).
+>
+> This is what §7 of `docs/design-system-drift.md` is waiting on — the two lockup SVGs still
+> draw the old wordmark as outlines, and the wordmark's tracking was cut for one nine-letter
+> word rather than two.
 >
 > ⚠ `lib/site-role.ts` treats an unset variable as "this is the product" — deliberately, so
 > the App Store hostname can never accidentally serve the demo masthead. That is also exactly
