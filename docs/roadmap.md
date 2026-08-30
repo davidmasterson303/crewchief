@@ -73,9 +73,9 @@
 > |---|---|---|
 > | **1** | **Promote `web-live`** — the rename, the operator, the address and the demo fix are all sitting behind it. SQL trip and `AI_HEALTH_SECRET` first | **David**, then Claude Code |
 > | **2** | ⚠ **Gemini billing → prepay.** Google shows *Action Required*; a lapse stops the advisor, scanning and the dossier — and quietly falsifies the Terms sentence `lib/gemini.ts` now carries the receipt for | **David · 10 min** |
-> | **3** | **The bundle id.** `co.davidmasterson.crewchief` today. No App Store record exists (`APP_STORE_URL` is null), so changing it is free *now* and impossible after the record is created. Design's package says `co.southmoordigital.wellkept`; the Aug handoff said `com.` — the two disagree | **David · one word** |
-> | **4** | **Recalls in the paywall.** Design's §4.5 gates them; `paid-features.ts` puts them in the free tier with a safety argument and a test. Two current documents disagree | **David · decision** |
-> | **5** | Implement the brand package — `BrandLockup` component, icon set, metadata strings, the retired lockups | Claude Code |
+> | **3** | ~~The bundle id~~ — **settled 30 Aug: keep `co.davidmasterson.crewchief`.** Design's second pass ruled it, the code never changed, and the StoreKit product ids built on it (`…crewchief.paid.monthly` / `.annual`) stay as they are. ⚠ It is the id to create the App Store Connect record with | closed |
+> | **4** | ~~Recalls in the paywall~~ — **settled 30 Aug: recalls stay free.** Design reversed their own first pass and endorsed `paid-features.ts`, adding the better argument: NHTSA publishes it, so it is not ours to sell. No code change | closed |
+> | **5** | **Implement the brand package** — vendored at `docs/brand-package/` with its provenance, so it survives a cleared Downloads folder. `BrandLockup` component, the four icon reductions, metadata strings, and the two old lockups deleted rather than edited. ⚠ Outline the type before any PNG export; the SVGs declare Newsreader and a rasteriser substitutes Georgia | Claude Code |
 > | **6** | E8 — `expo-iap` and the store adapter, then enforce the gate, then the ceilings | Claude Code · costs a build |
 > | 7 | Paywall as the front door; onboarding ends at a purchase | Claude Code · after 6 |
 >
@@ -90,6 +90,10 @@
 >   miss.
 > - **The two `public/brand/crewchief-lockup-*.svg` still draw the old wordmark.** They are
 >   vector outlines, so grep reports them clean. Design replaces rather than edits them.
+> - **The bundle id and the deep-link scheme keep the old name on purpose** — Design's
+>   ruling for the id, shipped-builds compatibility for the scheme. ⚠ Design's §1 also
+>   says `@crewchief/core` stays; the scope was already renamed to `@wellkept/core` in
+>   `9d2dc41` and reverting it would be churn. "Not required" is not "unwelcome".
 > - **`RECALL_ALERTS_AFTER_LAPSE` is `false`** — David's call, 30 Aug: no features that incur
 >   costs for a lapsed account.
 > - **The demo's six sample answers are approved** and are drafts only in the sense that
@@ -98,6 +102,11 @@
 >   StoreKit library is installed. Nothing can be bought.
 > - **Seven migrations still pending**, `20260729060000` first — mod details still fail to save.
 > - `verify:mobile` reports PARTIAL: `MOBILE_TEST_TOKEN` expired 2 Aug.
+> - ⚠ **`mobile-native-build-inputs.test.ts` flaked twice on 30 Aug** — failed inside a full
+>   `npm test` run, passed in isolation immediately after, both times. It does real
+>   filesystem work (it walks the repo to check the EAS upload size), so a concurrent
+>   write is the likely cause. Not diagnosed. Worth doing before it teaches somebody to
+>   re-run a red suite instead of reading it — which is how a real failure gets missed.
 >
 > #### ⚠ What is still open in `lib/legal.ts`
 >

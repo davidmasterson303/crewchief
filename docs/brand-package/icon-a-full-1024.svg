@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="1024" height="1024" role="img" aria-label="Well Kept">
+  <title>App icon — full drawing (1024, 180, 167, 152, 120)</title>
+  <defs><radialGradient id="bay" cx="0.5" cy="0.45" r="0.72"><stop offset="0" stop-color="#1E2A2E"></stop><stop offset="0.8" stop-color="#0B0A09"></stop></radialGradient><filter id="glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="6"></feGaussianBlur></filter></defs><rect width="100" height="100" fill="url(#bay)"></rect>
+  <g filter="url(#glow)" opacity="0.6"><path d="M22 12 H78 L88 26 V74 L78 88 H22 L12 74 V26 Z" fill="#22D3EE"></path></g>
+  <path d="M22 12 H78 L88 26 V74 L78 88 H22 L12 74 V26 Z" fill="#16140F" stroke="rgb(160 240 252 / 0.55)" stroke-width="2.5"></path>
+  <g fill="rgb(245 243 240 / 0.26)"><circle cx="27" cy="24" r="1.8"></circle><circle cx="73" cy="24" r="1.8"></circle><circle cx="27" cy="76" r="1.8"></circle><circle cx="73" cy="76" r="1.8"></circle></g>
+  <text x="50" y="62" text-anchor="middle" font-family="Newsreader, Georgia, serif" font-weight="600" font-size="32" letter-spacing="0.64" fill="#F5F3F0">WK</text>
+</svg>

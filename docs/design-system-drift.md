@@ -666,7 +666,28 @@ caps beside it, and the type outlined at PNG-export time because every SVG in
 the package declares `Newsreader, Georgia, serif` and a rasteriser without the
 webfont silently substitutes Georgia.
 
-### 7.4 · ⚠ One thing in that package is not a design question
+### 7.4 · ✅ Resolved by Design's second pass, 30 Aug — recalls stay free
+
+Design revised `REBRAND_PROMPT.md` the same afternoon and reversed this one
+themselves: *"Recalls are free, and `paid-features.ts` is right. The first pass
+of this document gated them; that was wrong and the shipped argument is the
+correct one… It is also the one item on the list that is not ours to sell: NHTSA
+publishes it. Keep the test that asserts it."*
+
+The added reason is better than the one the code carried. `paid-features.ts`
+argues from consequence — an owner who cannot see a defect notice because their
+card expired. Design argues from ownership: it is a federal record, and selling
+access to it is selling something that is not ours. Both hold; the second is
+harder to talk yourself out of.
+
+**Nothing in the build changes.** The gate list becomes AI consultant, invoice
+scanning, second vehicle, factory build specs and full history — recalls out of
+it, which is where the code already had them.
+
+The original entry is kept below, because a disagreement that resolved is worth
+being able to see resolve.
+
+### 7.4a · ⚠ The finding as it stood, before Design's second pass
 
 Design's §4.5 lists the paywall's gates as *"AI consultant, invoice scanning,
 second vehicle, VIN specs + recalls, full history"*, with free as *"one car,
@@ -683,3 +704,19 @@ the one that is not.
 Not implemented, not silently reconciled. It is David's call, and it is recorded
 here rather than in a commit message because it is a disagreement between two
 current documents rather than a defect in either.
+
+### 7.5 · The truck that was not there
+
+Design's first pass said *"retire the truck glyph — it described a crew chief."*
+There is no truck in this app: the nav ships the Sweep dial mark, and a grep for
+`truck` returns vehicle-illustration prose and nothing else.
+
+Their second pass accepts it and makes the instruction sharper than the
+correction was: the car icon is in the **templates**, not the build, so the work
+is to replace the dial mark in the nav with the plate lockup and drop the car
+icon from template chrome — while keeping it where it means *a car*, on the
+consultant composer's vehicle-context line.
+
+Worth recording as a pattern rather than a one-off: Design writes against the
+templates, this repo is the build, and the two have drifted before. A "was →
+is" table in a handoff is describing the template's *was*.
