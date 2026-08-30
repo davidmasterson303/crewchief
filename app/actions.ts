@@ -12,7 +12,7 @@ import { checkDemoBudget, checkMonthlyBudget } from '@/lib/ai-budget';
 import { checkFeatureAccess, featureRefusal } from '@/lib/feature-gate';
 import { checkStoredPhotoSize } from '@wellkept/core/image-resize';
 import { budgetMessage, demoBudgetMessage } from '@wellkept/core/ai/budget';
-import { POWERTRAIN_OPTIONS_PROMPT, CONSULTANT_SYSTEM_PROMPT, CONSULTANT_DOCUMENT_VALIDATION_PROMPT } from '@wellkept/core/prompts';
+import { ADVISOR_NAME, POWERTRAIN_OPTIONS_PROMPT, CONSULTANT_SYSTEM_PROMPT, CONSULTANT_DOCUMENT_VALIDATION_PROMPT } from '@wellkept/core/prompts';
 import { researchVehicleDossier } from '@/lib/vehicle-research';
 import { showsModifications } from '@wellkept/core/mod-progression';
 import { logger } from '@wellkept/core/logger';
@@ -1282,21 +1282,20 @@ export async function sendConsultantMessage(params: {
     });
 
     /*
-      ⚠ `CrewChief` is the ADVISOR'S name, not the product's, and it stays
-      until the persona is renamed. The product became Well Kept on 30 Aug;
-      the character did not, because nobody has chosen what it is called yet.
+      The advisor's name comes from `ADVISOR_NAME`, not from a literal here.
 
-      This label and the one below have to match the name in `prompts.ts` —
-      the transcript is fed back as context, so a model told it is one
-      character and shown a script attributed to another has been handed a
-      third party mid-conversation. Rename all three together or none.
+      This label and the closing one below are fed back to the model as its own
+      past turns, so they have to be the name the system prompt gives it — a
+      model told it is Jay and shown a transcript attributed to somebody else
+      has been handed a third party mid-conversation. Interpolating from the
+      constant makes that impossible rather than merely tested.
     */
     const conversationHistory = messageHistory.slice(-20);
     const conversationText = conversationHistory
-      .map((msg: any) => `${msg.role === 'user' ? 'Owner' : 'CrewChief'}: ${msg.content}`)
+      .map((msg: any) => `${msg.role === 'user' ? 'Owner' : ADVISOR_NAME}: ${msg.content}`)
       .join('\n\n');
 
-    const fullPrompt = `${systemPrompt}\n\n${conversationText}\n\nOwner: ${message}\n\nCrewChief:`;
+    const fullPrompt = `${systemPrompt}\n\n${conversationText}\n\nOwner: ${message}\n\n${ADVISOR_NAME}:`;
 
     let contents: any;
 

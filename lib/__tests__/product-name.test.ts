@@ -71,6 +71,11 @@ const EXEMPT: Exemption[] = [
     pattern: /__CREW_CHIEF_DEBUG_VERBOSE/,
   },
   {
+    reason:
+      'a crew chief is a real job in motorsport, and the phrase is the advisor persona\'s archetype — never the product',
+    pattern: /NASCAR crew chief/i,
+  },
+  {
     reason: 'the support mailbox, which exists and is monitored',
     pattern: /crewchief\.support@gmail\.com/i,
   },
@@ -78,11 +83,6 @@ const EXEMPT: Exemption[] = [
     reason:
       'dead feedback address on a domain nobody here owns — flagged 30 Aug, David to decide whether it goes or moves',
     pattern: /feedback@crewchief\.app/i,
-  },
-  {
-    reason:
-      "the ADVISOR's name, not the product's — held until the persona is renamed, which is a voice rewrite and blocked on a name",
-    pattern: /'CrewChief'|CrewChief:|Hey, CrewChief here\.|You are CrewChief|>CrewChief</,
   },
 ];
 
@@ -166,9 +166,23 @@ describe('the product is called Well Kept everywhere it is named', () => {
     expect(stripComments('/* a\n b */\nconst x = 1;').split('\n')).toHaveLength(3);
   });
 
-  it('the persona exemption covers the advisor and not the product', () => {
-    const persona = EXEMPT.find((e) => e.reason.startsWith('the ADVISOR'))!;
-    expect(persona.pattern.test("? 'Owner' : 'CrewChief'")).toBe(true);
-    expect(persona.pattern.test('Everything else in CrewChief works the same')).toBe(false);
+  it('the archetype exemption covers the job and not the product', () => {
+    /*
+      ⚠ The persona exemption that used to be here is gone, and its absence is
+      the point: the advisor was renamed to Jay on 30 Aug, so no shipped source
+      says "CrewChief" as a character any more. An exemption that has stopped
+      being true is how an allowlist rots — it silently re-permits the thing it
+      was narrowly written for.
+
+      What survives is narrower and is not a name at all. A crew chief is a real
+      role in motorsport, and the system prompt reaches for it as the voice's
+      archetype.
+    */
+    const archetype = EXEMPT.find((e) => e.reason.startsWith('a crew chief is a real job'))!;
+    expect(archetype.pattern.test('the love child of a grizzled NASCAR crew chief')).toBe(true);
+    expect(archetype.pattern.test('Everything else in CrewChief works the same')).toBe(false);
+
+    // And nothing here exempts the character's old name any more.
+    expect(EXEMPT.some((e) => e.pattern.test("? 'Owner' : 'CrewChief'"))).toBe(false);
   });
 });

@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Loader as Loader2, Send, Plus, Search, MessageSquare, Paperclip, X, FileText, ExternalLink, Heart, Check, Wrench, TriangleAlert, Sparkles, PanelLeft, Copy } from 'lucide-react';
 import { logger } from '@wellkept/core/logger';
 import { isDemoVehicleId } from '@wellkept/core/demo';
+import { ADVISOR_NAME } from '@wellkept/core/prompts';
 import { isDemoMode } from '@/lib/demo-mode';
 import { wishlistItemIdentifier } from '@wellkept/core/wishlist-identifier';
 import {
@@ -773,17 +774,11 @@ export default function ConsultantChat({
                   <MessageSquare className="h-7 w-7 text-info" />
                 </div>
                 {/*
-                  ⚠ The advisor is still called CrewChief, on purpose. The
-                  product was renamed to Well Kept on 30 Aug; the character was
-                  not, because its new name is not chosen yet. A product is not
-                  a person, and naming the advisor after the app would be a
-                  decision made by a find-and-replace.
-
-                  Three places say this name and they must move together: here,
-                  the turn labels below, `prompts.ts`, and the transcript
-                  formatter in `app/actions.ts`.
+                  The advisor is Jay; the product is Well Kept. Both names come
+                  from one constant in core, so this greeting, the turn bylines
+                  below and the name the model is given cannot drift apart.
                 */}
-                <h3 className="text-lg font-bold mb-2 text-white">Hey, CrewChief here.</h3>
+                <h3 className="text-lg font-bold mb-2 text-white">Hey, {ADVISOR_NAME} here.</h3>
                 <p className="text-white/55 mb-5 text-sm leading-relaxed">
                   I know your {vehicle.year} {vehicle.make} {vehicle.model} inside and out. What&apos;s on your mind?
                 </p>
@@ -821,7 +816,7 @@ export default function ConsultantChat({
                   {msg.role === 'assistant' && (
                     <div className="flex items-center gap-1.5 mb-1.5">
                       <Sparkles className="h-[13px] w-[13px] flex-shrink-0" style={{ color: 'var(--info)' }} />
-                      <span className="text-xs font-semibold uppercase tracking-widest text-white/50">CrewChief</span>
+                      <span className="text-xs font-semibold uppercase tracking-widest text-white/50">{ADVISOR_NAME}</span>
                       <span className="text-xs text-white/50">
                         {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
@@ -833,7 +828,7 @@ export default function ConsultantChat({
                         ? 'max-w-[80%] bg-primary/90 text-primary-foreground rounded-2xl rounded-tr-sm p-4 overflow-hidden'
                         /*
                           Unboxed: no background, border, radius or padding. A
-                          CrewChief answer is a diagnosis, not a chat line, and
+                          an answer from Jay is a diagnosis, not a chat line, and
                           after this a container on this screen means
                           "structured payload" rather than "someone spoke".
 
@@ -1027,7 +1022,7 @@ export default function ConsultantChat({
                 <div className="animate-fade-in flex flex-col items-start">
                   <div className="flex items-center gap-1.5 mb-1.5">
                     <Sparkles className="h-[13px] w-[13px] flex-shrink-0" style={{ color: 'var(--info)' }} />
-                    <span className="text-xs font-semibold uppercase tracking-widest text-white/50">CrewChief</span>
+                    <span className="text-xs font-semibold uppercase tracking-widest text-white/50">{ADVISOR_NAME}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Loader2 className="h-3.5 w-3.5 animate-spin text-info flex-shrink-0" />

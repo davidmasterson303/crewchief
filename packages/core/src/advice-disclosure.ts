@@ -53,19 +53,23 @@
  * misunderstanding when a confident paragraph recommends a repair. It is also
  * the one claim here that is unarguably, checkably true.
  *
- * ── ⚠ The advisor's name is missing from this file, and that is deliberate ──
+ * ── ⚠ The advisor's name is absent here, and stays absent ──────────────────
  *
  * §1.3's suggested copy reads *"Written by [advisor name]'s AI from your
- * records."* The name is **blocked on David** — see `WELLKEPT_RENAME_PACKAGE`:
- * the advisor *is* "Well Kept", it is the persona's name in the system prompt's
- * voice instructions and the label transcripts are formatted with, and the
- * product is renaming to Well Kept, which is not a person. Three options are
- * with him and none has been chosen.
+ * records."* The name was blocked when that was written and is not any more —
+ * the advisor is **Jay**, chosen 30 Aug — and this file still does not use it.
  *
- * So these strings say "AI" unqualified rather than guessing a name. **When the
- * persona commit happens, this file is part of it** — the disclosure is one of
- * the places the character is named, and it is easy to miss because it is copy
- * rather than a prompt.
+ * That is a decision, not an oversight. These sentences exist to tell a reader
+ * that a **model** produced the text. A first name in that position reads as a
+ * person vouching for it, which is precisely the impression the disclosure is
+ * here to prevent: "Jay says your brakes are fine" is a recommendation from
+ * somebody, and "written by AI, it has never seen your car" is what actually
+ * happened. Jay is the voice everywhere else — the greeting, the turn bylines,
+ * the system prompt — and this is the one surface where the machinery should
+ * be visible instead of the character.
+ *
+ * `advice-says-it-is-generated.test.ts` asserts all three failures: no
+ * placeholder, no product name, and no persona name.
  */
 
 export type AdviceSurface =

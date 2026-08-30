@@ -25,6 +25,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { ADVISOR_NAME } from '@wellkept/core/prompts';
 import { adviceDisclosure, RECALL_MATCH_CAVEAT } from '@wellkept/core/advice-disclosure';
 import { ADVISOR_AI_CONSENT, INVOICE_AI_CONSENT } from '@wellkept/core/ai-consent-copy';
 
@@ -114,22 +115,59 @@ describe('the disclosure itself', () => {
   });
 
   /*
-    ── ⚠ The advisor's name is blocked, and must not be guessed ──────────────
+    ── ⚠ The advisor is named now, and the disclosure still must not name him ─
 
-    §1.3's suggested copy reads "Written by [advisor name]'s AI…". The advisor
-    *is* "CrewChief" — the persona's name in the system prompt and the label
-    transcripts are formatted with — and the product is renaming to Well Kept,
-    which is not a person. The shortlist is with David.
+    This was "the name is blocked, do not guess it". It was chosen on 30 Aug —
+    the advisor is **Jay** — and the assertion survives the decision with its
+    meaning intact rather than being deleted with the blocker.
 
-    This asserts the placeholder never shipped and that no old name was
-    hard-coded into the disclosure in the meantime. When the persona is chosen,
-    this test is the thing that should fail and be updated deliberately.
+    §1.3's suggested copy reads *"Written by [advisor name]'s AI…"*, and this
+    file deliberately does not use it. The disclosure exists to tell a reader a
+    **model** wrote the text; a first name in that sentence reads as a person
+    vouching for it, which is the one impression a liability line cannot afford
+    to give. "Written by AI" is the claim; "Jay" is the character who delivers
+    it everywhere else.
+
+    So: no placeholder, no product name, and no persona name — three ways the
+    same sentence goes soft, and the third only became possible today.
   */
-  it('ships no placeholder and no guessed persona name', () => {
+  it('ships no placeholder, no product name and no persona name', () => {
     for (const surface of ['consultant', 'health', 'estimate', 'plan'] as const) {
       const copy = adviceDisclosure(surface);
       expect([surface, /\[advisor name\]|\{advisor/i.test(copy)]).toEqual([surface, false]);
       expect([surface, /CrewChief|Well Kept/i.test(copy)]).toEqual([surface, false]);
+      expect([surface, new RegExp(`\\b${ADVISOR_NAME}\\b`, 'i').test(copy)]).toEqual([
+        surface,
+        false,
+      ]);
+    }
+  });
+
+  it('the advisor is named in one place, and every surface reads it from there', () => {
+    /*
+      The drift this prevents is not cosmetic. The transcript formatter labels
+      past turns with this name and feeds them back as the model's own words —
+      a model told it is Jay and shown a script attributed to somebody else has
+      been handed a third party mid-conversation.
+
+      So the literal may exist once, in the constant. Anywhere else it is a copy
+      waiting to be missed by the next rename, which is exactly what the last
+      one found.
+    */
+    expect(ADVISOR_NAME).toBe('Jay');
+
+    const rendered_ = (src: string) =>
+      src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\/.*$/gm, '');
+
+    for (const [name, source] of [
+      ['web consultant', WEB_CHAT],
+      ['the transcript formatter', read('app', 'actions.ts')],
+    ] as const) {
+      const body = rendered_(source);
+      expect(`${name}: ${body.includes('ADVISOR_NAME')}`).toBe(`${name}: true`);
+      expect(`${name}: ${new RegExp(`['\"\`>]${ADVISOR_NAME}[:'\"\`<]`).test(body)}`).toBe(
+        `${name}: false`
+      );
     }
   });
 

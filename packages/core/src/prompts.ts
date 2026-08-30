@@ -1,3 +1,32 @@
+/**
+ * The advisor's name — the character, not the product.
+ *
+ * ── Why this is a constant and not four string literals ────────────────────
+ *
+ * It is spoken in four places and they are not interchangeable: the system
+ * prompt tells the model who it is, the transcript formatter in
+ * `app/actions.ts` labels past turns with it and feeds them back as context,
+ * and the web chat prints it as a greeting and as a per-turn byline. A model
+ * told it is one character and shown a script attributed to another has been
+ * handed a third party mid-conversation — so these cannot drift, and a test
+ * asserting they match only reports the drift after it ships.
+ *
+ * ⚠ **Chosen 30 Aug 2026: Jay.** It was the last thing blocking the rename's
+ * second half. The product is Well Kept and the advisor is Jay, deliberately
+ * different words: a product is not a person, and an app that answers in the
+ * first person under its own brand name is making a claim about who is
+ * talking.
+ *
+ * The one thing worth knowing and not worth relitigating: *Jay Leno's Garage*
+ * is a substantial automotive brand, so an advisor called Jay carries that
+ * association in this category. Raised with David before the call; his call.
+ *
+ * ⚠ It is deliberately **absent from `advice-disclosure.ts`**. That copy exists
+ * to say a model wrote the text, and a friendly name in a liability sentence
+ * reads as a person vouching for it. See that file's header.
+ */
+export const ADVISOR_NAME = 'Jay';
+
 export const VEHICLE_RESEARCH_PROMPT = (year: number, make: string, model: string) => `
 You are an expert automotive consultant with deep knowledge of vehicle reliability and maintenance.
 
@@ -158,18 +187,12 @@ export const CONSULTANT_SYSTEM_PROMPT = (context: {
    */
   invoiceTotals: string[];
   /*
-    ⚠ The advisor's name is CrewChief and the product's is Well Kept. That is
-    not a missed rename: the product was renamed on 30 Aug and the character
-    was held back, because the persona rewrite is a voice change rather than a
-    substitution and its name is still unchosen.
-
-    It appears in four places — this line, the two turn labels in
-    `components/ConsultantChat.tsx`, and the transcript formatter in
-    `app/actions.ts`, which feeds `CrewChief:` back as context. They have to
-    change in one commit or the model is shown a script by somebody else.
+    The name is interpolated from `ADVISOR_NAME` rather than written here, so
+    the prompt and the transcript labels cannot disagree about who is speaking.
+    See that constant for why that matters more than it looks.
   */
 }) => `
-You are CrewChief — think the love child of a grizzled NASCAR crew chief and your uncle who's been elbows-deep in engines since before you were born. You've got grease under your nails, opinions for days, and a genuine love for keeping machines alive. You're a little salty, a little funny, and deeply passionate about cars. You talk like a real person — colorful, direct, occasionally throwing in a car metaphor that lands perfectly.
+You are ${ADVISOR_NAME} — think the love child of a grizzled NASCAR crew chief and your uncle who's been elbows-deep in engines since before you were born. You've got grease under your nails, opinions for days, and a genuine love for keeping machines alive. You're a little salty, a little funny, and deeply passionate about cars. You talk like a real person — colorful, direct, occasionally throwing in a car metaphor that lands perfectly.
 
 Think: if Mike Ehrmantraut from Breaking Bad was a master mechanic who actually liked people. Dry wit, zero BS, but secretly loves helping owners take care of their rides.
 
