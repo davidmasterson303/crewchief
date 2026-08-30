@@ -1,6 +1,122 @@
 # Well Kept roadmap — image pipeline, backdrop, cockpit direction, and responsive web
 
-> ### ⚠ START HERE — 25 Aug 2026, into the feedback thread
+> ### ⚠ START HERE — 30 Aug 2026, the rebrand day
+>
+> Written at the end of the 30 Aug session. **The product is now Well Kept, the advisor is
+> Jay, the operator is Southmoor Digital LLC, there is no free tier, and the demo makes no
+> model calls.** None of it is on a hostname. Everything below this block is history.
+>
+> The plan of record for launch is still outside this repo, in
+> `~/Documents/Claude/Projects/davidmasterson.co/` — plus, new today,
+> **`Well Kept brand identity redesign.zip`** in `~/Downloads`, whose
+> `REBRAND_PROMPT.md` is Design's handoff and the spec for what is left.
+>
+> ---
+>
+> #### ⛔ Nothing shipped today is live, and the gap is now large
+>
+> ```
+> crewchief.davidmasterson.co        02b36c6e   23 Aug   ← still says CrewChief, still David
+> crewchief-demo.davidmasterson.co   9b789a87   23 Aug        Masterson, still the gmail
+> main                               38 commits ahead, 17 of them unpushed
+> ```
+>
+> Curled anonymously with a cache-buster at the end of the session: `/privacy` serves
+> **David Masterson** and **crewchief.support@gmail.com**, twice each. Both are corrected in
+> the tree and neither is corrected in public. A green suite is not a fixed page.
+>
+> ⚠ **This is the most consequential thing on the board.** `crewchief.davidmasterson.co` is
+> the App Store listing's privacy URL and the origin the phone talks to. Everything from
+> §8 still applies: promote `web-live` before the next mobile build, run
+> `scripts/sql/reconcile-rls-2026-08-24.sql` first, and set `AI_HEALTH_SECRET` on both
+> Netlify sites.
+>
+> #### What landed 30 Aug
+>
+> | | |
+> |---|---|
+> | `9d2dc41` | **the rename** — 355 files, `@wellkept/*`, every user-visible string, metadata, the iOS display name, fixtures, doc headers |
+> | `afb0b0f` | `OPERATOR` = **Southmoor Digital LLC** |
+> | `1bb9f64` | **the advisor is Jay**, from one constant (`ADVISOR_NAME`) that four sites interpolate |
+> | `26759f8` · `edc53f4` | the pricing model, derived from the price; **$3.99 / $39.90** |
+> | `663908a` | `access.ts` — no free tier, a lapse drops to read-only; `demo-answers.ts` |
+> | `10a06a2` | **the demo makes no model call at all** — the last unauthenticated path to Gemini |
+> | `3c4ad01` | `CONTACT_EMAIL` = **support@southmoordigital.com** |
+> | `b1e2baa` | the quote panel's fake progress bar, D11's fifth surface, LEG-01's receipt, the dead footer mailto |
+>
+> **181 web suites / 3166 tests, 26 mobile / 451, typecheck and production build clean.**
+> Both legal pages verified in the *production build*: operator, address and date all render.
+>
+> #### The pricing model, settled
+>
+> The ceiling is **derived from the price** (`packages/core/src/ai/pricing.ts`) so breakeven
+> is structural rather than tuned. Two things decide it and neither is obvious:
+>
+> - **The annual plan sets the ceiling**, always — one ceiling serves every subscriber, so it
+>   must be safe for the worst-paying one. $39.90 nets $2.83/month. The monthly price never
+>   enters the arithmetic, which is why $4.99 → $3.99 cost nothing in safety.
+> - **Worst case is priced at the Pro rate**, not Flash, because `decideBudget` counts tokens
+>   without recording which model produced them.
+>
+> Derived paid ceiling: **283,000 output-equivalent tokens**. Measured against real per-call
+> costs, a heavy month — 120 advisor turns, 2 dossiers, 24 scans, 12 health summaries, 20 mod
+> analyses — is **$1.21**, or 43% of it.
+>
+> ⛔ **The live ceilings are unchanged and still wrong**: `paid` is 1,000,000 (3.5× what it
+> earns) and `free` is 400,000. They cannot move until the gate is enforced, because 283,000
+> is *below* the free ceiling and applying it would invert the tiers. `ai-pricing.test.ts`
+> pins that gap; the pins are meant to fail when somebody closes it.
+>
+> #### Next, in order
+>
+> | # | What | Who |
+> |---|---|---|
+> | **1** | **Promote `web-live`** — the rename, the operator, the address and the demo fix are all sitting behind it. SQL trip and `AI_HEALTH_SECRET` first | **David**, then Claude Code |
+> | **2** | ⚠ **Gemini billing → prepay.** Google shows *Action Required*; a lapse stops the advisor, scanning and the dossier — and quietly falsifies the Terms sentence `lib/gemini.ts` now carries the receipt for | **David · 10 min** |
+> | **3** | **The bundle id.** `co.davidmasterson.crewchief` today. No App Store record exists (`APP_STORE_URL` is null), so changing it is free *now* and impossible after the record is created. Design's package says `co.southmoordigital.wellkept`; the Aug handoff said `com.` — the two disagree | **David · one word** |
+> | **4** | **Recalls in the paywall.** Design's §4.5 gates them; `paid-features.ts` puts them in the free tier with a safety argument and a test. Two current documents disagree | **David · decision** |
+> | **5** | Implement the brand package — `BrandLockup` component, icon set, metadata strings, the retired lockups | Claude Code |
+> | **6** | E8 — `expo-iap` and the store adapter, then enforce the gate, then the ceilings | Claude Code · costs a build |
+> | 7 | Paywall as the front door; onboarding ends at a purchase | Claude Code · after 6 |
+>
+> #### Known and deliberate — do not re-report these
+>
+> - **The advisor is Jay and the product is Well Kept.** Different words on purpose. The
+>   disclosure deliberately says "written by AI" and never "written by Jay" — a first name in
+>   a liability sentence reads as a person vouching.
+> - **`crewchief://`, the storage keys, `CREWCHIEF_DEMO_SITE` and the bundle id still say
+>   CrewChief.** Each is held for a different reason; `product-name.test.ts`'s exemption list
+>   is the record, and every entry carries its argument. Read it before assuming a hit is a
+>   miss.
+> - **The two `public/brand/crewchief-lockup-*.svg` still draw the old wordmark.** They are
+>   vector outlines, so grep reports them clean. Design replaces rather than edits them.
+> - **`RECALL_ALERTS_AFTER_LAPSE` is `false`** — David's call, 30 Aug: no features that incur
+>   costs for a lapsed account.
+> - **The demo's six sample answers are approved** and are drafts only in the sense that
+>   Design owns the voice.
+> - `PAID_FEATURES_ENFORCED` is still off, `PaywallScreen` is mounted by no navigator, and no
+>   StoreKit library is installed. Nothing can be bought.
+> - **Seven migrations still pending**, `20260729060000` first — mod details still fail to save.
+> - `verify:mobile` reports PARTIAL: `MOBILE_TEST_TOKEN` expired 2 Aug.
+>
+> #### ⚠ What is still open in `lib/legal.ts`
+>
+> The operator is the LLC and the address is on its domain. Two things are not settled and
+> both are recorded in that file's header: **no company address appears in either document**,
+> and **the Apple membership is still Individual**, so the store listing will name David
+> while the policy names the company. Closing that is a D-U-N-S, a fresh enrolment and an app
+> transfer — not a code change.
+>
+> ⚠ `LAST_UPDATED` is **30 August 2026** and that is a ship date. If the promote slips past
+> today, the constant and the pin in `legal-pages.test.ts` both move to the day it runs.
+>
+
+> ### 25 Aug 2026 — into the feedback thread. **Superseded by the block above.**
+>
+> Its deploy block, its next-list and its rename section are all out of date: the rename
+> happened, the operator and contact changed, and the unpromoted gap grew from 27 commits
+> to 38. What it still carries correctly is the migration state, the promote preconditions
+> and the three waves of 23–25 Aug.
 >
 > Written at the start of the 25 Aug session, for the thread where **David uses the app and
 > reports what is wrong with it**. Everything below this block is history; the two blocks
