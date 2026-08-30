@@ -125,28 +125,24 @@ export const PRICING = {
 } as const;
 
 /**
- * The free trial, and ⚠ the one path in this file that can cost money and earn
- * none.
+ * ⚠ **There is no free trial, removed 30 Aug — and the reason it was bounded is
+ * worth keeping for whoever adds one back.**
  *
- * A 7-day trial is a subscription that has not been paid for yet. Somebody can
- * take one, spend a month's ceiling inside the week, cancel, and owe nothing —
- * which is the free tier arriving through a different door, four days after it
- * was deleted for exactly that reason.
+ * A trial is a subscription nobody has paid for. Somebody can take one, spend a
+ * month's ceiling inside the week, cancel, and owe nothing — which is the free
+ * tier arriving through a different door, days after it was deleted for exactly
+ * that shape.
  *
- * **The bound is proportional rather than a second number to tune.** A trial is
- * 7/30 of a month, so it gets 7/30 of the month's ceiling: at today's prices
- * ~49,500 output-equivalent tokens, a worst case of about **$0.50 per trial
- * taken**. That is a real acquisition cost and it is deliberately small enough
- * to be one — it is roughly twice the *normal* month measured on real per-call
- * figures, so a trialist doing ordinary things never meets it.
+ * The bound that was written for it, if a trial returns: **proportional, not a
+ * second number to tune.** A 7-day trial is 7/30 of a month, so it gets 7/30 of
+ * the month's ceiling — about 49,500 output-equivalent tokens at the prices
+ * below, a worst case near 50¢ per trial taken. Proportional means it follows
+ * the price and the trial length without either being restated, which is the
+ * drift this whole file exists to remove.
  *
- * ⚠ **This is not yet enforced anywhere.** `decideBudget` takes a `Tier`, and a
- * trial is not a tier — it is a state in `access.ts`. Wiring it is E8 work,
- * because nothing can start a trial until StoreKit exists. Until then this
- * function is the number that wiring should use, and the gap is named here
- * rather than discovered when the first trial runs.
+ * ⚠ It was never enforced. `decideBudget` takes a `Tier` and a trial is not one
+ * — it is a state in `access.ts` — so the wiring is E8 work either way.
  */
-export const TRIAL_DAYS = 7;
 
 /**
  * Output-equivalent token rates, US dollars per token.
@@ -282,16 +278,6 @@ export const FREE_MONTHLY_COST_USD = 0.25;
  */
 export function freeMonthlyOutputTokensWhenGated(): number {
   return Math.floor(FREE_MONTHLY_COST_USD / OUTPUT_USD_PER_TOKEN.pro);
-}
-
-/**
- * What a trial may spend before it has paid for anything.
- *
- * Proportional to the ceiling, so it follows the price and the trial length
- * without either being restated. See `TRIAL_DAYS`.
- */
-export function trialOutputTokens(): number {
-  return Math.floor((paidMonthlyOutputTokens() * TRIAL_DAYS) / 30);
 }
 
 /**
