@@ -160,7 +160,7 @@
 > | **1** | Feedback from using the app — screenshots, not video | **David** |
 > | **2** | ⚠ **Switch the Gemini billing account to prepay.** Google shows *Action Required*; if it lapses the advisor, invoice scanning and the dossier all stop — and the Terms sentence that says content is not used for training stops being true with it | **David · 10 min** |
 > | **3** | The SQL trip: seven migrations + `reconcile-rls-2026-08-24.sql` | **David · one editor session** |
-> | **4** | **The name.** LEG-11 blocks the rename, the bundle id, the App Store Connect record and the advisor persona — everything downstream | **David · decision** |
+> | **4** | **The advisor's name.** LEG-11's product half is settled — Well Kept, renamed in the tree on 30 Aug. What is still blocked is the *character*, and with it the persona rewrite; the bundle id and the App Store Connect record wait on `southmoordigital.com` | **David · decision** |
 > | **5** | Promote `web-live` (then `demo-live`), once 2 and 3 are done | Claude Code · on David's word |
 > | **6** | E8 — `expo-iap` and the store adapter, then `PAID_FEATURES_ENFORCED` | Claude Code · costs a build |
 > | 7 | IAP-02 (a sandbox purchase still grants the paid tier on a fresh account), and LEG-01's project-id comment in `lib/gemini.ts` | Claude Code |
@@ -169,12 +169,29 @@
 > the reviewer account's password, and registering `southmoordigital.com` before any App
 > Store Connect record exists.
 >
-> #### The rename is coming, and it renames this file's subject
+> #### The rename happened on 30 Aug — the mechanical half
 >
-> **CrewChief → Well Kept**, company **Southmoor Digital LLC** (not yet formed — keep it out
-> of `lib/legal.ts` until Colorado accepts the filing), bundle `com.southmoordigital.wellkept`,
-> scheme `wellkept://`, npm scope `@wellkept/core`. Two commits, never one: the mechanical
-> rename, then the persona rewrite, which needs reading for voice. Blocked on the name.
+> **CrewChief → Well Kept** across 355 files: the npm scope (`@wellkept/*`), every
+> user-visible string, metadata, the iOS display name, permission strings, fixtures and doc
+> headers. `product-name.test.ts` now fails on the old name outside an exemption list where
+> every entry carries its reason — that list is the record of what still legitimately says
+> "CrewChief", so read it before assuming a hit is a miss.
+>
+> ⚠ **Held back deliberately, and each for a different reason:** the advisor is still called
+> CrewChief (a character, not a product, and its new name is unchosen — four sites that must
+> move together); `crewchief://` is in shipped notifications; the storage keys hold real
+> state; `CREWCHIEF_DEMO_SITE` is half of a pair whose other half is in Netlify; the bundle
+> id, the Expo slug and both hostnames were David's explicit do-not-touch list.
+>
+> **Southmoor Digital LLC exists**, and as of 30 Aug it is the `OPERATOR` in `lib/legal.ts`,
+> with `LAST_UPDATED` moved to match. ⛔ **Neither is published** — `web-live` is frozen at
+> 23 Aug, so the live privacy policy and terms still name David personally. The date in the
+> file is a promise until that promote runs; if it slips past 30 Aug, the date moves with it.
+>
+> ⚠ The Apple membership is still **Individual**, so the store listing names David while the
+> policy names the LLC. Closing that is a D-U-N-S, a fresh enrolment and an app transfer —
+> not a code change. And no company address appears in either document, because nobody has
+> given one.
 >
 > ⚠ `lib/site-role.ts` treats an unset variable as "this is the product" — deliberately, so
 > the App Store hostname can never accidentally serve the demo masthead. That is also exactly

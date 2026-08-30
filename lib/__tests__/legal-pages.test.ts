@@ -144,7 +144,16 @@ describe('who operates the service, and who to write to about it', () => {
   */
 
   it('names a real operator rather than a bracketed placeholder', () => {
-    expect(OPERATOR).toBe('David Masterson');
+    /*
+      ⚠ Changed 30 Aug: the operator is **Southmoor Digital LLC**, not a person.
+
+      The pin is the point. This value decides who a reader is contracting with
+      and who is accountable for what the product says about their car, so it
+      moves only when David says it moves — an entity appearing or disappearing
+      here through a merge, a refactor or a find-and-replace is the failure this
+      exact literal exists to stop.
+    */
+    expect(OPERATOR).toBe('Southmoor Digital LLC');
 
     // Anti-vacuous: this must still be able to catch a placeholder coming back.
     expect(OPERATOR).not.toMatch(/[[\]]|TBD|not yet|to be decided/i);
@@ -202,8 +211,14 @@ describe('who operates the service, and who to write to about it', () => {
       file's own docblock is explicit that a date which moves for a CSS change
       teaches people the date means nothing. An exact pin makes every bump a
       line somebody had to write on purpose.
+
+      ⚠ Moved to 30 August with the operator becoming Southmoor Digital LLC.
+      Unlike the 19 August bump, this one is ahead of its own promote: web-live
+      has been frozen since 23 Aug, so the published policy still names David
+      personally. If the promote slips past the 30th, this literal and the
+      constant both move to the day it runs.
     */
-    expect(LAST_UPDATED).toBe('19 August 2026');
+    expect(LAST_UPDATED).toBe('30 August 2026');
     expect(new Date(LAST_UPDATED).getTime()).not.toBeNaN();
     expect(new Date(LAST_UPDATED).getTime()).toBeGreaterThanOrEqual(
       new Date('14 August 2026').getTime(),

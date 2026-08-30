@@ -44,12 +44,17 @@ export const metadata: Metadata = {
  * is the privacy-policy URL in the App Store listing. It is not a draft waiting
  * for a launch date; it is what App Review reads.
  *
- * ✅ Both are now named — `OPERATOR` on 18 Aug, once Apple's Individual
- * membership settled it without needing an entity, and `CONTACT_EMAIL` on
- * 19 Aug. Nothing bracketed renders below any more, and `LAST_UPDATED` moves
- * with them because who operates a service and how to reach them is the
+ * ✅ Both are named — `CONTACT_EMAIL` on 19 Aug, and `OPERATOR` twice: David
+ * personally on 18 Aug, then **Southmoor Digital LLC on 30 Aug** once the
+ * company existed. Nothing bracketed renders below any more, and `LAST_UPDATED`
+ * moves with them because who operates a service and how to reach them is the
  * substance of the document rather than its trim. See `lib/legal.ts` for why
  * the contact is deliberately not a domain address.
+ *
+ * ⛔ **The operator on the live page is still the person, not the company.**
+ * This file changed on 30 Aug; `web-live` has been frozen since 23 Aug, so the
+ * document App Review reads names David until a promote runs. The date in
+ * `lib/legal.ts` is written for the day it ships, not the day it was edited.
  */
 export default function PrivacyPolicyPage() {
   return (

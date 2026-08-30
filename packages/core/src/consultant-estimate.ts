@@ -142,7 +142,10 @@ export function parseEstimate(response: string): {
       other advice surface. `cc-design-0003` is deliberately written for *all*
       of them, and "Fluid flush (they're overcharging)" as a line item is the
       exact failure `statesVerdict` exists to catch: a statement about a named
-      local business, made by a product with no entity behind it.
+      local business, made by a product that cannot check what that business
+      quoted. (It read "with no entity behind it" until Southmoor Digital LLC
+      became the operator on 30 Aug; an entity does not make the claim
+      checkable, so the rule is unchanged.)
 
       The line is dropped rather than the whole estimate. One badly worded
       label should not cost the owner the other three prices.

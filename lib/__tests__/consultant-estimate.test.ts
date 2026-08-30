@@ -182,7 +182,7 @@ describe('a line item is advice copy, and answers to the same rule', () => {
       just the front door — a rule the consultant follows and the well does not
       is a rule that drifts back within two features. "Fluid flush (they're
       overcharging)" set in a styled panel next to a price is a statement about
-      a named local business made by a product with no entity behind it.
+      a named local business made by a product that cannot check the quote.
     */
     const { estimate } = parseEstimate(
       "[ESTIMATE: Fluid flush, they're overcharging|110|160]\n[ESTIMATE: Pads|240|310]"

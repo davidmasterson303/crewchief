@@ -1,43 +1,45 @@
 /**
  * The two facts these documents cannot be written without, and one date.
  *
- * ── ⚠ OPEN, 30 Aug: neither of the two facts below has been re-decided ──────
+ * ── `OPERATOR` — an entity, from 30 Aug ────────────────────────────────────
  *
- * The product was renamed to **Well Kept** on 30 Aug. Nothing in this file
- * moved with it, deliberately:
+ * **Southmoor Digital LLC**, on David's instruction. This is a substance
+ * change rather than a wording one: the party a reader is contracting with,
+ * and the party accountable for what this product says about their car, is now
+ * a company rather than a person. `LAST_UPDATED` moves with it — that is the
+ * rule this file already carried, not a courtesy.
  *
- *   `OPERATOR`        David says **Southmoor Digital LLC now exists**. If the
- *                     LLC operates the service, this constant is wrong on a
- *                     page Apple reads — and the docblock below already says
- *                     an entity is "a substance change that bumps
- *                     `LAST_UPDATED` on its own terms". Who the operator is
- *                     is David's answer, not a rename's.
- *   `CONTACT_EMAIL`   a real mailbox that exists and is delegated. Renaming
- *                     the string would point customers at nothing.
- *   `LAST_UPDATED`    must become the day the change reaches a live hostname,
- *                     not the day it was edited — see the note on it below.
+ * The entry it replaces read `David Masterson` and its reasoning is kept
+ * because it was right about the mechanism and wrong about the timing. It
+ * argued the entity question "did not need answering", since the Apple
+ * membership is Individual and the seller name is David's either way — and
+ * then predicted that forming one "would change who operates the service,
+ * which is a substance change that bumps `LAST_UPDATED` on its own terms".
+ * That is what has happened.
  *
- * ⚠ And one thing that does not resolve itself: the reasoning below turns on
- * the Apple membership being **Individual**, so the store's seller name is
- * David's personal name. A policy naming an LLC beside a listing naming a
- * person is a disagreement in public, and closing it means enrolling as an
- * Organization — D-U-N-S, fresh enrolment, app transfer.
+ * ⚠ **The Apple half has not moved with it.** The membership submitted 16 Aug
+ * is Individual, so the App Store listing still names David personally. A
+ * privacy policy naming an LLC beside a store listing naming a person is a
+ * disagreement anybody can read in one sitting, and closing it means enrolling
+ * as an Organization — D-U-N-S, a fresh enrolment, an app transfer. Nothing in
+ * this file can fix that. It is recorded here because this is where the next
+ * person will be standing when they notice.
  *
- * ── `OPERATOR` — settled 18 Aug, and Apple settled it ───────────────────────
+ * ⚠ **No company address appears in either document, and that is not an
+ * oversight.** Nobody has given one, and what Colorado publishes is the
+ * registered agent's address rather than a mailing address. Apple's DSA trader
+ * flow demands one the moment EU distribution is on — US-only at launch is
+ * what currently keeps that off the table. Naming an address is a decision,
+ * not a lookup, so this file does not guess at one.
  *
- * This was a placeholder until 18 Aug because CrewChief has no legal entity
- * (`cc-business-0001`, roadmap Q2 — still open) and a policy naming an entity
- * that does not exist is worse than one admitting it is unfinished.
+ * ── `CONTACT_EMAIL` — settled 19 Aug, and unchanged by the entity ──────────
  *
- * **The entity question did not need answering.** The Apple Developer
- * membership submitted 16 Aug is **Individual, not Organization**, so the App
- * Store seller name is David's personal legal name whatever Q2 decides later.
- * Naming him here is consistent with what Apple displays anyway, needs no
- * entity to exist first, and cannot be made wrong by forming one — an entity
- * would change who operates the service, which is a substance change that
- * bumps `LAST_UPDATED` on its own terms.
- *
- * ── `CONTACT_EMAIL` — settled 19 Aug, and it is deliberately not a domain ───
+ * The company does not change this and it was checked rather than assumed: the
+ * argument below is about what a *customer* can reach, and a gmail an LLC
+ * monitors is reachable in exactly the way a gmail a person monitors is. What
+ * an entity does add is somewhere for `support@` to live once a domain exists
+ * — that is on the launch runbook, not blocking, and it is not this constant's
+ * decision to make on its own.
  *
  * `crewchief.support@gmail.com`. A dedicated address rather than a personal
  * one, because this renders on a page App Review reads and gets scraped
@@ -62,8 +64,8 @@
  * whose date moves for a CSS edit teaches people the date means nothing.
  */
 
-/** The legal name the service is operated under — confirmed by David, 18 Aug. */
-export const OPERATOR = 'David Masterson';
+/** The legal name the service is operated under — confirmed by David, 30 Aug. */
+export const OPERATOR = 'Southmoor Digital LLC';
 
 /** A monitored address, delegated so replies come from CrewChief Support. */
 export const CONTACT_EMAIL = 'crewchief.support@gmail.com';
@@ -71,14 +73,23 @@ export const CONTACT_EMAIL = 'crewchief.support@gmail.com';
 /**
  * The date the substance of these documents last changed.
  *
- * ⚠ **This is a ship date, not an edit date.** It read `18 August` while the
- * contact was still bracketed, because that was the day the operator landed on
- * `main` — but nothing deploys from `main`, so no reader ever saw it. The
- * contact and the operator reach the public page together, today, and this is
- * that day. A date describing a change readers could not see is the same defect
- * as one that precedes the change it describes.
+ * ⚠ **This is a ship date, not an edit date**, and on 30 Aug it is a promise
+ * rather than a fact. It read `18 August` once while the contact was still
+ * bracketed, because that was the day the operator landed on `main` — and
+ * nothing deploys from `main`, so no reader ever saw it. The 19 August value
+ * was correct because the promote happened that day.
+ *
+ * ⛔ **The operator change is NOT on a hostname yet.** `web-live` has been
+ * frozen since 23 Aug and `crewchief.davidmasterson.co` still serves a policy
+ * naming David personally. Until that promote runs, this date describes a
+ * change no reader can see — which the paragraph above calls the same defect as
+ * a date that precedes its own change.
+ *
+ * **So: if the promote slips past 30 August, move this line to the day it
+ * runs.** It is one edit, and it is the difference between a date that means
+ * something and one that teaches people it does not.
  */
-export const LAST_UPDATED = '19 August 2026';
+export const LAST_UPDATED = '30 August 2026';
 
 /**
  * Where Apple sends someone to stop a subscription.

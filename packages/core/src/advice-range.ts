@@ -10,9 +10,14 @@ import { formatCurrency } from './formatting-utils';
  * ── What this is actually for, and it is three things at once ───────────────
  *
  * **Liability.** "That quote is a ripoff" is an assertion about a named local
- * business, made by a product with no entity behind it yet (5.0 has not
- * started) and no way to verify the work the shop actually quoted. A range plus
- * a comparison is the same information without the defamation surface.
+ * business, made by a product with no way to verify the work that shop actually
+ * quoted. A range plus a comparison is the same information without the
+ * defamation surface.
+ *
+ * ⚠ This said "no entity behind it yet" until 30 Aug, when Southmoor Digital
+ * LLC became the operator. An entity changes where the exposure lands, not
+ * whether the assertion is checkable — and truthfulness below is the reason
+ * this posture actually rests on. Nothing about the posture changes.
  *
  * **Credibility.** A confident single number invites one disproof — the user
  * pays $1,180 against a $900 "answer" and the product was wrong. A range that
