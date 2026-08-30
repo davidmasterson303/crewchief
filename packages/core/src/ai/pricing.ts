@@ -114,14 +114,18 @@ export const PRICING = {
    * ⚠ **This is the number that sets every ceiling below.** It is the plan that
    * earns least per month, so it is the one the fuse has to be safe for.
    *
-   * $29.99 is **7.5 months** of the monthly price — an unusually generous
-   * annual, and generosity here lands entirely on the ceiling: it nets $2.12 a
-   * month against the monthly plan's $3.39, and the ceiling is sized for the
-   * lower one. Moving from $39.90 to $29.99 cost 70,000 tokens of headroom.
+   * $39.90 is ten months of the monthly price — the conventional annual ratio.
    *
-   * Recorded, not reopened. David, 30 Aug: decided, do not re-open.
+   * ⚠ It went to $29.99 for part of 30 Aug, from a handoff note, and came back.
+   * The round trip is worth a line because it is the clearest demonstration of
+   * what this constant does: generosity on an annual plan lands entirely on the
+   * ceiling. $29.99 nets $2.12 a month against $39.90's $2.83, and one ceiling
+   * has to be safe for the lower — so 70,000 output-equivalent tokens of
+   * headroom, a quarter of the total, turned on nine dollars a year.
+   *
+   * The monthly price does not do this. Only this one does.
    */
-  annualUsd: 29.99,
+  annualUsd: 39.90,
 } as const;
 
 /**

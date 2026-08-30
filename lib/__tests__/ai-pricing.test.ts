@@ -137,7 +137,7 @@ describe('⛔ the gap between what is shipped and what was asked for', () => {
       somebody wrote on purpose.
     */
     expect(TIERS.paid.monthlyOutputTokens).toBe(1_000_000);
-    expect(Math.round(ceilingOverRevenue(TIERS.paid.monthlyOutputTokens) * 10) / 10).toBe(4.7);
+    expect(Math.round(ceilingOverRevenue(TIERS.paid.monthlyOutputTokens) * 10) / 10).toBe(3.5);
   });
 
   it('the live free ceiling is what blocks applying the derived one', () => {

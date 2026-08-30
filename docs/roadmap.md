@@ -58,6 +58,13 @@
 > - **Worst case is priced at the Pro rate**, not Flash, because `decideBudget` counts tokens
 >   without recording which model produced them.
 >
+> ⚠ **A 21 Aug entry further down this file settles the price at `$3.99/mo · $29.99/yr +
+> 7-day trial`, and both halves of it are superseded.** The annual went to $29.99 for part of
+> 30 Aug on the strength of that entry and came back to $39.90 the same day; the trial was
+> removed. It is worth knowing the older line exists rather than meeting it cold — it is not
+> a stray, it was a real decision, and $9 a year on the annual moves the ceiling by 70,000
+> tokens because the annual is the plan the fuse is sized for.
+>
 > Derived paid ceiling: **283,000 output-equivalent tokens**. Measured against real per-call
 > costs, a heavy month — 120 advisor turns, 2 dossiers, 24 scans, 12 health summaries, 20 mod
 > analyses — is **$1.21**, or 43% of it.
