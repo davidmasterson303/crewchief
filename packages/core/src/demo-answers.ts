@@ -113,6 +113,17 @@ export const DEMO_ANSWERS: readonly DemoAnswer[] = [
   },
 ] as const;
 
+/**
+ * What the demo says when it is asked something it does not hold.
+ *
+ * ⚠ It names the limit rather than apologising for it. "I could not find an
+ * answer" reads as a failure and invites a retry; "the demo answers these
+ * questions" is a true statement about a sample, and the questions are on
+ * screen beside it.
+ */
+export const DEMO_UNANSWERED =
+  'The demo answers a fixed set of questions about these three cars, written in advance. Subscribe to ask anything about your own.';
+
 /** The questions the demo offers for one vehicle, in the order they are shown. */
 export function demoQuestionsFor(vehicleId: string): DemoAnswer[] {
   return DEMO_ANSWERS.filter((entry) => entry.vehicleId === vehicleId);

@@ -140,6 +140,60 @@ describe('the answers are about the cars that are actually seeded', () => {
   });
 });
 
+describe('the wiring: the demo path spends nothing and says what it is', () => {
+  const ACTIONS = readFileSync(
+    join(__dirname, '..', '..', 'app', 'actions.ts'),
+    'utf8'
+  );
+  const CHAT = readFileSync(
+    join(__dirname, '..', '..', 'components', 'ConsultantChat.tsx'),
+    'utf8'
+  );
+  const strip = (code: string) =>
+    code
+      .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
+      .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+      .replace(/\/\/.*$/gm, '');
+
+  it('the demo branch returns a sample and never falls through to the model', () => {
+    /*
+      ⚠ The assertion that retires the ~$11/month exposure. The demo was the
+      only unauthenticated path to a model in the application; what makes it
+      safe now is that the branch *returns*, rather than checking something and
+      carrying on. A guard that only asserted "a sample is looked up" would pass
+      for code that looked one up and then called Gemini anyway.
+    */
+    const body = strip(ACTIONS);
+
+    expect(body).toMatch(/const sample = demoAnswerFor\(params\.vehicleId, params\.message\)/);
+    expect(body).toMatch(/if \(!sample\) \{\s*return \{ success: false, error: DEMO_UNANSWERED \}/);
+    expect(body).toMatch(/response: sample\.answer/);
+    expect(body).toMatch(/isSample: true/);
+  });
+
+  it('the client labels a sample, and carries the flag on the message', () => {
+    /*
+      On the message rather than in component state: a scrolled-back
+      conversation must not lose the label while keeping the answer, which is
+      the one way this could quietly become the thing it was built to avoid.
+    */
+    const body = strip(CHAT);
+
+    expect(body).toMatch(/isSample: result\.isSample === true/);
+    expect(body).toMatch(/msg\.isSample &&/);
+    expect(body).toMatch(/refusalCopy\('demo', 'generate'\)/);
+  });
+
+  it('the sample label sits beside the AI disclosure, not instead of it', () => {
+    // They answer different questions — who wrote this, and when. A sample
+    // carrying only the AI line would claim a model produced it for this
+    // visitor.
+    const body = strip(CHAT);
+
+    expect(body).toMatch(/adviceDisclosure\('consultant'\)/);
+  });
+});
+
 describe('the label that keeps it honest', () => {
   it('the demo’s refusal copy says the answer was written in advance', () => {
     /*

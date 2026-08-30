@@ -9,6 +9,7 @@ import {
   withThinking,
 } from '@/lib/gemini';
 import { checkDemoBudget, checkMonthlyBudget } from '@/lib/ai-budget';
+import { DEMO_UNANSWERED, demoAnswerFor } from '@wellkept/core/demo-answers';
 import { checkFeatureAccess, featureRefusal } from '@/lib/feature-gate';
 import { checkStoredPhotoSize } from '@wellkept/core/image-resize';
 import { budgetMessage, demoBudgetMessage } from '@wellkept/core/ai/budget';
@@ -1045,20 +1046,49 @@ export async function sendConsultantMessage(params: {
     */
     if (isDemoVehicle) {
       /*
-        Two windows against one shared pool. This is the only unauthenticated
-        path to a model in the application, so the per-minute limit on its own
-        left the largest uncontrolled cost in it uncontrolled.
+        ── ⚠ The demo makes no model call at all, as of 30 Aug ────────────────
 
-        It degrades rather than breaking. Everything else on the demo — the
-        garage, the dossiers, the service history, the health scores, the cost
-        tables — is stored data that never touches a model, so a spent
-        allowance pauses live chat and nothing else, and the message says when
-        it comes back.
+        David: *"I don't want a free tier. I think we should have a demo
+        view/mode without real LLM calls so prospects can explore the app
+        without costing anything."*
+
+        This branch used to check a shared ceiling and then call Gemini — the
+        only unauthenticated path to a model in the application, and about $11 a
+        month of exposure to anybody holding the URL. That arrangement gets
+        *worse* as the product succeeds, because prospects are now the largest
+        unpaid population in it.
+
+        It returns a pre-written answer instead. `packages/core/src/demo-answers.ts`
+        holds them, grounded in the three seeded cars' real records, and a guard
+        there fails if that module ever grows a fetch or a model import.
+
+        ⚠ **`null` is returned rather than the closest sample.** A matcher that
+        finds the nearest answer answers a question nobody asked, and a
+        plausible answer to the wrong question is indistinguishable from a good
+        one. The caller says the demo does not cover it; the questions it does
+        cover are on screen.
+
+        ⚠ `isSample` travels with the answer so the client can label it. A
+        pre-written answer presented as one a model just produced is the same
+        defect as the scan sweep that depicted an examination nobody ran — and
+        this file has removed three of those this month.
+
+        The demo budget is not deleted: `checkDemoBudget` still guards the front
+        door, which does call a model. It is simply no longer reachable from
+        here, because nothing here spends.
       */
-      const demo = await checkDemoBudget();
-      if (!demo.allowed) {
-        return { success: false, error: demoBudgetMessage(demo) };
+      const sample = demoAnswerFor(params.vehicleId, params.message);
+      if (!sample) {
+        return { success: false, error: DEMO_UNANSWERED };
       }
+
+      return {
+        success: true,
+        response: sample.answer,
+        contextKinds: [],
+        isSample: true,
+        wishlistActions: [],
+      };
     } else {
       /*
         ── The feature gate, above the budget and distinct from it ────────────

@@ -10,6 +10,7 @@ import { Loader as Loader2, Send, Plus, Search, MessageSquare, Paperclip, X, Fil
 import { logger } from '@wellkept/core/logger';
 import { isDemoVehicleId } from '@wellkept/core/demo';
 import { ADVISOR_NAME } from '@wellkept/core/prompts';
+import { refusalCopy } from '@wellkept/core/access';
 import { isDemoMode } from '@/lib/demo-mode';
 import { wishlistItemIdentifier } from '@wellkept/core/wishlist-identifier';
 import {
@@ -577,6 +578,14 @@ export default function ConsultantChat({
          * model, not what the model used, and deliberately absent on replayed
          * history. */
         sources: result.contextKinds ?? [],
+        /*
+          ⚠ Set by the server when this answer was written in advance rather
+          than generated — the demo, which makes no model call at all since
+          30 Aug. It rides on the message rather than on component state so a
+          scrolled-back conversation cannot lose the label while keeping the
+          answer, which is the one way this could quietly become a lie.
+        */
+        isSample: result.isSample === true,
       };
       setMessages([...optimisticMessages, assistantMsg]);
       setCurrentFollowUps(getFollowUps(result.response || ''));
@@ -981,6 +990,19 @@ export default function ConsultantChat({
                     repeated defect applied to the sentence that limits
                     liability.
                   */}
+                  {msg.role === 'assistant' && msg.content && msg.isSample && (
+                    /*
+                      ⚠ A pre-written answer says so, above the disclosure and
+                      not instead of it. The two sentences answer different
+                      questions — "who wrote this" and "when" — and a sample
+                      that only carried the AI disclosure would be claiming a
+                      model produced it for this visitor, which is precisely the
+                      class of defect the scan sweep and the quote bar were.
+                    */
+                    <p className="measure text-xs text-white/60 mt-2 italic">
+                      {refusalCopy('demo', 'generate')}
+                    </p>
+                  )}
                   {msg.role === 'assistant' && msg.content && (
                     <p className="measure text-xs text-white/50 mt-2">
                       {adviceDisclosure('consultant')}
