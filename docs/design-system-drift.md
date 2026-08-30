@@ -642,3 +642,44 @@ The five mark-only assets (`mark`, `mark-small`, `mark-mono`, `favicon`,
 **What Design owns:** a new lockup in the new name, and the tracking that goes
 with it. Until then the app's own `Logo` is correct and the two lockup files in
 `public/brand` are the old brand.
+
+### 7.3 · Design answered both, 30 Aug
+
+**The lockups are replaced, not edited.** Design's `REBRAND_PROMPT.md` §7: both
+current files draw "CrewChief" as vector outlines, so there is nothing to
+rename — they are deleted and `lockup-full.svg` / `lockup-short.svg` from the
+brand package take their place. Design makes the same point this register did,
+from the other side: *"outlined type is also why the rename cannot be a
+find-and-replace: grep will report those files clean."*
+
+**The tracking goes back to 0.1em and is not optical.** It was cut to fit one
+nine-letter word; "Well Kept" is nine characters including the space and sets at
+0.1em small caps without touching the plate's inner step. Design's rule, worth
+keeping because it settles the question rather than answering it once: *"a plate
+carries engraved type — the letterspacing is the engraving, and it does not get
+tuned per word. If a longer string ever has to fit, the plate widens; the
+tracking does not close."*
+
+So §7.1 and §7.2 are closed. What replaces them is a build task rather than a
+drift: one `BrandLockup` component, the plate mark at 28px with Newsreader small
+caps beside it, and the type outlined at PNG-export time because every SVG in
+the package declares `Newsreader, Georgia, serif` and a rasteriser without the
+webfont silently substitutes Georgia.
+
+### 7.4 · ⚠ One thing in that package is not a design question
+
+Design's §4.5 lists the paywall's gates as *"AI consultant, invoice scanning,
+second vehicle, VIN specs + recalls, full history"*, with free as *"one car,
+health score, its recalls, manual log"*.
+
+**That contradicts a shipped decision, and the part that matters is recalls.**
+`paid-features.ts` puts recalls in the free tier with an argument the code
+states plainly — a federal defect notice an owner cannot see because their card
+expired is not a version of this product that should exist — and
+`paid-features.test.ts` asserts it rather than trusting the list. Gating the
+second vehicle and full history are ordinary product calls; gating recalls is
+the one that is not.
+
+Not implemented, not silently reconciled. It is David's call, and it is recorded
+here rather than in a commit message because it is a disagreement between two
+current documents rather than a defect in either.

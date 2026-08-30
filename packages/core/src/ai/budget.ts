@@ -50,35 +50,44 @@ export interface Tier {
 }
 
 /**
- * Ceilings, not plans.
+ * Ceilings, not plans. ⚠ And as of 30 Aug, ceilings that do not yet satisfy the
+ * rule David set for them.
  *
- * `free` is set so an ordinary month of real use does not touch it — the
- * eval's median archetype lands around 200k output-equivalent tokens — while
- * still stopping the runaway case that costs more than any plausible price.
- * It is a fuse, not a meter.
+ * `free` is set so an ordinary month of real use does not touch it — the eval's
+ * median archetype lands around 200k output-equivalent tokens — while still
+ * stopping the runaway case. It is a fuse, not a meter. `paid` was sized on
+ * 21 Aug against a $3.99 price.
  *
- * `paid` exists so the shape of the code is right before there is anything to
- * sell. It is not a commitment to a number.
+ * ── ⛔ Neither number is breakeven, and `ai/pricing.ts` is where that is shown ─
+ *
+ * The requirement is that worst-case usage costs no more than the account
+ * earns. At today's placeholder prices the worst-paying plan nets **$2.83 a
+ * month** — the annual one, which is the binding plan because a ceiling is
+ * monthly — and 1,000,000 output-equivalent tokens costs about **$10** at the
+ * most expensive rate a metered path can reach. That is 3.5× the revenue it is
+ * supposed to protect, which is this file's own definition of a maximum loss
+ * rather than a ceiling.
+ *
+ * The derived figure is ~283,000. **It is not applied here**, and the reason is
+ * the ordering rather than the arithmetic: it is *below* the 400,000 free
+ * ceiling, so wiring it in would make the paid tier smaller than the free one.
+ * Three guards in `ai-budget.test.ts` caught exactly that and were right to.
+ *
+ * So the numbers stay until one of three things happens, all of them David's:
+ *
+ *   1. **The gate is enforced.** `PAID_FEATURES_ENFORCED` is off, so free
+ *      accounts still reach every expensive path and 400,000 is the only thing
+ *      bounding them. Enforce it and the free ceiling can fall to what the free
+ *      tier's own model use costs — see `freeMonthlyOutputTokensWhenGated`.
+ *   2. **The price rises**, which raises the derived ceiling with it.
+ *   3. **The call gets cheaper.** The dossier is 53% thinking at a level nobody
+ *      set — the largest unexamined lever in the bill.
+ *
+ * `ai-pricing.test.ts` pins the gap so it cannot widen unnoticed, and states
+ * what closes it.
  */
 export const TIERS: Record<TierName, Tier> = {
   free: { name: 'free', monthlyOutputTokens: 400_000 },
-  /*
-    ⚠ Lowered 2,000,000 → 1,000,000 on 21 Aug, when the price landed at $3.99.
-
-    The old ceiling was sized for a $9–15 subscription. At $3.99, Apple's 15%
-    leaves $3.39 — so a ceiling of 2M output-equivalent tokens (~$15 at Flash's
-    $7.50/M) was **4.4× the revenue it was supposed to protect**. A ceiling
-    above net revenue is not a ceiling, it is a maximum loss.
-
-    1M is ~$7.50 worst case, still 2.5× the free tier, and roughly three times
-    the heaviest month any real account has ever produced: the developer's own
-    account, building daily, measured $3.10/month across every purpose.
-
-    ⚠ It remains a fuse rather than a plan. Nobody real is expected to approach
-    it, and the two changes shipped alongside — caching modification details and
-    dropping their thinking budget — cut typical spend by more than this cap
-    does. This bounds the tail; those reduce the median.
-  */
   paid: { name: 'paid', monthlyOutputTokens: 1_000_000 },
 };
 
