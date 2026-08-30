@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Clock, MessageSquare, Wrench, CreditCard as Edit2, Check, X, Info, ChevronLeft, ChevronRight, Tag } from 'lucide-react';
 import Logo from '@/components/brand/Logo';
+import { CONTACT_EMAIL } from '@/lib/legal';
 import { isDemoVehicleId } from '@wellkept/core/demo';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -598,7 +599,24 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
             <span>&copy; {new Date().getFullYear()}</span>
           </span>
           <div className="flex items-center gap-4">
-            <a href="mailto:feedback@crewchief.app" className="hover:text-white/50 transition-colors">Feedback</a>
+            {/*
+              This read `mailto:feedback@crewchief.app` until 30 Aug — a domain
+              nobody here owns, so every piece of feedback anyone sent from this
+              footer went nowhere, silently, for as long as the link existed.
+              It survived the rename because an address is not copy: a
+              find-and-replace would have invented `feedback@wellkept.app`,
+              which is the same defect with a newer name on it.
+
+              It points at the address the legal pages publish instead — the one
+              that is verified receiving and delegated to a real mailbox. One
+              address, named in one place, so a second one cannot drift.
+            */}
+            <a
+              href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Well Kept feedback')}`}
+              className="hover:text-white/50 transition-colors"
+            >
+              Feedback
+            </a>
             <Link href={homeHref} className="hover:text-white/50 transition-colors">Garage</Link>
           </div>
         </footer>

@@ -1,6 +1,36 @@
 import { GoogleGenAI, ThinkingLevel, type GenerateContentConfig } from '@google/genai';
 import { acceptsThinkingLevel, type ThinkingLevelName } from '@wellkept/core/ai/models';
 
+/**
+ * ⚠ LEG-01 — the key below is what makes a published promise true or false.
+ *
+ * `app/terms/page.tsx:89` tells every reader **"We do not use your content to
+ * train models"**. Nothing in this file enforces that; Google's terms do, and
+ * only on one condition — the Gemini API is a Paid Service *"only when
+ * accessing the API through a Cloud Project associated with an active billing
+ * account."* Unbilled, Google's own terms say human reviewers may read and
+ * annotate the input and output. Invoices here carry an owner's name, a shop's
+ * street address and sometimes a VIN.
+ *
+ * So the sentence in the Terms is a claim about **billing state**, and it was
+ * published unverified from 27 July. Checked in AI Studio on **25 Aug 2026**:
+ *
+ *   project           CrewChief · gen-lang-client-0876183667 (created 19 Jul 2026)
+ *   billing account   011FAF-322A0D-84942D — Paid 1, postpay, active
+ *   last charged      1 Aug 2026
+ *
+ * ⛔ **This is not a fact that stays true on its own.** The same check found
+ * Google forcing that account off postpay — *"This account is required to use
+ * prepay billing. Switch now and purchase credits to prevent service
+ * disruption."* If the credits run out, the account leaves paid standing, and
+ * the Terms sentence quietly stops being true **before** anybody notices the
+ * API has stopped answering. The failure is silent in the direction that
+ * matters: a legal claim goes false while the product still looks fine.
+ *
+ * Re-check the billing state before each release, and if it has lapsed, the
+ * fix is the sentence in the Terms rather than a code change here.
+ */
+
 const apiKey = process.env.GEMINI_API_KEY || '';
 
 if (!apiKey) {

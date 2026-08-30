@@ -18,7 +18,7 @@
  * the claims are still there.
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { SUBSCRIPTION_CANCEL_PATH } from '@wellkept/core/account-deletion';
@@ -121,6 +121,50 @@ describe('the two documents cannot contradict the app', () => {
   });
 });
 
+describe('the training promise is tied to the evidence for it', () => {
+  /*
+    ── LEG-01 ─────────────────────────────────────────────────────────────────
+
+    The Terms tell every reader "We do not use your content to train models."
+    Nothing in this codebase can enforce that. It is true only while the Gemini
+    key sits on a Cloud project with **active billing** — Google's terms make
+    the API a Paid Service on exactly that condition, and unbilled they reserve
+    the right to have humans read the input and output. The input here includes
+    invoices carrying an owner's name and a shop's street address.
+
+    So the claim's evidence lives outside the repo, in a billing console, and
+    the only durable link between them is a dated note beside the client that
+    uses the key. This asserts the two stay together: make the promise, carry
+    the receipt.
+
+    It deliberately does not assert the billing is *currently* live — no test
+    can know that. It asserts that somebody wrote down when they last looked,
+    which is the difference between an unverified claim and a stale one.
+  */
+  const gemini = read('lib/gemini.ts');
+
+  it('the Terms still make the claim this is all about', () => {
+    expect(flat(read('app/terms/page.tsx'))).toMatch(
+      /We do not use your content to train models/i
+    );
+  });
+
+  it('names the Cloud project the key belongs to', () => {
+    // The project id, not just "it's billed" — a claim nobody can re-check is
+    // the same as no claim, and this is the string you paste into the console.
+    expect(gemini).toMatch(/gen-lang-client-\d{10}/);
+  });
+
+  it('records when the billing state was last verified', () => {
+    expect(gemini).toMatch(/\b\d{1,2} \w+ 20\d{2}\b/);
+
+    // Anti-vacuous: a file that merely mentions Google must not satisfy this.
+    expect(/gen-lang-client-\d{10}/.test('const genAI = new GoogleGenAI({ apiKey });')).toBe(
+      false
+    );
+  });
+});
+
 describe('who operates the service, and who to write to about it', () => {
   /*
     ── Both constants are now real, and the guard changed shape with them ──────
@@ -158,6 +202,66 @@ describe('who operates the service, and who to write to about it', () => {
     // Anti-vacuous: this must still be able to catch a placeholder coming back.
     expect(OPERATOR).not.toMatch(/[[\]]|TBD|not yet|to be decided/i);
     expect(OPERATOR.trim().length).toBeGreaterThan(0);
+  });
+
+  it('every mailto in the product points at that address and no other', () => {
+    /*
+      ⚠ Found 30 Aug, and it had been live for months: the dashboard footer's
+      "Feedback" link was `mailto:feedback@crewchief.app` — a domain nobody
+      here owns. Mail sent from it went nowhere and told the sender nothing,
+      which is the worst shape a support channel can have: it looks answered.
+
+      It also survived the rename, because a find-and-replace on the product
+      name would have produced `feedback@wellkept.app` — the same dead address
+      wearing the new name. An address is not copy.
+
+      So the rule is one address, from one constant. This walks the tree rather
+      than watching that one file, because the next invented address will be in
+      a different component.
+    */
+    const walk = (dir: string, acc: string[] = []): string[] => {
+      for (const entry of readdirSync(dir)) {
+        if (entry === 'node_modules' || entry === '__tests__') continue;
+        const full = join(dir, entry);
+        if (statSync(full).isDirectory()) walk(full, acc);
+        else if (/\.tsx?$/.test(entry)) acc.push(full);
+      }
+      return acc;
+    };
+
+    const files = [...walk(join(root, 'app')), ...walk(join(root, 'components'))];
+    expect(files.length).toBeGreaterThan(50); // a walker that finds nothing is not a clean tree
+
+    /*
+      ⚠ Comments are stripped first, and this file learned that the hard way:
+      the paragraph above quotes the dead address, and the component that used
+      to carry it explains itself the same way. Scanning raw text reported both
+      explanations as the defect they document.
+
+      Block comments are blanked rather than deleted so nothing else shifts.
+    */
+    const strip = (code: string) =>
+      code
+        .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
+        .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+        .replace(/\/\/.*$/gm, '');
+
+    const literals = new Set<string>();
+    for (const file of files) {
+      // `Array.from`, not a spread or a for-of over the iterator: the root
+      // tsconfig targets es5, so iterating one directly is TS2802. Same trap
+      // the ramp guard hit, and the house pattern is this.
+      for (const [, address] of Array.from(
+        strip(readFileSync(file, 'utf8')).matchAll(/mailto:([^"'`\s]+)/g)
+      )) {
+        // `mailto:${CONTACT_EMAIL}?subject=…` is the shape that passes: the
+        // address came from the constant. A literal is what this is looking for.
+        if (address.startsWith('${')) continue;
+        literals.add(address.split('?')[0]);
+      }
+    }
+
+    expect(Array.from(literals)).toEqual([]);
   });
 
   it('names a contact address somebody actually reads', () => {

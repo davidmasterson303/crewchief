@@ -44,6 +44,7 @@ const MOBILE_MODS = read('apps', 'mobile', 'src', 'screens', 'BuildScreen.tsx');
 const WEB_SCHEDULE = read('components', 'insights', 'MaintenanceTab.tsx');
 const MOBILE_SCHEDULE = read('apps', 'mobile', 'src', 'screens', 'ServiceMilestoneScreen.tsx');
 
+const WEB_ESTIMATE = read('components', 'CostBreakdownTable.tsx');
 const MOBILE_ESTIMATE = read('apps', 'mobile', 'src', 'components', 'EstimateWell.tsx');
 
 const WEB_RECALL_CARD = read('components', 'RecallAlerts.tsx');
@@ -177,6 +178,18 @@ describe('both clients render it', () => {
     ['web mods', WEB_MODS, /adviceDisclosure\('plan'\)/],
     ['mobile mods', MOBILE_MODS, /adviceDisclosure\('plan'\)/],
     ['mobile estimate', MOBILE_ESTIMATE, /adviceDisclosure\('estimate'\)/],
+    /*
+      ⚠ Added 30 Aug, and its absence is the finding. This table was written to
+      catch "one client quietly lacking what the other has" — and it shipped
+      with an estimate row for mobile and none for the web, so the web's cost
+      breakdown rendered a model's figures with no disclosure for six days
+      while this suite stayed green.
+
+      A table-driven guard is only as complete as its table. That is the cost
+      of the pattern and the reason a missing row has to read as a defect
+      rather than as a surface nobody got to.
+    */
+    ['web estimate', WEB_ESTIMATE, /adviceDisclosure\('estimate'\)/],
   ];
 
   it.each(SURFACES)('%s renders its disclosure', (_name, source, pattern) => {

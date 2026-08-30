@@ -1,3 +1,5 @@
+import { adviceDisclosure } from '@wellkept/core/advice-disclosure';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -194,6 +196,24 @@ export function CostBreakdownTable({ costBreakdown }: CostBreakdownTableProps) {
           <p>• Actual prices may vary by shop, parts availability, and vehicle condition.</p>
           <p>• Use this breakdown to compare quotes from different shops.</p>
         </div>
+
+        {/*
+          ⚠ D11's fifth surface, missed when the other four were fixed on 24 Aug.
+
+          Every figure above is a model's, and mobile has said so since
+          `EstimateWell` was written — the web said nothing. That is the exact
+          defect D11 was about, and the guard that exists to catch it had a
+          `mobile estimate` row and no `web estimate` row, so the asymmetry it
+          was built to see was the one shape it could not.
+
+          It sits under the numbers rather than in the header because a person
+          scrolls to the total; a caveat above the thing it qualifies is read
+          before there is anything to qualify. Same placement argument as the
+          consultant's per-turn disclosure.
+        */}
+        <p className="mt-3 text-xs text-muted-foreground/80 leading-relaxed">
+          {adviceDisclosure('estimate')}
+        </p>
       </CardContent>
     </Card>
   );

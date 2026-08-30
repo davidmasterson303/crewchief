@@ -114,7 +114,19 @@ describe('the dashboard tab bar', () => {
     */
     const source = readFileSync(LAYOUT, 'utf8');
 
-    expect(source).toMatch(/<a href="mailto:/);
+    /*
+      ⚠ Anchored on the string `mailto:`, not on `<a href="mailto:`.
+
+      The exact markup was the anchor until 30 Aug, when the footer's dead
+      `feedback@crewchief.app` address became `mailto:${CONTACT_EMAIL}` on a
+      multi-line element — and this failed for a formatting change, on a file
+      whose tab block it was not even looking at. A guard that fires for the
+      prettier is one people learn to re-run rather than read.
+
+      What it needs is any marker that lives in the file and not in the block.
+      The footer is still that marker; only the spelling moved.
+    */
+    expect(source).toMatch(/mailto:/);
     expect(code(tabBlock())).not.toMatch(/mailto:/);
   });
 });
