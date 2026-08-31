@@ -1,6 +1,9 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import Button from '../components/Button';
 import Card from '../components/Card';
+import { invoiceUrl } from '../api/documents';
 import {
   describeRecord,
   formatRecordDate,
@@ -31,16 +34,65 @@ import { TABULAR, border, space, surface, text, type } from '../theme';
  * a notification needs to open an invoice is the moment it earns an id and a
  * fetch.
  *
- * ── ⚠ What this screen deliberately does not offer ─────────────────────────
+ * ── ⚠ The document, which two notes in this app said was impossible ────────
  *
- * The document itself. The file is behind a signed URL and nothing on this
- * client mints one, so a "view invoice" control could not work — the same
- * finding `6560f1b` recorded when it added this metadata to the history rows.
- * Naming what the invoice was is the honest half, and it is most of the value:
- * *was this the March visit or the other one* is the actual question.
+ * *"The file is behind a signed URL and nothing on this client mints one, so a
+ * 'view invoice' control could not work."* True when written, twice. What was
+ * missing was a route, not a capability — `/api/v1/document-url` mints one with
+ * the web action's authorization, and `Linking.openURL` hands it to whatever
+ * the phone uses for a PDF, which is also how it gets saved.
+ *
+ * ⛔ **It 404s until `web-live` is promoted**, because the route is new and that
+ * hostname has been frozen since 23 Aug. The failure says so rather than
+ * reading as a missing file — see `invoiceUrl`.
+ *
+ * ⚠ The control appears only for a **scanned** visit. A record typed by hand or
+ * marked done from the wishlist has no document, and a button offering to open
+ * one would be promising a file that was never taken.
  */
-export function InvoiceDetailScreen({ visit }: { visit: ServiceVisit }) {
+export function InvoiceDetailScreen({
+  visit,
+  vehicleId,
+}: {
+  visit: ServiceVisit;
+  /*
+    ⚠ Passed in rather than read off a record. `ServiceRecord` has no
+    `vehicle_id` — the payload is already scoped to one car — and inventing the
+    field to carry it here would have put a second, unvalidated copy of the
+    authorization key on the client. The route checks it against the document
+    anyway; SEC-01 is what happens when only one of two ids is checked.
+  */
+  vehicleId: string;
+}) {
   const date = formatRecordDate(visit.date);
+  const [opening, setOpening] = useState(false);
+  const [openError, setOpenError] = useState<string | null>(null);
+
+  const documentId = visit.records.find((record) => record.source_document_id)?.source_document_id;
+
+  const open = async () => {
+    if (!documentId) return;
+    setOpening(true);
+    setOpenError(null);
+
+    const result = await invoiceUrl(vehicleId, documentId);
+
+    if ('url' in result) {
+      /*
+        `openURL` rather than an in-app viewer. A PDF viewer is a native module
+        and therefore an EAS build (§9); handing the signed link to the system
+        opens it in Safari or Files, where saving and sharing are already built
+        and better than anything worth writing here.
+      */
+      const supported = await Linking.canOpenURL(result.url);
+      if (supported) await Linking.openURL(result.url);
+      else setOpenError('This device could not open that link.');
+    } else {
+      setOpenError(result.error);
+    }
+
+    setOpening(false);
+  };
 
   return (
     <ScrollView contentContainerStyle={styles.page}>
@@ -88,6 +140,25 @@ export function InvoiceDetailScreen({ visit }: { visit: ServiceVisit }) {
         })}
       </Card>
 
+      {visit.scanned && documentId && (
+        <View style={styles.docBlock}>
+          <Button
+            label={opening ? 'Opening…' : 'Open the original invoice'}
+            onPress={() => void open()}
+            busy={opening}
+            variant="outline"
+            accessibilityLabel="Open the original invoice document"
+          />
+          {/*
+            The error is shown here rather than raised as an alert. It is about
+            this control, it is not urgent, and an alert would take a tap to
+            dismiss before somebody could read the invoice's lines — which are
+            the thing they came for and which still work.
+          */}
+          {openError ? <Text style={styles.openError}>{openError}</Text> : null}
+        </View>
+      )}
+
       {/*
         The total says what it is the total *of*. `counted` is how many lines
         carried a price, so an invoice where two of five did says so rather than
@@ -125,6 +196,8 @@ const styles = StyleSheet.create({
     gap: space.sm,
     paddingHorizontal: space.xs,
   },
+  docBlock: { gap: space.sm },
+  openError: { ...type.label, color: text.muted },
   totalLabel: { ...type.label, color: text.muted, flex: 1 },
   total: { ...type.value, ...TABULAR, color: text.primary },
 });

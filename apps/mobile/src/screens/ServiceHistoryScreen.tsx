@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 
+import Button from '../components/Button';
 import Card from '../components/Card';
 import EmptyState from '../components/EmptyState';
 import { apiRequest, ApiRequestError } from '../api/client';
@@ -77,6 +78,17 @@ import { interFace } from '../theme/fonts';
 
 interface Props {
   vehicleId: string;
+  /**
+   * Start a scan from here.
+   *
+   * ⚠ David, 30 Aug: *"it still needs to retain the 'scan an invoice' button…
+   * it ties together existing history and adding to that history with new
+   * invoices."* Scanning was previously reachable only by opening a car and
+   * finding it on the hub — a screen away from the record it writes into.
+   */
+  onScan: () => void;
+  /** Open the whole visit behind one line item. */
+  onOpenVisit: (visit: ServiceVisit) => void;
   onSignOut: () => void;
 }
 
@@ -95,7 +107,7 @@ type State =
   | { kind: 'error'; message: string }
   | { kind: 'loaded'; records: ServiceRecord[] };
 
-export function ServiceHistoryScreen({ vehicleId, onSignOut }: Props) {
+export function ServiceHistoryScreen({ vehicleId, onScan, onOpenVisit, onSignOut }: Props) {
   const [state, setState] = useState<State>({ kind: 'loading' });
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState('');
@@ -349,14 +361,18 @@ export function ServiceHistoryScreen({ vehicleId, onSignOut }: Props) {
       >
       {state.records.length === 0 ? (
         /*
-          No action: this screen has no navigation callbacks — only a vehicle
-          id and a sign-out — so an "action" here could not go anywhere. The
-          body names both routes in instead, which is the honest version of a
-          next step on a screen that cannot offer one.
+          ⚠ This used to carry no action, and said so: *"this screen has no
+          navigation callbacks — only a vehicle id and a sign-out — so an
+          'action' here could not go anywhere."* It has one now. The note is
+          kept because it is the reason the copy read the way it did, and
+          because the fix was to give the screen the callback rather than to
+          reword around the gap.
         */
         <EmptyState
           headline="Nothing recorded yet"
           body="Scan an invoice, or mark something done on the wishlist, and it will appear here."
+          actionLabel="Scan an invoice"
+          onAction={onScan}
         />
       ) : (
         <>
@@ -427,9 +443,31 @@ export function ServiceHistoryScreen({ vehicleId, onSignOut }: Props) {
                 const meta = describeRecord(record, { withShop: false });
 
                 return (
-                  <View
+                  /*
+                    ── 30 Aug · a line item opens the visit it belongs to ─────
+
+                    David: *"when user clicks into any line item, we should then
+                    enter the full invoice detail view."* The row is the way in,
+                    because a line is what somebody is looking at when they want
+                    the rest of the bill it came from.
+
+                    ⚠ `Pressable` around the row and **not** around the Remove
+                    control, which is nested inside it. Two overlapping tap
+                    targets where the inner one is destructive is how a stray
+                    tap deletes something — UI-01's wishlist delete sat 6px from
+                    Done and that is exactly what happened. Remove stops
+                    propagation.
+                  */
+                  <Pressable
                     key={record.id ?? `${record.item_description}-${index}`}
-                    style={[styles.line, index > 0 && styles.lineDivided]}
+                    onPress={() => onOpenVisit(visit)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${record.item_description ?? 'Service'}, open the full record`}
+                    style={({ pressed }) => [
+                      styles.line,
+                      index > 0 && styles.lineDivided,
+                      pressed && styles.linePressed,
+                    ]}
                   >
                     <View style={styles.head}>
                       <Text style={styles.name}>{record.item_description ?? 'Service'}</Text>
@@ -445,7 +483,16 @@ export function ServiceHistoryScreen({ vehicleId, onSignOut }: Props) {
                         accessibilityRole="button"
                         accessibilityLabel={`Remove ${record.item_description ?? 'this record'}`}
                         style={styles.removeCta}
-                        onPress={() => remove(record)}
+                        /*
+                          ⚠ The row opens the visit and this deletes a record,
+                          so the inner press must not reach the outer one. A
+                          tap that both opened a screen and destroyed a row is
+                          the UI-01 shape with a worse ending.
+                        */
+                        onPress={(event) => {
+                          event.stopPropagation();
+                          remove(record);
+                        }}
                       >
                         {/*
                           ── R9 · quiet, because destruction is not attention ─
@@ -464,7 +511,7 @@ export function ServiceHistoryScreen({ vehicleId, onSignOut }: Props) {
                         <Text style={styles.removeText}>Remove</Text>
                       </Pressable>
                     ) : null}
-                  </View>
+                  </Pressable>
                 );
               })}
 
@@ -492,6 +539,27 @@ export function ServiceHistoryScreen({ vehicleId, onSignOut }: Props) {
         </>
       )}
       </ScrollView>
+
+      {/*
+        ── 30 Aug · the scan control, pinned ─────────────────────────────────
+
+        David: *"it ties together existing history and adding to that history
+        with new invoices."* Scanning was reachable only from the car's hub — a
+        screen away from the record it writes into — so the two halves of the
+        same job lived apart.
+
+        Pinned rather than in the scroller, because a service record grows
+        forever and a control at the bottom of it is a control nobody reaches.
+        Same argument the wishlist filter got.
+
+        Hidden while the list is empty: the empty state already offers it, and
+        two identical buttons on one screenful is a screen that cannot decide.
+      */}
+      {state.records.length > 0 && (
+        <View style={styles.scanBar}>
+          <Button label="Scan an invoice" onPress={onScan} accessibilityLabel="Scan a new invoice" />
+        </View>
+      )}
     </View>
   );
 }
@@ -588,6 +656,14 @@ const styles = StyleSheet.create({
     Between lines, not around each: they are parts of one object. Inset to the
     card's own padding so the rule reads as a seam rather than a slice.
   */
+  linePressed: { backgroundColor: surface.well },
+  scanBar: {
+    padding: space.lg,
+    paddingBottom: space.md,
+    borderTopWidth: 1,
+    borderTopColor: border.panel,
+    backgroundColor: surface.page,
+  },
   lineDivided: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: border.panel,

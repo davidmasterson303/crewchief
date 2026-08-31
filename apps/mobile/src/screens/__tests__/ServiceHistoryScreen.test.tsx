@@ -63,7 +63,7 @@ const RECOLLECTION_ROW = {
 };
 
 function mount() {
-  return render(<ServiceHistoryScreen vehicleId="v1" onSignOut={jest.fn()} />);
+  return render(<ServiceHistoryScreen vehicleId="v1" onScan={jest.fn()} onOpenVisit={jest.fn()} onSignOut={jest.fn()} />);
 }
 
 let alertSpy: jest.SpyInstance;
@@ -252,7 +252,7 @@ describe('failure', () => {
     */
     request.mockRejectedValue(new ApiRequestError({ status: 401, origin: 'device', message: 'Unauthorized' }));
 
-    await render(<ServiceHistoryScreen vehicleId="v1" onSignOut={onSignOut} />);
+    await render(<ServiceHistoryScreen vehicleId="v1" onScan={jest.fn()} onOpenVisit={jest.fn()} onSignOut={onSignOut} />);
 
     await waitFor(() => expect(onSignOut).toHaveBeenCalled());
   });

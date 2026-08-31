@@ -330,3 +330,54 @@ export function describeUploadError(error: unknown): string {
   */
   return 'Something went wrong uploading that invoice.';
 }
+
+/**
+ * A short-lived link to the stored invoice behind one scanned visit.
+ *
+ * ── ⚠ Two notes in this app said this could not be done ────────────────────
+ *
+ * *"The document is a stored file behind a signed URL and no route on this app
+ * mints one, so a 'view invoice' control could not work"* — `53bcf0a`, and
+ * again in `6560f1b`. Both were true when written. `/api/v1/document-url` is
+ * the route they were missing, and its authorization is the web action's,
+ * reachable by bearer token.
+ *
+ * ── ⛔ It 404s until `web-live` is promoted, and the copy says which ────────
+ *
+ * The route is new and the deployed API has been frozen since 23 Aug, so on a
+ * phone talking to `crewchief.davidmasterson.co` today this returns a 404 from
+ * a deployment that has never heard of the path — §8's "a 404 on a path that
+ * works perfectly on `main`", which is named there as the most confusing shape
+ * a bug can take.
+ *
+ * So a 404 is not reported as "invoice missing". It is reported as what it
+ * almost certainly is, in words somebody can act on. The distinction costs one
+ * branch and saves the next person half an hour of looking for a file that is
+ * sitting exactly where it should be.
+ */
+export async function invoiceUrl(
+  vehicleId: string,
+  documentId: string
+): Promise<{ url: string } | { error: string }> {
+  try {
+    const body = await apiRequest<{ success?: boolean; url?: string }>(
+      `/document-url?vehicleId=${encodeURIComponent(vehicleId)}&documentId=${encodeURIComponent(
+        documentId
+      )}`
+    );
+
+    if (body?.url) return { url: body.url };
+    return { error: 'That invoice could not be opened.' };
+  } catch (error) {
+    const apiError = error as ApiRequestError;
+
+    if (apiError.status === 404) {
+      return {
+        error:
+          'Opening the original invoice needs a newer version of the Well Kept API than this app is talking to.',
+      };
+    }
+
+    return { error: describeUploadError(error) };
+  }
+}

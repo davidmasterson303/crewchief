@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 
 import Segmented from '../components/Segmented';
 import { ServiceHistoryScreen } from './ServiceHistoryScreen';
+import type { ServiceVisit } from '@wellkept/core/service-record';
 import { ServiceMilestoneScreen } from './ServiceMilestoneScreen';
 import { PAGE_BODY, space, surface } from '../theme';
 
@@ -39,6 +40,8 @@ export type ServiceSegment = 'due' | 'history';
  */
 export function ServiceScreen({
   vehicleId,
+  onScan,
+  onOpenVisit,
   initialSegment = 'due',
   onSignOut,
 }: {
@@ -52,6 +55,18 @@ export function ServiceScreen({
    */
   initialSegment?: ServiceSegment;
   onSignOut: () => void;
+  /*
+    ── 30 Aug · threaded through rather than reached for ─────────────────────
+
+    The history segment gained two things it cannot do itself: start a scan, and
+    open the visit behind a line. Both are navigation, and this screen is
+    rendered by the navigator — so they arrive as callbacks for the same reason
+    every other route transition in this tree does. A screen that imported
+    `useNavigation` would also stop mounting in its own suite, which is what the
+    prop-injection seam exists to prevent.
+  */
+  onScan: () => void;
+  onOpenVisit: (visit: ServiceVisit) => void;
 }) {
   const [segment, setSegment] = useState<ServiceSegment>(initialSegment);
 
@@ -72,7 +87,12 @@ export function ServiceScreen({
       {segment === 'due' ? (
         <ServiceMilestoneScreen vehicleId={vehicleId} onSignOut={onSignOut} />
       ) : (
-        <ServiceHistoryScreen vehicleId={vehicleId} onSignOut={onSignOut} />
+        <ServiceHistoryScreen
+          vehicleId={vehicleId}
+          onScan={onScan}
+          onOpenVisit={onOpenVisit}
+          onSignOut={onSignOut}
+        />
       )}
     </View>
   );

@@ -18,7 +18,6 @@ import { shouldRegisterSilently } from '@wellkept/core/push-priming';
 import { AdvisorScreen } from '../screens/AdvisorScreen';
 import { HealthScreen } from '../screens/HealthScreen';
 import { InvoiceScanScreen } from '../screens/InvoiceScanScreen';
-import { InvoiceHistoryScreen } from '../screens/InvoiceHistoryScreen';
 import { InvoiceDetailScreen } from '../screens/InvoiceDetailScreen';
 import type { ServiceVisit } from '@wellkept/core/service-record';
 import { WishlistAddScreen } from '../screens/WishlistAddScreen';
@@ -123,29 +122,18 @@ export type RootStackParamList = {
   */
   InvoiceScan: { vehicleId: string; title?: string };
   /*
-    ── 30 Aug · the History tab ──────────────────────────────────────────────
+    ── 30 Aug · the visit behind a line item ─────────────────────────────────
 
-    Every invoice this car has had scanned, and the control that starts a new
-    one. **Not the service log** — `Service` still owns that, typed records and
-    all. This is the documents view, and `scannedVisits` in core draws the line.
+    Pushed from a row in `Service → History`: the whole visit, its other lines,
+    and — when it came off a scan — the document itself.
 
-    ⚠ It needs a car and the bar has none, so it uses `lastVehicle()` exactly as
-    the advisor does, with the same fallback to the garage. Guessing at a car
-    would show somebody another vehicle's invoices, which is a worse answer than
-    asking which one.
+    ⚠ Takes the visit rather than an id. The history screen already holds every
+    line, so refetching would be a second request for data on the device and a
+    chance for two screens to disagree about one invoice. The cost is stated
+    where it lands: this route cannot be opened cold, so it is **not a
+    deep-link target** and has no entry in `linking.screens` below.
   */
-  InvoiceHistory: { vehicleId: string; title?: string };
-  /*
-    One invoice and the lines it produced. Takes the visit itself rather than an
-    id: the list already holds every line, so refetching would be a second
-    request for data on the device and a chance for two screens to disagree
-    about one invoice.
-
-    ⚠ The cost of that is stated where it lands — this route is **not a
-    deep-link target**, because it cannot be opened cold. There is deliberately
-    no entry for it in `linking.screens` below.
-  */
-  InvoiceDetail: { visit: ServiceVisit; title?: string };
+  InvoiceDetail: { visit: ServiceVisit; vehicleId: string; title?: string };
   /*
     5.6. Where a recall notification lands. It used to open the advisor with
     the question pre-typed, which explained a notice well and gave no way to
@@ -313,7 +301,6 @@ const linking: LinkingOptions<RootStackParamList> = {
       VehicleDetail: 'vehicle/:vehicleId',
       Advisor: 'vehicle/:vehicleId/advisor',
       InvoiceScan: 'vehicle/:vehicleId/scan',
-      InvoiceHistory: 'vehicle/:vehicleId/invoices',
       /*
         ⚠ Kept, and it renders `HealthScreen` — see the route's own note.
         Installed builds send this path in recall notifications.
@@ -437,7 +424,13 @@ function tabFor(route: string | undefined): TabName {
     lost its place — the failure mode this function's original note names, now
     with a second tab that can be one screen deep.
   */
-  if (route === 'InvoiceHistory' || route === 'InvoiceDetail') return 'History';
+  /*
+    ⚠ `Service` is the History tab, and it is also reachable from the car's hub.
+    The bar follows the screen rather than how somebody arrived at it — opening
+    the service record from the hub lights History, because that is where they
+    are. `InvoiceDetail` is pushed off it and belongs to it.
+  */
+  if (route === 'Service' || route === 'InvoiceDetail') return 'History';
   return 'Garage';
 }
 
@@ -801,10 +794,30 @@ export function RootNavigator({
           is what such a notification is about.
         */}
         <Stack.Screen name="Service" options={{ title: 'Service' }}>
-          {({ route }) => (
+          {({ route, navigation }) => (
             <ServiceScreen
               vehicleId={route.params.vehicleId}
               initialSegment={route.params.segment}
+              /*
+                Scanning starts here and returns here. `useRefetchOnFocus` on
+                the history segment is what makes the new lines appear when it
+                does — without it the screen would show the record it had when
+                it mounted, which is MOB-05 on the one screen whose job is to
+                reflect the write.
+              */
+              onScan={() =>
+                navigation.navigate('InvoiceScan', {
+                  vehicleId: route.params.vehicleId,
+                  title: route.params.title,
+                })
+              }
+              onOpenVisit={(visit) =>
+                navigation.navigate('InvoiceDetail', {
+                  visit,
+                  vehicleId: route.params.vehicleId,
+                  title: route.params.title,
+                })
+              }
               onSignOut={onSignOut}
             />
           )}
@@ -899,42 +912,15 @@ export function RootNavigator({
         </Stack.Screen>
 
         {/*
-          ── 30 Aug · the History tab's two screens ────────────────────────────
-
-          `title` is declared on both, and that is not decoration: native-stack
-          takes a back button's label from the *previous* screen's title and
-          falls back to `route.name` when there is none, which is how six
-          screens came to read "‹ VehicleDetail" on 23 Aug. A guard requires
-          every route to declare one.
+          `title` is declared, and that is not decoration: native-stack takes a
+          back button's label from the *previous* screen's title and falls back
+          to `route.name` when there is none, which is how six screens came to
+          read "‹ VehicleDetail" on 23 Aug.
         */}
-        <Stack.Screen name="InvoiceHistory" options={{ title: 'Invoices' }}>
-          {({ route, navigation }) => (
-            <InvoiceHistoryScreen
-              vehicleId={route.params.vehicleId}
-              title={route.params.title}
-              onOpenInvoice={(visit) =>
-                navigation.navigate('InvoiceDetail', { visit, title: route.params.title })
-              }
-              /*
-                ⚠ `navigate`, and the scan returns *here* rather than to the
-                vehicle hub. `useRefetchOnFocus` on the list is what makes the
-                new invoice appear when it does — without it the screen would
-                show the count it had when it mounted, which is MOB-05 on the
-                one screen whose whole job is to reflect a write.
-              */
-              onScan={() =>
-                navigation.navigate('InvoiceScan', {
-                  vehicleId: route.params.vehicleId,
-                  title: route.params.title,
-                })
-              }
-              onSignOut={onSignOut}
-            />
-          )}
-        </Stack.Screen>
-
         <Stack.Screen name="InvoiceDetail" options={{ title: 'Invoice' }}>
-          {({ route }) => <InvoiceDetailScreen visit={route.params.visit} />}
+          {({ route }) => (
+            <InvoiceDetailScreen visit={route.params.visit} vehicleId={route.params.vehicleId} />
+          )}
         </Stack.Screen>
       </Stack.Navigator>
 
@@ -976,9 +962,30 @@ export function RootNavigator({
               navigation.navigate('Garage');
               return;
             }
-            navigation.navigate(tab === 'Garage' ? 'VehicleDetail' : 'InvoiceHistory', {
+            if (tab === 'Garage') {
+              navigation.navigate('VehicleDetail', {
+                vehicleId: car.vehicleId,
+                title: car.title,
+              });
+              return;
+            }
+
+            /*
+              ⚠ The History tab is the **searchable service record**, not a list
+              of invoices. David, 30 Aug: *"I wanted history tab to show
+              searchable history of line items, like web app version and
+              existing history feature."*
+
+              So it opens the screen that already does that, on its history
+              segment, rather than a second screen that would have had to be
+              kept in step with it. `Service` is also a deep-link target that
+              shipped notifications carry, which is the other reason not to
+              build a parallel one.
+            */
+            navigation.navigate('Service', {
               vehicleId: car.vehicleId,
               title: car.title,
+              segment: 'history',
             });
             return;
           }

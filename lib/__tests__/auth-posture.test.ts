@@ -215,6 +215,18 @@ const ROUTE_POSTURE: Record<
   'app/api/v1/push-token/route.ts': 'session',
   'app/api/v1/load-vehicle/route.ts': 'vehicle-scoped',
   'app/api/v1/load-maintenance-data/route.ts': 'vehicle-scoped',
+  /*
+    A signed link to one stored invoice, for the phone — 30 Aug.
+    'vehicle-scoped', and it takes the label seriously in the way SEC-01 says it
+    has to: **two ids arrive** and the document is fetched scoped to the vehicle
+    that was authorized, then checked a second time against the vehicle prefix
+    in its own storage path. SEC-01 was precisely the other shape — `vehicleId`
+    verified, `documentId` used unchecked against the service role.
+
+    Demo callers are refused with the same 404 a stranger's document gets, so
+    this does not become an oracle for which vehicles are demos.
+  */
+  'app/api/v1/document-url/route.ts': 'vehicle-scoped',
   'app/api/v1/wishlist/route.ts': 'vehicle-scoped',
   'app/api/v1/wishlist/check/route.ts': 'vehicle-scoped',
   'app/api/v1/wishlist/complete/route.ts': 'vehicle-scoped',
