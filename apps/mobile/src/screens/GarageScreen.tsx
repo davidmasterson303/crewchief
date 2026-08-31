@@ -18,7 +18,7 @@ import Icon from '../components/Icon';
 import EmptyState from '../components/EmptyState';
 import FirstRun from '../components/FirstRun';
 import GarageBay from '../components/GarageBay';
-import Logo from '../components/Logo';
+import BrandLockup from '../components/BrandLockup';
 import { SkeletonCard } from '../components/Skeleton';
 import { radius, space, status, surface, text, type, TARGET_MIN } from '../theme';
 import { PushPrimer } from '../notifications/PushPrimer';
@@ -470,7 +470,15 @@ export function GarageScreen({
       <View style={styles.headingRow}>
         {/* 22px — the small cut, switched inside the component. This is the
             root screen, so the nav header carries the mark alone. */}
-        <Logo variant="mark" size={22} />
+        {/*
+          ── 30 Aug · the plate replaces the dial ──────────────────────────
+
+          The icon reduction, not the lockup: at nav height the plate's own
+          name would be under the type floor, and Design's rule is a different
+          drawing rather than smaller type. The screen title beside it already
+          says where you are.
+        */}
+        <BrandLockup width={26} variant="icon" />
         <Text style={styles.heading}>Garage</Text>
       </View>
       <View style={styles.headerActions}>
