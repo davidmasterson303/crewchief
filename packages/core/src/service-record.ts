@@ -248,6 +248,48 @@ export interface ServiceVisit {
 }
 
 /**
+ * The invoices, newest first — the visits that came off a scanned document.
+ *
+ * ── Why this is a filter and not a fetch ────────────────────────────────────
+ *
+ * A documents list looks like it needs a documents endpoint, and it does not.
+ * `groupIntoVisits` already keys on `source_document_id`, so the rows sharing
+ * one **are** that invoice, and shop, date, total and line count all fall out
+ * of records the device already holds. No route, no join, no second request —
+ * and, since a route change would mean promoting `web-live` before the next
+ * mobile build, no promote either. This ships as JS.
+ *
+ * ⚠ **A visit with no document is not an invoice**, and is excluded rather than
+ * shown with an empty file. Marking something done on the wishlist writes a
+ * line with no source document; so does typing a record by hand. Those are real
+ * service history and they belong on the history screen — they are simply not
+ * *invoices*, and a list that mixed them would be claiming a document exists
+ * for something nobody ever photographed.
+ *
+ * ⚠ **A failed scan appears nowhere, and that is correct.** Since `05dd54f` a
+ * failed extraction writes nothing at all rather than a completed $0 invoice,
+ * so there is no orphan document to list. If that ever changes, this list is
+ * one of the places that would quietly start lying about how many invoices an
+ * owner has.
+ */
+export function scannedVisits(records: readonly ServiceRecord[]): ServiceVisit[] {
+  return groupIntoVisits(records)
+    .filter((visit) => visit.scanned)
+    .sort((a, b) => {
+      /*
+        Undated last rather than first. A visit with no date is one the
+        extraction could not read, and floating those to the top of a list
+        sorted by recency would put the least-known invoices where the most
+        recent ones belong.
+      */
+      if (a.date === b.date) return 0;
+      if (a.date === null) return 1;
+      if (b.date === null) return -1;
+      return a.date < b.date ? 1 : -1;
+    });
+}
+
+/**
  * Words that stay lower-case inside a name, and the length below which an
  * all-caps word is assumed to be an acronym rather than shouting.
  *

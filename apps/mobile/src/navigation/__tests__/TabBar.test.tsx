@@ -4,7 +4,7 @@ import TabBar from '../TabBar';
 import { withSafeArea } from '../../test-support/safe-area';
 
 /**
- * The bar is how the app is navigated, and one of its three destinations is a
+ * The bar is how the app is navigated, and one of its four destinations is a
  * compliance requirement.
  *
  * ── What App Store 5.1.1(v) needs from this file ────────────────────────────
@@ -22,12 +22,39 @@ import { withSafeArea } from '../../test-support/safe-area';
  * who cannot separate the two, and this bar is the app's navigation.
  */
 describe('the tab bar', () => {
-  it('offers all three destinations, by name', async () => {
+  it('offers all four destinations, by name', async () => {
     const view = await render(withSafeArea(<TabBar current="Garage" onSelect={jest.fn()} />));
 
-    for (const label of ['Garage', 'Advisor', 'Account']) {
+    for (const label of ['Car', 'History', 'Advisor', 'Account']) {
       expect(view.getByLabelText(label)).toBeTruthy();
     }
+  });
+
+  it('names the first tab for the car, not the garage', async () => {
+    /*
+      ⚠ 30 Aug. The tab is still called `Garage` internally — the route name and
+      the fallback both are — but it reads "Car", because it now opens the
+      vehicle you were last looking at rather than the list. David: *"there's no
+      reason people need to go back to garage so often."*
+
+      Asserted rather than left to the label, because the name and the
+      destination disagreeing is exactly the sort of thing that gets "corrected"
+      back to `Garage` by somebody tidying up.
+    */
+    const view = await render(withSafeArea(<TabBar current="Garage" onSelect={jest.fn()} />));
+
+    expect(view.queryByLabelText('Garage')).toBeNull();
+    expect(view.getByLabelText('Car')).toBeTruthy();
+  });
+
+  it('reports History by its route name, not its label', async () => {
+    // The bar hands back a `TabName`; the navigator switches on it. A label
+    // leaking into that contract would route nowhere.
+    const onSelect = jest.fn();
+    const view = await render(withSafeArea(<TabBar current="Garage" onSelect={onSelect} />));
+
+    await userEvent.press(view.getByLabelText('History'));
+    expect(onSelect).toHaveBeenCalledWith('History');
   });
 
   it('announces which one is current, not only tints it', async () => {
@@ -36,7 +63,7 @@ describe('the tab bar', () => {
     expect(view.getByLabelText('Advisor').props.accessibilityState).toMatchObject({
       selected: true,
     });
-    expect(view.getByLabelText('Garage').props.accessibilityState).toMatchObject({
+    expect(view.getByLabelText('Car').props.accessibilityState).toMatchObject({
       selected: false,
     });
   });
@@ -58,6 +85,6 @@ describe('the tab bar', () => {
     const view = await render(withSafeArea(<TabBar current="Account" onSelect={jest.fn()} />));
 
     expect(view.getByLabelText('Account')).toBeTruthy();
-    expect(view.getByLabelText('Garage')).toBeTruthy();
+    expect(view.getByLabelText('Car')).toBeTruthy();
   });
 });

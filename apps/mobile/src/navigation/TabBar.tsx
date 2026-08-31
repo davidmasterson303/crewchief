@@ -4,10 +4,33 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon, { type IconName } from '../components/Icon';
 import { TARGET_MIN, border, brand, space, surface, text, type } from '../theme';
 
-export type TabName = 'Garage' | 'Advisor' | 'Account';
+export type TabName = 'Garage' | 'History' | 'Advisor' | 'Account';
 
+/**
+ * ── ⚠ Four, and the first one is a car rather than the garage ──────────────
+ *
+ * David, 30 Aug: *"garage link in bottom nav should be replaced with car detail
+ * view, not to garage view. There's no reason people need to go back to garage
+ * so often."* He is right about the traffic — most owners have one car, and a
+ * list of one is a step between somebody and the thing they opened the app for.
+ *
+ * So the first tab keeps its name and changes its destination: it opens the car
+ * you were last looking at, and falls back to the garage when there is not one.
+ * The garage is still reachable, from the car's own header — see
+ * `VehicleDetailScreen`. It became a place you visit, rather than the lobby you
+ * pass through.
+ *
+ * **History is new and is the invoices**, not the service log. `Service →
+ * History` still lists every record; this lists what came off a photographed
+ * document, and carries the control that starts a new scan.
+ *
+ * ⚠ Four tabs at 375pt is 93pt each, comfortably past the 44pt floor. Five
+ * would be 75pt and the bar would start reading as a toolbar; that is the
+ * reason the garage did not simply become a fifth entry.
+ */
 const TABS: ReadonlyArray<{ name: TabName; label: string; icon: IconName }> = [
-  { name: 'Garage', label: 'Garage', icon: 'car' },
+  { name: 'Garage', label: 'Car', icon: 'car' },
+  { name: 'History', label: 'History', icon: 'file-text' },
   { name: 'Advisor', label: 'Advisor', icon: 'message-square' },
   { name: 'Account', label: 'Account', icon: 'sliders' },
 ];

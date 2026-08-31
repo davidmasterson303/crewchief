@@ -18,6 +18,9 @@ import { shouldRegisterSilently } from '@wellkept/core/push-priming';
 import { AdvisorScreen } from '../screens/AdvisorScreen';
 import { HealthScreen } from '../screens/HealthScreen';
 import { InvoiceScanScreen } from '../screens/InvoiceScanScreen';
+import { InvoiceHistoryScreen } from '../screens/InvoiceHistoryScreen';
+import { InvoiceDetailScreen } from '../screens/InvoiceDetailScreen';
+import type { ServiceVisit } from '@wellkept/core/service-record';
 import { WishlistAddScreen } from '../screens/WishlistAddScreen';
 import { pickInvoiceImage, pickVehiclePhoto } from '../media/pick-image';
 import { GarageScreen } from '../screens/GarageScreen';
@@ -119,6 +122,30 @@ export type RootStackParamList = {
     meantime so it could still be rendered and reviewed.
   */
   InvoiceScan: { vehicleId: string; title?: string };
+  /*
+    ── 30 Aug · the History tab ──────────────────────────────────────────────
+
+    Every invoice this car has had scanned, and the control that starts a new
+    one. **Not the service log** — `Service` still owns that, typed records and
+    all. This is the documents view, and `scannedVisits` in core draws the line.
+
+    ⚠ It needs a car and the bar has none, so it uses `lastVehicle()` exactly as
+    the advisor does, with the same fallback to the garage. Guessing at a car
+    would show somebody another vehicle's invoices, which is a worse answer than
+    asking which one.
+  */
+  InvoiceHistory: { vehicleId: string; title?: string };
+  /*
+    One invoice and the lines it produced. Takes the visit itself rather than an
+    id: the list already holds every line, so refetching would be a second
+    request for data on the device and a chance for two screens to disagree
+    about one invoice.
+
+    ⚠ The cost of that is stated where it lands — this route is **not a
+    deep-link target**, because it cannot be opened cold. There is deliberately
+    no entry for it in `linking.screens` below.
+  */
+  InvoiceDetail: { visit: ServiceVisit; title?: string };
   /*
     5.6. Where a recall notification lands. It used to open the advisor with
     the question pre-typed, which explained a notice well and gave no way to
@@ -286,6 +313,7 @@ const linking: LinkingOptions<RootStackParamList> = {
       VehicleDetail: 'vehicle/:vehicleId',
       Advisor: 'vehicle/:vehicleId/advisor',
       InvoiceScan: 'vehicle/:vehicleId/scan',
+      InvoiceHistory: 'vehicle/:vehicleId/invoices',
       /*
         ⚠ Kept, and it renders `HealthScreen` — see the route's own note.
         Installed builds send this path in recall notifications.
@@ -403,6 +431,13 @@ function lastVehicle() {
 function tabFor(route: string | undefined): TabName {
   if (route === 'Advisor') return 'Advisor';
   if (route === 'Account') return 'Account';
+  /*
+    ⚠ Both invoice routes belong to History, including the detail screen pushed
+    off it. A bar that went blank one screen into a tab would read as having
+    lost its place — the failure mode this function's original note names, now
+    with a second tab that can be one screen deep.
+  */
+  if (route === 'InvoiceHistory' || route === 'InvoiceDetail') return 'History';
   return 'Garage';
 }
 
@@ -574,7 +609,21 @@ export function RootNavigator({
               title={route.params.title}
               vehicleId={route.params.vehicleId}
               onSignOut={onSignOut}
-              onBack={() => navigation.goBack()}
+              /*
+                ⚠ `navigate('Garage')`, not `goBack()` — changed 30 Aug with the
+                tab.
+
+                The control says "Back to the garage" and used to be reached
+                only by pushing off the garage, so `goBack` happened to land
+                there. Now the Car tab opens this screen from anywhere: pressing
+                it from Account and then pressing a pill labelled *back to the
+                garage* would have returned to Account.
+
+                `navigate` also does the right thing on the old path — it moves
+                to the Garage already on the stack rather than stacking a second
+                copy behind the first, which is the same reason the bar uses it.
+              */
+              onBack={() => navigation.navigate('Garage')}
               onAskAdvisor={() =>
                 navigation.navigate('Advisor', {
                   vehicleId: route.params.vehicleId,
@@ -848,6 +897,45 @@ export function RootNavigator({
             />
           )}
         </Stack.Screen>
+
+        {/*
+          ── 30 Aug · the History tab's two screens ────────────────────────────
+
+          `title` is declared on both, and that is not decoration: native-stack
+          takes a back button's label from the *previous* screen's title and
+          falls back to `route.name` when there is none, which is how six
+          screens came to read "‹ VehicleDetail" on 23 Aug. A guard requires
+          every route to declare one.
+        */}
+        <Stack.Screen name="InvoiceHistory" options={{ title: 'Invoices' }}>
+          {({ route, navigation }) => (
+            <InvoiceHistoryScreen
+              vehicleId={route.params.vehicleId}
+              title={route.params.title}
+              onOpenInvoice={(visit) =>
+                navigation.navigate('InvoiceDetail', { visit, title: route.params.title })
+              }
+              /*
+                ⚠ `navigate`, and the scan returns *here* rather than to the
+                vehicle hub. `useRefetchOnFocus` on the list is what makes the
+                new invoice appear when it does — without it the screen would
+                show the count it had when it mounted, which is MOB-05 on the
+                one screen whose whole job is to reflect a write.
+              */
+              onScan={() =>
+                navigation.navigate('InvoiceScan', {
+                  vehicleId: route.params.vehicleId,
+                  title: route.params.title,
+                })
+              }
+              onSignOut={onSignOut}
+            />
+          )}
+        </Stack.Screen>
+
+        <Stack.Screen name="InvoiceDetail" options={{ title: 'Invoice' }}>
+          {({ route }) => <InvoiceDetailScreen visit={route.params.visit} />}
+        </Stack.Screen>
       </Stack.Navigator>
 
       {/*
@@ -864,6 +952,37 @@ export function RootNavigator({
       <TabBar
         current={tabFor(route)}
         onSelect={(tab) => {
+          /*
+            ── 30 Aug · two tabs that need a car, and one rule for both ───────
+
+            David: the first tab should open the car, not the garage — *"there's
+            no reason people need to go back to garage so often."* History needs
+            a car for the same reason the advisor does.
+
+            So all three share `lastVehicle()` and its fallback, which was
+            already argued once above: guessing at a car — the first in the
+            list, the last persisted, whatever — opens somebody else's vehicle
+            in a two-car garage. The garage is where a car gets chosen, and on a
+            cold start that is the honest place to land.
+
+            ⚠ The garage did not become unreachable. `VehicleDetailScreen`'s
+            header carries the way back to it, which is the trade: the list is a
+            place you go to switch or add a car, not the lobby every session
+            starts in.
+          */
+          if (tab === 'Garage' || tab === 'History') {
+            const car = lastVehicle();
+            if (!car) {
+              navigation.navigate('Garage');
+              return;
+            }
+            navigation.navigate(tab === 'Garage' ? 'VehicleDetail' : 'InvoiceHistory', {
+              vehicleId: car.vehicleId,
+              title: car.title,
+            });
+            return;
+          }
+
           if (tab === 'Advisor') {
             /*
               ⚠ The advisor needs a car, and the bar has none.

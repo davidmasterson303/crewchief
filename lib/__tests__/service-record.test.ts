@@ -20,7 +20,9 @@ import {
   formatRecordDate,
   isRecollection,
   recordSourceLabel,
+  scannedVisits,
   totalRecorded,
+  type ServiceRecord,
 } from '@wellkept/core/service-record';
 
 describe('recordSourceLabel', () => {
@@ -218,5 +220,88 @@ describe('describeRemoval', () => {
 
   it('says nothing about parts for an ordinary row', () => {
     expect(describeRemoval({ is_combined: false }).toLowerCase()).not.toContain('labour and its parts');
+  });
+});
+
+describe('scannedVisits — the invoices, and only the invoices', () => {
+  /*
+    ── Why this exists (30 Aug) ───────────────────────────────────────────────
+
+    The History tab lists invoices and drills into the records each one
+    produced. That looks like it needs a documents endpoint and does not:
+    `groupIntoVisits` already keys on `source_document_id`, so the rows sharing
+    one *are* the invoice. Filtering is the whole feature, which is why it is
+    six lines of core rather than a route — and a route would have meant
+    promoting `web-live` before the next mobile build.
+  */
+  let seq = 0;
+  const line = (over: Partial<ServiceRecord> = {}): ServiceRecord => ({
+    id: `r-${(seq += 1)}`,
+    item_description: 'Oil change',
+    service_date: '2026-05-01',
+    total_cost: 100,
+    source: 'vision',
+    source_document_id: 'doc-1',
+    ...over,
+  });
+
+  it('keeps only what came off a document', () => {
+    /*
+      ⚠ The assertion that decides what the tab means. A hand-typed record and a
+      wishlist item marked done are real service history and are not invoices —
+      a list that included them would claim a document exists for something
+      nobody photographed.
+    */
+    const visits = scannedVisits([
+      line({ source_document_id: 'doc-1' }),
+      line({ source_document_id: null, source: 'manual' }),
+    ]);
+
+    expect(visits).toHaveLength(1);
+    expect(visits[0].scanned).toBe(true);
+  });
+
+  it('collapses the lines of one invoice into one entry that keeps them', () => {
+    // The drill-in depends on this: the row is the invoice, `records` is what
+    // it produced, and the count has to be the real one.
+    const visits = scannedVisits([
+      line({ total_cost: 100, source_document_id: 'doc-9' }),
+      line({ total_cost: 61, source_document_id: 'doc-9' }),
+    ]);
+
+    expect(visits).toHaveLength(1);
+    expect(visits[0].records).toHaveLength(2);
+    expect(visits[0].total).toBe(161);
+  });
+
+  it('orders newest first', () => {
+    const visits = scannedVisits([
+      line({ service_date: '2026-01-01', source_document_id: 'old' }),
+      line({ service_date: '2026-07-01', source_document_id: 'new' }),
+    ]);
+
+    expect(visits.map((v) => v.key)).toEqual(['new', 'old']);
+  });
+
+  it('puts an undated invoice last rather than first', () => {
+    /*
+      A visit with no date is one the extraction could not read. Sorting it to
+      the top of a recency-ordered list would put the least-known invoice where
+      the most recent one belongs — the same `null is not zero` rule this
+      codebase applies to scores and odometers.
+    */
+    const visits = scannedVisits([
+      line({ service_date: null, source_document_id: 'undated' }),
+      line({ service_date: '2026-03-01', source_document_id: 'dated' }),
+    ]);
+
+    expect(visits.map((v) => v.key)).toEqual(['dated', 'undated']);
+  });
+
+  it('returns nothing when nothing was ever scanned', () => {
+    // Anti-vacuous in the other direction: an empty result has to be reachable,
+    // because the screen's empty state is most owners' first experience of it.
+    expect(scannedVisits([line({ source_document_id: null, source: 'manual' })])).toEqual([]);
+    expect(scannedVisits([])).toEqual([]);
   });
 });
