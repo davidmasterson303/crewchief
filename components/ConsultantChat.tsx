@@ -11,6 +11,7 @@ import { logger } from '@wellkept/core/logger';
 import { isDemoVehicleId } from '@wellkept/core/demo';
 import { ADVISOR_NAME } from '@wellkept/core/prompts';
 import { refusalCopy } from '@wellkept/core/access';
+import { demoQuestionsFor } from '@wellkept/core/demo-answers';
 import { isDemoMode } from '@/lib/demo-mode';
 import { wishlistItemIdentifier } from '@wellkept/core/wishlist-identifier';
 import {
@@ -792,12 +793,26 @@ export default function ConsultantChat({
                   I know your {vehicle.year} {vehicle.make} {vehicle.model} inside and out. What&apos;s on your mind?
                 </p>
                 <div className="grid gap-2 text-left">
-                  {[
+                  {/*
+                    ── ⚠ On the demo these MUST be the questions it holds ─────
+
+                    The demo answers from a fixed set of pre-written answers and
+                    matches on the exact question. These four prompts were
+                    written for a live model and match none of them — so every
+                    chip dead-ended in "the demo answers a fixed set of
+                    questions", on the one surface a recruiter is sent to.
+
+                    A prompt that cannot be answered is worse than no prompt.
+                    So the demo offers its own questions and the product offers
+                    the open ones, and the two lists cannot drift because the
+                    demo's come from the module that answers them.
+                  */}
+                  {(isDemoVehicleId(vehicleId) ? demoQuestionsFor(vehicleId).map((entry) => entry.question) : [
                     'Something acting funny? Let\'s figure it out.',
                     'Planning your next round of work? I\'ll help prioritize.',
                     'Got a quote from a shop? Send it over for a second opinion.',
                     'Thinking about mods? I know what works on these.',
-                  ].map((suggestion, i) => (
+                  ]).map((suggestion, i) => (
                     <button
                       key={i}
                       onClick={() => handleSend(suggestion)}

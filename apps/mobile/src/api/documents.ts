@@ -378,6 +378,21 @@ export async function invoiceUrl(
       };
     }
 
-    return { error: describeUploadError(error) };
+    /*
+      ⚠ Not `describeUploadError`. Its copy is written for the upload flow and
+      reassures somebody about a photograph they have just taken — *"took too
+      long to read that invoice. Your photo was not lost"* — which is a
+      confident description of work that is not happening. Nothing is being
+      uploaded here and nothing is being read; a stored file is being fetched.
+    */
+    if (apiError.kind === 'offline') {
+      return { error: 'Could not reach Well Kept. Check your connection.' };
+    }
+
+    if (apiError.kind === 'timeout') {
+      return { error: 'That took too long. The invoice is still here — try again.' };
+    }
+
+    return { error: 'That invoice could not be opened.' };
   }
 }

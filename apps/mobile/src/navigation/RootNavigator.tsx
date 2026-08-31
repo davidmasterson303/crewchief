@@ -419,18 +419,20 @@ function tabFor(route: string | undefined): TabName {
   if (route === 'Advisor') return 'Advisor';
   if (route === 'Account') return 'Account';
   /*
-    ⚠ Both invoice routes belong to History, including the detail screen pushed
-    off it. A bar that went blank one screen into a tab would read as having
-    lost its place — the failure mode this function's original note names, now
-    with a second tab that can be one screen deep.
-  */
-  /*
     ⚠ `Service` is the History tab, and it is also reachable from the car's hub.
     The bar follows the screen rather than how somebody arrived at it — opening
     the service record from the hub lights History, because that is where they
-    are. `InvoiceDetail` is pushed off it and belongs to it.
+    are.
+
+    `InvoiceDetail` and `InvoiceScan` are both pushed off it and both belong to
+    it. `InvoiceScan` was missing and fell through to Garage, so starting a scan
+    from the History screen's own control moved the highlight to Car while the
+    user was still inside the History flow — the exact failure this function's
+    original note names.
   */
-  if (route === 'Service' || route === 'InvoiceDetail') return 'History';
+  if (route === 'Service' || route === 'InvoiceDetail' || route === 'InvoiceScan') {
+    return 'History';
+  }
   return 'Garage';
 }
 

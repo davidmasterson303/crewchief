@@ -105,6 +105,54 @@ describe('what is sold', () => {
     expect(FREE_FEATURES).not.toContain('recalls');
   });
 
+  it('every paid feature is gated somewhere, or is named here as not yet', () => {
+    /*
+      ── ⚠ The gap a type cannot show ──────────────────────────────────────
+
+      Adding a feature to `PaidFeature` puts it on the paywall. It does not
+      gate anything — that takes a `checkFeatureAccess` call at the place the
+      feature is served — and nothing in the type system or the copy notices
+      the difference. The result is a product that charges for something it
+      still gives away, and the only symptom is the absence of a call site.
+
+      `recalls` moved to paid on 30 Aug and is exactly that today. It is listed
+      rather than quietly tolerated: the entry has to be deleted when the gate
+      lands, and until then this test is where somebody finds out.
+
+      ⚠ Where its gate belongs is decided, and it is not the read path. A
+      lapsed account keeps reading its own records, recalls included — see
+      `access.ts`. What stops is the **refresh and the notification**, which is
+      `RECALL_ALERTS_AFTER_LAPSE = false` and lives in the nightly sweep. That
+      is E8 work, because enforcement is off until there is something to buy.
+    */
+    const UNGATED: Record<string, string> = {
+      recalls:
+        'gate belongs in the sweep’s refresh and notify, not the read path — E8',
+    };
+
+    const sources = ['app/actions.ts', 'lib/vehicle-research.ts']
+      .map((file) =>
+        readFileSync(join(__dirname, '..', '..', file), 'utf8')
+      )
+      .join('\n');
+
+    // Anti-vacuous: the scan must be able to see the gates that do exist.
+    expect(sources).toMatch(/checkFeatureAccess\([^)]*'advisor'\)/);
+
+    const missing = PAID_FEATURES.filter(
+      (feature) =>
+        !new RegExp(`checkFeatureAccess\\([^)]*'${feature}'\\)`).test(sources) &&
+        !(feature in UNGATED)
+    );
+
+    expect(missing).toEqual([]);
+
+    // And an entry that stopped being true is how an allowlist rots.
+    for (const feature of Object.keys(UNGATED)) {
+      expect(`${feature}: ${PAID_FEATURES.includes(feature as never)}`).toBe(`${feature}: true`);
+    }
+  });
+
   it('gives every feature copy a customer can act on', () => {
     for (const feature of PAID_FEATURES) {
       const copy = PAID_FEATURE_COPY[feature];

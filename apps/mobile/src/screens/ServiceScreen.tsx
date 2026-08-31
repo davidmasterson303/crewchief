@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import Segmented from '../components/Segmented';
@@ -69,6 +69,25 @@ export function ServiceScreen({
   onOpenVisit: (visit: ServiceVisit) => void;
 }) {
   const [segment, setSegment] = useState<ServiceSegment>(initialSegment);
+
+  /*
+    ── ⚠ The prop can change after mount, and it does ────────────────────────
+
+    `useState` reads its argument once. `Service` is now reachable two ways —
+    the car's hub, which lands on Due, and the History tab, which asks for
+    history — and `navigate` on an already-mounted screen updates params
+    **without remounting**. So tapping History while looking at Due did
+    nothing at all: the params said history, the state still said due.
+
+    ⚠ Residual, stated rather than hidden: if somebody arrives on history,
+    switches to Due by hand and taps History again, the param has not changed,
+    so this does not fire and the screen stays on Due. Fixing that needs the
+    bar to force a params update, and it is a much rarer path than the one
+    above. Worth doing if it is ever reported; not worth a nonce param today.
+  */
+  useEffect(() => {
+    setSegment(initialSegment);
+  }, [initialSegment]);
 
   return (
     <View style={styles.screen}>
