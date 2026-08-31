@@ -736,3 +736,31 @@ consultant composer's vehicle-context line.
 Worth recording as a pattern rather than a one-off: Design writes against the
 templates, this repo is the build, and the two have drifted before. A "was →
 is" table in a handoff is describing the template's *was*.
+
+### 7.6 · The lockup, implemented 30–31 Aug — one departure to bless
+
+The plate is built on both clients from `packages/core/src/brand.ts`, whose
+every value `brand.test.ts` asserts against Design's own SVG files. Geometry is
+imported rather than copied, for the reason `Icon.tsx` already states about
+Lucide: *"do not redraw or approximate."*
+
+**⚠ The one departure: small caps on mobile.** `font-variant: small-caps` has no
+`react-native-svg` equivalent. The web renders the name exactly as the package
+does; the native lockup sets it in **capitals** at Design's tracking instead.
+
+The alternative was drawing large and small capitals by hand as two font sizes,
+which is the approximation this project forbids for glyphs and would drift from
+the web the first time either changed. So: same letters, same tracking, same
+plate — the small-capital forms are the difference, and they are the part a
+rasteriser cannot fake honestly.
+
+For Design: if the distinction matters at nav size, the fix is a drawn wordmark
+in the package rather than a runtime approximation here.
+
+**Newsreader 500 was added to the app**, which the mark needed and the app did
+not have — it bundled 700 alone, and rendering the plate a weight heavier is
+exactly the silent substitution `mobile-font-faces` exists to catch. Free: the
+face comes out of a package already installed.
+
+⚠ **Not yet done, and both need the native build:** the app icon set and the
+iOS display name. `app.json` names them; Metro cannot move either.

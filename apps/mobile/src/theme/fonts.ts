@@ -60,6 +60,18 @@ export const FONT_FACES = [
   'Inter_700Bold',
   'Inter_800ExtraBold',
   'Newsreader_700Bold',
+  /*
+    ⚠ Added 30 Aug for the brand lockup, and it is the only thing that uses it.
+
+    Design sets the plate's engraved name at Newsreader **500**, and the app
+    carried 700 alone. Rendering the mark a weight heavier than specified is the
+    kind of drift nobody reports — it looks like a design decision.
+
+    Free: `@expo-google-fonts/newsreader` is already a dependency and this is
+    another face out of it, loaded by `useFonts` at runtime. No native module,
+    so no EAS build.
+  */
+  'Newsreader_500Medium',
 ] as const;
 
 export type FontFace = (typeof FONT_FACES)[number];

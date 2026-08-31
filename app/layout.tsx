@@ -46,7 +46,18 @@ export const metadata: Metadata = {
      so each deployment claims itself.
   */
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || siteOrigin(IS_DEMO)),
-  title: 'Well Kept — Your Personal Auto Ownership Consultant',
+  /*
+    ── ⚠ Design's string table, 30 Aug — this is the App Store name ──────────
+
+    `Well Kept: Know Your Car` is the App Store name, and the page title is the
+    same string on purpose: a listing and its own marketing URL disagreeing
+    about what the product is called is the first thing a reviewer sees.
+
+    It replaces "Well Kept — Your Personal Auto Ownership Consultant", which was
+    the CrewChief title with the name swapped — a description standing where a
+    name belongs, and forty characters of it.
+  */
+  title: 'Well Kept: Know Your Car',
   /*
      The favicon, apple-touch-icon and SVG icon are NOT declared here — they
      are app/favicon.ico, app/icon.svg and app/apple-icon.png, served by the
@@ -56,8 +67,13 @@ export const metadata: Metadata = {
      hand-edit one.
   */
   manifest: '/manifest.json',
+  /*
+    ⚠ Leads with the App Store subtitle — `AI-kept service records`, 23
+    characters, inside Apple's 30 — so the phrase somebody meets in the store
+    and the phrase they meet on the page are the same one.
+  */
   description:
-    'Track your vehicles, log service history, and get answers from an AI consultant that knows your car — its issues, schedule, and history.',
+    'AI-kept service records. Track your vehicles, log service history, and get answers from an AI that knows your car — its issues, schedule, and history.',
   /*
      Canonical, cheap insurance. `og:url` is treated as a canonicalisation hint
      by search engines, and the product site previously had no `<link rel=
@@ -65,7 +81,7 @@ export const metadata: Metadata = {
   */
   alternates: { canonical: '/' },
   openGraph: {
-    title: 'Well Kept — Your Personal Auto Ownership Consultant',
+    title: 'Well Kept: Know Your Car',
     // Per-deployment. The product must never describe itself as a demo — see
     // `lib/site-role.ts` for why that sentence is expensive on this hostname.
     description: shareDescription(IS_DEMO),

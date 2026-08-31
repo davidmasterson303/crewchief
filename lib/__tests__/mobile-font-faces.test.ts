@@ -152,13 +152,42 @@ describe('the faces the roles are built from', () => {
     expect(roles.filter(([, style]) => !style.fontFamily).map(([name]) => name)).toEqual([]);
   });
 
-  it('keeps the serif to one cut, because it is one role', () => {
-    // "Newsreader for one serif role per screen" — one per screen, never two.
-    // A second cut is a second editorial role arriving by the back door.
-    const serifs = FONT_FACES.filter((face) => face.startsWith('Newsreader'));
+  it('keeps the serif to one cut in the type scale, because it is one role', () => {
+    /*
+      "Newsreader for one serif role per screen" — one per screen, never two. A
+      second cut in the *scale* is a second editorial role arriving by the back
+      door, and that is what this refuses.
 
-    expect(serifs).toEqual([EDITORIAL_FACE]);
+      ⚠ Narrowed 30 Aug, and the narrowing is the interesting part. It used to
+      assert `FONT_FACES` held exactly one Newsreader, which is a different
+      claim and was only accidentally the same one. The brand lockup needs
+      Newsreader **500** — Design sets the engraved name at that weight — and it
+      is not a text role at all: it is a mark, drawn in SVG, that no screen sets
+      body copy in.
+
+      So the rule is enforced where it actually lives: **the type scale** may
+      contain one serif cut. A second face may exist in the bundle only if
+      nothing in the scale uses it. That is stricter than the old assertion in
+      the direction that matters — it would still fail if somebody wired the
+      brand face into a text role.
+    */
+    const serifs = FONT_FACES.filter((face) => face.startsWith('Newsreader'));
+    const inScale = Object.values(typeScale)
+      .map((style) => (style as { fontFamily?: string }).fontFamily)
+      .filter((face): face is string => Boolean(face?.startsWith('Newsreader')));
+
+    expect(Array.from(new Set(inScale))).toEqual([EDITORIAL_FACE]);
     expect(typeScale.editorial.fontFamily).toBe(EDITORIAL_FACE);
+
+    // Any extra serif cut is the brand's, and it is used by the mark alone.
+    const extras = serifs.filter((face) => face !== EDITORIAL_FACE);
+    expect(extras).toEqual(['Newsreader_500Medium']);
+
+    const lockup = readFileSync(
+      join(__dirname, '..', '..', 'apps', 'mobile', 'src', 'components', 'BrandLockup.tsx'),
+      'utf8'
+    );
+    expect(lockup).toContain('Newsreader_500Medium');
   });
 
   it('spends a bundled file on each weight it offers, and no more', () => {
