@@ -47,7 +47,7 @@ export default function BrandStatesPage() {
           <div className="space-y-8">
             {WIDTHS.map((width) => (
               <div key={width} className="space-y-2">
-                <p className="font-mono text-xs uppercase tracking-widest text-white/40">
+                <p className="font-mono text-xs uppercase tracking-widest text-white/55">
                   {width}px
                 </p>
                 <BrandLockup width={width} />

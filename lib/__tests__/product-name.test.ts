@@ -86,7 +86,31 @@ function sources(dir: string, acc: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
     if (entry === '__tests__' || entry === 'node_modules') continue;
     const full = join(dir, entry);
-    if (statSync(full).isDirectory()) sources(full, acc);
+
+    /*
+      ⚠ A walk is not an atomic snapshot. `readdirSync` lists names, and by the
+      time `statSync` asks about one it may be gone — an editor's temp file, a
+      bundler's cache write, anything touching the tree while this runs.
+
+      Three source-scanning suites failed once each on 30 Aug and passed on an
+      immediate re-run, which is the signature of exactly that. Not diagnosed,
+      and this does not claim to be the diagnosis — but a tree walker that dies
+      on a vanished entry is wrong on its own terms, and a guard that fails
+      intermittently is worse than none: it teaches people to re-run a red
+      result rather than read it.
+
+      ⚠ It skips the entry rather than the file *class*. Anything that made the
+      scan quietly cover less would defeat the point of the scan, so the
+      anti-vacuous file-count assertion below still has to hold.
+    */
+    let isDirectory: boolean;
+    try {
+      isDirectory = statSync(full).isDirectory();
+    } catch {
+      continue;
+    }
+
+    if (isDirectory) sources(full, acc);
     else if (/\.(ts|tsx|json)$/.test(entry) && !/\.test\.tsx?$/.test(entry)) acc.push(full);
   }
   return acc;

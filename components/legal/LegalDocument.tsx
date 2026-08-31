@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
-import Logo from '@/components/brand/Logo';
+import BrandLockup from '@/components/brand/BrandLockup';
 import { LAST_UPDATED } from '@/lib/legal';
 
 /**
@@ -38,7 +38,11 @@ export default function LegalDocument({
     <div className="min-h-screen service-bay service-bay-dim">
       <div className="mx-auto w-full max-w-2xl px-5 py-14">
         <Link href="/" className="inline-flex mb-10" aria-label="Well Kept home">
-          <Logo variant="stacked" size={52} />
+          {/*
+            The full lockup, maker line and all — this is the page Apple reads,
+            and it is the one place the operator's name belongs beside the mark.
+          */}
+          <BrandLockup width={240} />
         </Link>
 
         <h1 className="text-3xl font-bold text-white mb-3">{title}</h1>

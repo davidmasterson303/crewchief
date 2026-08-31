@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Clock, MessageSquare, Wrench, CreditCard as Edit2, Check, X, Info, ChevronLeft, ChevronRight, Tag } from 'lucide-react';
-import Logo from '@/components/brand/Logo';
+import BrandLockup, { BrandWordmark } from '@/components/brand/BrandLockup';
 import { CONTACT_EMAIL } from '@/lib/legal';
 import { isDemoVehicleId } from '@wellkept/core/demo';
 import { Button } from '@/components/ui/button';
@@ -248,8 +248,15 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
           <div className={`flex items-center justify-between transition-all duration-200 ${scrolled ? 'py-3' : 'py-4'}`}>
             <div className="flex items-center gap-3">
               <Link href={homeHref} className="flex items-center group">
-                {/* 21px mark — the small cut, switched inside the component. */}
-                <Logo variant="horizontal" size={21} />
+                {/*
+                  ── 30 Aug · the plate replaces the dial ────────────────────
+
+                  `REBRAND_PROMPT.md` §4.1 sets a nav at *"the 28px plate mark +
+                  Newsreader small caps 19–20px"* — a mark and a wordmark rather
+                  than one drawing, because a bar is wide and short and the
+                  plate's own proportions fight that.
+                */}
+                <BrandWordmark size={28} />
               </Link>
 
               {/*
@@ -587,15 +594,15 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
         </div>
 
         <footer className={`${appShell ? 'hidden md:flex ' : 'flex '}mt-10 pt-6 border-t border-white/6 items-center justify-between text-xs text-white/50`}>
-          {/* One-colour knockout: whole lockup in --text-primary, redline dropped. */}
+          {/*
+            ⚠ The footer takes the plate at its icon size, not the wordmark.
+
+            At 16px the name would sit under the 12px type floor, and Design's
+            reduction rule is a different drawing rather than smaller type. The
+            copyright line beside it already names the product in words.
+          */}
           <span className="flex items-center gap-2">
-            <Logo
-              variant="horizontal"
-              size={16}
-              mono
-              color="var(--text-primary)"
-              nameColor="var(--text-primary)"
-            />
+            <BrandLockup width={18} variant="icon" />
             <span>&copy; {new Date().getFullYear()}</span>
           </span>
           <div className="flex items-center gap-4">

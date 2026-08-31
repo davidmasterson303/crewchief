@@ -176,4 +176,52 @@ export function BrandLockup({
   );
 }
 
+/**
+ * The nav treatment: the plate at 28px with the name set beside it.
+ *
+ * ⚠ Not the plate lockup shrunk. `REBRAND_PROMPT.md` §4.1 specifies a nav as
+ * *"the 28px plate mark + Newsreader small caps 19–20px"* — a mark and a
+ * wordmark, not one drawing — because a bar is wide and short and the plate's
+ * own proportions fight that. Shrinking the lockup to fit a 44px bar would put
+ * the name at about 9px inside it.
+ *
+ * The name is HTML text rather than SVG here, so it inherits the page's font
+ * loading and can be selected and read. `BrandLockup` draws the plate.
+ */
+export function BrandWordmark({
+  size = 28,
+  ground = 'dark',
+  className,
+}: {
+  size?: number;
+  ground?: 'dark' | 'light';
+  className?: string;
+}) {
+  return (
+    <span className={`inline-flex items-center gap-2.5${className ? ` ${className}` : ''}`}>
+      {/*
+        `aria-hidden` on the mark, because the name beside it is real text. Both
+        labelled would make a screen reader say "Well Kept Well Kept" — the
+        failure the old lockup's docblock names.
+      */}
+      <span aria-hidden="true" className="inline-flex">
+        <BrandLockup width={size} variant="icon" ground={ground} />
+      </span>
+      <span
+        style={{
+          fontFamily: 'var(--font-display), Newsreader, Georgia, serif',
+          fontWeight: BRAND_TYPE.name.weight,
+          fontSize: Math.round(size * 0.7),
+          fontVariant: 'small-caps',
+          letterSpacing: '0.1em',
+          lineHeight: 1,
+          color: ground === 'light' ? BRAND_COLOR.light.name : BRAND_COLOR.name,
+        }}
+      >
+        {BRAND_NAME}
+      </span>
+    </span>
+  );
+}
+
 export default BrandLockup;
