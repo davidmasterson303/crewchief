@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Eye, EyeOff, Loader as Loader2, CircleCheck as CheckCircle2 } from 'lucide-react';
-import Logo from '@/components/brand/Logo';
+import BrandLockup from '@/components/brand/BrandLockup';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -126,7 +126,7 @@ export default function ResetPasswordPage() {
         <div className="w-full max-w-md text-center">
           <div className="bg-white/5 border border-white/10 rounded-2xl p-10 backdrop-blur-xl">
             {/* Resting glyph: mark alone, one colour, --text-muted-40. */}
-            <Logo variant="mark" size={40} mono color="var(--text-muted-40)" className="mx-auto mb-5" />
+            <BrandLockup width={40} variant="mono" className="mx-auto mb-5 text-[var(--text-muted-40)]" />
             <h2 className="text-xl font-bold text-white mb-3">Reset link expired</h2>
             <p className="text-white/55 text-sm mb-6">
               This link is invalid or has already been used. Request a new one below.
@@ -166,7 +166,7 @@ export default function ResetPasswordPage() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex group mb-6">
-            <Logo variant="stacked" size={60} />
+            <BrandLockup width={200} />
           </Link>
           <h1 className="text-2xl font-bold text-white mb-2">Set new password</h1>
           <p className="text-white/50 text-sm">Choose a strong password for your account</p>

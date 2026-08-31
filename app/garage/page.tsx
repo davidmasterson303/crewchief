@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
-import Logo from '@/components/brand/Logo';
+import BrandLockup, { BrandWordmark } from '@/components/brand/BrandLockup';
 import { VehicleCard } from '@/components/VehicleCard';
 import { useMyVehicles } from '@/hooks/useVehicles';
 import { useAuth } from '@/components/AuthProvider';
@@ -50,7 +50,7 @@ export default function GaragePage() {
           <div className="flex items-center justify-between">
             <Link href={homeHref} className="flex items-center group">
               {/* 21px mark — the small cut, switched inside the component. */}
-              <Logo variant="horizontal" size={21} />
+              <BrandWordmark size={28} />
             </Link>
             <div className="flex items-center gap-3">
               {/*
@@ -94,7 +94,7 @@ export default function GaragePage() {
             <div className="mb-8">
               <div className="h-24 w-24 bg-gradient-to-br from-cyan-500/20 to-cyan-500/20 rounded-2xl flex items-center justify-center mx-auto">
                 {/* Resting glyph: mark alone, one colour, --text-muted-40. */}
-                <Logo variant="mark" size={48} mono color="var(--text-muted-40)" />
+                <BrandLockup width={48} variant="mono" className="text-[var(--text-muted-40)]" />
               </div>
             </div>
             <h2 className="text-4xl font-bold mb-4 text-white tracking-tight">Your Garage is Empty</h2>

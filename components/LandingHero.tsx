@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { ArrowRight, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import FeaturesDrawer from './FeaturesDrawer';
-import Logo from '@/components/brand/Logo';
+import BrandLockup from '@/components/brand/BrandLockup';
 import { AppStoreCTA } from './AppStoreCTA';
 import { useIsDemoSite } from '@/components/SiteRoleProvider';
 
@@ -76,7 +76,14 @@ export default function LandingHero({ onEnter }: LandingHeroProps) {
             that finish line.
           */}
           <div className="flex justify-center mb-10">
-            <Logo variant="stacked" size={60} />
+            {/*
+              ⚠ The lockup only. Design's Landing deliverable rewrites this
+              page — the tagline, the hero, the CTA — and that is a separate
+              piece of work. Swapping the mark now stops the landing page being
+              the one surface still showing the retired dial; it is not an
+              attempt to do the landing redesign early.
+            */}
+            <BrandLockup width={240} />
           </div>
           <h1
             className="text-6xl md:text-[5.25rem] font-bold text-white leading-tight"

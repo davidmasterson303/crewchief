@@ -49,7 +49,7 @@ export function BrandLockup({
   /** The space available. The drawing is chosen from it unless `variant` says otherwise. */
   width?: number;
   /** Force a drawing. Omit and the width decides — which is the safer default. */
-  variant?: 'full' | 'short' | 'icon';
+  variant?: 'full' | 'short' | 'icon' | 'mono';
   /**
    * ⚠ `light` is the only sanctioned substitution: the glow cannot exist on a
    * light ground, so the plate goes hollow and the edge takes cyan-700. Never a
@@ -64,6 +64,47 @@ export function BrandLockup({
   const edge = light ? BRAND_COLOR.light.edge : BRAND_COLOR.edge;
   const ink = light ? BRAND_COLOR.light.name : BRAND_COLOR.name;
   const quiet = light ? BRAND_COLOR.light.quiet : BRAND_COLOR.quiet;
+
+  if (chosen === 'mono') {
+    /*
+      ── The quiet mark ────────────────────────────────────────────────────
+
+      Design ships this as `favicon-mono.svg`: a solid plate in `currentColor`
+      with the W knocked out of it. It is the drawing for places where the mark
+      is furniture rather than the subject — a loading state, an empty panel,
+      a tab bar — and the caller sets the colour by setting `color`.
+
+      ⚠ Its plate is **not** the icon's. At this size the icon's proportions
+      close up and the cut corners stop reading as cuts, so the package carries
+      a second path with a wider bevel. `brand.test.ts` asserts the two differ,
+      which is what stops a later tidy collapsing them into one.
+    */
+    const plate = PLATE.favicon;
+    return (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox={`0 0 ${plate.width} ${plate.height}`}
+        width={width}
+        height={width}
+        role="img"
+        aria-label={BRAND_NAME}
+        className={className}
+      >
+        <path d={plate.path} fill="currentColor" />
+        <text
+          x={plate.width / 2}
+          y={70}
+          textAnchor="middle"
+          fontFamily="var(--font-display), Newsreader, Georgia, serif"
+          fontWeight={600}
+          fontSize={56}
+          fill={BRAND_COLOR.plate}
+        >
+          W
+        </text>
+      </svg>
+    );
+  }
 
   if (chosen === 'icon') {
     const plate = PLATE.icon;

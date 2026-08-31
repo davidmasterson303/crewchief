@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Loader as Loader2, CircleCheck as CheckCircle2, CircleAlert as AlertCircle, X, Upload, Image as ImageIcon } from 'lucide-react';
-import Logo from '@/components/brand/Logo';
+import { BrandWordmark } from '@/components/brand/BrandLockup';
 import { logger } from '@wellkept/core/logger';
 import { queryClient } from '@wellkept/core/query-client';
 import { createVehicle, updateVehiclePowertrain, fetchPowertrainOptions, uploadVehiclePhoto } from '@/app/actions';
@@ -478,7 +478,7 @@ export default function OnboardingWizard({ vehicleData }: OnboardingWizardProps)
       <div className="w-full max-w-2xl">
         <div className="mb-8 text-center">
           <div className="flex items-center justify-center mb-2">
-            <Logo variant="horizontal" size={24} />
+            <BrandWordmark size={28} />
           </div>
           <p className="text-white/50 text-sm">Vehicle Setup</p>
         </div>

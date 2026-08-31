@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Loader as Loader2, ArrowLeft, CircleCheck as CheckCircle2 } from 'lucide-react';
-import Logo from '@/components/brand/Logo';
+import BrandLockup from '@/components/brand/BrandLockup';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -71,7 +71,7 @@ export default function ForgotPasswordPage() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex group mb-6">
-            <Logo variant="stacked" size={60} />
+            <BrandLockup width={200} />
           </Link>
           <h1 className="text-2xl font-bold text-white mb-2">Reset your password</h1>
           <p className="text-white/50 text-sm">Enter your email and we'll send a reset link</p>

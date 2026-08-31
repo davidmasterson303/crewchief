@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, Loader as Loader2 } from 'lucide-react';
-import Logo from '@/components/brand/Logo';
+import BrandLockup from '@/components/brand/BrandLockup';
 import { Button } from '@/components/ui/button';
 import { createBrowserSupabaseClient } from '@/lib/supabase';
 
@@ -132,7 +132,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex group mb-6">
-            <Logo variant="stacked" size={60} />
+            <BrandLockup width={200} />
           </Link>
           <h1 className="text-2xl font-bold text-white mb-2">Welcome back</h1>
           <p className="text-white/50 text-sm">Sign in to access your garage</p>

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
-import Logo from '@/components/brand/Logo';
+import BrandLockup, { BrandWordmark } from '@/components/brand/BrandLockup';
 import { VehicleCard } from '@/components/VehicleCard';
 import GarageDoor, { useIntroRevealed } from '@/components/GarageDoor';
 import LandingHero from '@/components/LandingHero';
@@ -115,7 +115,7 @@ function GarageContents() {
             <div className="flex items-center justify-between">
               <Link href="/" className="flex items-center group">
                 {/* 21px mark — the small cut, switched inside the component. */}
-                <Logo variant="horizontal" size={21} />
+                <BrandWordmark size={28} />
               </Link>
               <PublicNavActions />
             </div>
@@ -227,7 +227,7 @@ function GarageContents() {
               */
               <div className="col-span-full text-center py-20">
                 {/* Resting glyph: mark alone, one colour, --text-muted-40. */}
-                <Logo variant="mark" size={40} mono color="var(--text-muted-40)" className="mx-auto mb-5" />
+                <BrandLockup width={40} variant="mono" className="mx-auto mb-5 text-[var(--text-muted-40)]" />
                 <h2 className="text-xl font-semibold text-white mb-2">
                   Demo vehicles unavailable
                 </h2>
