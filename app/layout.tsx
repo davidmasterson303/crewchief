@@ -61,10 +61,15 @@ export const metadata: Metadata = {
   /*
      The favicon, apple-touch-icon and SVG icon are NOT declared here — they
      are app/favicon.ico, app/icon.svg and app/apple-icon.png, served by the
-     same filename convention as opengraph-image.tsx below. All of them, and
-     the manifest's two PNGs, are generated from the Sweep 1024 master
-     (public/brand/crewchief-icon-1024.svg); regenerate together, never
-     hand-edit one.
+     same filename convention as opengraph-image.tsx below.
+
+     ⚠ **They are no longer generated together, and that is a known gap.**
+     `app/icon.svg` carries the Well Kept plate as of 1 Sep; `favicon.ico`,
+     `apple-icon.png` and the manifest's two PNGs are still the Sweep dial,
+     because regenerating them needs a rasteriser with Newsreader loaded — the
+     outlining step Design's package README describes, which is an export task
+     rather than a code one. A browser showing the plate in its tab and the dial
+     on a pinned shortcut is the visible symptom until that runs.
   */
   manifest: '/manifest.json',
   /*

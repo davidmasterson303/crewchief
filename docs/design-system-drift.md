@@ -737,6 +737,21 @@ Worth recording as a pattern rather than a one-off: Design writes against the
 templates, this repo is the build, and the two have drifted before. A "was →
 is" table in a handoff is describing the template's *was*.
 
+### 7.2a · ✅ Closed 1 Sep — the old lockups are deleted
+
+Design's §7 said to delete rather than edit them, and they are gone:
+`public/brand/crewchief-lockup-horizontal.svg` and `-stacked.svg`, along with
+both `Logo.tsx` files that drew the dial. Nothing references any of them.
+
+⚠ **What is left in `public/brand` is the dial's icon masters** — `favicon`,
+`icon-1024`, `mark`, `mark-small`, `mark-mono` — and they are still the source
+for `app/favicon.ico`, `app/apple-icon.png` and the manifest's two PNGs. Those
+binaries have not been regenerated, because doing it needs a rasteriser with
+Newsreader loaded (the outlining step the package README describes). `app/icon.svg`
+carries the plate as of 1 Sep, so a browser tab shows the new mark while a
+pinned shortcut still shows the dial. That is the visible symptom, and it closes
+when the export runs.
+
 ### 7.6 · The lockup, implemented 30–31 Aug — one departure to bless
 
 The plate is built on both clients from `packages/core/src/brand.ts`, whose

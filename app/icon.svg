@@ -1,10 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Well Kept">
-  <rect width="32" height="32" rx="6" fill="#100F0D"></rect>
-  <g transform="translate(4 4) scale(0.24)" color="#22D3EE">
-  <g fill="none" stroke="currentColor" stroke-linecap="butt">
-    <path d="M50 84 A34 34 0 1 1 84 50" stroke-width="14"></path>
-    <path d="M50 50 L55.9 21.5" stroke-width="12"></path>
-  </g>
-  <circle cx="50" cy="50" r="7" fill="currentColor"></circle>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="32" height="32" role="img" aria-label="Well Kept">
+  <title>Well Kept</title>
+  <!--
+    The tab icon: Design's `favicon-mono` plate, filled rather than tinted so it
+    reads on a light tab strip as well as a dark one.
+
+    ⚠ Its plate is the favicon's, not the app icon's. At this size the icon
+    drawing's proportions close up and the cut corners stop reading as cuts, so
+    the brand package ships a second path with a wider bevel — see
+    `packages/core/src/brand.ts`, where `brand.test.ts` asserts the two differ.
+
+    ⚠ The W is `<text>`, and a rasteriser without Newsreader substitutes
+    Georgia. That is acceptable here and only here: a browser renders this SVG
+    itself, one capital letter is one capital letter at 16px, and the package
+    README's outlining instruction is about the **PNG export set** — which
+    `app/favicon.ico` and `app/apple-icon.png` still need and have not had.
+  -->
+  <path d="M22 10 H78 L90 26 V74 L78 90 H22 L10 74 V26 Z" fill="#F5F3F0"></path>
+  <text x="50" y="70" text-anchor="middle" font-family="Newsreader, Georgia, serif" font-weight="600" font-size="56" fill="#16140F">W</text>
 </svg>
