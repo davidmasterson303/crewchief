@@ -7,6 +7,9 @@
  */
 import { ImageResponse } from 'next/server';
 
+import { BRAND_COLOR, BRAND_NAME, PLATE, RIVETS } from '@wellkept/core/brand';
+import { isDemoSite } from '@/lib/site-role';
+
 /*
  * The share card, generated rather than stored.
  *
@@ -43,7 +46,7 @@ import { ImageResponse } from 'next/server';
  */
 
 export const runtime = 'nodejs';
-export const alt = 'Well Kept — an AI consultant that knows your car';
+export const alt = 'Well Kept — an AI that keeps the record, so the care keeps itself';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
@@ -137,29 +140,83 @@ export default async function OpengraphImage() {
           }}
         />
 
-        {/* Wordmark. The Sweep horizontal lockup at its 46px master size —
-            the same geometry components/brand/Logo.tsx renders in the nav,
-            restated here because Satori renders JSX, not our components.
-            Mark cyan-400, redline #FF4436, name Inter 700 at 32/-0.035em. */}
+        {/*
+          ── The plate, restated because Satori renders JSX and not components ─
+
+          `BrandLockup` cannot be used here: this renders through Satori, which
+          takes a JSX tree rather than a React component tree with our imports.
+          What it *can* share is the numbers — the path, the rivets and the
+          colours come from `@wellkept/core/brand`, so the card cannot drift
+          from the mark the app draws even though the drawing is restated.
+
+          ⚠ The engraved name is set in Satori's default face, not Newsreader.
+          Loading a webfont here means a network fetch inside `next build`, and
+          this build is the promote gate for the hostname the App Store points
+          at — a font CDN having a bad minute would fail a deploy. Design's own
+          README makes the matching point about rasterisers substituting fonts;
+          the honest version at this size is the plate carrying capitals in the
+          face that is actually present.
+        */}
         <div
           style={{
             position: 'absolute',
-            top: 148,
+            top: 132,
             left: 108,
             display: 'flex',
             alignItems: 'center',
           }}
         >
-          <svg width="46" height="46" viewBox="0 0 100 100">
-            <g fill="none" strokeLinecap="butt">
-              <path d="M50 85 A35 35 0 1 1 85 50" stroke="#22D3EE" strokeWidth="10" />
-              <path d="M74.75 25.25 A35 35 0 0 1 85 50" stroke="#FF4436" strokeWidth="10" />
-              <path d="M50 50 L55.21 20.45" stroke="#22D3EE" strokeWidth="8" />
-            </g>
-            <circle cx="50" cy="50" r="5.5" fill="#22D3EE" />
-          </svg>
-          <div style={{ marginLeft: 16, fontSize: 32, fontWeight: 700, color: '#F5F3F0', letterSpacing: '-0.035em' }}>
-            Well Kept
+          {/*
+            ⚠ **The plate is paths and the name is a div**, and that split is
+            not stylistic.
+
+            Satori refuses SVG text outright — *"<text> nodes are not currently
+            supported, please convert them to <path>"* — and the way it refuses
+            is the dangerous part: the route still answers **200 with
+            `content-type: image/png` and a zero-byte body**. A scraper sees a
+            valid response and a broken picture, and nothing in the app looks
+            wrong. Caught by generating the card and measuring it; it would not
+            have shown up in any test that reads source.
+
+            So the plate is drawn as paths, which Satori does support, and the
+            engraved name is a positioned div, which is how the wordmark on
+            this card has always been set.
+          */}
+          <div style={{ position: 'relative', display: 'flex', width: 240, height: 82 }}>
+            <svg width="240" height="82" viewBox={`0 0 ${PLATE.short.width} ${PLATE.short.height}`}>
+              <path
+                d={PLATE.short.path}
+                fill={BRAND_COLOR.plate}
+                stroke={BRAND_COLOR.edge}
+                strokeWidth={2}
+              />
+              {RIVETS.short.map((rivet) => (
+                <circle
+                  key={`${rivet.x}-${rivet.y}`}
+                  cx={rivet.x}
+                  cy={rivet.y}
+                  r={RIVETS.radius}
+                  fill={BRAND_COLOR.rivet}
+                />
+              ))}
+            </svg>
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: 240,
+                height: 82,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 26,
+                letterSpacing: '0.1em',
+                color: BRAND_COLOR.name,
+              }}
+            >
+              {BRAND_NAME.toUpperCase()}
+            </div>
           </div>
         </div>
 
@@ -173,11 +230,24 @@ export default async function OpengraphImage() {
             width: 840,
           }}
         >
-          <div style={{ fontSize: 76, fontWeight: 700, color: '#FFFFFF', letterSpacing: '-0.025em', lineHeight: 1.05 }}>
-            An AI consultant that knows your car
+          <div style={{ fontSize: 68, fontWeight: 700, color: '#FFFFFF', letterSpacing: '-0.025em', lineHeight: 1.08 }}>
+            An AI that keeps the record, so the care keeps itself.
           </div>
+          {/*
+            ⚠ **Per site, and it was not.** This line read "Live demo with
+            sample vehicles — no signup required" on *both* deployments — so the
+            share card for `crewchief.davidmasterson.co`, which is the App Store
+            listing's marketing URL, described the product as a demo.
+
+            `39f7f0b` fixed exactly this on the landing page and `site-role.ts`
+            states the rule — *"the product copy must not describe Well Kept as
+            a demo"* — and the card was missed because it is generated by a
+            convention route rather than rendered inside the app.
+          */}
           <div style={{ marginTop: 26, fontSize: 30, color: 'rgba(255,255,255,0.55)', lineHeight: 1.35 }}>
-            Live demo with sample vehicles — no signup required
+            {isDemoSite(process.env.CREWCHIEF_DEMO_SITE)
+              ? 'Live demo with sample vehicles — no signup required'
+              : 'Every invoice read, every interval anchored.'}
           </div>
         </div>
       </div>

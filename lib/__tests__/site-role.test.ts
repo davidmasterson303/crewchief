@@ -129,6 +129,88 @@ describe('the share card describes the site it is actually on', () => {
     expect(shareDescription(true)).not.toBe(shareDescription(false));
   });
 
+  it('the generated card branches too, and did not', () => {
+    /*
+      ── ⚠ Found 1 Sep, the same defect one surface further out ──────────────
+
+      `app/opengraph-image.tsx` is the share **image**, and its sub-line read
+      *"Live demo with sample vehicles — no signup required"* on **both**
+      deployments. So the picture attached to every share of
+      `crewchief.davidmasterson.co` — the App Store listing's own marketing URL
+      — called the product a demo, in 30px type, while the description tag
+      beside it correctly did not.
+
+      It was missed for the same reason the 20 Aug one was: a convention route
+      generates it outside the app, so nothing that reviews pages reviews it.
+      The assertions above check `shareDescription`; this checks the picture.
+    */
+    const card = readFileSync(
+      join(__dirname, '..', '..', 'app', 'opengraph-image.tsx'),
+      'utf8'
+    );
+
+    // It has to ask which site it is on at all.
+    expect(card).toContain('isDemoSite(process.env.CREWCHIEF_DEMO_SITE)');
+
+    /*
+      ⚠ And it must sit on the **demo** arm. A substring check alone would pass
+      for the version that had the sentence on both sides, which is the bug.
+
+      Comments are stripped first: the paragraph above this assertion quotes
+      the offending line while explaining it, and a scan satisfied by prose is
+      the failure CLAUDE.md §5 records twice over — the same reason the
+      `layout` constant at the top of this file is stripped.
+    */
+    const rendered = card
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .replace(/\{\/\*[\s\S]*?\*\/\}/g, ' ');
+
+    const branch = rendered.slice(rendered.indexOf('isDemoSite(process.env.CREWCHIEF_DEMO_SITE)'));
+    const demoArm = branch.slice(0, branch.indexOf(':'));
+    const productArm = branch.slice(branch.indexOf(':'));
+
+    expect(demoArm.toLowerCase()).toContain('no signup');
+    expect(productArm.toLowerCase()).not.toContain('no signup');
+    expect(productArm.toLowerCase()).not.toContain('demo');
+
+    // Said once, on one arm — not on both, which is what shipped.
+    expect(rendered.match(/no signup required/gi) ?? []).toHaveLength(1);
+  });
+
+  it('draws no SVG text, because Satori answers 200 with an empty PNG', () => {
+    /*
+      ── ⚠ The failure mode, which is the reason this assertion exists ───────
+
+      Satori refuses SVG text — *"<text> nodes are not currently supported,
+      please convert them to <path>"* — and refuses it by **returning HTTP 200
+      with `content-type: image/png` and a zero-byte body**. A scraper gets a
+      valid-looking response and a broken picture; the app looks fine; no
+      source-reading test can tell.
+
+      Caught on 1 Sep by generating the card and measuring it, after a rebrand
+      put the plate's engraved name in an SVG `<text>`. The plate is paths now
+      and the name is a positioned div, which is how the wordmark on this card
+      has always been set.
+
+      ⚠ This does not prove the card renders — only a request can do that, and
+      `npm run dev` plus `curl -o` is the check. What it prevents is the one
+      construct known to produce the silent version.
+    */
+    const card = readFileSync(
+      join(__dirname, '..', '..', 'app', 'opengraph-image.tsx'),
+      'utf8'
+    )
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .replace(/\{\/\*[\s\S]*?\*\/\}/g, ' ');
+
+    expect(card).not.toMatch(/<text[\s>]/);
+
+    // Anti-vacuous: it must still be drawing SVG, or this passes for a card
+    // that lost its mark entirely.
+    expect(card).toMatch(/<svg[\s>]/);
+    expect(card).toMatch(/<path[\s>]/);
+  });
+
   it('is wired into the layout rather than left as a helper nobody calls', () => {
     /*
       The same structural check the masthead needed, and for the same reason:
