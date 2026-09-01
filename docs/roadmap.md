@@ -82,7 +82,7 @@
 > | **2** | ⚠ **Gemini billing → prepay.** Google shows *Action Required*; a lapse stops the advisor, scanning and the dossier — and quietly falsifies the Terms sentence `lib/gemini.ts` now carries the receipt for | **David · 10 min** |
 > | **3** | ⚠ **The bundle id is open again.** Design's second pass said keep `co.davidmasterson.crewchief`; David's 30 Aug §0 lists it as still his, against `com.southmoordigital.wellkept`. ⚠ The two documents also disagree on the prefix — Design writes `co.`, the §0 note `com.` — and the App Store record binds to one permanently | **David · one word** |
 > | **4** | ~~Recalls in the paywall~~ — **settled 30 Aug: recalls are PAID.** Design gated them, reversed to free, and David overruled both. `PaidFeature` carries `recalls`; the test asserts it in the opposite direction and keeps the argument against it visible | closed |
-> | **5** | **Implement the brand package** — vendored at `docs/brand-package/` with its provenance, so it survives a cleared Downloads folder. `BrandLockup` component, the four icon reductions, metadata strings, and the two old lockups deleted rather than edited. ⚠ Outline the type before any PNG export; the SVGs declare Newsreader and a rasteriser substitutes Georgia | Claude Code |
+> | **5** | ✅ **Brand package implemented, 30 Aug–1 Sep.** `BrandLockup` on both clients from one set of constants in `packages/core/src/brand.ts`, asserted against Design's SVGs; every placement swapped; the dial and both old lockups deleted; the share card rebranded. ⛔ **What is left is an export, not code:** `favicon.ico`, `apple-icon.png`, the manifest PNGs and the iOS icon set need a rasteriser with Newsreader loaded, and the iOS set needs the native build | Claude Code · then David |
 > | **6** | E8 — `expo-iap` and the store adapter, then enforce the gate, then the ceilings | Claude Code · costs a build |
 > | 7 | Paywall as the front door; onboarding ends at a purchase | Claude Code · after 6 |
 >
@@ -109,6 +109,11 @@
 >   StoreKit library is installed. Nothing can be bought.
 > - **Seven migrations still pending**, `20260729060000` first — mod details still fail to save.
 > - `verify:mobile` reports PARTIAL: `MOBILE_TEST_TOKEN` expired 2 Aug.
+> - ⚠ **A browser tab shows the new plate; a pinned shortcut still shows the dial.** Not a
+>   bug — `app/icon.svg` is code and the binaries are an export. See drift register §7.2a.
+> - ⚠ **§0's "Inter is still unbundled" is stale.** All five Inter faces and Newsreader load
+>   through `useFonts` from `FONT_ASSETS`; the app is not rendering in San Francisco. Worth
+>   confirming on the phone, but the code says otherwise.
 > - ⚠ **`mobile-native-build-inputs.test.ts` flaked twice on 30 Aug** — failed inside a full
 >   `npm test` run, passed in isolation immediately after, both times. It does real
 >   filesystem work (it walks the repo to check the EAS upload size), so a concurrent
