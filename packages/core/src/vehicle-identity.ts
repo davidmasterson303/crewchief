@@ -105,8 +105,27 @@ export function vehicleField(make: string | null | undefined): VehicleField {
   // border, not as a lit backdrop behind a car.
   const angle = 115 + ((hash >>> 16) % 101);
 
-  const from = `oklch(0.278 ${(0.048 * chromaFactor).toFixed(4)} ${hue})`;
-  const to = `oklch(0.138 ${(0.024 * chromaFactor).toFixed(4)} ${(hue + 22) % 360})`;
+  /*
+    ── ⚠ Chroma cut hard, 3 Sep: 0.048/0.024 → 0.016/0.008 ───────────────────
+
+    The field is a per-make hue so two cars without photographs do not look
+    like the same card. At the old chroma it did more than that: BMW hashes
+    into the violets, and a card with no photo rendered as a **purple wash** —
+    which is the single most recognisably generated look on the web, on the one
+    surface of this product that is pure decoration.
+
+    The hue survives, so the identity function still varies by make and every
+    property this file's suite asserts still holds. What changes is that the
+    variation is now felt as a temperature rather than seen as a colour: at
+    0.016 against a 0.278 lightness the field reads as a lit dark room, which
+    is the aesthetic the rest of the product is built in.
+
+    ⚠ Not zero. Zero would make every unphotographed card identical, which is
+    the thing the hash exists to prevent — and it would also make
+    `isSemanticHue` pointless rather than satisfied.
+  */
+  const from = `oklch(0.278 ${(0.016 * chromaFactor).toFixed(4)} ${hue})`;
+  const to = `oklch(0.138 ${(0.008 * chromaFactor).toFixed(4)} ${(hue + 22) % 360})`;
 
   return {
     hue,
@@ -196,8 +215,9 @@ export function vehicleFieldStops(make: string | null | undefined): VehicleField
   const field = vehicleField(make);
 
   return {
-    from: oklchToHex(0.278, 0.048 * field.chromaFactor, field.hue),
-    to: oklchToHex(0.138, 0.024 * field.chromaFactor, (field.hue + 22) % 360),
+    /* Same stops as `vehicleField`'s gradient — see the chroma note there. */
+    from: oklchToHex(0.278, 0.016 * field.chromaFactor, field.hue),
+    to: oklchToHex(0.138, 0.008 * field.chromaFactor, (field.hue + 22) % 360),
     angle: field.angle,
   };
 }

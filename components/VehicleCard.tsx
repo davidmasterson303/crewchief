@@ -282,12 +282,37 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary, alerts }: V
    * lib/usage-profile.ts. Rendered over the strip when there is one, and in
    * the body when there is not, so a photo-less card still says what the car
    * is for. */
-  const nicknameChip = (
+  /*
+    ── ⚠ A badge every card carries classifies nothing ───────────────────────
+
+    `usageProfileChip` falls back to "Daily Driver" for an unset status, so a
+    garage of cars nobody has categorised printed the same chip three times —
+    decoration wearing a label's clothes. A label earns its place by being
+    absent sometimes.
+
+    So it renders only when the owner has actually said something. The fallback
+    in `usage-profile.ts` stays, because a *set* status must never render blank;
+    what changes is that an unset one is now a reason not to draw a chip rather
+    than a reason to invent one.
+  */
+  /*
+    ⚠ And `daily_driver` is the assumed state, so it earns no chip either.
+
+    Only marking a car unset was not enough: the seeded garage declares all
+    three as daily drivers, so the chip still printed three times and still
+    classified nothing. What a status chip is *for* is the car that is not the
+    ordinary case — the one in storage, the one being sold, the weekend car.
+    Those get a chip; the default does not.
+  */
+  const hasDeclaredStatus =
+    Boolean(displayVehicle.vehicle_status) && displayVehicle.vehicle_status !== 'daily_driver';
+
+  const nicknameChip = hasDeclaredStatus ? (
     <div className={`flex items-center gap-1.5 ${statusInfo.className} border px-2.5 py-1 rounded-full text-xs font-semibold backdrop-blur-sm`}>
       <Tag className="h-3 w-3" />
       {statusInfo.label}
     </div>
-  );
+  ) : null;
 
   return (
     <div className="group card-lift relative border rounded-2xl overflow-hidden bg-[#0f1318]/90 backdrop-blur-sm h-full flex flex-col shadow-lg shadow-black/50 edge-light hover:border-cyan-400/30">
@@ -322,14 +347,28 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary, alerts }: V
           trim={vehicle.trim}
         />
 
-        <div className="above-stretch absolute inset-0 bg-black/50 reveal-on-hover flex items-center justify-center">
+        {/*
+          ── ⚠ Hovering a card says "open", not "manage" ────────────────────
+
+          This dimmed the photograph by 50% and centred a "Change Photo" pill.
+          On a browsing surface the primary hover affordance was therefore an
+          **asset-management** action: the page invites somebody into a dossier
+          and hands them a file picker. It also obscured the one thing the hover
+          should be showing off — the car.
+
+          The control is not lost. It sits at the corner, quiet until hover, so
+          the photograph stays visible and the card's own lift remains the
+          "open me" signal. The dialog below is unchanged, as is the menu that
+          already carries the management actions.
+        */}
+        <div className="above-stretch absolute bottom-2 right-2 reveal-on-hover">
           <button
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowPhotoDialog(true); }}
-            className="tap-target-44 flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full text-white text-xs font-medium transition-all backdrop-blur-sm"
+            className="tap-target-44 flex items-center gap-1.5 px-2.5 py-1.5 bg-black/55 hover:bg-black/75 border border-white/15 rounded-full text-white/80 hover:text-white text-xs font-medium transition-all backdrop-blur-sm"
             aria-label={photoUrl ? 'Change vehicle photo' : 'Add a photo of this car'}
           >
             <Camera className="h-3.5 w-3.5" />
-            {photoUrl ? 'Change Photo' : 'Add Photo'}
+            {photoUrl ? 'Change' : 'Add photo'}
           </button>
         </div>
 
@@ -368,10 +407,31 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary, alerts }: V
         {/* Reading order starts here: score, name, condition, detail. */}
         <div className="flex items-start gap-3">
           <div className="flex-1 min-w-0">
-            <h3 className="text-xl font-bold text-white tracking-tight leading-tight">
+            {/*
+              ── ⚠ The model is the name; the year and make are the eyebrow ──
+
+              This had it the other way round — "2019 BMW" at 20px bold with
+              "M3 · Competition" as grey subtext. Nobody thinks of their car as
+              a 2019 BMW. Worse, on a car with no photograph the plate above
+              prints the model large, so the card contradicted itself: "M3" in
+              the image and "2019 BMW" underneath it.
+
+              The model takes the display serif, which is the same face as the
+              wordmark and the page heading — one type system rather than a
+              serif mark sitting on a sans page.
+            */}
+            <p className="font-mono text-xs uppercase tracking-[0.18em] text-white/55">
               {vehicle.year} {vehicle.make}
+            </p>
+            <h3
+              className="text-[26px] text-white tracking-tight leading-none mt-1"
+              style={{ fontFamily: 'var(--font-display), Newsreader, Georgia, serif', fontWeight: 500 }}
+            >
+              {vehicle.model}
             </h3>
-            <p className="text-sm text-white/50 mt-0.5">{vehicle.model}{vehicle.trim ? ` · ${vehicle.trim}` : ''}</p>
+            {vehicle.trim ? (
+              <p className="text-[13px] text-white/55 mt-1">{vehicle.trim}</p>
+            ) : null}
 
             {/*
               The chip used to be repeated here when there was no photograph,
@@ -396,8 +456,12 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary, alerts }: V
             <div className="meta-row above-stretch relative mt-3 flex items-center gap-1.5">
               <Gauge className="h-3 w-3 text-white/40 flex-shrink-0" />
               <span className="text-[13px] text-secondary-foreground">
+                {/*
+                  ⚠ "67,400 mi mileage" — the unit and the word, together, on
+                  every card. It is "67,400 mi" or "Mileage 67,400", never both.
+                */}
                 <span className="num font-semibold">{displayVehicle.current_mileage.toLocaleString()}</span>
-                <span className="text-muted-foreground font-normal"> mi mileage</span>
+                <span className="text-muted-foreground font-normal"> mi</span>
               </span>
               <button
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowMileageDialog(true); }}
@@ -501,13 +565,24 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary, alerts }: V
 
         {/* mt-auto, so CTAs align across a row of unequal-height cards. The
             grid must stay align-items: stretch for this to hold. */}
+        {/*
+          ── ⚠ The whole card is the link, so the label was saying it twice ───
+
+          `stretch-link` makes this anchor cover the card, which is correct —
+          and it also meant a centred "View Dashboard →" repeated identically on
+          every card, the weakest possible treatment of the page's only action.
+          Three of them in a row read as a template.
+
+          The anchor stays and keeps its stretch, its focus ring and its
+          accessible name; what goes is the visible row. The affordance is the
+          card lifting and its edge lighting on hover, which this component
+          already does.
+        */}
         <Link
           href={`/dashboard/${vehicle.id}`}
-          className="stretch-link group/cta mt-auto flex items-center justify-center gap-1.5 w-full h-11 rounded-xl text-sm font-semibold text-info hover:text-info-strong transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
-        >
-          View Dashboard
-          <ArrowRight className="h-4 w-4 transition-transform group-hover/cta:translate-x-0.5" />
-        </Link>
+          aria-label={`Open ${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+          className="stretch-link absolute inset-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
+        />
       </div>
 
       <Dialog open={showMileageDialog} onOpenChange={setShowMileageDialog}>

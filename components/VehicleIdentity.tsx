@@ -204,7 +204,17 @@ export function VehicleIdentity({
         background: field.gradient,
         ...(isBand
           ? { height: `${height}px`, borderBottom: '1px solid rgb(255 255 255 / 0.08)' }
-          : { aspectRatio: '3 / 2' }),
+          /*
+            ⚠ 4:3, not 3:2 — widened 3 Sep.
+
+            The photograph is the content on a garage page, and at 3:2 a row of
+            three cards occupied barely half a tall viewport while the bottom
+            was empty gradient. Taller plates give the collection the scale the
+            page was leaving on the floor, and they crop these particular
+            photographs better: all three are three-quarter views where the
+            interest is the body, not the ground in front of it.
+          */
+          : { aspectRatio: '4 / 3' }),
       }}
       data-variant={variant}
       data-has-photo={src ? 'true' : 'false'}
@@ -350,34 +360,53 @@ export function VehicleIdentity({
             className="absolute pointer-events-none text-white"
             strokeWidth={0.55}
             style={{
-              width: isBand ? 230 : 150,
-              height: isBand ? 230 : 150,
-              right: isBand ? -28 : -18,
-              bottom: isBand ? -46 : -30,
-              opacity: 0.11,
+              /*
+                ⚠ Larger and quieter on the card, 3 Sep. At 150px/0.11 against
+                a now much darker field it read as a clip-art car sitting in the
+                corner — a picture of a car standing in for a picture of a car.
+                Scaled up and dropped to 0.055 it is what it claims to be in the
+                note above: texture, a shape the light catches, not an
+                illustration somebody is meant to look at.
+              */
+              width: isBand ? 230 : 260,
+              height: isBand ? 230 : 260,
+              right: isBand ? -28 : -54,
+              bottom: isBand ? -46 : -64,
+              opacity: isBand ? 0.11 : 0.055,
             }}
           />
 
-          <div
-            className={`absolute left-0 right-0 bottom-0 ${isBand ? 'p-8' : 'p-5'}`}
-          >
-            {model && (
-              <p
-                className="display-serif text-white tracking-tight leading-none truncate"
-                style={{ fontSize: isBand ? '2.25rem' : '1.5rem' }}
-              >
-                {model}
-              </p>
-            )}
-            {subtitle && (
-              <p
-                className="text-white/55 mt-1.5 truncate"
-                style={{ fontSize: '12.5px' }}
-              >
-                {subtitle}
-              </p>
-            )}
-          </div>
+          {/*
+            ── ⚠ The band names the car; the card does not ──────────────────
+
+            This printed the model and the year/make/trim on the plate for both
+            variants. On the **band** that is right — it is a hero with no name
+            beneath it. On the **card** the name is directly below, so an
+            unphotographed car said "M3 / 2019 BMW · Competition" twice in
+            sixty vertical pixels, and the two copies did not even agree about
+            which line was the heading.
+
+            So the plate stays a plate on a card. What fills it is the field and
+            the glyph, which is what a plate with nothing to photograph should
+            look like.
+          */}
+          {isBand && (
+            <div className="absolute left-0 right-0 bottom-0 p-8">
+              {model && (
+                <p
+                  className="display-serif text-white tracking-tight leading-none truncate"
+                  style={{ fontSize: '2.25rem' }}
+                >
+                  {model}
+                </p>
+              )}
+              {subtitle && (
+                <p className="text-white/55 mt-1.5 truncate" style={{ fontSize: '12.5px' }}>
+                  {subtitle}
+                </p>
+              )}
+            </div>
+          )}
 
           <div
             aria-hidden="true"

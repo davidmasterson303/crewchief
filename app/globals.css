@@ -773,7 +773,12 @@ nav {
    * light only, which is the right reading for a screen whose whole job is
    * one form. */
   .service-bay-dim {
-    --bay-led: 0.4;
+    /*
+      ⚠ `--bay-led` 0.4 → 0.22 on 3 Sep. At 0.4 the ceiling wash still read as a
+      coloured bloom in a screenshot rather than as light falling on a surface,
+      which is the difference the whole `.service-bay` docblock is about.
+    */
+    --bay-led: 0.22;
     --bay-vignette: 0.55;
   }
 
@@ -816,7 +821,25 @@ nav {
       rgb(34 211 238 / 0.55) 86%,
       transparent 100%
     );
-    box-shadow: 0 0 18px 2px rgb(34 211 238 / 0.28), 0 0 70px 16px rgb(34 211 238 / 0.08);
+    /*
+      ── ⚠ Bloom cut hard, 3 Sep — the halo was doing no work ────────────────
+
+      This was `0 0 18px 2px / 0.28` plus a `70px 16px / 0.08` outer halo, and
+      the second one threw a soft cyan wash a third of the way down the page. A
+      design critique of the rendered result named it and the background seams
+      as the two most obviously generated elements on the page — a glow that
+      touches nothing interactive, in a product whose only accent colour should
+      mean *status*.
+
+      The **line stays**: it is the fixture the room is lit by, and 2b's
+      "ambient hairline on the nav bottom edge" is the concept it collapses. The
+      halo around it does not. 8px at 0.16 keeps the sense of a lit edge and
+      stops it being a bloom.
+
+      ⚠ Logged in `docs/design-system-drift.md` §8 rather than changed quietly:
+      the batten is a v8 element and its intensity is Design's to set.
+    */
+    box-shadow: 0 0 8px 0 rgb(34 211 238 / 0.16);
   }
 
   /* The signature photography treatment, as one class.

@@ -22,16 +22,39 @@ function plate(container: HTMLElement): HTMLElement {
 }
 
 describe('the no-photo state, which is the primary design', () => {
-  it('renders the plate with the vehicle named, and no <img> at all', () => {
+  it('renders the plate with no <img> at all', () => {
     const { container } = render(<VehicleIdentity variant="card" {...M235i} />);
 
     expect(plate(container).dataset.hasPhoto).toBe('false');
-    expect(screen.getByText('M235i')).toBeInTheDocument();
-    expect(screen.getByText('2015 BMW · Base')).toBeInTheDocument();
 
     // The bug this whole component replaces: a fallback <img> pointing at a
     // path that 404s. There must be no image element on the no-photo path.
     expect(container.querySelectorAll('img').length).toBe(0);
+  });
+
+  it('names the car on the band and leaves the card to its caller', () => {
+    /*
+      ⚠ Changed 3 Sep, and the split is the point.
+
+      Both variants used to print the model and the year/make/trim on the
+      plate. On the **band** that is right — it is a hero with no name beneath
+      it. On the **card** the caller puts the name directly below, so an
+      unphotographed car said "M235i / 2015 BMW · Base" twice inside sixty
+      vertical pixels, and the two copies disagreed about which line was the
+      heading.
+
+      Asserted as a pair rather than by deleting the old case: "the card does
+      not name it" is only safe while something else does, and `VehicleCard` is
+      the only `variant="card"` caller in the tree.
+    */
+    const { container: band } = render(
+      <VehicleIdentity variant="band" height={320} {...M235i} />
+    );
+    expect(band.textContent).toContain('M235i');
+    expect(band.textContent).toContain('2015 BMW · Base');
+
+    const { container: card } = render(<VehicleIdentity variant="card" {...M235i} />);
+    expect(card.textContent).not.toContain('M235i');
   });
 
   it('paints the make-derived field', () => {
@@ -49,7 +72,8 @@ describe('the no-photo state, which is the primary design', () => {
   });
 
   it('omits the separator when there is nothing on both sides of it', () => {
-    render(<VehicleIdentity variant="card" make="Honda" model="Civic" />);
+    // On the band, which is the variant that still sets this type.
+    render(<VehicleIdentity variant="band" height={320} make="Honda" model="Civic" />);
     expect(screen.getByText('Honda')).toBeInTheDocument();
     expect(screen.queryByText(/·/)).not.toBeInTheDocument();
   });
@@ -142,7 +166,19 @@ describe('one answer to "what does a vehicle look like"', () => {
     expect(plate(band).style.height).toBe('320px');
 
     const { container: card } = render(<VehicleIdentity variant="card" {...M235i} />);
-    // 3:2, so a photo swapped in cannot change the card's height.
-    expect(plate(card).style.aspectRatio.replace(/\s/g, '')).toBe('3/2');
+    /*
+      ⚠ Widened 3 Sep, 3:2 → 4:3, and the pin moved with it deliberately.
+
+      What this assertion is actually protecting is that the plate has a
+      *fixed* ratio at all — a photo swapped in must not change the card's
+      height, or a row of cards reflows as images arrive. The particular ratio
+      is a design decision, and it changed because the photography was carrying
+      too little of a garage page.
+
+      So the pin stays exact rather than becoming a range: a ratio that drifts
+      by accident is the thing worth catching, and an exact figure makes every
+      change to it a line somebody wrote on purpose.
+    */
+    expect(plate(card).style.aspectRatio.replace(/\s/g, '')).toBe('4/3');
   });
 });

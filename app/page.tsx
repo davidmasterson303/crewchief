@@ -10,6 +10,7 @@ import LandingHero from '@/components/LandingHero';
 import { AppStoreCTA } from '@/components/AppStoreCTA';
 import { useAuth } from '@/components/AuthProvider';
 import { useDemoVehicles, type GarageVehicle } from '@/hooks/useVehicles';
+import { firstEmbed } from '@wellkept/core/vehicle-embed';
 
 function VehicleCardSkeleton() {
   return (
@@ -107,7 +108,24 @@ function GarageContents() {
         vignette layer also makes the separate `.vignette-frame` overlay
         redundant, so two fixed divs collapse into one.
       */}
-      <div className="fixed inset-0 z-0 service-bay" aria-hidden="true" />
+      {/*
+        ── ⚠ `service-bay-dim`, 3 Sep — the room, turned down ────────────────
+
+        At full `--bay-led` the ceiling wash and the vertical wall seams were
+        legible as *effects* rather than as light: a design critique of the
+        rendered page named the cyan bloom and the ghosted gridlines as the two
+        most obviously generated things on it, on a page whose whole argument is
+        restraint.
+
+        The room stays — it is v8 §3 and it is the reason this does not look
+        like a dark web page — but at the dim variant the fixture reads as a lit
+        edge instead of a glow, and the seams drop to the threshold where they
+        are texture rather than a grid. One class, using the knob the design
+        system already provides, rather than deleting a documented element.
+
+        Logged in `docs/design-system-drift.md` §8.
+      */}
+      <div className="fixed inset-0 z-0 service-bay service-bay-dim" aria-hidden="true" />
 
       <div className="relative z-10">
         <nav className="relative bay-batten border-b border-white/8 bg-black/80 backdrop-blur-xl">
@@ -142,7 +160,22 @@ function GarageContents() {
                 on a page whose audience is people paid to look closely. What is
                 genuinely real is the research, so the claim moved onto that.
               */}
-              <h1 className="text-4xl lg:text-5xl font-bold text-white mb-2 tracking-tight">
+              {/*
+                ── The serif belongs on the page, not only in the masthead ────
+
+                The wordmark is Newsreader small caps and everything under it
+                was geometric sans, so the mark read as pasted on from another
+                brand. One type system: the headline takes the display face the
+                lockup is set in, which is what makes the page and the mark look
+                like the same object.
+              */}
+              <p className="font-mono text-xs uppercase tracking-[0.22em] text-white/55 mb-3">
+                Three cars, researched end to end
+              </p>
+              <h1
+                className="text-5xl lg:text-6xl text-white mb-3 tracking-tight"
+                style={{ fontFamily: 'var(--font-display), Newsreader, Georgia, serif', fontWeight: 500 }}
+              >
                 A Live Garage
               </h1>
               {/*
@@ -158,14 +191,21 @@ function GarageContents() {
                 does not otherwise want. The demo host still says what it is —
                 loudly, in the masthead above.
               */}
-              <p className="text-base text-white/50">
+              {/*
+                ⚠ The subhead used to narrate the page — *"Three cars,
+                researched end to end — open any one for its dossier"* — which
+                is a caption about the demo rather than a sentence to an owner.
+                The count moved to the eyebrow above, where a label belongs, and
+                this says what the product does with them.
+              */}
+              <p className="text-base text-white/55 max-w-xl">
                 {isLoading
                   ? 'Loading…'
                   : queryError
                   ? 'Unable to load vehicles'
                   : vehicles.length === 0
                   ? 'Vehicles unavailable'
-                  : 'Three cars, researched end to end — open any one for its dossier'}
+                  : 'Every invoice read, every interval anchored. Open one for its dossier.'}
               </p>
             </div>
           </div>
@@ -212,8 +252,8 @@ function GarageContents() {
                 >
                   <VehicleCard
                     vehicle={vehicle}
-                    activeRecalls={vehicle.nhtsa_data?.[0]?.recalls?.length || 0}
-                    healthSummary={vehicle.vehicle_health_summary?.[0]}
+                    activeRecalls={firstEmbed(vehicle.nhtsa_data)?.recalls?.length || 0}
+                    healthSummary={firstEmbed(vehicle.vehicle_health_summary)}
                   />
                 </div>
               ))
@@ -244,6 +284,33 @@ function GarageContents() {
               </div>
             )}
           </div>
+
+          {/*
+            ── ⚠ The page used to stop, not end ─────────────────────────────
+
+            `min-h-screen` on the wrapper against three cards of content left
+            the bottom of a tall viewport as undifferentiated gradient — no
+            footer, no ground, no closure, so it read as a document that had
+            not finished loading rather than as composed space.
+
+            A rule and one line of type is enough to close it, and the line is
+            load-bearing rather than filler: it says what the demo is, which is
+            the sentence the masthead carries on the demo host and which the
+            product host has nowhere else to put. `min-w-0` so the row can
+            shrink; the two halves stack on a phone.
+          */}
+          <footer className="mt-16 border-t border-white/8 pt-6">
+            {/*
+              ⚠ A colophon, not a second subhead. This read "Every car here has
+              been researched end to end — issues, schedule and open recalls",
+              which restated the hero line within the same single screen. On a
+              one-viewport page that is filler; the footer closes the page and
+              the hero is trusted to have said it.
+            */}
+            <p className="font-mono text-xs uppercase tracking-[0.18em] text-white/55">
+              Well Kept — Southmoor Digital
+            </p>
+          </footer>
         </main>
       </div>
     </div>

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { firstEmbed } from '@wellkept/core/vehicle-embed';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import BrandLockup, { BrandWordmark } from '@/components/brand/BrandLockup';
@@ -138,8 +139,8 @@ export default function GaragePage() {
               <RevealOnScroll key={vehicle.id} index={i} className="h-full">
                 <VehicleCard
                   vehicle={vehicle}
-                  activeRecalls={vehicle.nhtsa_data?.[0]?.recalls?.length || 0}
-                  healthSummary={vehicle.vehicle_health_summary?.[0]}
+                  activeRecalls={firstEmbed(vehicle.nhtsa_data)?.recalls?.length || 0}
+                  healthSummary={firstEmbed(vehicle.vehicle_health_summary)}
                 />
               </RevealOnScroll>
             ))}
