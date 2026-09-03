@@ -103,12 +103,57 @@ describe('the photo state', () => {
     expect(screen.queryByText('M235i')).not.toBeInTheDocument();
     expect(screen.queryByText('2015 BMW · Base')).not.toBeInTheDocument();
 
+    /*
+      ── ⚠ Narrowed 3 Sep, and the narrowing is a declared deviation ──────────
+
+      This asserted the component carried exactly one filter — the blurred
+      backdrop copy — on the reasoning that "anything else is a treatment
+      applied to the sharp photograph".
+
+      The rule that reasoning serves is the header's: **nothing is printed over
+      a photograph**. Its evidence is a hero that composited six layers and let
+      ~1.7% of each 700 KB photograph do any visual work. That is about tints,
+      scrims and vignettes — things that obscure — and it is still enforced
+      below.
+
+      A colour grade is not that. It hides nothing; it makes owner photographs
+      taken at different times of day read as one set. Four independent design
+      critiques of the rendered garage named the temperature clash — a
+      golden-hour Accord beside a cold industrial WRX — as the largest single
+      gap, every time.
+
+      So the list is exact rather than open: the blur, and one named grade. A
+      third filter, or a different grade, still fails. Logged for Design in
+      `docs/design-system-drift.md` §9, because the no-treatment rule is theirs
+      and this narrows it.
+    */
     const filters = Array.from(container.querySelectorAll<HTMLElement>('*'))
       .map((el) => el.style.filter)
       .filter(Boolean);
-    // The only filter in the component is the blurred backdrop copy. Anything
-    // else is a treatment applied to the sharp photograph.
-    expect(filters).toEqual(['blur(34px) saturate(.8) brightness(.52)']);
+
+    expect(filters).toEqual([
+      'blur(34px) saturate(.8) brightness(.52)',
+      'saturate(0.55) brightness(0.92) contrast(1.06) hue-rotate(-4deg)',
+    ]);
+
+    /*
+      ⚠ The half that has not moved — and writing it down found that the
+      header overstates it.
+
+      "Nothing is printed over a photograph" is the rule, and the component in
+      fact composites one layer over it: `.machined`, the falloff the v8 spec
+      asks for. That is sanctioned and long-standing; what the rule is really
+      against is the *stack* the old hero had — tint plus scrim plus vignette,
+      six layers deep, passing 1.7% of the image.
+
+      So this asserts the shape the rule actually protects: the machined falloff
+      and nothing else on top. A scrim or a tint reappearing fails here.
+    */
+    const overlays = Array.from(
+      container.querySelectorAll<HTMLElement>('.machined, .scrim-bottom, .vignette-frame')
+    ).map((el) => el.className);
+
+    expect(overlays).toEqual(['absolute inset-0 pointer-events-none machined']);
   });
 
   it('falls back to the plate when the photo fails to load', () => {

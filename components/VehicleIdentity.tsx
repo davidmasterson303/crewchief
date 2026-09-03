@@ -259,14 +259,41 @@ export function VehicleIdentity({
               transition: 'opacity 200ms ease-out',
             }}
           />
-          {/* The sharp copy. Contained — the whole vehicle, always. */}
+          {/*
+            The sharp copy. Contained — the whole vehicle, always.
+
+            ── ⚠ One grade, so three photographs read as one collection ───────
+
+            Owner photographs arrive at whatever temperature they were taken at,
+            and the seeded garage shows the problem plainly: a golden-hour amber
+            Accord beside a cold industrial-dock WRX. Four separate design
+            critiques of the rendered page named it every time — three colour
+            temperatures on one shelf reads as a scrapbook, which is the
+            opposite of an archive.
+
+            A studio grades the set. This is that, as one filter: pull most of
+            the colour out, cool what is left, and drop the brightness a touch so
+            the plates sit *in* the near-black page rather than glowing off it.
+
+            ⚠ Deliberately not a duotone. A hard two-tone map would make every
+            car the same object and throw away the one thing a photograph is
+            for — this is the owner's actual car. Desaturating to 55% keeps it
+            recognisably theirs while ending the temperature clash.
+
+            The blurred fill underneath already carries `saturate(.8)
+            brightness(.52)`; this is the same idea applied to the layer people
+            actually look at.
+          */}
           <div
             className="absolute inset-0 photo-layer"
+            data-graded="true"
             style={{
               ...photoLayerVars(src, formats),
               backgroundSize: 'contain',
               backgroundPosition: 'center',
               backgroundRepeat: 'no-repeat',
+              /* The grade. See the note above — one treatment for the set. */
+              filter: 'saturate(0.55) brightness(0.92) contrast(1.06) hue-rotate(-4deg)',
               opacity: photoReady ? 1 : 0,
               transition: 'opacity 200ms ease-out',
             }}

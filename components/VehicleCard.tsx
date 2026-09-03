@@ -393,18 +393,31 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary, alerts }: V
       */}
       {resolvedAlerts.length > 0 && (
         <div
-          className="absolute inset-x-0 bottom-0 flex items-center gap-1.5 px-4 py-[7px] text-xs font-semibold border-t backdrop-blur-sm"
+          /*
+            ── ⚠ The most urgent fact was the lowest-contrast thing on the card ─
+
+            The wash tokens are built to sit *behind body text on a page*, and
+            over a photograph they rendered as a murky smear — a critique of the
+            rendered page called it a rendering artifact. A recall is the single
+            most important thing a garage can tell somebody, and it was styled
+            like a scanline.
+
+            Solid ink on a near-opaque ground now, at `uiStrong` weight rather
+            than 9px. Still the same red family, still on the plate's edge, but
+            it reads as a statement instead of a stain.
+          */
+          className="absolute inset-x-0 bottom-0 flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider border-t"
           style={
             ribbonCritical
               ? {
-                  color: 'var(--critical-red)',
-                  background: 'var(--critical-red-wash)',
-                  borderColor: 'var(--critical-red-border)',
+                  color: '#0b0a09',
+                  background: 'rgb(224 136 130 / 0.92)',
+                  borderColor: 'rgb(224 136 130)',
                 }
               : {
-                  color: 'var(--attention-amber)',
-                  background: 'var(--attention-amber-wash)',
-                  borderColor: 'var(--attention-amber-border)',
+                  color: '#0b0a09',
+                  background: 'rgb(224 164 104 / 0.92)',
+                  borderColor: 'rgb(224 164 104)',
                 }
           }
         >

@@ -779,3 +779,64 @@ face comes out of a package already installed.
 
 ⚠ **Not yet done, and both need the native build:** the app icon set and the
 iOS display name. `app.json` names them; Metro cannot move either.
+
+---
+
+## 9. The garage's look, reworked against a design critic — 3 Sep
+
+David asked for the site's look and feel to be raised page by page, judged by an
+independent critic that sees only a screenshot. Four rounds on the landing
+garage so far: **4 → 6 → 5 → 6**. The dip is the loop working — fixing the data
+defect made three new problems visible that a blank card had been hiding.
+
+Most of what changed is ordinary craft and needs nothing from Design. **Three
+items touch the design system and are Design's to bless or overrule.**
+
+### 9.1 · ⚠ The sharp photograph is now graded
+
+`VehicleIdentity`'s header states *"nothing is printed over a photograph — no
+tint, no scrim, no vignette"*, and `vehicle-identity-component.test.ts` enforced
+it as *exactly one filter in the component*.
+
+**A colour grade is now applied to the sharp layer:** `saturate(0.55)
+brightness(0.92) contrast(1.06) hue-rotate(-4deg)`.
+
+The rule's stated evidence is a hero that composited six layers and let ~1.7% of
+each 700 KB photograph do any visual work — that is about **obscuring**, and it
+is still enforced. A grade hides nothing. What it fixes is the thing every one
+of the four critiques named first: owner photographs arrive at whatever
+temperature they were taken at, and a golden-hour Accord beside a cold
+industrial-dock WRX reads as a scrapbook rather than a collection.
+
+Deliberately **not a duotone** — that would make every car the same object and
+throw away the one thing a photograph is for. The guard now pins the exact
+filter list, so a third treatment or a different grade still fails.
+
+⚠ Writing that assertion found the header **overstates its own rule**: the
+component already composites `.machined` over the photograph. That is sanctioned
+and long-standing; the sentence is simply absolute where the practice is not.
+
+### 9.2 · ⚠ The batten's bloom is cut and the room runs dim
+
+`.bay-batten`'s outer halo (`70px 16px`) threw cyan a third of the way down the
+page; two critiques named it and the wall seams as the most obviously generated
+elements on screen. The **line stays** — it is the fixture, and 2b's ambient
+hairline collapses into it — the halo does not, and the landing page runs
+`.service-bay-dim`, whose `--bay-led` also drops 0.4 → 0.22.
+
+### 9.3 · ⚠ The identity field's chroma is cut by two thirds
+
+`0.048/0.024` → `0.016/0.008`. BMW hashes into the violets, so an unphotographed
+card rendered as a **purple wash** — the single most recognisably generated look
+on the web, on the one surface of this product that is pure decoration. The hue
+survives, so cards still differ by make; it now reads as a lit dark room.
+
+### Not design-system changes, listed so Design can see the whole pass
+
+Model as the card's name with year/make as the eyebrow · "67,400 mi mileage" →
+"67,400 mi" · the "Daily Driver" chip only for a declared, non-default status ·
+the repeated "View Dashboard" row dropped (the card was already a stretch-link)
+· the recall ribbon welded to the plate's edge so it stops breaking the grid's
+horizontal registers · summaries cut to a whole first sentence instead of a
+ragged clamp · garage ordered by attention · the empty plate designed as a plate
+rather than a clip-art car · a fleet readout in the hero's dead space.

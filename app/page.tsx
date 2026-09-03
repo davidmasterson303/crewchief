@@ -12,6 +12,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { useDemoVehicles, type GarageVehicle } from '@/hooks/useVehicles';
 import { firstEmbed } from '@wellkept/core/vehicle-embed';
 import { byAttention } from '@wellkept/core/garage-order';
+import { fleetSummary } from '@wellkept/core/fleet-summary';
 
 function VehicleCardSkeleton() {
   return (
@@ -95,6 +96,7 @@ function PublicNavActions() {
  */
 function GarageContents() {
   const { data: vehicles = [], isLoading, error: queryError } = useDemoVehicles();
+  const fleet = fleetSummary(vehicles);
   const revealed = useIntroRevealed();
 
   return (
@@ -208,6 +210,59 @@ function GarageContents() {
                   ? 'Vehicles unavailable'
                   : 'Every invoice read, every interval anchored. Open one for its dossier.'}
               </p>
+
+              {/*
+                ── The live part of "A Live Garage" ──────────────────────────
+
+                The headline sat in the left third of a 1440 viewport with the
+                rest empty, on a page whose title claims to be live. This is the
+                fact the claim rests on, in the space that was doing nothing.
+
+                ⚠ Three rules it follows, all of them this codebase's standing
+                ones. The average is over **scored** cars and says how many
+                those are, so a garage where one car has never been assessed
+                does not present an average of two as an average of three. It
+                renders nothing at all rather than a zero when nothing is
+                scored. And it states a recall count only when there is one —
+                **there is no all-clear here**, because a count of zero may mean
+                the lookup never ran (§10), and `recallsWereChecked` is the only
+                place that question is answered.
+              */}
+              {!isLoading && !queryError && fleet.count > 0 && (
+                <dl className="mt-7 flex flex-wrap items-baseline gap-x-10 gap-y-3">
+                  <div>
+                    <dt className="font-mono text-xs uppercase tracking-[0.18em] text-white/55">
+                      In the garage
+                    </dt>
+                    <dd className="num mt-1 text-2xl text-white tabular-nums">{fleet.count}</dd>
+                  </div>
+
+                  {fleet.averageScore !== null && (
+                    <div>
+                      <dt className="font-mono text-xs uppercase tracking-[0.18em] text-white/55">
+                        Average health{fleet.scored < fleet.count ? ` · ${fleet.scored} of ${fleet.count}` : ''}
+                      </dt>
+                      <dd className="num mt-1 text-2xl text-white tabular-nums">
+                        {fleet.averageScore}
+                      </dd>
+                    </div>
+                  )}
+
+                  {fleet.openRecalls > 0 && (
+                    <div>
+                      <dt className="font-mono text-xs uppercase tracking-[0.18em] text-white/55">
+                        Open recalls
+                      </dt>
+                      <dd
+                        className="num mt-1 text-2xl tabular-nums"
+                        style={{ color: 'rgb(224 136 130)' }}
+                      >
+                        {fleet.openRecalls}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+              )}
             </div>
           </div>
 
