@@ -51,7 +51,7 @@ import {
 } from '@wellkept/core/storage-paths';
 import { parseWishlistCommands, parsePerformanceCommands, parseStatusCommands, parseInvoiceFlag } from '@wellkept/core/consultant-commands';
 import { parseEstimate } from '@wellkept/core/consultant-estimate';
-import { validateData, vehicleIdSchema, serviceItemSchema, maintenanceLineItemSchema, quoteRequestSchema } from '@wellkept/core/validation';
+import { ALLOWED_IMAGE_TYPES, validateData, vehicleIdSchema, serviceItemSchema, maintenanceLineItemSchema, quoteRequestSchema } from '@wellkept/core/validation';
 import { withRetry } from '@wellkept/core/retry';
 import type { Vehicle, ServiceItem, MaintenanceLineItem, KnowledgeBase, ApiResponse, ConsultantContext } from '@wellkept/core/types';
 import { z } from 'zod';
@@ -4314,6 +4314,38 @@ export async function uploadVehiclePhoto(formData: FormData) {
     const access = await authorizeVehicleAccess(vehicleId, { intent: 'write' });
     if (!access.ok) {
       return { success: false, error: access.error };
+    }
+
+    /*
+      ── ⚠ SEC-16 · the allowlist belongs here, not only in the route ────────
+
+      `app/api/v1/upload-photo` checks this and **this action did not**, while
+      being independently reachable: `'use server'` makes every export a public
+      POST endpoint, and `VehiclePhotoDialog` imports this one directly, so its
+      action id ships to the browser. The guard lived in the wrapper rather than
+      at the privileged call — the exact split `lib/actions/wishlist.ts` warns
+      about.
+
+      What it allowed: a signed-in owner posting an HTML payload with
+      `file.type = 'text/html'`. Nothing below inspects the type, and both the
+      `Blob` and the `upload()` call take it verbatim — so the object is stored
+      and later served through a signed URL as `Content-Type: text/html`. That
+      is stored XSS on the Supabase storage origin, and a permanently broken
+      hero on the owner's own card. The storage origin is not the app's, which
+      bounds it; it does not make it fine.
+
+      Same constant as the route, deliberately. Two allowlists is how one of
+      them ends up shorter.
+
+      Checked after authorization, for the reason the size check below is: a
+      refusal on content would tell an unauthorized caller their request
+      reached something.
+    */
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      return {
+        success: false,
+        error: 'That file type cannot be used as a photo. Choose a JPEG, PNG or WebP.',
+      };
     }
 
     /*

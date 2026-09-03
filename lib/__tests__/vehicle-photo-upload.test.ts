@@ -135,6 +135,62 @@ const photo = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
+describe('the action carries the same allowlist as the route — SEC-16', () => {
+  /*
+    ── ⚠ The guard was in the wrapper, not at the privileged call ────────────
+
+    `'use server'` makes every export in `app/actions.ts` a public POST
+    endpoint, and `uploadVehiclePhoto` is imported by a client component — so
+    its action id ships to the browser and it is reachable **without going
+    through the route that validated the file type**.
+
+    The action checked authorization and size and nothing else, and both the
+    `Blob` and the `upload()` call take `file.type` verbatim. A signed-in owner
+    posting an HTML payload with `file.type = 'text/html'` had it stored and
+    later served through a signed URL as `Content-Type: text/html` — stored XSS
+    on the storage origin, and a permanently broken hero on their own card.
+
+    Source-read for the same reason the route half above is: running the action
+    needs a live Supabase, a session and a bucket, and what regressed is which
+    checks exist and in what order — which is on disk.
+  */
+  const action = code(readFileSync(join(ROOT, 'app', 'actions.ts'), 'utf8'));
+  const upload = action.slice(action.indexOf('export async function uploadVehiclePhoto'));
+  const body = upload.slice(0, upload.indexOf('export async function removeVehiclePhoto'));
+
+  it('refuses a type the route would have refused', () => {
+    expect(body).toMatch(/ALLOWED_IMAGE_TYPES\.includes\(file\.type\)/);
+  });
+
+  it('uses the shared constant rather than a second list', () => {
+    /*
+      Two allowlists is how one of them ends up shorter. The route imports the
+      same symbol; a literal array here would pass the case above and drift the
+      first time either is edited.
+    */
+    expect(body).not.toMatch(/\['image\/jpeg'/);
+    expect(action).toMatch(/import \{[^}]*ALLOWED_IMAGE_TYPES[^}]*\} from '@wellkept\/core\/validation'/);
+  });
+
+  it('checks it after authorization, not before', () => {
+    // Refusing on content tells an unauthorized caller their request reached
+    // something. Same ordering the route is held to above.
+    expect(body.indexOf('authorizeVehicleAccess')).toBeLessThan(
+      body.indexOf('ALLOWED_IMAGE_TYPES')
+    );
+  });
+
+  it('still hands the stored object a caller-supplied content type', () => {
+    /*
+      ⚠ Not a regression — a bound. The allowlist is what makes `file.type`
+      safe to pass through, so this asserts the pairing rather than the
+      absence: if somebody removes the check above, this case documents what
+      it was protecting.
+    */
+    expect(body).toMatch(/contentType: file\.type/);
+  });
+});
+
 describe('uploadVehiclePhoto, on the phone', () => {
   beforeEach(() => {
     apiRequest.mockReset();
