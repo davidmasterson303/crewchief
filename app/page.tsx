@@ -11,6 +11,7 @@ import { AppStoreCTA } from '@/components/AppStoreCTA';
 import { useAuth } from '@/components/AuthProvider';
 import { useDemoVehicles, type GarageVehicle } from '@/hooks/useVehicles';
 import { firstEmbed } from '@wellkept/core/vehicle-embed';
+import { byAttention } from '@wellkept/core/garage-order';
 
 function VehicleCardSkeleton() {
   return (
@@ -233,7 +234,16 @@ function GarageContents() {
             {isLoading ? (
               [1, 2, 3].map((i) => <VehicleCardSkeleton key={i} />)
             ) : vehicles.length > 0 ? (
-              vehicles.map((vehicle: GarageVehicle, index: number) => (
+              /*
+                ⚠ Read order, not insert order — 3 Sep.
+
+                By `created_at` the three cards carried identical weight and the
+                page said nothing about which car mattered. A garage whose
+                promise is "we watch this for you" should open on the one asking
+                for something. `byAttention` puts open recalls first, then the
+                lowest score, and leaves everything else where the query had it.
+              */
+              byAttention(vehicles).map((vehicle: GarageVehicle, index: number) => (
                 /*
                   The stagger waits for the door.
 

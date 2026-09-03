@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { firstEmbed } from '@wellkept/core/vehicle-embed';
+import { byAttention } from '@wellkept/core/garage-order';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import BrandLockup, { BrandWordmark } from '@/components/brand/BrandLockup';
@@ -133,7 +134,8 @@ export default function GaragePage() {
           // about their gap (8 here, 6 there) as well as skipping `sm`. See
           // app/page.tsx.
           <div className="grid gap-5 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-            {vehicles.map((vehicle, i) => (
+            {/* Same read order as the landing garage — see `byAttention`. */}
+            {byAttention(vehicles).map((vehicle, i) => (
               // Index is per-grid, so the stagger restarts here rather than
               // continuing a count from elsewhere on the page.
               <RevealOnScroll key={vehicle.id} index={i} className="h-full">

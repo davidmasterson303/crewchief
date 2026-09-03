@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usageProfileChip } from '@wellkept/core/usage-profile';
+import { firstSentence } from '@wellkept/core/summary-text';
 import { useVehicleImage } from '@/hooks/useSignedUrl';
 import { VehicleIdentity } from '@/components/VehicleIdentity';
 import { ClusterGauge } from '@/components/ClusterGauge';
@@ -373,17 +374,26 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary, alerts }: V
         </div>
 
         <div className="absolute top-2 left-2">{nicknameChip}</div>
-      </div>
 
       {/*
-        Conditions, in their own slot. Full-bleed so it reads as a property of
-        the card rather than another chip floating on the photo. One line,
-        joined with ' · ' — never stacked, never wrapped; past two entries the
-        caller summarises ("3 issues").
+        Conditions, on the plate's bottom edge.
+
+        ⚠ **Moved into the plate, 3 Sep, and the original reasoning survives.**
+        It sat between the plate and the body as a block in flow — which meant a
+        card with a recall pushed its title, its dial and its mileage rule ~30px
+        below the cards without one. In a three-column grid the horizontal
+        registers *are* the design, and they did not register.
+
+        The note this replaces refused to put it "on the photo" because a chip
+        floating there competes with the identity chip. That still holds and
+        this is not that: it is a full-bleed band welded to the plate's bottom
+        edge, spanning it, which is why it still reads as a property of the card
+        rather than as a second chip. What changes is that it no longer moves
+        anything below it.
       */}
       {resolvedAlerts.length > 0 && (
         <div
-          className="flex items-center gap-1.5 px-4 py-[7px] text-xs font-semibold border-y"
+          className="absolute inset-x-0 bottom-0 flex items-center gap-1.5 px-4 py-[7px] text-xs font-semibold border-t backdrop-blur-sm"
           style={
             ribbonCritical
               ? {
@@ -402,6 +412,7 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary, alerts }: V
           <span className="truncate">{resolvedAlerts.map((a) => a.label).join(' · ')}</span>
         </div>
       )}
+      </div>
 
       <div className="p-5 flex-1 flex flex-col gap-4">
         {/* Reading order starts here: score, name, condition, detail. */}
@@ -550,9 +561,22 @@ export function VehicleCard({ vehicle, activeRecalls, healthSummary, alerts }: V
           ring has moved to the header, and this is prose — so it is unboxed,
           and capped at a readable measure rather than run to the card's width.
         */}
-        {healthSummary?.summary && (
-          <p className="measure text-xs text-white/60 leading-relaxed line-clamp-2">
-            {healthSummary.summary}
+        {/*
+          ── ⚠ A complete sentence, not a clamped paragraph ────────────────
+
+          This ran the whole summary under `line-clamp-2`, so the card ended
+          mid-clause with an ellipsis butted against the text's own punctuation
+          — "...separates a healthy car from a costly one...." On a product
+          whose pitch is "every invoice read", an unfinished sentence on the
+          front page is a self-own.
+
+          `firstSentence` takes the lead sentence whole. The rest is one click
+          away, on the screen that exists to carry it, and nothing here is ever
+          cut off in the middle of a word.
+        */}
+        {firstSentence(healthSummary?.summary) && (
+          <p className="measure text-xs text-white/60 leading-relaxed">
+            {firstSentence(healthSummary?.summary)}
           </p>
         )}
 

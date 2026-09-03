@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Car } from 'lucide-react';
 import { vehicleField } from '@wellkept/core/vehicle-identity';
 import { vehicleBlurData } from '@wellkept/core/vehicle-blur';
 import { cardSlotSource } from '@wellkept/core/photo-slots';
@@ -346,50 +345,38 @@ export function VehicleIdentity({
       ) : (
         <>
           {/*
-            The oversized glyph, bleeding off the bottom-right corner.
+            ── ⚠ The empty plate says it is empty ─────────────────────────────
 
-            Decorative, at 11% — it is texture, not information. The twelve
-            body-style silhouettes in components/vehicle-illustrations are the
-            *informative* set: they tell an owner which body style the VIN
-            decoded to. Do not swap one for the other without deciding which
-            job the art is doing; using an informative silhouette at 11%
-            opacity wastes it.
+            This drew an oversized generic car outline bleeding off the corner
+            — and a design critique of the rendered page called it exactly
+            what it looked like: "a grey clip-art car silhouette", scanning as
+            a broken image on the first card a visitor sees.
+
+            The glyph is gone. What replaces it is the plate as a plate: the
+            field, a hairline inset frame, and one line saying what is missing.
+            An empty state that names itself is designed; a picture of a car
+            standing in for a picture of a car is a placeholder.
+
+            ⚠ The no-photo state is the **primary** design here, not a fallback
+            — this component's header says so, and the demo garage keeps one car
+            unphotographed on purpose so a visitor sees what their own will look
+            like before they upload. That is the whole reason it has to be worth
+            looking at.
           */}
-          <Car
+          <div
             aria-hidden="true"
-            className="absolute pointer-events-none text-white"
-            strokeWidth={0.55}
-            style={{
-              /*
-                ⚠ Larger and quieter on the card, 3 Sep. At 150px/0.11 against
-                a now much darker field it read as a clip-art car sitting in the
-                corner — a picture of a car standing in for a picture of a car.
-                Scaled up and dropped to 0.055 it is what it claims to be in the
-                note above: texture, a shape the light catches, not an
-                illustration somebody is meant to look at.
-              */
-              width: isBand ? 230 : 260,
-              height: isBand ? 230 : 260,
-              right: isBand ? -28 : -54,
-              bottom: isBand ? -46 : -64,
-              opacity: isBand ? 0.11 : 0.055,
-            }}
+            className="absolute pointer-events-none rounded-lg border border-white/8"
+            style={{ inset: isBand ? 20 : 12 }}
           />
 
-          {/*
-            ── ⚠ The band names the car; the card does not ──────────────────
+          {!isBand && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <p className="font-mono text-xs uppercase tracking-[0.2em] text-white/55">
+                No photograph yet
+              </p>
+            </div>
+          )}
 
-            This printed the model and the year/make/trim on the plate for both
-            variants. On the **band** that is right — it is a hero with no name
-            beneath it. On the **card** the name is directly below, so an
-            unphotographed car said "M3 / 2019 BMW · Competition" twice in
-            sixty vertical pixels, and the two copies did not even agree about
-            which line was the heading.
-
-            So the plate stays a plate on a card. What fills it is the field and
-            the glyph, which is what a plate with nothing to photograph should
-            look like.
-          */}
           {isBand && (
             <div className="absolute left-0 right-0 bottom-0 p-8">
               {model && (
