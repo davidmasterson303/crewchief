@@ -878,6 +878,31 @@ nav {
   @media (max-width: 640px) {
     .cockpit-belt {
       --belt-edge-ink: 0;
+      /*
+        ── ⚠ The beltline moves off the phone, rather than being dimmed ──────
+
+        The strip is a 1px cyan line at `--belt-y`, and on a phone that lands
+        *in* the content rather than behind it: measured on the maintenance
+        page it ran straight under the mileage row, and on the dashboard it
+        crossed the dial's own baseline. Successive critiques read it as a
+        stray rule or a seam every time. The belt's own docblock calls it
+        "atmosphere, not a feature", and a hairline crossing a stat row is a
+        feature whatever it was meant to be.
+
+        ⚠ **`--belt-led: 0` is the obvious way to do this and it is forbidden.**
+        That token belongs to the register, which sets it on `<html>`, and a
+        declaration on this element would beat the inherited one — the exact
+        defect `register-tokens.test.ts` exists for, and it caught this
+        attempt. `--belt-y` is this element's own geometry, declared here
+        already, and no register touches it.
+
+        So the band is moved out of the box instead of dimmed. Everything
+        positioned against it — the strip, its bloom, the end shading — goes
+        with it, while the ground and the floor sheen are anchored elsewhere
+        and stay. The room keeps its floor and stops drawing a line across the
+        reading.
+      */
+      --belt-y: 220%;
     }
   }
 
@@ -1299,11 +1324,41 @@ nav {
   .turn-actions:focus-within {
     opacity: 1;
   }
+  /*
+    ── ⚠ The editable value carries its own affordance ──────────────────────
+
+    A dashed rule under a number is the long-standing "you can change this"
+    convention, and unlike a glyph it cannot be mistaken for a status icon.
+    Two design critiques of the rendered pages reported the pencil beside
+    "67,400 mi" as "ambiguous grey glyphs… illegible as affordances" and
+    "unlabeled boxes" — on touch it is pinned visible (see below), so it sat
+    there permanently with nothing to explain it.
+
+    The pencil stays for pointer devices, where it appears on hover and the
+    hover itself is the explanation.
+  */
+  .meta-value {
+    border-bottom: 1px dashed rgb(255 255 255 / 0.22);
+    padding-bottom: 1px;
+  }
+
   @media (hover: none) {
     .reveal-on-hover,
-    .meta-edit,
     .turn-actions {
       opacity: 1;
+    }
+    /*
+      ⚠ `.meta-edit` is deliberately **not** in that list any more.
+
+      It was, and correctly at the time: the rule exists because a hover-only
+      affordance is invisible on a phone, which is the audit finding this whole
+      block records. But the fix was to reveal the glyph, and the glyph is what
+      reads as noise once it can never hide. The row keeps its affordance —
+      the dashed rule above — and the phone stops carrying a pencil it cannot
+      explain.
+    */
+    .meta-edit {
+      opacity: 0;
     }
   }
 

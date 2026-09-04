@@ -625,7 +625,7 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                     className="meta-row flex items-center gap-1.5 group/edit"
                     aria-label="Edit mileage"
                   >
-                    <span className="text-2xl font-bold text-white tabular-nums tracking-tight">{displayVehicle.current_mileage?.toLocaleString() || '—'}</span>
+                    <span className="meta-value text-2xl font-bold text-white tabular-nums tracking-tight">{displayVehicle.current_mileage?.toLocaleString() || '—'}</span>
                     <span className="text-sm text-white/50 font-normal">mi</span>
                     <Edit2 className="meta-edit h-3.5 w-3.5 text-white/30 group-hover/edit:text-cyan-400 transition-colors" />
                   </button>
@@ -657,7 +657,7 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                     className="meta-row flex items-center gap-1.5 group/edit"
                     aria-label="Edit average monthly miles"
                   >
-                    <span className="text-2xl font-bold text-white tabular-nums tracking-tight">{displayVehicle.avg_miles_per_month || '—'}</span>
+                    <span className="meta-value text-2xl font-bold text-white tabular-nums tracking-tight">{displayVehicle.avg_miles_per_month || '—'}</span>
                     <span className="text-sm text-white/50 font-normal">mi/mo</span>
                     <Edit2 className="meta-edit h-3.5 w-3.5 text-white/30 group-hover/edit:text-cyan-400 transition-colors" />
                   </button>
