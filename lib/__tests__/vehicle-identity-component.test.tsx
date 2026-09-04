@@ -32,29 +32,44 @@ describe('the no-photo state, which is the primary design', () => {
     expect(container.querySelectorAll('img').length).toBe(0);
   });
 
-  it('names the car on the band and leaves the card to its caller', () => {
+  it('names the car on neither variant — the layout around it does', () => {
     /*
-      ⚠ Changed 3 Sep, and the split is the point.
+      ⚠ Changed twice in three days, and the second change is the one that
+      holds. On 3 Sep the card stopped printing the name while the band kept
+      it, on the argument that the band "is a hero with no name beneath it".
 
-      Both variants used to print the model and the year/make/trim on the
-      plate. On the **band** that is right — it is a hero with no name beneath
-      it. On the **card** the caller puts the name directly below, so an
-      unphotographed car said "M235i / 2015 BMW · Base" twice inside sixty
-      vertical pixels, and the two copies disagreed about which line was the
-      heading.
+      That argument was checked against the rendered page and is false: the
+      dashboard hero has a page heading directly above it carrying the same
+      three facts, so an unphotographed car printed "2019 BMW M3 · Competition"
+      in the heading and "M3 / 2019 BMW · Competition" in the plate — adjacent
+      on a desktop viewport, and about 1100px apart on a phone, which reads as
+      a second car rather than a repeat.
 
-      Asserted as a pair rather than by deleting the old case: "the card does
-      not name it" is only safe while something else does, and `VehicleCard` is
-      the only `variant="card"` caller in the tree.
+      This component's own docblock had it right all along: *"Callers put a
+      vehicle's name in the layout around the band, not on top of it."* Both
+      variants now do that, and what the empty plate says instead is the one
+      thing the layout around it does not — that there is no photograph.
     */
     const { container: band } = render(
       <VehicleIdentity variant="band" height={320} {...M235i} />
     );
-    expect(band.textContent).toContain('M235i');
-    expect(band.textContent).toContain('2015 BMW · Base');
+    expect(band.textContent).not.toContain('M235i');
+    expect(band.textContent).toContain('No photograph yet');
 
     const { container: card } = render(<VehicleIdentity variant="card" {...M235i} />);
     expect(card.textContent).not.toContain('M235i');
+    expect(card.textContent).toContain('No photograph yet');
+  });
+
+  it('still hands the car\'s name to a screen reader with the photograph', () => {
+    /*
+      Anti-vacuous for the case above, and the guarantee that survives dropping
+      the visible copy: the information was never the problem, the second
+      rendering of it was. With a photograph there is an element to label, and
+      it is labelled with the name.
+    */
+    render(<VehicleIdentity variant="band" photo="https://example.test/car.jpg" {...M235i} />);
+    expect(screen.getByRole('img', { name: '2015 BMW M235i' })).toBeInTheDocument();
   });
 
   it('paints the make-derived field', () => {
@@ -71,11 +86,16 @@ describe('the no-photo state, which is the primary design', () => {
     expect(plate(container).style.background).toContain('linear-gradient');
   });
 
-  it('omits the separator when there is nothing on both sides of it', () => {
-    // On the band, which is the variant that still sets this type.
-    render(<VehicleIdentity variant="band" height={320} make="Honda" model="Civic" />);
-    expect(screen.getByText('Honda')).toBeInTheDocument();
-    expect(screen.queryByText(/·/)).not.toBeInTheDocument();
+  it('composes the accessible name from the parts it actually has', () => {
+    /*
+      This used to assert that the plate's visible subtitle dropped its " · "
+      separator when the trim was missing. That type is gone with the naming,
+      and the separator with it — so what is left to check is the label, which
+      is where the name lives now. A missing year must not leave a leading
+      space or a stray joiner in what a screen reader reads out.
+    */
+    render(<VehicleIdentity variant="band" photo="https://example.test/car.jpg" make="Honda" model="Civic" />);
+    expect(screen.getByRole('img', { name: 'Honda Civic' })).toBeInTheDocument();
   });
 });
 
@@ -170,7 +190,7 @@ describe('the photo state', () => {
     // Whole no-photo state returns, not merely the image disappearing.
     expect(plate(container).dataset.hasPhoto).toBe('false');
     expect(container.querySelectorAll('img').length).toBe(0);
-    expect(screen.getByText('M235i')).toBeInTheDocument();
+    expect(screen.getByText('No photograph yet')).toBeInTheDocument();
   });
 
   it('gives a freshly signed URL another attempt', () => {
@@ -207,7 +227,13 @@ describe('one answer to "what does a vehicle look like"', () => {
   });
 
   it('honours the band height prop and the card aspect ratio', () => {
-    const { container: band } = render(<VehicleIdentity variant="band" height={320} {...M235i} />);
+    /*
+      ⚠ `height` is honoured **for a photograph**. With one there is a
+      photograph to give 320px to.
+    */
+    const { container: band } = render(
+      <VehicleIdentity variant="band" height={320} photo="https://example.test/car.jpg" {...M235i} />
+    );
     expect(plate(band).style.height).toBe('320px');
 
     const { container: card } = render(<VehicleIdentity variant="card" {...M235i} />);
@@ -225,5 +251,46 @@ describe('one answer to "what does a vehicle look like"', () => {
       change to it a line somebody wrote on purpose.
     */
     expect(plate(card).style.aspectRatio.replace(/\s/g, '')).toBe('4/3');
+  });
+
+  it('does not give an empty plate a photograph’s height', () => {
+    /*
+      ── ⚠ The defect this pins, measured on the rendered page ──────────────
+
+      The dashboard hero passes `height={400}`, and a vehicle with no
+      photograph got 400px of gradient. On a 390px phone that plate plus the
+      heading above it filled the entire first screen, so the health score —
+      the reason the page exists — began below the fold.
+
+      `height` is how tall a photograph should be; an empty plate holds one
+      line of 12px mono. The clamp is the default so a caller that never
+      thinks about it cannot reintroduce the void.
+    */
+    const { container } = render(<VehicleIdentity variant="band" height={400} {...M235i} />);
+    expect(plate(container).style.height).toBe('168px');
+  });
+
+  it('lets a caller that arranges the empty plate differently say so', () => {
+    /*
+      The hero puts the empty plate *beside* the reading rather than above it,
+      where it is a column and wants the extra height. `emptyHeight` is that,
+      and it is separate from `height` because the two measure different
+      things — so overriding one must not move the other.
+    */
+    const { container } = render(
+      <VehicleIdentity variant="band" height={400} emptyHeight={236} {...M235i} />
+    );
+    expect(plate(container).style.height).toBe('236px');
+
+    const { container: photographed } = render(
+      <VehicleIdentity
+        variant="band"
+        height={400}
+        emptyHeight={236}
+        photo="https://example.test/car.jpg"
+        {...M235i}
+      />
+    );
+    expect(plate(photographed).style.height).toBe('400px');
   });
 });

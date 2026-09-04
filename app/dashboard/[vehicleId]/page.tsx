@@ -1,7 +1,8 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { recallsWereChecked } from '@wellkept/core/nhtsa-lookup';
+import { recallsAreKnown } from '@wellkept/core/nhtsa-lookup';
+import { selectNhtsaRow } from '@/lib/nhtsa-row';
 import { driversForVehicle, driversSupportAScore } from '@wellkept/core/health-drivers';
 import type { ServiceHistoryRow } from '@wellkept/core/service-history';
 import { useRouter } from 'next/navigation';
@@ -68,8 +69,14 @@ export default function DashboardPage({ params }: { params: { vehicleId: string 
           ⚠ `lookup_status` travels — FN-03. Without it this page can only ask
           "is there a row", which is true for a lookup NHTSA did not recognise
           and is how a green tick lands on a truck with open campaigns.
+
+          ⚠ And it travels through `selectNhtsaRow`, not a bare `select`. The
+          column is not applied in production, and naming it in a select makes
+          PostgREST reject the entire query — so this read was returning `null`
+          for every vehicle and the recall banner below had never rendered for
+          anyone. See that helper for the full account.
         */
-        supabase.from('nhtsa_data').select('recalls,lookup_status').eq('vehicle_id', params.vehicleId).maybeSingle(),
+        selectNhtsaRow(supabase, params.vehicleId),
         supabase.from('vehicle_health_summary').select('*').eq('vehicle_id', params.vehicleId).maybeSingle(),
         supabase.from('recall_actions').select('campaign_number').eq('vehicle_id', params.vehicleId),
         /*
@@ -124,7 +131,7 @@ export default function DashboardPage({ params }: { params: { vehicleId: string 
       return {
         vehicle: vehicleResult.data,
         knowledge: knowledgeResult.data,
-        nhtsa: nhtsaResult.data,
+        nhtsa: nhtsaResult,
         healthSummary: healthSummaryResult.data,
         // Errors resolve to empty rather than throwing: a missing score history
         // is a normal state for a new vehicle, not a broken dashboard.
@@ -166,7 +173,7 @@ export default function DashboardPage({ params }: { params: { vehicleId: string 
       : driversForVehicle({
           schedule: data.knowledge?.maintenance_schedule,
           historyRows: data.serviceRows ?? [],
-          recalls: recallsWereChecked(data.nhtsa?.lookup_status)
+          recalls: recallsAreKnown(data.nhtsa?.lookup_status, data.nhtsa?.recalls)
             ? data.nhtsa?.recalls ?? []
             : undefined,
           currentMileage: data.vehicle?.current_mileage ?? null,
@@ -230,6 +237,8 @@ export default function DashboardPage({ params }: { params: { vehicleId: string 
         currentPage="dashboard"
         vehicleImage={vehicleImage}
         healthSummary={data.healthSummary}
+        /* Every child below is a bordered section already — see the prop. */
+        contentSurface="bare"
       >
         <div className="space-y-8">
           {/*
@@ -262,17 +271,24 @@ export default function DashboardPage({ params }: { params: { vehicleId: string 
                   : null
                 : undefined
             }
-            reason={data.healthSummary?.summary}
+            /*
+              ⚠ The model's summary used to be passed here as `reason`, and
+              `HealthSummary` prints the same string in "What's driving the
+              score" a few hundred pixels below. One paragraph, twice, in one
+              screen. It stays there — that is where the disclosure saying a
+              model wrote it lives — and the hero links to it instead.
+            */
+            driversHref="#health-report"
             work={{
               serviceRecords: data.serviceRows === null ? null : data.serviceRows.length,
               /*
                 ⚠ Recalls are `null` unless the lookup is known to have run.
-                `recallsWereChecked` is the only thing that answers this — an
+                `recallsAreKnown` is the only thing that answers this — an
                 `nhtsa_data` row exists for lookups NHTSA did not recognise, so
                 `recalls?.length ?? 0` would report "0 recall campaigns" for a
                 truck nobody successfully checked. FN-03, again.
               */
-              recalls: recallsWereChecked(data.nhtsa?.lookup_status)
+              recalls: recallsAreKnown(data.nhtsa?.lookup_status, data.nhtsa?.recalls)
                 ? data.nhtsa?.recalls?.length ?? 0
                 : null,
             }}
@@ -322,6 +338,9 @@ export default function DashboardPage({ params }: { params: { vehicleId: string 
             <CollapsibleSection
               title="Health report"
               storageKey={`dash:health:${params.vehicleId}`}
+              /* The hero's "What's driving this score" link points here, and
+                 the section opens itself when the hash names it. */
+              anchorId="health-report"
               defaultOpen
               summary={healthSummaryLine(
                 scoreIsSupported ? data.healthSummary?.health_score : null
@@ -333,7 +352,7 @@ export default function DashboardPage({ params }: { params: { vehicleId: string 
                 is what put a green "No active recalls" tick on a 2003 Accord
                 whose lookup had never run — and, once that was fixed, would
                 have put the same tick on any car whose make NHTSA does not
-                recognise. `recallsWereChecked` is the one place that question
+                recognise. `recallsAreKnown` is the one place that question
                 is answered; see `packages/core/src/nhtsa-lookup.ts`.
               */}
               <HealthSummary
@@ -341,7 +360,7 @@ export default function DashboardPage({ params }: { params: { vehicleId: string 
                 drivers={drivers}
                 vehicleId={params.vehicleId}
                 recalls={data.nhtsa?.recalls || []}
-                recallsChecked={recallsWereChecked(data.nhtsa?.lookup_status)}
+                recallsChecked={recallsAreKnown(data.nhtsa?.lookup_status, data.nhtsa?.recalls)}
                 researchComplete={data.knowledge?.research_status === 'completed'}
               />
             </CollapsibleSection>

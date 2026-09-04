@@ -22,8 +22,22 @@ interface DiagnosticHeroProps {
    * score", which is a statement about the car and gets the unknown face.
    */
   healthScore?: number | null;
-  /** One line on why the score is what it is. Optional. */
-  reason?: string | null;
+  /**
+   * Fragment link to the health report — the section that explains the reading.
+   *
+   * ⚠ This replaced a `reason` prop that took the model's summary paragraph.
+   * That paragraph is rendered by `HealthSummary` under the disclosure saying a
+   * model wrote it, and printing it here as well put the same sentence on the
+   * screen twice. A route to the explanation is not a second copy of it.
+   *
+   * A real `href` rather than a scroll callback: it works before hydration, it
+   * offers a middle-click and a keyboard focus ring for free, and
+   * `CollapsibleSection` opens itself when the hash names it — so the link
+   * cannot land someone on a closed drawer.
+   *
+   * Omitted by callers with nowhere to send anyone, which renders no link.
+   */
+  driversHref?: string;
   /**
    * What the assessment was actually built from — D13.
    *
@@ -84,7 +98,7 @@ export default function DiagnosticHero({
   model,
   trim,
   healthScore,
-  reason,
+  driversHref,
   work,
   onAddRecord,
   addRecordLabel = 'Add a service record',
@@ -151,20 +165,50 @@ export default function DiagnosticHero({
     it is a row somebody can go and count in the service log, which is the
     standard `health-drivers.ts` holds its own inputs to.
 
-    The photo state survives as a fallback because it is still true and still
-    the most useful thing to say when there is nothing else — but it is the last
-    resort now rather than the first branch, since what the app read matters
-    more than whether there is a picture of the car.
+    ⚠ The `'No photo yet'` fallback that used to close this expression is gone,
+    and not lost: the empty band says "No photograph yet" in its own centre, so
+    the fallback was a second sentence about one missing photograph about 60px
+    away from the first, in different words. The plate is the better place for
+    it — the plate is the thing that is empty.
   */
-  const caption = work ? describeReadWork(work, counted) : !photo ? 'No photo yet' : null;
+  const caption = work ? describeReadWork(work, counted) : null;
+
+  /*
+    ⚠ `height` is the height of a *photograph*. The empty band is shorter, and
+    `VehicleIdentity` decides that rather than this component — it is the half
+    that knows whether a photograph actually resolved, and a URL that 404s has
+    to collapse the same way a missing one does.
+  */
+
+  /*
+    ── ⚠ Two arrangements, and the photograph is what decides ────────────────
+
+    A photograph is the content: it gets the full width, with the reading in a
+    strip beneath it. That is CC-142 §3 and the reason nothing is printed over
+    the image any more.
+
+    An empty plate is not content. Given the same full width it was a 1130×170
+    letterbox saying "No photograph yet", and the strip below it was a gauge
+    with 600px of nothing to its right — two half-empty rows stacked. Side by
+    side they make one composed row instead, and the plate stays big enough to
+    read as the place a photograph goes.
+
+    ⚠ It stays `variant="band"` in both, rather than borrowing the card
+    drawing. The card variant is 4:3 with its own top radius and its own inset
+    frame, all of which belong to a garage tile; what is wanted here is the
+    same plate at a column's width.
+  */
+  const stacked = Boolean(photo);
 
   return (
     <section
       ref={containerRef}
       aria-label={vehicleName}
-      className="rounded-2xl overflow-hidden border border-white/8"
+      className={`rounded-2xl overflow-hidden border border-white/8${
+        stacked ? '' : ' sm:flex sm:items-stretch'
+      }`}
     >
-      <div className="relative">
+      <div className={`relative${stacked ? '' : ' sm:w-[300px] sm:shrink-0 sm:border-r sm:border-white/8'}`}>
         <VehicleIdentity
           variant="band"
           photo={photo ?? null}
@@ -173,6 +217,13 @@ export default function DiagnosticHero({
           model={model}
           trim={trim}
           height={height}
+          /*
+            Taller than the default empty band, because here the plate is
+            standing beside the reading rather than lying above it — a column,
+            not a letterbox. `VehicleIdentity` would otherwise clamp it to
+            168px, which is right for the full-width case it defaults to.
+          */
+          emptyHeight={236}
         />
 
         {/*
@@ -193,10 +244,15 @@ export default function DiagnosticHero({
       </div>
 
       {/*
-        Beneath the band: the score, and the reason for it. The vehicle's name
-        lives here now rather than on the photograph.
+        Beneath the band: the reading, what it was read from, and the way into
+        the report that explains it. The vehicle's name lives in the page
+        heading above the hero rather than on the photograph.
       */}
-      <div className="bg-[#0f1318]/90 px-4 sm:px-6 sm:px-8 py-6">
+      <div
+        className={`bg-[#0f1318]/90 px-4 sm:px-6 sm:px-8 py-6${
+          stacked ? '' : ' sm:flex-1'
+        }`}
+      >
         {/*
           The vehicle is not named again here.
 
@@ -217,15 +273,6 @@ export default function DiagnosticHero({
           was never the problem, the third copy of it was.
         */}
         {/*
-          ⚠ Rendered only when there is something to say — handoff §1.4, *"show
-          nothing rather than a timer"*. `describeReadWork` returns `null` when
-          neither read resolved, and the element goes with it rather than
-          holding an empty slot open. A caption that fills its slot to avoid
-          looking unfinished is the same reflex that produced the timer.
-        */}
-        {caption && <p className="label-uppercase mb-6">{caption}</p>}
-
-        {/*
           One instrument, where there used to be a numeral and a separate
           linear track beside it.
 
@@ -244,14 +291,27 @@ export default function DiagnosticHero({
           it.
         */}
         {healthScore !== undefined && (
-          <div className="flex flex-col sm:flex-row sm:items-center gap-5 sm:gap-9">
+          <div className="flex h-full flex-col sm:flex-row sm:items-center sm:justify-between gap-5 sm:gap-9">
             {/*
               `active` was `scanDone` — the dial held its sweep until a timer
               elsewhere on the screen said a fictional scan had finished. There
               is nothing to wait for, so it is live on mount.
             */}
             <ClusterGauge score={score} active />
-            <div className="flex-1 max-w-prose">
+            {/*
+              ── ⚠ Not `flex-1`, and the difference is 400px of nothing ──────
+
+              This column held the model's summary paragraph and stretched to
+              fill the row. What is left after that moved out is a link and a
+              one-line caption, and a stretched column put them hard against
+              the gauge with the rest of a 1130px row empty to their right —
+              which reads as content that failed to load rather than as space.
+
+              Pushed to the far edge instead, the row has two anchors and the
+              gap between them is the composition. `sm:` only: on a phone this
+              is a stacked column and there is no row to distribute.
+            */}
+            <div className="sm:max-w-xs sm:text-right">
               {/*
                 ── ⚠ D10 · the unknown score gets a sentence and an action ────
 
@@ -260,7 +320,8 @@ export default function DiagnosticHero({
                 The dial says *there is no reading*; this says *why*, and the
                 button says *what closes it*.
 
-                `reason` is not used for this. It is the model's summary of an
+                The model's summary is not used for this, and was not even
+                when this component still took one: it is the summary of an
                 assessment, and when there is no score there was no assessment
                 — printing it here would attach prose about the car to a state
                 whose entire content is that we have nothing to say about it.
@@ -282,16 +343,65 @@ export default function DiagnosticHero({
                   )}
                 </>
               ) : (
-                reason && (
-                  <p className="text-sm text-white/50 leading-relaxed">{reason}</p>
+                /*
+                  ── ⚠ The model's summary is deliberately not here ──────────
+
+                  It was — as `reason`, the same string `HealthSummary` prints
+                  in "What's driving the score" directly below, verbatim, in
+                  one screen.
+
+                  The duplicate resolves *there* rather than here, and the
+                  reason is the disclosure rather than the composition. That
+                  paragraph is written by a model, and it has to be read with
+                  the line that says so; `advice-disclosure.ts`: "a surface
+                  that shows generated advice shows this". Beside the gauge it
+                  would sit about 500px from that line on a phone.
+
+                  So the hero carries what the *system* can vouch for — the
+                  reading, and the records it was made from — and hands off.
+                */
+                driversHref && (
+                  <a
+                    href={driversHref}
+                    className="tap-target-44 inline-flex items-center gap-1.5 text-sm font-semibold text-info-strong transition-colors hover:text-info"
+                  >
+                    What&apos;s driving this score
+                    <span aria-hidden="true">↓</span>
+                  </a>
                 )
+              )}
+
+              {/*
+                ── ⚠ The provenance line, and why it moved ───────────────────
+
+                It sat above the gauge in `label-uppercase` — 12px mono
+                small-caps reading "READ 11 SERVICE RECORDS." — and a design
+                critique of the rendered page called it what it looked like: a
+                debug string. Uppercase mono is this design system's voice for
+                *labels*, and this is not a label; it is a sentence, already
+                punctuated as one by `describeReadWork`.
+
+                Set as a sentence and placed under the claim it qualifies, it
+                does the job it was written for: the reading, then what the
+                reading was made from. Handoff §1.4's requirement is unchanged
+                — it renders only when there is something true to say, and
+                `describeReadWork` still answers `null` when neither read
+                resolved.
+              */}
+              {caption && (
+                <p className="text-xs text-white/55 mt-3 leading-relaxed">{caption}</p>
               )}
             </div>
           </div>
         )}
 
-        {healthScore === undefined && reason && (
-          <p className="text-sm text-white/50 mt-4">{reason}</p>
+        {/*
+          A caller that shows no score at all still says what it read. This is
+          the only content in the strip for those callers, so it takes the
+          body size rather than the caption size it has beside a gauge.
+        */}
+        {healthScore === undefined && caption && (
+          <p className="text-sm text-white/60 leading-relaxed">{caption}</p>
         )}
       </div>
 

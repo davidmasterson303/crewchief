@@ -36,6 +36,15 @@ interface CollapsibleSectionProps {
   defaultOpen?: boolean;
   /** One line that stays visible when collapsed. Keep it short. */
   summary?: ReactNode;
+  /**
+   * DOM id, so something elsewhere on the page can link to this section.
+   *
+   * ⚠ Giving it an id also makes it open when the hash names it — see the
+   * effect below. A link that scrolls someone to a collapsed drawer is a link
+   * that did not work, and the stored preference means collapsed is the state
+   * a returning reader is most likely to be in.
+   */
+  anchorId?: string;
   /** Rendered only while open — see the note above about mounting cost. */
   children: ReactNode;
 }
@@ -55,6 +64,7 @@ export default function CollapsibleSection({
   storageKey,
   defaultOpen = true,
   summary,
+  anchorId,
   children,
 }: CollapsibleSectionProps) {
   /*
@@ -71,6 +81,32 @@ export default function CollapsibleSection({
     if (stored !== null) setOpen(stored);
   }, [storageKey]);
 
+  /*
+    ── Being linked to opens the section ─────────────────────────────────────
+
+    `#health-report` in the URL is a request to read the health report, and
+    honouring the scroll while leaving the panel shut answers it with a closed
+    drawer. The hero's "What's driving this score" link is exactly that case.
+
+    ⚠ Ordered after the effect above deliberately: both run on mount, and this
+    one has to win. A reader who collapsed the section last week has `false` in
+    storage, and following a link to it now is the more recent instruction.
+
+    `hashchange` covers the second click. The browser does not re-fire it for a
+    hash that is already current, so a link followed twice would otherwise
+    scroll and do nothing — which is fine here, because by then the section is
+    already open.
+  */
+  useEffect(() => {
+    if (!anchorId) return;
+    const openIfNamed = () => {
+      if (window.location.hash === `#${anchorId}`) setOpen(true);
+    };
+    openIfNamed();
+    window.addEventListener('hashchange', openIfNamed);
+    return () => window.removeEventListener('hashchange', openIfNamed);
+  }, [anchorId]);
+
   const toggle = () => {
     const next = !open;
     setOpen(next);
@@ -82,7 +118,15 @@ export default function CollapsibleSection({
   };
 
   return (
-    <section className="rounded-2xl border border-white/8 bg-card/40 overflow-hidden">
+    <section
+      id={anchorId}
+      /*
+        `scroll-mt` clears the sticky nav. Without it a fragment link puts the
+        section's header underneath the bar and the reader lands on its second
+        row, which reads as having missed.
+      */
+      className="scroll-mt-28 rounded-2xl border border-white/8 bg-card/40 overflow-hidden"
+    >
       <h2>
         <button
           type="button"

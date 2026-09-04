@@ -8,7 +8,6 @@ import BrandLockup, { BrandWordmark } from '@/components/brand/BrandLockup';
 import { CONTACT_EMAIL } from '@/lib/legal';
 import { isDemoVehicleId } from '@wellkept/core/demo';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { updateVehicleAvgMileage, updateVehicleMileage, updateVehicleStatus } from '@/app/actions';
@@ -16,6 +15,7 @@ import { USAGE_PROFILES, usageProfileChip } from '@wellkept/core/usage-profile';
 import { invalidateDashboardCache } from '@wellkept/core/query-invalidation';
 import { AccountMenu } from '@/components/AccountMenu';
 import { useHomeHref } from '@/hooks/use-home-href';
+import { getHealthBand } from '@/hooks/use-health-band';
 
 interface DashboardLayoutProps {
   vehicle: any;
@@ -24,6 +24,27 @@ interface DashboardLayoutProps {
   children: React.ReactNode;
   vehicleImage?: string;
   healthSummary?: { health_score?: number } | null;
+  /**
+   * Whether the layout draws a panel around `children`.
+   *
+   * ── ⚠ `'bare'` exists because a card inside a card inside a card ──────────
+   *
+   * The panel's padding, border and radius are what make a page of loose
+   * content read as a card on a ground. That is right for the pages whose
+   * children *are* loose content — vehicle info, documents, the consultant.
+   *
+   * The dashboard's children are already sections: `CollapsibleSection` draws
+   * its own 16px radius and border, and the cards inside those draw theirs. A
+   * design critique of the rendered page counted five concentric rounded
+   * rectangles from the viewport edge to a red-flag chip, four of them within
+   * 70px on a phone — where they stop reading as depth and start reading as
+   * stripes down the page edge. Measured at row 500 of a mobile capture: 17,
+   * 24, 27, border, 20. Four surfaces, seven levels of grey between them.
+   *
+   * So the outermost one goes on that page, and the sections speak for
+   * themselves.
+   */
+  contentSurface?: 'panel' | 'bare';
   /**
    * How the page behaves below `md`. R4.
    *
@@ -52,7 +73,7 @@ const tabs = [
   { key: 'vehicle-info', label: 'Vehicle Info', icon: Info, href: (id: string) => `/vehicle-info/${id}` },
 ] as const;
 
-export default function DashboardLayout({ vehicle, knowledge, currentPage, children, vehicleImage, healthSummary, mobileLayout = 'page' }: DashboardLayoutProps) {
+export default function DashboardLayout({ vehicle, knowledge, currentPage, children, vehicleImage, healthSummary, contentSurface = 'panel', mobileLayout = 'page' }: DashboardLayoutProps) {
   const appShell = mobileLayout === 'app-shell';
   const router = useRouter();
   const homeHref = useHomeHref();
@@ -128,27 +149,49 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
    * R12 gives the phone its own compact breadcrumb, and the pill appears in
    * both that and the full one. Three colour thresholds copy-pasted into two
    * branches is how a green 79 and an amber 79 end up on the same page.
+   *
+   * ── ⚠ It had its own thresholds, and they disagreed with the dial ─────────
+   *
+   * The comment above was right about the risk and then missed it by one
+   * level: the two branches matched each other, and neither matched
+   * `getHealthBand` — the table the gauge, the ring and every band label read
+   * from. Its cut was 60/80 against the table's 40/60/80, and its palette was
+   * Tailwind's amber against the table's cyan.
+   *
+   * The visible result on the seeded M3: an amber **61** in the breadcrumb
+   * about 400px above a cyan **61 / Fair** on the dial. A design critique of
+   * the rendered page read those as two different measurements — which is
+   * exactly what two colours for one number claims.
+   *
+   * So the chip is furniture and the band supplies the ink. No second
+   * threshold anywhere.
    */
-  const healthPill = (score: number) => (
-    <span
-      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
-        score >= 80
-          ? 'bg-green-500/15 text-green-300 border border-green-400/25'
-          : score >= 60
-          ? 'bg-amber-500/15 text-amber-300 border border-amber-400/25'
-          : 'bg-red-500/15 text-red-300 border border-red-400/25'
-      }`}
-    >
-      {score}
-    </span>
-  );
-
-  const getReliabilityBadge = (score: number) => {
-    if (score >= 8) return { text: 'Excellent', color: 'bg-green-500/20 text-green-300 border-green-400/30' };
-    if (score >= 6) return { text: 'Good', color: 'bg-info-wash text-info border-info-border' };
-    if (score >= 4) return { text: 'Fair', color: 'bg-yellow-500/20 text-yellow-300 border-yellow-400/30' };
-    return { text: 'Poor', color: 'bg-red-500/20 text-red-300 border-red-400/30' };
+  const healthPill = (score: number) => {
+    const band = getHealthBand(score);
+    return (
+      <span
+        className={`inline-flex items-center gap-1 rounded-full border border-white/12 bg-white/[0.06] px-2 py-0.5 text-xs font-semibold ${band.textClass}`}
+      >
+        <span className="num">{score}</span>
+        {/*
+          The band's own word, so the chip states the fact rather than posing a
+          number the reader has to go and decode. `short` because the
+          breadcrumb is 375px wide with a vehicle name already in it, and
+          "Needs attention" does not fit — it is an abbreviation of the same
+          judgement, never a softer one.
+        */}
+        <span className="font-medium text-white/50">{band.short}</span>
+      </span>
+    );
   };
+
+  /*
+    ⚠ The reliability verdict chip was here — `Excellent / Good / Fair / Poor`
+    over its own four thresholds — and it is deleted rather than left unused.
+    Its wording collided with the health band's ("Good" beside "Fair" for one
+    car) and a dormant second verdict ramp is precisely what somebody restores
+    later on the grounds that the row looks bare. See the stat itself below.
+  */
 
   const handleSaveAvgMileage = async () => {
     const value = parseInt(avgMileage);
@@ -443,15 +486,38 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
         <div className={appShell ? 'hidden md:block md:mb-8' : 'mb-8'}>
           <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
             <div>
-              {/* R11 — 36px for "2018 Honda Accord" in 279px is three lines
-                  before the trim even appears. The desktop size is the one
-                  that was designed; the phone just never had its own. */}
-              <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight mb-1.5">
-                {vehicle.year} {vehicle.make} {vehicle.model}
+              {/*
+                ── The vehicle's name, set the way this product sets names ───
+
+                It was one line of heavy sans — `2019 BMW M3` at 48px — with
+                the trim in grey underneath. Three facts of three different
+                kinds in one weight: the model is the name, the year and make
+                place it, the trim qualifies it.
+
+                So: mono eyebrow for the placing, serif for the name, and the
+                trim joins the eyebrow where it belongs. It is the treatment
+                the garage cards and the landing page already use, and this was
+                the last screen setting a vehicle's name a different way.
+
+                ⚠ `display-serif` is licensed for "exactly one element per
+                screen — a vehicle title or the single largest hero number",
+                and this is that element. It became available when the empty
+                hero band stopped printing the model in 36px serif directly
+                below — which was the duplicate, and was also the screen's one
+                serif slot spent on the second copy.
+
+                R11's finding still holds and is why the eyebrow carries the
+                year and make: 36px of "2018 Honda Accord" wrapped to three
+                lines in 279px before the trim appeared. The name alone does
+                not wrap.
+              */}
+              <p className="label-uppercase mb-2">
+                {[vehicle.year, vehicle.make].filter(Boolean).join(' ')}
+                {vehicle.trim ? ` · ${vehicle.trim}` : ''}
+              </p>
+              <h1 className="display-serif text-4xl sm:text-5xl lg:text-6xl text-white tracking-tight leading-none">
+                {vehicle.model}
               </h1>
-              {vehicle.trim && (
-                <p className="text-base text-white/50 font-medium">{vehicle.trim}</p>
-              )}
             </div>
 
             {/* R11 — `flex flex-wrap gap-8` wrapped these four into a ragged
@@ -558,18 +624,35 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                 </div>
               </div>
 
+              {/*
+                ── ⚠ This is not the health score, and it read like it was ───
+
+                Two numbers with verdicts, on one screen, about one car: the
+                dial says **61 / Fair** and this said **6/10 · Good**. They are
+                different subjects — 61 is *this* car's condition from its own
+                records, 6/10 is how the 2019 M3 fares as a model — and nothing
+                on the screen said so. A design critique of the rendered page
+                read them as the same fact contradicting itself, which is the
+                only available reading when a label is one word long.
+
+                Two changes, and the second matters more than the first:
+
+                  - The label names the subject. "Reliability" beside a car's
+                    dashboard is naturally read as *this car's*.
+                  - The verdict chip is gone. "Good" next to "Fair" is the
+                    contradiction in its sharpest form, and the chip was the
+                    one element on the row asserting a judgement — the other
+                    three state readings and let the reader judge. The figure
+                    keeps its `/10`, which is what makes it a scale rather than
+                    a score out of a hundred read wrong.
+              */}
               {knowledge?.reliability_score && (
                 <div className="flex flex-col gap-1">
-                  <span className="label-uppercase">Reliability</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl font-bold text-white tabular-nums tracking-tight">
-                      {knowledge.reliability_score}
-                      <span className="text-sm text-white/50 ml-0.5">/10</span>
-                    </span>
-                    <Badge variant="outline" className={`${getReliabilityBadge(knowledge.reliability_score).color} border text-xs`}>
-                      {getReliabilityBadge(knowledge.reliability_score).text}
-                    </Badge>
-                  </div>
+                  <span className="label-uppercase">Model reliability</span>
+                  <span className="text-2xl font-bold text-white tabular-nums tracking-tight">
+                    {knowledge.reliability_score}
+                    <span className="text-sm text-white/50 ml-0.5">/10</span>
+                  </span>
                 </div>
               )}
             </div>
@@ -582,12 +665,15 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
 
         {/* The panel's padding, border and radius are what make it read as a
             card on a page. In app-shell mode there is no page for it to sit
-            on, so below `md` it is just the remaining height. */}
+            on, so below `md` it is just the remaining height — and see
+            `contentSurface` for the page that brings its own sections. */}
         <div
           className={
             appShell
               ? 'flex-1 min-h-0 flex flex-col md:block md:glass-panel md:rounded-2xl md:p-6'
-              : 'glass-panel rounded-2xl p-4 sm:p-6'
+              : contentSurface === 'bare'
+                ? ''
+                : 'glass-panel rounded-2xl p-4 sm:p-6'
           }
         >
           {children}

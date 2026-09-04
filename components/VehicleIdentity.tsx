@@ -62,6 +62,20 @@ interface VehicleIdentityProps {
   trim?: string | null;
   /** Band height. The design default is 400px; it is a prop so it can flex. */
   height?: number;
+  /**
+   * Band height when there is no photograph to show.
+   *
+   * ⚠ A separate number rather than a fraction of `height`, because the two
+   * are not the same measurement: `height` is how tall a photograph should be,
+   * and this is how tall one line of 12px mono needs to be. The default is
+   * whichever is smaller, so a caller that never thinks about it cannot get
+   * 400px of empty gradient — which is what the dashboard hero was doing.
+   *
+   * A caller that arranges the empty plate differently says so. The hero puts
+   * it beside the reading rather than above it, where it is a column and wants
+   * the extra height.
+   */
+  emptyHeight?: number;
   className?: string;
 }
 
@@ -109,6 +123,7 @@ export function VehicleIdentity({
   model,
   trim,
   height = 400,
+  emptyHeight,
   className = '',
 }: VehicleIdentityProps) {
   /*
@@ -188,10 +203,14 @@ export function VehicleIdentity({
 
   const field = vehicleField(make);
 
-  // `{year} {make} · {trim}` — each part optional, and the separator only
-  // earns its place when there is something on both sides of it.
+  /*
+    Only the photograph's accessible name needs this now — the empty band used
+    to print `{year} {make} · {trim}` as visible type, and that line is gone
+    because the layout around the band already carries it. `trim` stays a prop:
+    callers pass it, and it belongs to the vehicle whether or not this drawing
+    happens to render it.
+  */
   const lead = [year, make].filter(Boolean).join(' ');
-  const subtitle = [lead, trim].filter(Boolean).join(' · ');
 
   return (
     <div
@@ -202,7 +221,29 @@ export function VehicleIdentity({
         // instant before a photo decodes.
         background: field.gradient,
         ...(isBand
-          ? { height: `${height}px`, borderBottom: '1px solid rgb(255 255 255 / 0.08)' }
+          /*
+            ── ⚠ The empty band is not a photograph's height ────────────────
+
+            `height` is the height of a photograph — 400px, the design default,
+            and right for one. With no photograph it was 400px of gradient: on
+            a 390px phone the plate plus the heading above it filled the entire
+            first screen, and the score — the reason the page exists — started
+            below the fold.
+
+            So the empty state takes the height its content needs. What it
+            holds is one line of 12px mono, and 168px gives that line air
+            without pretending a photograph is on its way.
+
+            ⚠ Keyed on `src`, not on the `photo` prop, so a URL that 404s
+            collapses the same way a missing one does. That is a downward
+            layout shift on the error path, and it is the better of the two
+            available failures — the alternative is the void this removes,
+            arrived at by a broken link instead of an empty column.
+          */
+          ? {
+              height: `${src ? height : emptyHeight ?? Math.min(height, 168)}px`,
+              borderBottom: '1px solid rgb(255 255 255 / 0.08)',
+            }
           /*
             ⚠ 4:3, not 3:2 — widened 3 Sep.
 
@@ -390,37 +431,47 @@ export function VehicleIdentity({
             like before they upload. That is the whole reason it has to be worth
             looking at.
           */}
-          <div
-            aria-hidden="true"
-            className="absolute pointer-events-none rounded-lg border border-white/8"
-            style={{ inset: isBand ? 20 : 12 }}
-          />
+          {/*
+            ⚠ The frame is a card treatment, and only a card treatment.
 
+            On a card it draws a plate: 12px in from a 4:3 box, it reads as an
+            edge with a margin. Stretched across the band it was a 700px-wide
+            hairline rectangle around nothing, and it was the third concentric
+            rounded rectangle in a row — hero section, then this, then the
+            band's own radius — all within 40px and all nearly the same value.
+          */}
           {!isBand && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <p className="font-mono text-xs uppercase tracking-[0.2em] text-white/55">
-                No photograph yet
-              </p>
-            </div>
+            <div
+              aria-hidden="true"
+              className="absolute pointer-events-none rounded-lg border border-white/8"
+              style={{ inset: 12 }}
+            />
           )}
 
-          {isBand && (
-            <div className="absolute left-0 right-0 bottom-0 p-8">
-              {model && (
-                <p
-                  className="display-serif text-white tracking-tight leading-none truncate"
-                  style={{ fontSize: '2.25rem' }}
-                >
-                  {model}
-                </p>
-              )}
-              {subtitle && (
-                <p className="text-white/55 mt-1.5 truncate" style={{ fontSize: '12.5px' }}>
-                  {subtitle}
-                </p>
-              )}
-            </div>
-          )}
+          {/*
+            ── ⚠ The band no longer names the car ────────────────────────────
+
+            It printed `model` in 36px serif with `{year} {make} · {trim}` under
+            it, and both are already on the screen: the page heading above the
+            hero is the same three facts. On a phone the two renderings sat
+            about 1100px apart, which is worse than adjacent — it reads as a
+            second car rather than a repeat.
+
+            This component's own docblock draws the line — *"Callers put a
+            vehicle's name in the layout around the band, not on top of it"* —
+            and the no-photo branch was the one place that broke it, on the
+            argument that the plate *is* the naming when there is no
+            photograph. That argument holds for a garage card, which has no
+            heading of its own. It never held for the dashboard hero.
+
+            So the empty band says the one thing the layout around it does not:
+            that there is no photograph. Same line the card uses.
+          */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <p className="font-mono text-xs uppercase tracking-[0.2em] text-white/55">
+              No photograph yet
+            </p>
+          </div>
 
           <div
             aria-hidden="true"

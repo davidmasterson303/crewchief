@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { adviceDisclosure } from '@wellkept/core/advice-disclosure';
-import { healthClaim, mayReassure } from '@wellkept/core/health-claims';
-import type { HealthDriver } from '@wellkept/core/health-drivers';
+import { healthClaim, mayReassure, type HealthClaim } from '@wellkept/core/health-claims';
+import type { HealthDriver, HealthDriverKey } from '@wellkept/core/health-drivers';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -96,52 +96,174 @@ function ScoreRing({ score }: { score: number }) {
 }
 
 /**
- * The three computed drivers — the web half of what mobile has had since 15 Aug.
+ * The contributing factors — one block per subject.
+ *
+ * ── ⚠ Two provenances in one row, and they are not interchangeable ──────────
+ *
+ * Each row can carry two sentences about the same subject and they come from
+ * different places:
+ *
+ *   - the **measured** line is arithmetic over rows the owner can go and
+ *     count, assembled by `driversForVehicle`;
+ *   - the **claim** is prose from the model, gated by `healthClaim`.
+ *
+ * The measured line is first and takes the brighter ink. That ordering was the
+ * whole argument of the panel this replaces and it survives intact: nothing
+ * makes the score a function of the drivers, so when the two disagree the
+ * checkable half should be the half read first. What changed is that they are
+ * one list instead of two — the subject appeared twice before, once with a
+ * number and once with an icon, and a reader had to notice they were the same
+ * topic.
  *
  * ── ⚠ Not terms in a sum, and this must not imply they are ──────────────────
  *
- * `health_score` comes from the model; these are computed from rows. So they
- * explain the *subject* without arithmetically explaining the *total*, and they
- * are laid out as three peers: no plus signs, no "= 74", no ordering that
+ * `health_score` comes from the model; the scores here are computed from rows.
+ * So they explain the *subject* without arithmetically explaining the *total*,
+ * and they are laid out as peers: no plus signs, no "= 74", no ordering that
  * suggests one contributes more. `health-drivers.ts` carries the same warning
- * at the source and `HealthDrivers.tsx` on mobile makes the same choices — this
- * is deliberately its twin rather than a second design, because a driver that
+ * at the source and `HealthDrivers.tsx` on mobile makes the same choices —
+ * deliberately its twin rather than a second design, because a driver that
  * reads one way on the phone and another on the web is this codebase's most
  * repeated defect wearing a new hat.
  */
-function HealthDriverRows({ drivers }: { drivers: HealthDriver[] }) {
-  if (drivers.length === 0) return null;
+function ClaimIcon({ claim }: { claim: HealthClaim }) {
+  /*
+    The state's ink attaches to the claim sentence, not to the row. A whole
+    tile washed green for one reassuring sentence is what made three of these
+    read as a scorecard — and it put a green panel directly above a red one
+    about the same car.
+  */
+  /*
+    ⚠ Each className is written out in full rather than composed from a shared
+    size string. `text-contrast-floor` classifies a colour token by the size
+    token beside it in the source, and a template literal leaves it looking at
+    the alpha token on its own — which it reports as unclassifiable, and
+    correctly: that value is allowed here at all *because* it is 16px of glyph
+    rather than a line of body copy.
+
+    ⚠ The token is deliberately not quoted in this comment. The suite's
+    anti-vacuous case counts how many of these tokens vanish when comments are
+    stripped, and allows five across the tree — the margin exists to catch a
+    stripper that has started eating markup, so spending it on prose about the
+    rule is what breaks it.
+  */
+  if (mayReassure(claim)) {
+    return <CheckCircle className="h-4 w-4 shrink-0 mt-0.5 text-green-400" aria-hidden="true" />;
+  }
+  if (claim.state === 'unknown') {
+    return <HelpCircle className="h-4 w-4 shrink-0 mt-0.5 text-white/45" aria-hidden="true" />;
+  }
+  return <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-orange-400" aria-hidden="true" />;
+}
+
+function HealthFactorRows({
+  drivers,
+  claims,
+  recalls,
+  recallsChecked,
+}: {
+  drivers: HealthDriver[];
+  claims: { maintenance: HealthClaim; issues: HealthClaim; recalls: HealthClaim };
+  recalls: any[];
+  recallsChecked: boolean;
+}) {
+  const driverFor = (key: HealthDriverKey) => drivers.find((d) => d.key === key);
+
+  /*
+    ⚠ The subjects are declared, not derived from whichever list happens to be
+    populated. `issues` has no driver and `mileage-load` has no claim, so
+    deriving the rows from either source alone would silently drop one of them
+    — and "Known issues" vanishing because nobody computes a number for it is
+    the kind of absence that reads as "nothing to report".
+
+    A row with neither a score nor a claim is dropped, which is the honest
+    result for a caller that wired nothing.
+  */
+  const rows: {
+    key: string;
+    label: string;
+    driver?: HealthDriver;
+    claim?: HealthClaim;
+  }[] = [
+    { key: 'maintenance', label: 'Maintenance', driver: driverFor('maintenance'), claim: claims.maintenance },
+    { key: 'issues', label: 'Known issues', claim: claims.issues },
+    { key: 'recalls', label: 'Recalls', driver: driverFor('recalls'), claim: claims.recalls },
+    { key: 'mileage-load', label: driverFor('mileage-load')?.label ?? 'Mileage load', driver: driverFor('mileage-load') },
+  ].filter((row) => row.driver || row.claim);
+
+  if (rows.length === 0) return null;
 
   return (
     <div className="rounded-xl border border-white/10 bg-white/[0.02] divide-y divide-white/8">
-      {drivers.map((driver) => (
-        <div key={driver.key} className="p-4">
+      {rows.map((row) => (
+        <div key={row.key} className="p-4">
           <div className="flex items-baseline justify-between gap-3">
-            <h4 className="text-sm font-semibold text-white">{driver.label}</h4>
+            <h4 className="text-sm font-semibold text-white">{row.label}</h4>
             {/*
               ⚠ An unmeasured driver takes muted ink, never a band. Banding a
               `null` asserts a condition nobody checked — the same overclaim
               `ClusterGauge`'s unknown face exists to prevent, one level down.
+
+              A subject with no driver at all prints no number rather than a
+              dash: the dash means "we looked and cannot say", and "Known
+              issues" is not measured by anything.
             */}
-            <span
-              className="num text-xl font-bold leading-none"
-              style={{
-                color:
-                  driver.score === null
-                    ? 'rgb(255 255 255 / 0.38)'
-                    : getHealthBand(driver.score).color,
-              }}
-            >
-              {driver.score === null ? '—' : driver.score}
-            </span>
+            {row.driver && (
+              <span
+                className="num text-xl font-bold leading-none"
+                style={{
+                  color:
+                    row.driver.score === null
+                      ? 'rgb(255 255 255 / 0.38)'
+                      : getHealthBand(row.driver.score).color,
+                }}
+              >
+                {row.driver.score === null ? '—' : row.driver.score}
+              </span>
+            )}
           </div>
+
           {/*
-            Always present, including at `null`. A dash on its own reads as a
-            bug; "Recalls have not been checked for this vehicle" reads as an
-            honest gap, and the difference between the two is what the sentence
-            is carrying.
+            Always present when there is a driver, including at `null`. A dash
+            on its own reads as a bug; "Recalls have not been checked for this
+            vehicle" reads as an honest gap, and the difference between the two
+            is what the sentence is carrying.
           */}
-          <p className="text-sm text-white/55 leading-relaxed mt-1">{driver.detail}</p>
+          {row.driver && (
+            <p className="text-sm text-white/65 leading-relaxed mt-1">{row.driver.detail}</p>
+          )}
+
+          {row.claim && (
+            <p className="text-sm text-white/50 leading-relaxed mt-1.5 flex items-start gap-2">
+              <ClaimIcon claim={row.claim} />
+              <span>{row.claim.text}</span>
+            </p>
+          )}
+
+          {row.key === 'recalls' && (
+            <RecallHistoryModal
+              recalls={recalls}
+              /*
+                The same evidence the sentence above is rendered from. Passing
+                the array alone left the modal unable to tell "checked, none
+                found" from "never checked" — so the honest row opened a dialog
+                saying "This vehicle has a clean safety record".
+              */
+              checked={recallsChecked}
+              trigger={
+                <button
+                  type="button"
+                  className="tap-target-44 group mt-2 inline-flex items-center gap-1 text-xs font-medium text-info/80 transition-colors hover:text-info-strong"
+                >
+                  <span>View recall history</span>
+                  <ChevronRight
+                    className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5"
+                    aria-hidden="true"
+                  />
+                </button>
+              }
+            />
+          )}
         </div>
       ))}
     </div>
@@ -326,7 +448,21 @@ export default function HealthSummary({
   const recallClaim = healthClaim('recall', healthSummary.recall_status, recallsChecked);
 
   return (
-    <Card className="bg-slate-900/60 border-white/10">
+    /*
+      ── ⚠ No border and no fill, because the section around it has both ──────
+
+      This was `bg-slate-900/60 border-white/10`, and its only caller renders
+      it inside a `CollapsibleSection` that already draws a 16px radius, a
+      hairline border and a `bg-card/40` fill. Two panels, 20px apart, in the
+      same value range — and the driver rows and the flag chips inside draw
+      two more. See `contentSurface` in `DashboardLayout` for the count and
+      where the outermost one went.
+
+      `Card` stays as the element rather than being swapped for a `div`: it is
+      what pairs with `CardHeader` / `CardContent`, and those carry the padding
+      rhythm this content is set on.
+    */
+    <Card className="border-0 bg-transparent">
       {/*
         D5 — this card used to print the score a second time.
         `DiagnosticHero` sits directly above it on the dashboard and renders the
@@ -346,8 +482,33 @@ export default function HealthSummary({
                 <Activity className="h-5 w-5 text-info" />
                 What&apos;s driving the score
               </CardTitle>
+              {/*
+                ── ⚠ D5, second half · the narrative was printed twice ───────
+
+                D5 removed this card's *score* because `DiagnosticHero` sits
+                directly above it and rendered the same number. It kept the
+                summary paragraph on the argument that the narrative is "the
+                lead-in… the one thing here that reads as an answer rather
+                than a reading" — and the hero was rendering that same string
+                as its `reason`, about 130px higher on a desktop viewport. The
+                screen carried one paragraph twice, verbatim, within a single
+                scroll position, and a design critique of the rendered page
+                named it before anything else.
+
+                It resolves here rather than in the hero, and the deciding
+                argument is the disclosure below, not composition: this is the
+                sentence a model wrote, and `advice-disclosure.ts` is explicit
+                that *"a surface that shows generated advice shows this"*. Kept
+                in the hero, the prose would have been 500px from its
+                disclosure on a phone — the shape of LEG-05 exactly, arrived at
+                by tidying.
+
+                The hero shows the reading, what it was read from, and a way in
+                here. Every generated sentence on this page is now inside this
+                card, under one disclosure.
+              */}
               {healthSummary.summary && (
-                <p className="text-sm text-white/55 mt-1.5 max-w-xl leading-relaxed">{healthSummary.summary}</p>
+                <p className="text-sm text-white/60 mt-1.5 max-w-xl leading-relaxed">{healthSummary.summary}</p>
               )}
               {/*
                 ── ⚠ UX-16 / LEG-05 · this reads as an assessment ────────────
@@ -425,90 +586,36 @@ export default function HealthSummary({
         )}
 
         {/*
-          The computed drivers sit above the model-written tiles on purpose.
+          ── ⚠ One block per subject, because there were two ────────────────
 
-          The tiles are prose from the model; these are arithmetic over rows the
-          owner can go and count. When the two disagree — and they can, since
-          nothing makes the score a function of the drivers — the checkable half
-          should be the half read first.
+          This was a driver panel *and* a three-tile grid, and they overlapped:
+          "Maintenance 97" in green, then 300px lower a second panel also
+          titled "Maintenance" with an orange alert icon reading "Brake fluid
+          overdue". Same word, twice, in two colours, disagreeing — and
+          "Recalls" appeared twice the same way.
+
+          The old comment here defended the order (computed above generated,
+          "the checkable half should be the half read first") and that argument
+          is kept and strengthened rather than dropped: inside each row the
+          measured sentence still comes first and the model's claim follows it.
+          What the ordering could not fix was that they were two *lists*, so
+          the same subject was two entries and the reader had to work out that
+          "Maintenance 97" and "Maintenance ⚠" were one topic.
+
+          ⚠ And they can genuinely disagree — nothing makes the score a
+          function of the drivers, and on the seeded M3 they do: the measured
+          line says nothing is overdue among the six items it can check while
+          the model says the brake fluid is. Putting them in one row does not
+          resolve that, and is not meant to. It makes it visible, in the one
+          place a reader can see both at once, instead of leaving it 300px
+          apart where each half reads as the whole truth.
         */}
-        <HealthDriverRows drivers={drivers} />
-
-        <div className="grid md:grid-cols-3 gap-3">
-          <div className={`p-4 rounded-xl border ${
-            mayReassure(maintenanceClaim)
-              ? 'bg-green-500/8 border-green-400/20'
-              : maintenanceClaim.state === 'unknown'
-                ? 'bg-white/[0.04] border-white/12'
-                : 'bg-orange-500/8 border-orange-400/20'
-          }`}>
-            <div className="flex items-center gap-2.5 mb-2">
-              {mayReassure(maintenanceClaim)
-                ? <CheckCircle className="h-6 w-6 text-green-400" />
-                : maintenanceClaim.state === 'unknown'
-                  ? <HelpCircle className="h-6 w-6 text-white/45" />
-                  : <AlertCircle className="h-6 w-6 text-orange-400" />}
-              <h4 className="text-sm font-semibold text-white">Maintenance</h4>
-            </div>
-            <p className="text-sm text-white/65 leading-relaxed">{maintenanceClaim.text}</p>
-          </div>
-
-          <div className={`p-4 rounded-xl border ${
-            mayReassure(issuesClaim)
-              ? 'bg-green-500/8 border-green-400/20'
-              : issuesClaim.state === 'unknown'
-                ? 'bg-white/[0.04] border-white/12'
-                : 'bg-info-wash border-info-border'
-          }`}>
-            <div className="flex items-center gap-2.5 mb-2">
-              {mayReassure(issuesClaim)
-                ? <CheckCircle className="h-6 w-6 text-green-400" />
-                : issuesClaim.state === 'unknown'
-                  ? <HelpCircle className="h-6 w-6 text-white/45" />
-                  : <AlertCircle className="h-6 w-6 text-info" />}
-              <h4 className="text-sm font-semibold text-white">Known Issues</h4>
-            </div>
-            <p className="text-sm text-white/65 leading-relaxed">{issuesClaim.text}</p>
-          </div>
-
-          <RecallHistoryModal
-            recalls={recalls}
-            /*
-              The same evidence the tile above is rendered from. Passing the
-              array alone left the modal unable to tell "checked, none found"
-              from "never checked" — so the honest tile opened a dialog saying
-              "This vehicle has a clean safety record".
-            */
-            checked={recallsChecked}
-            trigger={
-              <div className={`p-4 rounded-xl border cursor-pointer transition-all group ${
-                mayReassure(recallClaim)
-                  ? 'bg-green-500/8 border-green-400/20 hover:bg-green-500/14 hover:border-green-400/35'
-                  : recallClaim.state === 'unknown'
-                    ? 'bg-white/[0.04] border-white/12 hover:bg-white/[0.07] hover:border-white/20'
-                    : 'bg-orange-500/8 border-orange-400/20 hover:bg-orange-500/14 hover:border-orange-400/35'
-              }`}>
-                <div className="flex items-center gap-2.5 mb-2">
-                  {mayReassure(recallClaim)
-                    ? <CheckCircle className="h-6 w-6 text-green-400" />
-                    : recallClaim.state === 'unknown'
-                      ? <HelpCircle className="h-6 w-6 text-white/45" />
-                      : <ShieldAlert className="h-6 w-6 text-orange-400" />}
-                  <h4 className="text-sm font-semibold text-white">Recall Status</h4>
-                </div>
-                <p className="text-sm text-white/65 leading-relaxed mb-3">{recallClaim.text}</p>
-                {/* Informational link, not a CTA — info rather than brand cyan. */}
-                <div className="flex items-center gap-1 text-xs font-medium text-info/70 group-hover:text-info-strong transition-colors">
-                  <span>View recall history</span>
-                  <ChevronRight
-                    className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform"
-                    aria-hidden="true"
-                  />
-                </div>
-              </div>
-            }
-          />
-        </div>
+        <HealthFactorRows
+          drivers={drivers}
+          claims={{ maintenance: maintenanceClaim, issues: issuesClaim, recalls: recallClaim }}
+          recalls={recalls}
+          recallsChecked={recallsChecked}
+        />
 
         {/* The "Red Flags" card that stood here is gone — its rows are now the
             contributing factors at the top of this card. Two places listing the

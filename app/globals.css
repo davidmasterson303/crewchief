@@ -727,6 +727,23 @@ nav {
     /* `--belt-y` stays here — it is this element's geometry and no register
        touches it. `--belt-led` moved to `:root`, because sport does. */
     --belt-y: 58%;
+    /*
+      ── ⚠ Where the band turns away, and why it is a knob ─────────────────
+
+      The end shading is a percentage of the element's *width*, and the band is
+      a percentage of the page's *height*. On a 1440px desktop that is a 260px
+      falloff over a 230px-tall band and it reads as a band turning away from
+      the light. On a 390px phone the same stops give a 70px falloff over a
+      330px-tall band — and two dark rectangles standing at the page edges,
+      which is how it appeared in a mobile screenshot: not atmosphere, a
+      rendering fault.
+
+      Same geometry, opposite reading, because the aspect ratio inverted. So
+      the stop and the alpha are knobs, and the media query below opens the
+      falloff until the shading has nowhere to read as an edge.
+    */
+    --belt-edge: 18%;
+    --belt-edge-ink: 0.55;
 
     background-color: #0a0a0b;
     background-image:
@@ -752,7 +769,13 @@ nav {
         transparent 2px 3px
       ),
       /* the band's own shading, darker at both ends so it turns away */
-      linear-gradient(90deg, rgb(0 0 0 / 0.55), transparent 18%, transparent 82%, rgb(0 0 0 / 0.55)),
+      linear-gradient(
+        90deg,
+        rgb(0 0 0 / var(--belt-edge-ink)),
+        transparent var(--belt-edge),
+        transparent calc(100% - var(--belt-edge)),
+        rgb(0 0 0 / var(--belt-edge-ink))
+      ),
       /* floor sheen below the belt */
       linear-gradient(180deg, rgb(255 255 255 / 0.016), transparent 55%),
       /* the ground */
@@ -765,6 +788,34 @@ nav {
     background-size: 92% 1px, 100% 100%, 100% 11%, 100% 11%, 100% 34%, 100% 100%;
     background-position: 50% var(--belt-y), 0 0, 0 var(--belt-y), 0 var(--belt-y), 0 100%, 0 0;
     background-attachment: scroll;
+  }
+
+  /*
+    ── ⚠ The phone drops the end shading entirely, and 8 bits is the reason ──
+
+    Opening the falloff out was the first attempt and it made the artefact
+    worse, which is what identified it. The bars are not geometry: they are
+    **banding**. A 0.55 black wash over a `#0a0a0b` ground traverses about four
+    of the 256 available levels, so the ramp can only step — and the wider the
+    falloff, the wider each step, which is why 44% turned two dark rectangles
+    into four visible stripes.
+
+    There is no stop position that fixes that. A gradient with nowhere to go
+    bands at every width; it only looked acceptable at 1440px because the steps
+    were 260px apart and read as one soft edge.
+
+    So the phone gets no end shading at all. The ambient strip, the grain, the
+    sheen and the ground are untouched — the beltline still reads, it just
+    stops drawing a frame it does not have the colour depth to draw.
+
+    ⚠ Do not "restore this properly" with a lower alpha. Lower alpha is fewer
+    levels, which is more banding, not less. If the band ever needs ends on a
+    phone, it needs a dither or a real image.
+  */
+  @media (max-width: 640px) {
+    .cockpit-belt {
+      --belt-edge-ink: 0;
+    }
   }
 
   /* Auth screens. The room is scenery there, not the subject — the form is —
