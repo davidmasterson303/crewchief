@@ -84,7 +84,7 @@ function LoginForm() {
           <label htmlFor="password" className="text-white/70 text-sm font-medium">
             Password
           </label>
-          <Link href="/forgot-password" className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors">
+          <Link href="/forgot-password" className="text-xs text-white/70 underline decoration-white/25 underline-offset-4 transition-colors hover:text-white hover:decoration-white/50">
             Forgot password?
           </Link>
         </div>
@@ -134,7 +134,7 @@ export default function LoginPage() {
           <Link href="/" className="inline-flex group mb-6">
             <BrandLockup width={200} />
           </Link>
-          <h1 className="text-2xl font-bold text-white mb-2">Welcome back</h1>
+          <h1 className="display-serif text-3xl text-white mb-2">Welcome back</h1>
           <p className="text-white/50 text-sm">Sign in to access your garage</p>
         </div>
 
@@ -146,14 +146,34 @@ export default function LoginPage() {
           <div className="mt-6 pt-6 border-t border-white/[0.08] text-center">
             <p className="text-white/50 text-sm">
               Don't have an account?{' '}
-              <Link href="/signup" className="text-cyan-400 hover:text-cyan-300 transition-colors font-medium">
+              <Link href="/signup" className="font-medium text-white underline decoration-white/30 underline-offset-4 transition-colors hover:decoration-white/60">
                 Sign up free
               </Link>
             </p>
           </div>
 
+          {/*
+            ── ⚠ The demo is the funnel, and it was set as fine print ─────────
+
+            12px, at the quietest alpha the ramp allows, with **no hover
+            change at all** — its hover state named the same value the link
+            already had, so the one affordance saying "this is a link" did
+            nothing. A visitor with no account is exactly who this page is for,
+            and the route that costs them nothing was the quietest thing on it.
+
+            ⚠ The old class is described rather than quoted: the contrast suite
+            counts how many of these tokens vanish when comments are stripped
+            and allows five across the tree, so spending the margin on prose
+            about the rule is what breaks it.
+
+            Still below the sign-up line, because a returning user is the
+            page's primary case. But it reads as a control now.
+          */}
           <div className="mt-4 text-center">
-            <Link href="/" className="text-white/50 hover:text-white/50 text-xs transition-colors">
+            <Link
+              href="/"
+              className="text-sm text-white/70 underline decoration-white/25 underline-offset-4 transition-colors hover:text-white hover:decoration-white/50"
+            >
               Or try the demo without an account
             </Link>
           </div>
