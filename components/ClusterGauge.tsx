@@ -332,7 +332,19 @@ export function ClusterGauge({
             fill="none"
             stroke={band.color}
             strokeWidth="6"
-            strokeLinecap="butt"
+            /*
+              ⚠ Round on the value arc, butt on the track beneath it.
+
+              The arc "terminates bluntly" was a critique's word for it, and on
+              a 6px stroke a square end reads as a cut rather than a reading.
+              The track keeps butt caps because it is the full sweep and its
+              ends are the scale's ends, which are marked by ticks — a rounded
+              track would push those ends past their own graduations.
+
+              ⚠ This does **not** make a 0 look like a reading: `strokeDasharray`
+              at 0 draws nothing at all, and a cap needs a dash to sit on.
+            */
+            strokeLinecap="round"
             pathLength={100}
             strokeDasharray={`${clamped} 100`}
             style={{

@@ -154,19 +154,20 @@ function ClaimIcon({ claim }: { claim: HealthClaim }) {
     return <HelpCircle className="h-4 w-4 shrink-0 mt-0.5 text-white/45" aria-hidden="true" />;
   }
   /*
-    ⚠ The alert red, not a third hue. This was `text-orange-400`, which put an
-    amber on a page already carrying red for recalls and red for flags — a
-    critique counted five accent systems and this was one of them. Attention is
-    attention; the product does not have an amber tier, and inventing one in a
-    claim icon implied a severity nothing computes.
+    ── ⚠ Neither amber nor red: this glyph is not an alarm ──────────────────
+
+    It was `orange-400`, which put a third alert hue on the page. Moving it to
+    the critical red fixed the hue count and broke something else, which the
+    next round caught: "red is semantically overloaded — warning triangles on
+    advisory watch-items, red dots on recalls… everything reads as alarm, so
+    nothing does."
+
+    Both were wrong for the same reason. Red belongs to the two things that
+    genuinely are alarms here — an open NHTSA campaign and a critical red flag
+    — and a claim saying "brake fluid overdue" is a finding, not a hazard. It
+    takes ordinary ink and lets the sentence carry its own weight.
   */
-  return (
-    <AlertCircle
-      className="h-4 w-4 shrink-0 mt-0.5"
-      style={{ color: 'var(--critical-red)' }}
-      aria-hidden="true"
-    />
-  );
+  return <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-white/60" aria-hidden="true" />;
 }
 
 function HealthFactorRows({
@@ -224,7 +225,14 @@ function HealthFactorRows({
       {rows.map((row) => (
         <div key={row.key} className="p-4">
           <div className="flex items-baseline justify-between gap-3">
-            <h4 className="text-sm font-semibold text-white">{row.label}</h4>
+            {/*
+              Serif, per drift §10.1. These are the report's sub-heads, and a
+              critique of the rendered page found the editorial voice "dies
+              below the fold" — every heading past the section title was the
+              same bold sans any admin theme ships. The identity has to survive
+              the scroll or it is a hat rather than a system.
+            */}
+            <h4 className="display-serif text-[15px] text-white">{row.label}</h4>
             {/*
               ⚠ An unmeasured driver takes muted ink, never a band. Banding a
               `null` asserts a condition nobody checked — the same overclaim
@@ -795,7 +803,7 @@ export default function HealthSummary({
           <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
             <div className="flex items-center gap-2 mb-3">
               <TrendingUp className="h-5 w-5 text-white/45" />
-              <h4 className="font-semibold text-white text-sm">Recommendations</h4>
+              <h4 className="display-serif text-[15px] text-white">Recommendations</h4>
             </div>
             <ul className="space-y-2">
               {/*

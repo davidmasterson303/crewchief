@@ -62,7 +62,21 @@ export default function RecallAlerts({ recalls, vehicleId, addressedCampaigns = 
   }
 
   return (
-    <div className="bg-red-500/8 border border-red-400/25 rounded-2xl overflow-hidden">
+    <div
+      className="border border-red-400/25 rounded-2xl overflow-hidden"
+      /*
+        ⚠ An opaque ground under the wash, not a translucent panel.
+
+        `bg-red-500/8` alone let the page's `.cockpit-belt` through — its
+        brushed grain surfaced as vertical stripes at this panel's margins,
+        reported twice as "faint vertical stripe artifacts… looks like an
+        unresolved texture or rendering bug". The hero card had the same fault
+        and the same fix: a card sitting on the page's ground is a card, not a
+        window. The wash is composited over `--background` here so the red
+        reads exactly as it did.
+      */
+      style={{ background: 'linear-gradient(rgb(239 68 68 / 0.08), rgb(239 68 68 / 0.08)), #100F0D' }}
+    >
       <div className="flex items-center justify-between px-5 py-4 border-b border-red-400/15">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-red-500/15 border border-red-400/25 flex items-center justify-center flex-shrink-0">
@@ -163,7 +177,15 @@ export default function RecallAlerts({ recalls, vehicleId, addressedCampaigns = 
                       <button
                         onClick={() => handleMarkAddressed(campaignNum)}
                         disabled={isAddressing}
-                        className="tap-target-44 self-start flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/12 hover:border-white/20 text-white/70 hover:text-white text-xs font-medium transition-all disabled:opacity-50"
+                        /*
+                          ⚠ Not a ghost pill. On the dark red ground a 5% fill
+                          with 12% border and 70% ink read as disabled — a
+                          critique listed it under "inert controls" — which is
+                          the worst thing a safety panel's only action can look
+                          like. Solid ink, a real border, and text at full
+                          strength.
+                        */
+                        className="tap-target-44 self-start flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/12 hover:bg-white/20 border border-white/25 hover:border-white/40 text-white text-xs font-semibold transition-all disabled:opacity-50"
                       >
                         {isAddressing ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
