@@ -185,13 +185,15 @@ export function localToday(now: Date = new Date()): string {
  * Splitting the parts and building a **local** date sidesteps it: the numbers
  * the string names are the numbers rendered, in any zone.
  *
- * ⚠ This is a narrow fix for this row. `formatDate` has the same flaw for every
- * date-only string in the product and that is a wider change than this file
- * should make on its way past.
+ * ⚠ The narrow fix this used to be is gone: `formatDate` now handles the
+ * date-only shape itself, which is the wider change this comment asked for and
+ * declined to make on its way past. What survives here is the *guard* — a
+ * malformed string comes back unchanged rather than as "Invalid Date", which is
+ * this row's own decision and not a formatting concern.
  */
 function formatCalendarDate(iso: string): string {
   const [year, month, day] = iso.split('-').map(Number);
   if (!year || !month || !day) return iso;
 
-  return formatDate(new Date(year, month - 1, day));
+  return formatDate(iso);
 }

@@ -2,7 +2,8 @@
 
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
-import { FileText, CircleCheck as CheckCircle2, Calendar, MessageSquare } from 'lucide-react';
+import { FileText, CircleCheck as CheckCircle2, MessageSquare } from 'lucide-react';
+import { formatDate } from '@wellkept/core/formatting-utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getClientSupabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
@@ -170,11 +171,26 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
   const hasHistory = (visits?.length ?? 0) > 0;
 
   return (
-    <DashboardLayout vehicle={vehicle} currentPage="maintenance" vehicleImage={vehicleImage}>
+    <DashboardLayout
+      vehicle={vehicle}
+      currentPage="maintenance"
+      vehicleImage={vehicleImage}
+      /*
+        The visit records draw their own borders, so the layout's panel was a
+        third rounded rectangle around them — page panel, then card, then the
+        rules inside it. Two critiques counted that nesting on this page.
+      */
+      contentSurface="bare"
+    >
       <div className="space-y-6">
-        <div className="flex justify-between items-center mb-8">
+        {/*
+          ⚠ Stacks on a phone. Side by side, the button squeezed the heading
+          into "Service / History" over two lines at 390px — a two-word title
+          wrapping around a control is the layout deciding what the copy says.
+        */}
+        <div className="flex flex-col gap-4 mb-8 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-white">Service History</h2>
+            <h2 className="display-serif text-2xl text-white">Service history</h2>
             {/*
               This read "Digitized by <the vision model>" whenever any
               history existed. Naming the model from the constant fixed one
@@ -196,11 +212,19 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
           </div>
           <Button
             variant="outline"
-            className="border-info-border text-info hover:bg-cyan-500/10"
+            className="self-start border-white/20 text-white/80 hover:border-white/35 hover:bg-white/5 hover:text-white"
             onClick={() => router.push(`/consultant/${params.vehicleId}`)}
           >
+            {/*
+              ⚠ The glyph matches the destination. This was a speech bubble on
+              a button labelled "Upload Invoice" — a critique called it "the
+              wrong icon entirely, that's a chat glyph". It is not wrong about
+              where the button goes: uploading an invoice happens in the
+              advisor, by sending it. The label is what was misleading, so the
+              label says where you are going and the glyph agrees with it.
+            */}
             <MessageSquare className="w-4 h-4 mr-2" />
-            Upload Invoice
+            Upload in the advisor
           </Button>
         </div>
 
@@ -236,14 +260,27 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
             {visits!.map((visit) => (
               <div
                 key={visit.key}
-                className="bg-white/5 border border-white/10 rounded-xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-cyan-500/40 transition-colors"
+                className="rounded-xl border border-white/10 bg-white/[0.03] p-5 transition-colors hover:border-white/25"
               >
-                <div className="flex gap-4 items-start">
-                  <div className="bg-info-wash p-3 rounded-lg border border-info-border flex-shrink-0">
-                    <FileText className="text-info w-6 h-6" />
-                  </div>
+                {/*
+                  ── ⚠ A record, not a tile with a bulleted list beside it ────
+
+                  This was a two-column flex: an icon tile and a list on the
+                  left, the total floating in a 130px column on the right. A
+                  design critique measured what that cost — "the single most
+                  important number per card has no anchor", sitting "indented
+                  past the card edge but short of the bullet column, aligned to
+                  nothing" — and named the repeated generic document glyph on
+                  every card as informationless repetition.
+
+                  A service visit is an invoice. So it is set as one: the shop
+                  and the date as a header, the line items beneath, and the
+                  total behind a rule at the foot where a total goes. The icon
+                  is gone; the shop's name is the identity.
+                */}
+                <div>
                   <div>
-                    <h3 className="text-base font-semibold text-white flex items-center gap-2 flex-wrap">
+                    <h3 className="display-serif text-base text-white flex items-center gap-2 flex-wrap">
                       {visit.vendor}
                       {/*
                         The badge, back — and gated on data this time.
@@ -272,32 +309,56 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
                         </span>
                       )}
                     </h3>
+                    {/*
+                      ⚠ `formatDate`, not the raw column.
+
+                      This printed `visit.date` straight from `service_date` —
+                      "2025-01-20" — in a product wearing a small-caps serif
+                      wordmark, which a critique called the tell that nobody
+                      read the page in character. And the helper had its own
+                      bug: a date-only string parsed as UTC midnight rendered a
+                      day early anywhere west of Greenwich. Both fixed; see
+                      `formatting-utils.ts`.
+
+                      The calendar glyph goes with it — a date needs no icon to
+                      be recognised as a date.
+                    */}
                     {visit.date && (
-                      <div className="flex items-center gap-4 text-sm text-white/50 mt-1">
-                        <span className="flex items-center gap-1.5">
-                          <Calendar className="w-3.5 h-3.5" />
-                          {visit.date}
-                        </span>
-                      </div>
+                      <p className="label-uppercase mt-1.5">{formatDate(visit.date)}</p>
                     )}
-                    <ul className="mt-3 space-y-1.5">
+                    <ul className="mt-4 divide-y divide-white/8 border-t border-white/8">
                       {visit.items.map((item) => (
-                        <li key={item.id} className="text-sm text-white/75 flex items-start gap-2">
-                          <div className="w-1 h-1 rounded-full bg-white/30 flex-shrink-0 mt-2" />
-                          <span>
+                        <li
+                          key={item.id}
+                          className="flex items-baseline justify-between gap-4 py-2 text-sm text-white/75"
+                        >
+                          <span className="min-w-0">
                             {item.item_description}
                             {item.part_number && (
                               <span className="text-white/50 ml-2 text-xs">{item.part_number}</span>
                             )}
                           </span>
+                          {/*
+                            ⚠ Deliberately no per-line price. `total_cost` on a
+                            row is the *visit's* total repeated on every line —
+                            it is what the grouping above sums — so printing it
+                            here would show one figure several times and imply
+                            each item cost the whole visit. The invoice this
+                            came from has line prices; this table does not, and
+                            inventing the split is the precision this product
+                            refuses.
+                          */}
                         </li>
                       ))}
                     </ul>
-                  </div>
-                </div>
 
-                <div className="flex flex-col items-end gap-3 min-w-[130px]">
-                  <span className="text-xl font-bold text-white">{currency.format(visit.total)}</span>
+                    <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-white/15 pt-3">
+                      <span className="label-uppercase">Total</span>
+                      <span className="num text-lg font-bold text-white">
+                        {currency.format(visit.total)}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
