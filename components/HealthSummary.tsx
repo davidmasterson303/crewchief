@@ -153,7 +153,20 @@ function ClaimIcon({ claim }: { claim: HealthClaim }) {
   if (claim.state === 'unknown') {
     return <HelpCircle className="h-4 w-4 shrink-0 mt-0.5 text-white/45" aria-hidden="true" />;
   }
-  return <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-orange-400" aria-hidden="true" />;
+  /*
+    ⚠ The alert red, not a third hue. This was `text-orange-400`, which put an
+    amber on a page already carrying red for recalls and red for flags — a
+    critique counted five accent systems and this was one of them. Attention is
+    attention; the product does not have an amber tier, and inventing one in a
+    claim icon implied a severity nothing computes.
+  */
+  return (
+    <AlertCircle
+      className="h-4 w-4 shrink-0 mt-0.5"
+      style={{ color: 'var(--critical-red)' }}
+      aria-hidden="true"
+    />
+  );
 }
 
 function HealthFactorRows({
@@ -699,14 +712,20 @@ export default function HealthSummary({
         {healthSummary.red_flags && healthSummary.red_flags.length > 0 && (
           <div
             /*
-              ⚠ The red is on the left edge only. Ringing the panel in it put a
-              red arc around all four corners, which is the filled-capsule
-              loudness returning as an outline — the severity belongs to the
-              rows, and one rule down the side is enough to say they belong
-              together.
+              ── ⚠ No coloured rule down the edge ──────────────────────────
+
+              Three filled capsules became a panel with a red left border, and
+              the next critique read that as a rendering fault: "a half-pill
+              stroke hugging only the left edge". It was — a 2px colour on one
+              side of a 12px radius bends around two corners and stops, which
+              looks like a clipping bug rather than an emphasis.
+
+              The severity lives on the glyphs, where it is per-row and
+              accurate. The panel is furniture and matches the factor rows
+              below it, which is the point: one panel treatment, not one per
+              mood.
             */
-            className="rounded-xl border border-white/10 border-l-2 bg-white/[0.02] divide-y divide-white/8"
-            style={{ borderLeftColor: 'var(--critical-red)' }}
+            className="rounded-xl border border-white/10 bg-white/[0.02] divide-y divide-white/8"
           >
             {healthSummary.red_flags.map((flag: string) => (
               <div
@@ -760,10 +779,22 @@ export default function HealthSummary({
             contributing factors at the top of this card. Two places listing the
             same flags was the same duplication problem as the score itself. */}
 
+        {/*
+          ── ⚠ Neutral, not an `info` wash ───────────────────────────────────
+
+          This panel was `bg-info-wash` with an `info` border — a cool
+          slate-blue tint on a warm near-black page, and a design critique named
+          it as the clearest single tell that the palette had lost discipline:
+          "the bluish Recommendations card… belongs to a different, colder
+          product". It was one of five accent systems counted on one screen.
+
+          Recommendations are not a semantic state. They are the last block of
+          the report, and a panel is enough to say so.
+        */}
         {healthSummary.recommendations && healthSummary.recommendations.length > 0 && (
-          <div className="bg-info-wash border border-info-border rounded-xl p-4">
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
             <div className="flex items-center gap-2 mb-3">
-              <TrendingUp className="h-5 w-5 text-info" />
+              <TrendingUp className="h-5 w-5 text-white/45" />
               <h4 className="font-semibold text-white text-sm">Recommendations</h4>
             </div>
             <ul className="space-y-2">

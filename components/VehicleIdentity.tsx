@@ -505,19 +505,21 @@ export function VehicleIdentity({
           */}
           <div className="absolute inset-0 flex flex-row items-center justify-center gap-3 px-4 sm:flex-col sm:gap-4">
             {/*
-              ⚠ Hidden below `sm`, where the plate is one 64px row.
+              ── ⚠ Visible on every viewport, and the tracking is why ─────────
 
-              The row was carrying "NO PHOTOGRAPH YET" and a button reading
-              "Add a photograph" — the same fact twice, in 358px, with both of
-              them wrapping to two lines to fit. In a compact row the action
-              says everything the label said and offers the fix as well.
+              Hiding it below `sm` was the previous attempt, on the argument
+              that the button says everything the label said. The next critique
+              read the result exactly as it looked: "'Add a photograph' dangles
+              at the bottom of the card with zero context… the button reads as
+              an orphan". A button in a bare strip does not say what the strip
+              is.
 
-              It stays in the DOM rather than being conditionally rendered, so
-              the plate keeps naming its own gap for a screen reader on every
-              viewport, and from `sm` up — where this is a column with room —
-              it is visible again.
+              The real problem was never the label, it was 0.2em of tracking:
+              at that width the two elements needed about 394px inside 358 and
+              both wrapped. Tracked at 0.08em they fit on one line together,
+              which is what the compact row was always supposed to be.
             */}
-            <p className="hidden sm:block font-mono text-xs uppercase tracking-[0.2em] text-white/55">
+            <p className="font-mono text-xs uppercase tracking-[0.08em] sm:tracking-[0.2em] text-white/55">
               No photograph yet
             </p>
             {emptyAction}

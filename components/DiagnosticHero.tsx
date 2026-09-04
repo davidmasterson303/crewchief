@@ -293,7 +293,22 @@ export default function DiagnosticHero({
         heading above the hero rather than on the photograph.
       */}
       <div
-        className={`bg-[#0f1318]/90 px-4 sm:px-6 sm:px-8 py-6${
+        /*
+          ⚠ Opaque, not `/90`.
+
+          At 90% the page's `.cockpit-belt` showed straight through: its
+          ambient strip crossed the card as a full-width hairline right at the
+          dial's 0/100 baseline, and its brushed grain surfaced as vertical
+          banding at the card's margins. Two critiques of the rendered page
+          reported both as rendering faults — "a stray full-width hairline…
+          like a rendering bug", "visible striped banding artifacts" — which is
+          exactly what a background feature crossing a foreground card looks
+          like.
+
+          The belt is the page's ground and it belongs behind the page. A card
+          sitting on it is a card, not a window.
+        */
+        className={`bg-[#0f1318] px-4 sm:px-6 sm:px-8 py-6${
           stacked ? '' : ' order-1 sm:order-none sm:flex-1'
         }`}
       >
@@ -334,8 +349,17 @@ export default function DiagnosticHero({
           numeral lives in the well of the arc, which is where a cluster puts
           it.
         */}
+        {/*
+          ⚠ Centred on a phone, distributed on a desktop.
+
+          Stacked, the dial sat hard left with "a large empty right half" — a
+          design critique's words — because the column inherited the row's left
+          alignment. A single instrument in a column belongs on the column's
+          axis; the row only exists from `sm` up, where the two anchors and the
+          space between them are the composition.
+        */}
         {healthScore !== undefined && (
-          <div className="flex h-full flex-col sm:flex-row sm:items-center sm:justify-between gap-5 sm:gap-9">
+          <div className="flex h-full flex-col items-center text-center sm:flex-row sm:items-center sm:justify-between sm:text-left gap-5 sm:gap-9">
             {/*
               `active` was `scanDone` — the dial held its sweep until a timer
               elsewhere on the screen said a fictional scan had finished. There
