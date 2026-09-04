@@ -220,11 +220,13 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
               a button labelled "Upload Invoice" — a critique called it "the
               wrong icon entirely, that's a chat glyph". It is not wrong about
               where the button goes: uploading an invoice happens in the
-              advisor, by sending it. The label is what was misleading, so the
-              label says where you are going and the glyph agrees with it.
+              consultant, by sending it. The label is what was misleading, so
+              the label names the tab it opens — "advisor" was a third word for
+              a feature already called Consultant in the nav and Jay in the
+              thread, and a critique caught the collision.
             */}
             <MessageSquare className="w-4 h-4 mr-2" />
-            Upload in the advisor
+            Upload in Consultant
           </Button>
         </div>
 
@@ -280,7 +282,15 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
                 */}
                 <div>
                   <div>
-                    <h3 className="display-serif text-base text-white flex items-center gap-2 flex-wrap">
+                    {/*
+                      ⚠ Sans, not the display serif. Setting a shop's name in
+                      Newsreader at body size looked, in a critique's words,
+                      "like an unstyled font fallback rather than a choice" —
+                      the serif is for the page's display moments, and applying
+                      it one level deeper cheapened both. Drift §10.1 says
+                      titles and section heads; a record's subject is neither.
+                    */}
+                    <h3 className="text-base font-semibold text-white flex items-center gap-2 flex-wrap">
                       {visit.vendor}
                       {/*
                         The badge, back — and gated on data this time.

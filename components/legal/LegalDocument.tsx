@@ -45,7 +45,13 @@ export default function LegalDocument({
           <BrandLockup width={240} />
         </Link>
 
-        <h1 className="text-3xl font-bold text-white mb-3">{title}</h1>
+        {/*
+          Serif, per drift §10.1 — the page title and its section heads. These
+          pages open with the serif wordmark and then set everything under it in
+          bold sans, so the identity stopped at the mark. On the one page App
+          Review actually reads, that is the wrong place for it to stop.
+        */}
+        <h1 className="display-serif text-3xl sm:text-4xl text-white mb-3">{title}</h1>
 
         <p className="text-white/70 text-base leading-relaxed mb-2">{summary}</p>
 
@@ -82,5 +88,5 @@ export default function LegalDocument({
 
 /** A section heading, so the two documents cannot style theirs differently. */
 export function LegalSection({ children }: { children: React.ReactNode }) {
-  return <h2 className="text-white font-semibold text-lg pt-6">{children}</h2>;
+  return <h2 className="display-serif text-white text-xl pt-8">{children}</h2>;
 }

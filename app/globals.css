@@ -789,13 +789,27 @@ nav {
         rgb(34 211 238 / calc(0.05 * var(--belt-led))),
         transparent 65%
       ),
-      /* brushed metal — 1px on, 2px off, so it reads as grain not stripes */
-      repeating-linear-gradient(
-        90deg,
-        rgb(255 255 255 / 0.03) 0 1px,
-        rgb(255 255 255 / 0.012) 1px 2px,
-        transparent 2px 3px
-      ),
+      /*
+        ── ⚠ The brushed-metal grain is deleted, and it was the pinstripes ────
+
+        1px on, 2px off, across the full width, in an 11% band pinned at
+        `--belt-y`. The comment claimed it "reads as grain not stripes" and at
+        1440px on a short page it did. On a phone, and on any page long enough
+        to scroll, that band lands in the middle of the content and starts and
+        stops at arbitrary heights — four separate design critiques, across
+        three different pages, reported it as a rendering artefact. The last
+        called it "the single most damaging flaw… on a design whose whole pitch
+        is meticulous, an artifact like this is fatal to the premise."
+
+        They were describing it accurately. A 1px repeating gradient over a
+        near-black ground cannot survive a device pixel ratio it was not
+        authored at: at 2x and 3x the phase shifts and the grain resolves into
+        visible banding, which is exactly what a "pinstripe" is.
+
+        The beltline keeps its ambient strip, its shading and its ground. What
+        went is the one layer that was texture for its own sake — see
+        `docs/design-system-drift.md` §10.5.
+      */
       /* the band's own shading, darker at both ends so it turns away */
       linear-gradient(
         90deg,
@@ -808,13 +822,16 @@ nav {
       linear-gradient(180deg, rgb(255 255 255 / 0.016), transparent 55%),
       /* the ground */
       linear-gradient(180deg, #0a0a0b 0%, #100f0d 46%, #0b0a09 100%);
-    /* repeat-x, not repeat, on the brushed layer. `repeat` tiles it down the
-     * page as well as across, so the grain climbed out of its 11% band and
-     * textured the entire background — visible behind the page title, which is
-     * nowhere near the beltline. */
-    background-repeat: no-repeat, no-repeat, repeat-x, no-repeat, no-repeat, no-repeat;
-    background-size: 92% 1px, 100% 100%, 100% 11%, 100% 11%, 100% 34%, 100% 100%;
-    background-position: 50% var(--belt-y), 0 0, 0 var(--belt-y), 0 var(--belt-y), 0 100%, 0 0;
+    /* ⚠ The `repeat-x` note that stood here belonged to the brushed layer,
+     * which is gone. Keeping it would have described a layer nobody could find
+     * — and its finding is preserved where it still applies, in the deletion
+     * note above: that band did not stay in its band. */
+    /* ⚠ Five layers now, not six — the lists below are positional and the
+     * grain's entry had to come out of each of them. A stale entry here does
+     * not error; it silently shifts every layer after it. */
+    background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat;
+    background-size: 92% 1px, 100% 100%, 100% 11%, 100% 34%, 100% 100%;
+    background-position: 50% var(--belt-y), 0 0, 0 var(--belt-y), 0 100%, 0 0;
     background-attachment: scroll;
   }
 

@@ -519,7 +519,19 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                       is what made a critique read the page as having two
                       competing accents.
                     */}
-                    {isActive && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400 rounded-t-full" />}
+                    {/*
+                      ⚠ White, not cyan — there were two teal rules here.
+
+                      `.bay-batten` draws a cyan hairline along the bottom of
+                      this nav, and this underline sat a couple of pixels above
+                      it. Two critiques, on two different pages, read the pair
+                      as a rendering fault: "one of them is leftover".
+
+                      Neither is. The batten is the room's light and runs the
+                      full width; this marks one tab. They just could not both
+                      be the same colour and remain two things.
+                    */}
+                    {isActive && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-white rounded-t-full" />}
                   </Link>
                 );
             })}

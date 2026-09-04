@@ -882,6 +882,32 @@ can act on this" — the active tab, the focus ring — and links were a second,
 quieter blue saying the same thing. Links take the accent; `info` keeps the
 washes and informational glyphs it was made for.
 
+### 10.5 · ⚠ The beltline's brushed-metal grain is deleted
+
+`.cockpit-belt`'s third layer was a `repeating-linear-gradient` — 1px on, 2px
+off, full width, in an 11% band pinned at `--belt-y`. Its own comment claimed it
+"reads as grain not stripes", and at 1440px on a short page it did.
+
+**Four critiques, across three pages, reported it as a rendering fault** — the
+last calling it "the single most damaging flaw… on a design whose whole pitch is
+meticulous, an artifact like this is fatal to the premise". They were describing
+it accurately: a 1px repeating gradient over a near-black ground cannot survive a
+device pixel ratio it was not authored at, so at 2x and 3x the phase shifts and
+the grain resolves into visible banding. On any page long enough to scroll, that
+band also lands in the middle of the content and starts and stops at arbitrary
+heights.
+
+The beltline keeps its ambient strip, its shading and its ground. What went is
+the one layer that was texture for its own sake.
+
+### 10.6 · ⚠ The active tab's underline is white, not cyan
+
+`.bay-batten` draws a cyan hairline along the bottom of the nav, and the active
+tab's underline sat two pixels above it. Two critiques on two pages read the pair
+as a fault — "one of them is leftover". Neither is: the batten is the room's
+light and runs the full width, the underline marks one tab. They could not both
+be cyan and remain two things.
+
 ### Not design-system changes, listed so Design can see the whole pass
 
 Model as the card's name with year/make as the eyebrow · "67,400 mi mileage" →

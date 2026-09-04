@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Gauge, Zap, Timer, Droplets, Lightbulb, Cog, Activity, Loader as Loader2, RefreshCw } from 'lucide-react';
+import { Droplets, Lightbulb, Loader as Loader2, RefreshCw } from 'lucide-react';
 import ResearchButton from '@/components/ResearchButton';
 import { getClientSupabase } from '@/lib/supabase';
 import { logger } from '@wellkept/core/logger';
@@ -186,20 +186,31 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
 
         <Card className="bg-slate-900/60 border-white/10">
           <CardContent className="pt-5 pb-5">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+            {/*
+              ── ⚠ Three rows, not three cards with circled glyphs ────────────
+
+              This was page → panel → this card → three bordered tiles, each
+              with an icon in its own bordered circle: four levels of rounded
+              rectangle to show three key/value pairs. A design critique called
+              it the page's worst offence and "the classic AI tell", and it was
+              right about the glyphs too — a waveform meant Transmission, a
+              lightning bolt meant Drivetrain on a petrol car, and the same bolt
+              headed Performance Stats a few hundred pixels below. One glyph,
+              two meanings, one screen.
+
+              A studio sets this as table rows with a hairline. So it is rows,
+              stacked on a phone and three-up from `sm`, and the labels do the
+              work the circles were doing.
+            */}
+            <div className="divide-y divide-white/8 sm:grid sm:grid-cols-3 sm:divide-y-0 sm:divide-x">
               {[
-                { icon: Cog, label: 'Engine', value: cleanPowertrain(knowledge?.engine_type) },
-                { icon: Activity, label: 'Transmission', value: cleanPowertrain(knowledge?.transmission_type) },
-                { icon: Zap, label: 'Drivetrain', value: cleanPowertrain(knowledge?.drivetrain) },
-              ].map(({ icon: Icon, label, value }) => (
-                <div key={label} className="flex items-start gap-3 p-4 bg-white/4 rounded-xl border border-white/8">
-                  <div className="w-8 h-8 rounded-lg bg-info-wash border border-info-border flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Icon className="h-4 w-4 text-info" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="label-uppercase mb-1">{label}</p>
-                    <p className="text-sm font-semibold text-white leading-snug">{value}</p>
-                  </div>
+                { label: 'Engine', value: cleanPowertrain(knowledge?.engine_type) },
+                { label: 'Transmission', value: cleanPowertrain(knowledge?.transmission_type) },
+                { label: 'Drivetrain', value: cleanPowertrain(knowledge?.drivetrain) },
+              ].map(({ label, value }) => (
+                <div key={label} className="py-3 first:pt-0 last:pb-0 sm:px-4 sm:py-0 sm:first:pl-0 sm:last:pr-0">
+                  <p className="label-uppercase mb-1">{label}</p>
+                  <p className="text-sm font-semibold text-white leading-snug">{value}</p>
                 </div>
               ))}
             </div>
@@ -209,10 +220,7 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
         <Card className="bg-slate-900/60 border-white/10">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-white text-base">
-                <Zap className="h-5 w-5 text-info" />
-                Performance Stats
-              </CardTitle>
+              <CardTitle className="display-serif text-white text-lg">Performance</CardTitle>
               <button
                 onClick={() => fetchPerformanceStats(true)}
                 disabled={perfLoading}
@@ -326,9 +334,9 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
 
         <Card className="bg-slate-900/60 border-white/10">
           <CardHeader className="pb-4">
-            <CardTitle className="flex items-center gap-2 text-white text-base">
-              <Droplets className="h-5 w-5 text-info" />
-              Fluid Specifications
+            <CardTitle className="display-serif flex items-center gap-2 text-white text-lg">
+              <Droplets className="h-5 w-5 text-white/45" />
+              Fluid specifications
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -368,7 +376,7 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
 
         <Card className="bg-slate-900/60 border-white/10">
           <CardHeader className="pb-4">
-            <CardTitle className="flex items-center gap-2 text-white text-base">
+            <CardTitle className="display-serif flex items-center gap-2 text-white text-lg">
               {/*
                 ── ⚠ It said "Five" and rendered three ─────────────────────
 
