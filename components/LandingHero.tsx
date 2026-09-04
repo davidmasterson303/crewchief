@@ -2,7 +2,10 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, ChevronDown } from 'lucide-react';
+/* ⚠ No `ArrowRight`. The CTA carried one, and a critique named it "the one
+   stock-SaaS tell in an otherwise non-SaaS composition" — a painted sign does
+   not tell you which way the door opens. */
+import { ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import FeaturesDrawer from './FeaturesDrawer';
 import BrandLockup from '@/components/brand/BrandLockup';
@@ -83,6 +86,13 @@ export default function LandingHero({ onEnter }: LandingHeroProps) {
         the door still turns the corner behind it and the metal is still
         legible where nothing is written.
 
+        ⚠ Deepened on the second pass. The first scrim was 0.86 at its centre
+        and the slats still read through it: "bright band highlights run
+        directly under the body copy on mobile, costing contrast exactly where
+        the pitch lives." The door's ramp peaks at `#5e5e5e` with a lit hinge
+        edge above every joint, so a wash that leaves 14% of it showing leaves
+        the brightest 14%.
+
         `pointer-events-none` — the opener beneath must stay pressable.
       */}
       <div
@@ -90,7 +100,7 @@ export default function LandingHero({ onEnter }: LandingHeroProps) {
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            'radial-gradient(ellipse 78% 62% at 50% 46%, rgba(8,8,9,0.86) 0%, rgba(8,8,9,0.72) 42%, rgba(8,8,9,0) 78%)',
+            'radial-gradient(ellipse 96% 74% at 50% 46%, rgba(8,8,9,0.94) 0%, rgba(8,8,9,0.88) 46%, rgba(8,8,9,0.5) 72%, rgba(8,8,9,0) 100%)',
         }}
       />
       <div className="relative flex w-full max-w-4xl flex-col items-center">
@@ -150,7 +160,14 @@ export default function LandingHero({ onEnter }: LandingHeroProps) {
         </motion.div>
 
         <motion.p
-          className="text-xl text-gray-300 leading-relaxed mx-auto mt-6"
+          /*
+            ⚠ 18px on a phone, 20 above it. At 20px in a 358px column this set
+            to five ragged full-width lines, and a critique called the
+            paragraph long "at this size" — the note was about the setting, not
+            the words, which it praised as "specific and confident". So the
+            words are untouched and the measure gets more of them per line.
+          */
+          className="text-lg sm:text-xl text-gray-300 leading-relaxed mx-auto mt-6"
           style={{ maxWidth: '600px' }}
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -209,33 +226,34 @@ export default function LandingHero({ onEnter }: LandingHeroProps) {
             */
             <button
               onClick={onEnter}
-              className="enter-garage-btn group relative flex items-center justify-center gap-2 h-14 px-9 text-base font-semibold text-white rounded-xl overflow-hidden transition-all duration-300 hover:glow-cyan focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+              className="enter-garage-btn group relative flex items-center justify-center gap-2 h-14 px-9 text-base font-semibold rounded-xl transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
               /*
-                ⚠ One colour, not a gradient. A cyan-to-blue pill is the second
-                half of the trope the headline just lost, and its lightest stop
-                sat under the first word so the label's contrast was weakest
-                exactly where reading starts. `--primary` is the fill every
-                other button in the product already uses — the same Sign In
-                button on the auth pages — which is what makes this the
-                product's primary action rather than the landing page's own.
+                ── ⚠ White, and this is drift §11 arriving on the landing page ─
 
-                ⚠ `hsl(...)` around it. The token holds **raw HSL channels**
-                (`193 82% 31%`), not a colour — Tailwind's config wraps it. Set
-                bare it resolves to nothing and the button renders with no
-                fill at all, which is exactly what happened on the first pass.
+                It was a cyan-to-blue gradient, then a flat `--primary`. A
+                critique caught what the flat version still did: the plate's
+                glow is `#22D3EE` and `--primary` is `#0E7490`, so "the accent
+                color splits into two near-misses" — two cyans on one screen,
+                neither matching the other.
+
+                §11 settled what each hue is for, and white is what you can act
+                on. A white plate with near-black type is also the more
+                confident object on a dark metal door: it reads as painted
+                signage rather than as a web button, which is the register this
+                page is in.
+
+                One cyan on the screen now, and it is the mark.
               */
-              style={{ background: 'hsl(var(--primary))', minWidth: '200px' }}
+              style={{ background: '#F5F4F2', color: '#100F0D', minWidth: '200px' }}
             >
-              <span className="shimmer-layer absolute inset-0 pointer-events-none" aria-hidden="true" />
               <span className="relative z-10 flex items-center gap-2">
                 Enter demo
-                <ArrowRight className="h-5 w-5 transition-transform duration-300 group-hover:translate-x-1.5" />
               </span>
             </button>
           ) : (
             <Link
               href="/signup"
-              className="enter-garage-btn group relative flex items-center justify-center gap-2 h-14 px-9 text-base font-semibold text-white rounded-xl overflow-hidden transition-all duration-300 hover:glow-cyan focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+              className="enter-garage-btn group relative flex items-center justify-center gap-2 h-14 px-9 text-base font-semibold rounded-xl transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
               /*
                 ⚠ One colour, not a gradient. A cyan-to-blue pill is the second
                 half of the trope the headline just lost, and its lightest stop
@@ -245,12 +263,10 @@ export default function LandingHero({ onEnter }: LandingHeroProps) {
                 button on the auth pages — which is what makes this the
                 product's primary action rather than the landing page's own.
               */
-              style={{ background: 'hsl(var(--primary))', minWidth: '200px' }}
+              style={{ background: '#F5F4F2', color: '#100F0D', minWidth: '200px' }}
             >
-              <span className="shimmer-layer absolute inset-0 pointer-events-none" aria-hidden="true" />
               <span className="relative z-10 flex items-center gap-2">
                 Add your vehicle
-                <ArrowRight className="h-5 w-5 transition-transform duration-300 group-hover:translate-x-1.5" />
               </span>
             </Link>
           )}
@@ -286,7 +302,14 @@ export default function LandingHero({ onEnter }: LandingHeroProps) {
           */}
           <Link
             href="/login"
-            className="tap-target-44 flex items-center justify-center px-4 text-base font-medium text-white/70 underline decoration-white/25 underline-offset-4 transition-colors hover:text-white hover:decoration-white/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+            /*
+              ⚠ `h-14` matches the two buttons' box exactly. As a bare inline
+              link its box hugged its text, so in the row the three items
+              centred on three different heights and a critique read the link's
+              baseline as sitting low. Same height, one optical centreline —
+              and a full-height hit area for a control people reach for.
+            */
+            className="tap-target-44 flex h-14 items-center justify-center px-4 text-base font-medium text-white/70 underline decoration-white/25 underline-offset-4 transition-colors hover:text-white hover:decoration-white/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
           >
             Sign in
           </Link>
@@ -332,20 +355,11 @@ export default function LandingHero({ onEnter }: LandingHeroProps) {
       </div>
 
       <style jsx global>{`
-        .shimmer-layer {
-          background: linear-gradient(
-            110deg,
-            transparent 25%,
-            rgba(255, 255, 255, 0.22) 50%,
-            transparent 75%
-          );
-          background-size: 200% 100%;
-          animation: shimmer 2.8s infinite linear;
-        }
+        /* The shimmer layer and its keyframes are deleted with the gradient
+         * they slid across. A critique called what was left "a diagonal glossy
+         * blotch… an unfinished Sketch style", and it was: a moving highlight
+         * over a flat fill is a sheen with nothing to catch. */
 
-        @keyframes shimmer {
-          0%   { background-position: 200% center; }
-          100% { background-position: -200% center; }
         }
 
         .enter-garage-btn:hover {

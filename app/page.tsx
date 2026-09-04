@@ -372,7 +372,23 @@ function GarageContents() {
               one-viewport page that is filler; the footer closes the page and
               the hero is trusted to have said it.
             */}
-            <p className="font-mono text-xs uppercase tracking-[0.18em] text-white/55">
+            {/*
+              ⚠ Not mono. A design critique counted four type voices on this
+              screen — small-caps serif on the plate, display serif in the
+              headline, sans in the body and buttons, and monospace here — and
+              named this one: "the mono footer in particular is a developer's
+              flourish, not the sign-painter's."
+
+              It is right. Monospace says *machine* on a page whose whole
+              argument is that a person keeps the record.
+
+              ⚠ And it is **not** letterspaced small caps either, which was the
+              first replacement and made things worse: the next round counted
+              that gesture three times on one screen — the plate, its maker
+              line, and this — and called three "a tic". Twice is discipline. A
+              colophon can simply be a sentence.
+            */}
+            <p className="text-xs text-white/55">
               Well Kept — Southmoor Digital
             </p>
           </footer>
