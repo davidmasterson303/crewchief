@@ -56,6 +56,34 @@ function tsxFiles(dir: string): string[] {
 const unbreakpointed = () => /class(?:Name)?="([^"]*\bgrid-cols-[3-9]\b[^"]*)"/g;
 const HAS_BREAKPOINT = /\b(sm|md|lg|xl|2xl):/;
 
+/**
+ * Grids that are deliberately three-up on a phone, with the argument.
+ *
+ * ── ⚠ The rule invites this, and asks for the reasoning to live here ────────
+ *
+ * "If a fixed three-up is genuinely right for some future case — three icons
+ * with no text, say — this is the place to argue it, and the argument should be
+ * written here rather than the rule quietly loosened." So:
+ *
+ * **`vehicle-info` performance readings.** Three cells holding a numeral, its
+ * unit and a one-word label. Nothing else — no icon, no tile, no border, no
+ * body copy, which is what separates it from R3: that grid put a 32px icon, a
+ * 12px gap and 32px of padding into a 66px cell and left the text column at
+ * roughly zero, so "8-speed automatic" wrapped one character per line.
+ *
+ * Measured at 390px on the rendered page: cells are **96px**, content boxes
+ * **80px**, and every child fits inside without overflow —
+ * `scrollWidth === clientWidth` on all six elements. That check is what caught
+ * "Horsepower" at 97px, which is why the label reads "Power".
+ *
+ * ⚠ The exemption is the class string, not the file. A different three-up grid
+ * appearing in the same page is still a failure, which is the point — R3's own
+ * page is exactly where this keeps happening.
+ */
+const DELIBERATE_THREE_UP = [
+  'grid grid-cols-3 divide-x divide-white/8 rounded-xl border border-white/10 bg-white/[0.02]',
+];
+
 const offenders = ROOTS.flatMap((root) => tsxFiles(join(ROOT, root))).flatMap((path) => {
   const source = readFileSync(path, 'utf8');
   const found: string[] = [];
@@ -63,7 +91,7 @@ const offenders = ROOTS.flatMap((root) => tsxFiles(join(ROOT, root))).flatMap((p
 
   let match: RegExpExecArray | null;
   while ((match = pattern.exec(source)) !== null) {
-    if (!HAS_BREAKPOINT.test(match[1])) {
+    if (!HAS_BREAKPOINT.test(match[1]) && !DELIBERATE_THREE_UP.includes(match[1])) {
       found.push(`${path.slice(ROOT.length + 1)} — "${match[1]}"`);
     }
   }
@@ -77,6 +105,21 @@ describe('three-column grids declare a phone layout', () => {
     // assertion below trivially true — the failure mode this repo keeps
     // re-learning.
     expect(ROOTS.flatMap((root) => tsxFiles(join(ROOT, root))).length).toBeGreaterThan(50);
+  });
+
+  it('can still catch one, so the exemption list is not a hole', () => {
+    /*
+      §5: every scanner here carries a case proving it can still fail. The
+      exemption matches an exact class string, so a grid that merely resembles
+      the sanctioned one is still reported — which is what stops the list from
+      becoming "this page is allowed three columns".
+    */
+    const pattern = unbreakpointed();
+    const planted = 'x <div className="grid grid-cols-3 gap-4 p-5">y</div>';
+    const match = pattern.exec(planted);
+
+    expect(match).not.toBeNull();
+    expect(DELIBERATE_THREE_UP.includes(match![1])).toBe(false);
   });
 
   it('finds none without a breakpoint', () => {

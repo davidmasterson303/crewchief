@@ -407,8 +407,16 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
           */}
           {/* Full-bleed below `sm`: the strip is a rule across the screen, and
               the 16px page gutter it was sitting inside was 32px the four tabs
-              needed. Unchanged from `sm` up. */}
-          <div className="-mx-4 sm:mx-0 flex border-t border-white/8 overflow-x-auto edge-fade-x">
+              needed. Unchanged from `sm` up.
+
+              ⚠ `px-1.5` inside the bleed. Without it the first tab's label
+              starts at x=0, hard against the bezel, and two design critiques
+              reported "Dashboard" as clipped — it was not (the strip measures
+              390 in a 390 viewport, no overflow), but a label touching the
+              screen edge reads as cut, which for a navigation item is the same
+              failure. Six pixels of air costs nothing: the four tabs measured
+              369px inside 390. */}
+          <div className="-mx-4 sm:mx-0 px-1.5 sm:px-0 flex border-t border-white/8 overflow-x-auto edge-fade-x">
               {tabs.map(({ key, label, icon: Icon, href }) => {
                 const isActive = currentPage === key;
                 return (

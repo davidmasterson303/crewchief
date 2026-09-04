@@ -231,24 +231,46 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                {/*
+                  ── ⚠ Three columns on a phone, not three stacked tiles ──────
+
+                  Each figure was a full-width centred card with its own border,
+                  radius, icon and padding — about 500px of screen for one
+                  number, so three numbers cost roughly four screens of thumb
+                  travel. A design critique called it the single largest failure
+                  on the page, and it is a mobile-first product.
+
+                  They are three readings of one thing and they belong on one
+                  line. An instrument panel is dense; that density *is* the
+                  luxury register this page is reaching for.
+
+                  ⚠ The glyphs are gone with the tiles. `Zap` was doing duty for
+                  Torque here, for Drivetrain above and for Performance Stats in
+                  the header — an icon that means three things means none, and
+                  these were chosen to fill circles rather than to say anything.
+                */}
+                <div className="grid grid-cols-3 divide-x divide-white/8 rounded-xl border border-white/10 bg-white/[0.02]">
                   {[
                     {
-                      icon: Gauge,
-                      label: 'Horsepower',
+                      /*
+                        ⚠ "Power", not "Horsepower". At 12px with the house
+                        label tracking the longer word measures 97px into an
+                        80px cell — measured, not estimated — and overflowed.
+                        "Power" is what the figure is called next to torque,
+                        and `hp` is printed beside the number anyway.
+                      */
+                      label: 'Power',
                       value: displayHP,
                       unit: 'hp',
                       delta: hasModifications && vehicle.stock_hp ? `+${(displayHP || 0) - vehicle.stock_hp} from stock` : null,
                     },
                     {
-                      icon: Zap,
                       label: 'Torque',
                       value: displayTorque,
                       unit: 'lb-ft',
                       delta: hasModifications && vehicle.stock_torque ? `+${(displayTorque || 0) - vehicle.stock_torque} from stock` : null,
                     },
                     {
-                      icon: Timer,
                       label: '0-60 mph',
                       value: displayZeroToSixty,
                       unit: 's',
@@ -256,19 +278,20 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
                         ? `-${(vehicle.stock_zero_to_sixty - displayZeroToSixty).toFixed(2)}s faster`
                         : null,
                     },
-                  ].map(({ icon: Icon, label, value, unit, delta }) => (
-                    <div key={label} className="flex flex-col items-center justify-center p-5 bg-white/4 rounded-xl border border-white/8">
-                      <Icon className="h-6 w-6 text-info mb-3" />
-                      <div className="text-center">
-                        <div className="text-3xl font-bold text-white tabular-nums">
-                          {value || '\u2014'}
-                          {value && <span className="text-base font-normal text-white/50 ml-1">{unit}</span>}
-                        </div>
-                        <p className="text-xs text-white/50 mt-1">{label}</p>
-                        {delta && (
-                          <p className="text-xs text-green-400 font-medium mt-1">{delta}</p>
-                        )}
+                  ].map(({ label, value, unit, delta }) => (
+                    <div key={label} className="px-2 py-4 text-center sm:px-4 sm:py-5">
+                      <div className="num text-2xl sm:text-3xl font-bold text-white">
+                        {value || '\u2014'}
+                        {value && <span className="text-sm font-normal text-white/50 ml-0.5">{unit}</span>}
                       </div>
+                      <p className="label-uppercase mt-1.5">{label}</p>
+                      {/*
+                        ⚠ Not green. "+52 from stock" is a fact about a
+                        modification, not a good or a bad one, and the health
+                        ramp's green is this product's word for "fine" — a
+                        figure borrowing it claims a judgement nothing made.
+                      */}
+                      {delta && <p className="mt-1 text-xs text-white/55">{delta}</p>}
                     </div>
                   ))}
                 </div>
@@ -311,10 +334,29 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
           <CardContent>
             {Object.keys(fluidSpecs).length > 0 ? (
               <div className="divide-y divide-white/6">
+                {/*
+                  ── ⚠ Label above value on a phone, side by side above `sm` ──
+
+                  The row was label-left / value-right at every width, so
+                  "0W-30 or 0W-40 Full Synthetic (BMW LL-01 spec)" wrapped to
+                  three lines of **right-aligned** body copy in a 60% column —
+                  ragged-left, which is the hardest alignment to read, four rows
+                  running. A design critique named it, and at the other end the
+                  same pattern put 900px of empty table between "Coolant" and
+                  its value on a desktop.
+
+                  Stacked, the value gets the full column and reads left to
+                  right like everything else.
+                */}
                 {Object.entries(fluidSpecs).map(([key, value]: [string, any]) => (
-                  <div key={key} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
-                    <span className="text-sm text-white/60 capitalize">{key.replace(/_/g, ' ')}</span>
-                    <span className="text-sm font-medium text-white text-right max-w-[60%]">{value}</span>
+                  <div
+                    key={key}
+                    className="py-3 first:pt-0 last:pb-0 sm:flex sm:items-baseline sm:justify-between sm:gap-8"
+                  >
+                    <span className="label-uppercase block sm:mb-0">{key.replace(/_/g, ' ')}</span>
+                    <span className="mt-1 block text-sm font-medium text-white sm:mt-0 sm:max-w-[60%] sm:text-right">
+                      {value}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -327,20 +369,41 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
         <Card className="bg-slate-900/60 border-white/10">
           <CardHeader className="pb-4">
             <CardTitle className="flex items-center gap-2 text-white text-base">
-              <Lightbulb className="h-5 w-5 text-info" />
-              Five Interesting Facts
+              {/*
+                ── ⚠ It said "Five" and rendered three ─────────────────────
+
+                The prompt asks the model for five facts; the model returned
+                three for this car, and the heading counted anyway. For a
+                product whose stated position is that it makes no claim the
+                data cannot support, a title that miscounts the list beneath it
+                is a credibility wound rather than a nitpick — and it is the
+                same defect class as a score computed from no evidence, in
+                copy.
+
+                So the heading stops counting. "Worth knowing" is true at three
+                facts and at five, which is the only wording that can be.
+              */}
+              <Lightbulb className="h-5 w-5 text-white/45" />
+              Worth knowing
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {/*
+              ⚠ A hairline-divided list, not one bordered tile per fact inside a
+              bordered card inside a bordered page panel. Three levels of
+              rounded rectangle for a sentence apiece is the nesting two
+              critiques named as this page's most generated-looking habit — and
+              the numerals in circles implied a ranking that nothing computes.
+            */}
             {interestingFacts.length > 0 ? (
-              <div className="space-y-3">
+              <div className="divide-y divide-white/8">
                 {interestingFacts.map((fact: string, index: number) => (
-                  <div key={`fact-${index}`} className="flex gap-4 p-3.5 bg-white/3 rounded-xl border border-white/6">
-                    <div className="flex-shrink-0 w-6 h-6 rounded-lg bg-info-wash border border-info-border flex items-center justify-center text-xs font-bold text-info">
-                      {index + 1}
-                    </div>
-                    <p className="text-sm text-white/70 leading-relaxed flex-1">{fact}</p>
-                  </div>
+                  <p
+                    key={`fact-${index}`}
+                    className="py-3 text-sm leading-normal text-white/70 first:pt-0 last:pb-0"
+                  >
+                    {fact}
+                  </p>
                 ))}
               </div>
             ) : (
