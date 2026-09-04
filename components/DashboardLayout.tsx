@@ -395,7 +395,10 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
             always here, always visible, and cannot be on screen twice because
             it only exists once.
           */}
-          <div className="flex border-t border-white/8 overflow-x-auto edge-fade-x">
+          {/* Full-bleed below `sm`: the strip is a rule across the screen, and
+              the 16px page gutter it was sitting inside was 32px the four tabs
+              needed. Unchanged from `sm` up. */}
+          <div className="-mx-4 sm:mx-0 flex border-t border-white/8 overflow-x-auto edge-fade-x">
               {tabs.map(({ key, label, icon: Icon, href }) => {
                 const isActive = currentPage === key;
                 return (
@@ -458,11 +461,28 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                       rather than 12, which is the R10 site this closes at the
                       same time. Visual weight is unchanged.
                     */
-                    className={`relative flex items-center gap-1.5 px-4 py-3 min-h-[44px] text-[13px] font-medium whitespace-nowrap transition-colors duration-150 ${
+                    className={`relative flex items-center gap-1.5 px-2.5 sm:px-4 py-3 min-h-[44px] text-[13px] font-medium whitespace-nowrap transition-colors duration-150 ${
                       isActive ? 'text-cyan-400 bg-cyan-400/5' : 'text-white/50 hover:text-white/80 hover:bg-white/5'
                     }`}
                   >
-                    <Icon className={`h-3.5 w-3.5 ${isActive ? 'text-cyan-400' : 'text-white/40'}`} />
+                    {/*
+                      ── ⚠ The icons are the reason a whole tab was unreachable ─
+
+                      Four tabs with a glyph and 32px of padding each measured
+                      about 490px. On a 390px phone that put "Maintenance" half
+                      off the right edge and "Vehicle Info" entirely off it —
+                      and while the strip does scroll and `edge-fade-x` softens
+                      the cut, a design critique of the rendered page reported
+                      the fourth tab as something the mobile layout "gives no
+                      hint exists". A scroll affordance is not discovery.
+
+                      The glyphs are decoration here: every tab is a word, and
+                      the word is what is read. Dropping them below `sm` and
+                      tightening the padding fits all four, so the strip stops
+                      overflowing at all. Unchanged from `sm` up, where there
+                      was never a problem.
+                    */}
+                    <Icon className={`hidden sm:block h-3.5 w-3.5 ${isActive ? 'text-cyan-400' : 'text-white/40'}`} />
                     {label}
                     {isActive && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400 rounded-t-full" />}
                   </Link>

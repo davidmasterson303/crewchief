@@ -48,6 +48,13 @@ interface DiagnosticHeroProps {
   /** What to do about a missing score. Rendered only when there is no reading. */
   onAddRecord?: () => void;
   /**
+   * What to do about a missing photograph. Rendered inside the empty plate.
+   *
+   * Omitted by callers with no upload to offer, which renders the plate as it
+   * was — a statement of what is missing, with nothing to do about it.
+   */
+  onAddPhoto?: () => void;
+  /**
    * What the action's button says.
    *
    * ⚠ A prop rather than a constant because the two clients reach different
@@ -101,6 +108,7 @@ export default function DiagnosticHero({
   driversHref,
   work,
   onAddRecord,
+  onAddPhoto,
   addRecordLabel = 'Add a service record',
   height = 400,
 }: DiagnosticHeroProps) {
@@ -224,6 +232,17 @@ export default function DiagnosticHero({
             168px, which is right for the full-width case it defaults to.
           */
           emptyHeight={236}
+          emptyAction={
+            onAddPhoto ? (
+              <button
+                type="button"
+                onClick={onAddPhoto}
+                className="tap-target-44 rounded-xl border border-white/15 bg-white/[0.06] px-4 py-2 text-sm font-semibold text-white/80 transition-colors hover:border-white/30 hover:text-white"
+              >
+                Add a photograph
+              </button>
+            ) : undefined
+          }
         />
 
         {/*

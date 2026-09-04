@@ -568,10 +568,19 @@ nav {
     .gauge-reading {
       fill: CanvasText;
     }
-    .gauge-hub {
-      fill: Canvas;
-      stroke: Highlight;
-    }
+    /*
+      ⚠ The hub's forced-colors rule was here and is deleted with the element.
+      The dial's needle no longer runs to a pivot, so there was nothing left for
+      it to style — and `inclusive-affordances.test.ts` asserts exactly this
+      pairing: a rule whose class the component stopped rendering keeps
+      reviewing perfectly while applying to nothing, which is the failure that
+      whole suite exists for, one level up.
+
+      The class name is deliberately not written out below. The assertion is a
+      substring search over this stylesheet, so naming it here would re-orphan
+      it in prose — the same trap `text-contrast-floor` sets for comments that
+      quote the token they are explaining.
+    */
     /* The bloom is decoration and reads as a smear once colours are forced. */
     .gauge-arc {
       filter: none !important;

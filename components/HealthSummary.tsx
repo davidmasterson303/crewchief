@@ -478,8 +478,25 @@ export default function HealthSummary({
         <div className="flex items-start justify-between">
           <div className="flex items-start gap-5">
             <div>
-              <CardTitle className="text-white flex items-center gap-2 mb-1">
-                <Activity className="h-5 w-5 text-info" />
+              {/*
+                ⚠ The pulse glyph that sat here is gone. It decorated the word
+                "score" and cost the title about 28px — enough that on a 390px
+                phone the heading wrapped to two lines with a decorative icon
+                beside the first and a refresh control hard against the right
+                edge of the second. A title framed by two icons and broken
+                across two lines is layout by accident.
+
+                The refresh button stays: it does something.
+              */}
+              {/*
+                ⚠ `text-lg` below `sm`, against `CardTitle`'s 24px default.
+                "What's driving the score" is 24 characters; at 24px it needs
+                about 300px and the column is 290, so it wrapped — and a
+                two-line heading with a control pinned to the right of its
+                first line is the shape a reader parses as broken. 18px fits it
+                on one line with room to spare. Unchanged from `sm` up.
+              */}
+              <CardTitle className="text-lg sm:text-2xl text-white mb-1">
                 What&apos;s driving the score
               </CardTitle>
               {/*
@@ -563,16 +580,37 @@ export default function HealthSummary({
           So each factor gets a severity icon and its text, and the rows carry
           no magnitude they cannot justify.
         */}
+        {/*
+          ── ⚠ Three filled capsules were louder and said less ────────────────
+
+          Each flag was a fully-rounded chip on a red wash with a red border —
+          the default alert treatment, stacked three deep, and a design critique
+          of the rendered page named it as such: heavy, repetitive, and tonally
+          wrong for a product whose voice is a service record rather than a
+          notification tray. On desktop each one stretched 1100px around a
+          single line of text.
+
+          The severity has not been softened; it has been moved off the
+          furniture and onto the ink. One panel, hairline-divided rows, the
+          critical red on the glyph and a red rule down the edge that says
+          "these belong together" once instead of three times.
+        */}
         {healthSummary.red_flags && healthSummary.red_flags.length > 0 && (
-          <div className="space-y-2">
+          <div
+            /*
+              ⚠ The red is on the left edge only. Ringing the panel in it put a
+              red arc around all four corners, which is the filled-capsule
+              loudness returning as an outline — the severity belongs to the
+              rows, and one rule down the side is enough to say they belong
+              together.
+            */
+            className="rounded-xl border border-white/10 border-l-2 bg-white/[0.02] divide-y divide-white/8"
+            style={{ borderLeftColor: 'var(--critical-red)' }}
+          >
             {healthSummary.red_flags.map((flag: string) => (
               <div
                 key={flag}
-                className="flex items-start gap-2.5 p-3 rounded-xl border"
-                style={{
-                  background: 'var(--critical-red-wash)',
-                  borderColor: 'var(--critical-red-border)',
-                }}
+                className="flex items-start gap-2.5 px-4 py-3"
               >
                 <AlertTriangle
                   className="h-4 w-4 shrink-0 mt-0.5"
@@ -628,11 +666,18 @@ export default function HealthSummary({
               <h4 className="font-semibold text-white text-sm">Recommendations</h4>
             </div>
             <ul className="space-y-2">
+              {/*
+                ⚠ These were `>` chevrons. A chevron means "there is more this
+                way" — it is the affordance on the recall row a few lines up,
+                which actually opens something — and using it as a bullet spends
+                a directional glyph on a list that goes nowhere. A dot is a
+                bullet.
+              */}
               {healthSummary.recommendations.map((rec: string) => (
                 <li key={rec} className="text-sm text-white/75 flex items-start gap-2.5">
-                  <ChevronRight
-                    className="h-4 w-4 mt-0.5 shrink-0 text-info"
+                  <span
                     aria-hidden="true"
+                    className="mt-[0.5em] h-1 w-1 shrink-0 rounded-full bg-info"
                   />
                   <span className="leading-relaxed">{rec}</span>
                 </li>

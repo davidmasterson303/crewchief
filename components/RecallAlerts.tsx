@@ -109,13 +109,36 @@ export default function RecallAlerts({ recalls, vehicleId, addressedCampaigns = 
               <div className="flex items-start gap-3">
                 <div className="w-1.5 h-1.5 rounded-full bg-red-400 mt-2 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-3">
+                  {/*
+                    Stacks on a phone. Beside a two-line component title the
+                    button was squeezed against it and pushed "FUEL SYSTEM,
+                    GASOLINE" into a ragged wrap; below the notice it is where
+                    an action belongs — after the thing it acts on.
+                  */}
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-white leading-snug">
                         {recall.Component || 'Component Unknown'}
                       </p>
+                      {/*
+                        ── ⚠ Not clamped. This is NHTSA's own text ───────────
+
+                        It was `line-clamp-2`, which on a 1440px desktop held
+                        the whole notice and on a 390px phone held about ten
+                        words. What fell off the M3's fuel-pump campaign was
+                        *"causing the engine to stall without warning"* — the
+                        consequence clause, cut on the platform this product is
+                        mostly read on, with no expand control to get it back.
+
+                        A recall summary is one to three sentences. There is no
+                        length problem here worth trading a safety consequence
+                        for, and `advice-disclosure.ts` already draws this line
+                        for recalls specifically: they are NHTSA's record,
+                        quoted, and the one place in this product where a
+                        reader missing the point is dangerous.
+                      */}
                       {recall.Summary && (
-                        <p className="text-xs text-white/55 mt-1 leading-relaxed line-clamp-2">
+                        <p className="text-xs text-white/55 mt-1 leading-relaxed">
                           {recall.Summary}
                         </p>
                       )}
@@ -129,7 +152,7 @@ export default function RecallAlerts({ recalls, vehicleId, addressedCampaigns = 
                       <button
                         onClick={() => handleMarkAddressed(campaignNum)}
                         disabled={isAddressing}
-                        className="tap-target-44 flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/12 hover:border-white/20 text-white/70 hover:text-white text-xs font-medium transition-all disabled:opacity-50"
+                        className="tap-target-44 self-start flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/12 hover:border-white/20 text-white/70 hover:text-white text-xs font-medium transition-all disabled:opacity-50"
                       >
                         {isAddressing ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />

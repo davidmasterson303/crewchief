@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { vehicleField } from '@wellkept/core/vehicle-identity';
 import { vehicleBlurData } from '@wellkept/core/vehicle-blur';
 import { cardSlotSource } from '@wellkept/core/photo-slots';
@@ -76,6 +76,19 @@ interface VehicleIdentityProps {
    * the extra height.
    */
   emptyHeight?: number;
+  /**
+   * What a viewer can do about the missing photograph.
+   *
+   * ⚠ Rendered **only** in the empty state, which is what keeps "nothing is
+   * printed over a photograph" true. An empty plate that names its own gap and
+   * offers nothing is a label on a hole; a design critique of the dashboard
+   * called it dead space in the most valuable part of a phone screen, twice.
+   *
+   * A node rather than a handler so the caller owns the control's wording and
+   * its chrome — this component knows a photograph is missing, not what the
+   * surrounding product does about it.
+   */
+  emptyAction?: ReactNode;
   className?: string;
 }
 
@@ -124,6 +137,7 @@ export function VehicleIdentity({
   trim,
   height = 400,
   emptyHeight,
+  emptyAction,
   className = '',
 }: VehicleIdentityProps) {
   /*
@@ -467,10 +481,11 @@ export function VehicleIdentity({
             So the empty band says the one thing the layout around it does not:
             that there is no photograph. Same line the card uses.
           */}
-          <div className="absolute inset-0 flex items-center justify-center">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-4">
             <p className="font-mono text-xs uppercase tracking-[0.2em] text-white/55">
               No photograph yet
             </p>
+            {emptyAction}
           </div>
 
           <div

@@ -133,22 +133,36 @@ export default function CollapsibleSection({
           onClick={toggle}
           aria-expanded={open}
           aria-controls={panelId}
-          className="w-full flex items-center gap-3 px-5 py-4 text-left min-h-[56px] hover:bg-white/[0.03] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 focus-visible:ring-inset"
+          className="w-full flex items-start gap-3 px-5 py-4 text-left min-h-[56px] hover:bg-white/[0.03] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 focus-visible:ring-inset"
         >
           <ChevronDown
-            className={`h-4 w-4 flex-shrink-0 text-white/40 transition-transform duration-200 ${
+            className={`h-4 w-4 mt-0.5 flex-shrink-0 text-white/40 transition-transform duration-200 ${
               open ? '' : '-rotate-90'
             }`}
             aria-hidden="true"
           />
-          <span className="text-[15px] font-semibold text-white tracking-tight flex-1 min-w-0">
-            {title}
+          {/*
+            ⚠ Beside the title from `sm` up, under it on a phone.
+
+            It was always beside, truncating at 45% of the row — which on a
+            390px screen is about 130px, so "5 known issues · 7 service
+            intervals" rendered as "5 known issues · 7 s…". An ellipsis in a
+            summary line is the cheapest possible answer: the whole job of that
+            line is to say what is inside without opening it, and half of it
+            says nothing.
+
+            Given its own line it fits whole, and the truncation stays as the
+            backstop for a summary longer than anything written so far — a
+            folded section growing a third line would defeat the fold.
+          */}
+          <span className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-3">
+            <span className="text-[15px] font-semibold text-white tracking-tight sm:flex-1 sm:min-w-0 truncate">
+              {title}
+            </span>
+            {summary && !open && (
+              <span className="text-[13px] text-white/50 truncate sm:max-w-[45%]">{summary}</span>
+            )}
           </span>
-          {/* Truncates rather than wraps — a summary that grows a second line
-              defeats the point of the section being folded. */}
-          {summary && !open && (
-            <span className="text-[13px] text-white/50 truncate max-w-[45%]">{summary}</span>
-          )}
         </button>
       </h2>
 

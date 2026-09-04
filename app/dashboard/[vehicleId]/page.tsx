@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+
 import dynamic from 'next/dynamic';
 import { recallsAreKnown } from '@wellkept/core/nhtsa-lookup';
 import { selectNhtsaRow } from '@/lib/nhtsa-row';
@@ -19,6 +21,7 @@ import { DashboardSkeleton } from '@/components/Skeletons';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { VehicleResearchStatus } from '@/components/VehicleResearchStatus';
 import { useVehicleImage } from '@/hooks/useSignedUrl';
+import { VehiclePhotoUploadDialog } from '@/components/VehiclePhotoUploadDialog';
 import { getHealthBand } from '@/hooks/use-health-band';
 
 /*
@@ -154,6 +157,7 @@ export default function DashboardPage({ params }: { params: { vehicleId: string 
   // Before the loading and error branches: this is a hook, and it has to run
   // on every render regardless of which one this render takes.
   const vehicleImage = useVehicleImage(data?.vehicle);
+  const [showPhotoDialog, setShowPhotoDialog] = useState(false);
 
   /*
     ── ⚠ D10 · the drivers reach the web at last ─────────────────────────────
@@ -300,6 +304,14 @@ export default function DashboardPage({ params }: { params: { vehicleId: string 
             */
             onAddRecord={() => router.push(`/documents/${params.vehicleId}`)}
             addRecordLabel="Upload an invoice"
+            /*
+              The empty plate's own action. `VehicleCard` has offered this from
+              the garage since CC-142; the dashboard — the screen where the
+              plate is largest and emptiest — had no way to add a photograph at
+              all, so an owner had to go back to the garage to fix what this
+              page was pointing at.
+            */
+            onAddPhoto={() => setShowPhotoDialog(true)}
           />
 
           {data.nhtsa?.recalls && data.nhtsa.recalls.length > 0 && (
@@ -393,6 +405,20 @@ export default function DashboardPage({ params }: { params: { vehicleId: string 
             />
           </div>
         </div>
+        {/*
+          Mounted beside the layout rather than inside the hero: the hero draws
+          a plate and offers an action, and a modal that owns a file input, a
+          crop step and a router refresh is not a thing a presentational band
+          should be holding.
+        */}
+        <VehiclePhotoUploadDialog
+          vehicleId={params.vehicleId}
+          vehicleName={`${data.vehicle.year} ${data.vehicle.make} ${data.vehicle.model}`}
+          currentPhotoUrl={vehicleImage ?? undefined}
+          hasCustomPhoto={!!data.vehicle.custom_image_url}
+          open={showPhotoDialog}
+          onOpenChange={setShowPhotoDialog}
+        />
       </DashboardLayout>
     </ErrorBoundary>
   );

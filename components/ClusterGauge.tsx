@@ -72,6 +72,24 @@ function pointAt(score: number, radius: number): { x: number; y: number } {
   the dial is ticked rather than smooth.
 */
 const MAJORS = [0, 20, 40, 60, 80, 100];
+/*
+  ── ⚠ Which majors get a number, and why it is not all of them ─────────────
+
+  Six numerals around a 160px arc is a scale competing with its own reading. A
+  design critique of the rendered dashboard called the dial "the default AI
+  premium dashboard trope" and named the clutter first.
+
+  The set that survives is not a trim for looks: it is the two ends of the
+  scale, plus the three points where the *verdict* changes. `health-band.ts`
+  puts those at 40, 60 and 80, and the linear track this replaced made the same
+  argument in its own comment — a bare fill says "more is better" and nothing
+  else, and those three are the only places on the scale where the answer
+  changes. 20 is the one number that marks nothing.
+
+  The ticks are unchanged: every major still gets a mark, every 5 still gets a
+  hairline. What went is five characters of type, not the scale.
+*/
+const LABELLED = [0, 40, 60, 80, 100];
 const BOUNDARIES = new Set([40, 60, 80]);
 const MINORS = Array.from({ length: 21 }, (_, i) => i * 5).filter((t) => !MAJORS.includes(t));
 
@@ -243,7 +261,14 @@ export function ClusterGauge({
 
   return (
     <div
-      className={isCard ? 'flex flex-col items-center gap-1 flex-shrink-0' : 'flex-shrink-0'}
+      /*
+        ⚠ `w-fit` on the hero. The band label under the dial is `text-center`,
+        and in the hero's stacked mobile column this wrapper stretched to the
+        full 324px while the dial itself is 196 — so "Fair" centred on the
+        column and sat 64px to the right of the instrument it belongs to.
+        Hugging the drawing puts the two on one axis.
+      */
+      className={isCard ? 'flex flex-col items-center gap-1 flex-shrink-0' : 'w-fit flex-shrink-0'}
       role="img"
       /*
         ⚠ The unknown state has to be spoken, not merely undrawn. A dial that
@@ -341,8 +366,13 @@ export function ClusterGauge({
 
         {/* The numbers, on the majors. Upright — never rotated with the tick. */}
         {!isCard &&
-          MAJORS.map((tick) => {
-            const { x, y } = pointAt(tick, 90);
+          LABELLED.map((tick) => {
+            /*
+              97, not 90. The major ticks end at 84 and the numerals were
+              centred at 90 — about six pixels of clearance for type whose own
+              half-height is seven, so "80" sat on its tick and read as "-80".
+            */
+            const { x, y } = pointAt(tick, 97);
             return (
               <text
                 key={`L${tick}`}
@@ -397,28 +427,34 @@ export function ClusterGauge({
         */}
         {!unknown && (
           <g transform={`rotate(${angleFor(clamped)} ${CX} ${CY})`}>
+            {/*
+              ── ⚠ A pointer, not a needle on a spindle ────────────────────
+
+              It ran to the exact centre and met a 5px hub drawn over it —
+              which is what a toy speedometer looks like, and a design critique
+              of the rendered page said so. The hub existed for a reason worth
+              recording: without it the needle crossed the digits. It is not
+              needed now because the needle no longer reaches them.
+
+              What replaces it is a short marker riding just inside the track,
+              at the reading. A full-length needle floating without a pivot was
+              worse than either — it read as a stray line across the middle
+              rather than as something indicating a position on the arc.
+
+              And it clears the well completely, which is what lets the reading
+              move into it.
+            */}
             <line
               className="gauge-needle"
               x1={CX}
-              y1={42}
+              y1={isCard ? 42 : 34}
               x2={CX}
-              y2={isCard ? 62 : CY}
+              y2={isCard ? 62 : 50}
               stroke={band.color}
               strokeWidth={isCard ? 3 : 2.5}
-              strokeLinecap={isCard ? 'round' : 'butt'}
+              strokeLinecap="round"
             />
           </g>
-        )}
-        {!isCard && (
-          <circle
-            className="gauge-hub"
-            cx={CX}
-            cy={CY}
-            r="5"
-            fill="rgb(12 11 10)"
-            stroke={ink}
-            strokeWidth="1.5"
-          />
         )}
 
         {/*
@@ -436,9 +472,23 @@ export function ClusterGauge({
           drawn around it and both ends are numbered. The full reading is in the
           container's aria-label, where the dial cannot be seen.
         */}
+        {/*
+          ⚠ In the well now, not on the bottom line.
+
+          The comment this replaces was accurate about its own constraint —
+          *"centring it in the well is not available once there is a hub: the
+          needle would cross the digits"* — and the constraint is gone with the
+          hub. The reading is the instrument's subject; sitting it between the
+          0 and 100 labels made it a caption to the dial instead of the point
+          of it.
+
+          108 rather than 100: the arc is open at the bottom, so the optical
+          centre of the drawn shape is above the geometric one, and type
+          centred on 100 rides high in it.
+        */}
         <text
           x={CX}
-          y={isCard ? CY : 150}
+          y={isCard ? CY : 108}
           className="num gauge-reading"
           textAnchor="middle"
           dominantBaseline="central"
@@ -446,7 +496,14 @@ export function ClusterGauge({
           // 60, not 64: tabular figures make "100" exactly 1.5x the width of
           // "88", and at 64 a perfect score measured 40.4px inside a 43.6px
           // well. It fit, with 1.6px a side. 60 buys the margin back.
-          fontSize={isCard ? 60 : 30}
+          /*
+            30 -> 40 on the hero. The dial was spending a large band of a phone
+            screen to say one number, and printing that number smaller than the
+            page's own subheadings. With the hub gone and the labels pushed out
+            there is room in the well for the reading to be the largest thing
+            in the instrument, which is what it is.
+          */
+          fontSize={isCard ? 60 : 48}
           fontWeight="700"
         >
           {/*
