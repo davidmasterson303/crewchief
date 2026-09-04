@@ -172,20 +172,46 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
   const hasPowertrainData = knowledge?.engine_type || knowledge?.transmission_type || knowledge?.drivetrain;
 
   return (
-    <DashboardLayout vehicle={vehicle} knowledge={knowledge} currentPage="vehicle-info" vehicleImage={vehicleImage}>
+    <DashboardLayout
+      vehicle={vehicle}
+      knowledge={knowledge}
+      currentPage="vehicle-info"
+      vehicleImage={vehicleImage}
+      /*
+        Every child here is a bordered card already, so the layout's panel was
+        a third rounded rectangle around them — the nesting two critiques
+        counted on this page.
+      */
+      contentSurface="bare"
+    >
       <div className="space-y-5">
-        <div className="flex justify-end">
-          <ResearchButton
-            vehicleId={vehicle.id}
-            year={vehicle.year}
-            make={vehicle.make}
-            model={vehicle.model}
-            hasData={hasPerformanceData || hasInterestingFacts || hasPowertrainData}
-          />
-        </div>
+        {/*
+          ── ⚠ The research action belongs to a section, not to a dead band ───
 
+          It sat in a `flex justify-end` of its own: a lone pill right-aligned
+          in an otherwise empty row — about 90px of a phone's screen, and on a
+          desktop a button with 1000px of nothing to its left. A design critique
+          named it precisely: "a section-level action with no section header to
+          belong to… as-is it reads as an unfinished layout region."
+
+          It belongs to this card, which is where the research lands. Giving the
+          card a header gives the button somewhere to be and gives the first
+          block on the page a name.
+        */}
         <Card className="bg-slate-900/60 border-white/10">
-          <CardContent className="pt-5 pb-5">
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between gap-4">
+              <CardTitle className="display-serif text-white text-lg">Specification</CardTitle>
+              <ResearchButton
+                vehicleId={vehicle.id}
+                year={vehicle.year}
+                make={vehicle.make}
+                model={vehicle.model}
+                hasData={hasPerformanceData || hasInterestingFacts || hasPowertrainData}
+              />
+            </div>
+          </CardHeader>
+          <CardContent className="pb-5">
             {/*
               ── ⚠ Three rows, not three cards with circled glyphs ────────────
 
@@ -304,12 +330,19 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
                   ))}
                 </div>
 
-                {perfLoading && hasPerformanceData && (
-                  <div className="flex items-center justify-center gap-2 mt-4 text-xs text-white/50">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-info" />
-                    Checking for updates...
-                  </div>
-                )}
+                {/*
+                  ⚠ The second loading indicator is gone.
+
+                  A "Checking for updates…" line sat under the figures while the
+                  refresh control in this card's own header spun at the same
+                  time — two indicators for one fetch, and a critique read the
+                  line as permanent furniture: "a perpetual loading affordance
+                  under the hero stats is the opposite of well kept".
+
+                  The spinning glyph is the indicator, and it is attached to the
+                  control that started the work. Nothing is lost but the
+                  duplicate.
+                */}
               </>
             )}
           </CardContent>
@@ -340,8 +373,16 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {/*
+              ⚠ Capped width on a desktop. Full-bleed in a 1130px card put
+              "Coolant" hard left and its value hard right with about 900px of
+              void between them — a critique called it the "classic
+              justified-table mistake at wide viewports", and the eye travel is
+              the whole cost. A measure the eye can cross keeps the pair
+              readable as a pair.
+            */}
             {Object.keys(fluidSpecs).length > 0 ? (
-              <div className="divide-y divide-white/6">
+              <div className="divide-y divide-white/6 sm:max-w-3xl">
                 {/*
                   ── ⚠ Label above value on a phone, side by side above `sm` ──
 

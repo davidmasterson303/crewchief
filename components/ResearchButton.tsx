@@ -51,7 +51,14 @@ export default function ResearchButton({ vehicleId, year, make, model, hasData }
       disabled={isResearching}
       variant="outline"
       size="sm"
-      className="border-accent/50 text-accent hover:bg-accent/10"
+      /*
+        ⚠ Quiet. This was `border-accent/50 text-accent` — a fully saturated
+        cyan outline on a secondary action, which made refreshing the research
+        the loudest control on a page whose subject is the car's specification.
+        Cyan is the mark now, not the accent for ordinary controls; see the
+        note on links in `DiagnosticHero`.
+      */
+      className="border-white/20 text-white/80 hover:border-white/35 hover:bg-white/5 hover:text-white"
     >
       {isResearching ? (
         <>
