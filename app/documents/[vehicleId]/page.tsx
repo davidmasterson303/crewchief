@@ -170,6 +170,40 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
 
   const hasHistory = (visits?.length ?? 0) > 0;
 
+  /*
+    ── ⚠ The synthesis line, built only from what the rows hold ──────────────
+
+    A design critique: "a concierge page would lead with a synthesis line…
+    right now the page has no summary layer at all; it's chronology with no
+    insight." It suggested "3 visits · $1,700 · last serviced Jan 2025 at
+    66,900 mi".
+
+    Three of those four facts are in the table. **The odometer is not** —
+    `maintenance_line_items` has no mileage column, so "at 66,900 mi" would be
+    a number invented to complete a sentence. It is left out rather than
+    guessed, which is the same rule the health drivers hold themselves to.
+
+    ⚠ The spend is what this history *records*, not what the car has cost.
+    Rows arrive from uploaded invoices, so a visit nobody uploaded is missing
+    from it — the wording says "recorded" for that reason and must keep saying
+    something like it.
+  */
+  const summary = (() => {
+    if (!visits || visits.length === 0) return null;
+
+    const spend = visits.reduce((total, visit) => total + visit.total, 0);
+    const dated = visits.filter((visit) => visit.date);
+    const latest = dated.length > 0 ? dated[0].date : null;
+
+    return [
+      `${visits.length} ${visits.length === 1 ? 'visit' : 'visits'}`,
+      `${currency.format(spend)} recorded`,
+      latest ? `last ${formatDate(latest)}` : null,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  })();
+
   return (
     <DashboardLayout
       vehicle={vehicle}
@@ -207,12 +241,22 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
               name the model again for the ones that earned it.
             */}
             <p className="text-white/50 text-sm mt-1">
-              {hasHistory ? 'Every visit on file' : 'Upload an invoice to build your history'}
+              {summary ?? 'Upload an invoice to build your history'}
             </p>
           </div>
+          {/*
+            ⚠ A link, not a pill sitting between a heading and its content.
+
+            A critique: "a pill button named after a different tab, doing
+            navigation dressed as an action… on mobile it pushes the first card
+            below the fold." Two of those three are fixable without lying about
+            where it goes — it is navigation, so it looks like navigation, and
+            it stops taking a button's worth of vertical space above the
+            records.
+          */}
           <Button
-            variant="outline"
-            className="self-start border-white/20 text-white/80 hover:border-white/35 hover:bg-white/5 hover:text-white"
+            variant="ghost"
+            className="h-auto self-start p-0 text-sm font-medium text-white/70 underline decoration-white/25 underline-offset-4 hover:bg-transparent hover:text-white hover:decoration-white/50"
             onClick={() => router.push(`/consultant/${params.vehicleId}`)}
           >
             {/*
@@ -257,8 +301,15 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
           </div>
         )}
 
+        {/*
+          ⚠ Capped. The records ran the full ~1180px content width, so a
+          40-character line item stretched a hairline across 1150px with its
+          price orphaned at the far right — two critiques asked for a receipt
+          column around 640–720px. An invoice is a narrow document; it does not
+          get wider because the window did.
+        */}
         {hasHistory && (
-          <div className="grid gap-4">
+          <div className="grid gap-4 sm:max-w-3xl">
             {visits!.map((visit) => (
               <div
                 key={visit.key}
@@ -344,11 +395,36 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
                     {visit.date && (
                       <p className="label-uppercase mt-1.5">{formatDate(visit.date)}</p>
                     )}
-                    <ul className="mt-4 divide-y divide-white/8 border-t border-white/8">
+                    {/*
+                      ── ⚠ The line prices were here all along ────────────────
+
+                      Three design critiques asked for them — "a ledger without
+                      numbers on its lines is not a ledger", "the core object of
+                      this screen is under-designed" — and I refused twice, on
+                      the claim that `total_cost` was the visit's total repeated
+                      on every row.
+
+                      That was wrong, and checkable in one query: the M3's
+                      January visit is 89 + 28 + 155 + 145 + 378 + 220 = 1015,
+                      which is exactly the total this card was already printing.
+                      `groupIntoVisits` **sums** the column — if it held the
+                      visit total per row the figure would have been six times
+                      too large, and the page would have said so from the first
+                      screenshot.
+
+                      CLAUDE.md §1: verify against the artefact, never the
+                      board. I had a belief about a column and did not query it.
+
+                      ⚠ Rhythm, not a metronome: no rule between items — a
+                      critique counted "six identical hairlines inside one card"
+                      — spacing separates the lines and the only rule is the one
+                      above the total, which is where an invoice puts it.
+                    */}
+                    <ul className="mt-4 space-y-1.5 border-t border-white/8 pt-3">
                       {visit.items.map((item) => (
                         <li
                           key={item.id}
-                          className="flex items-baseline justify-between gap-4 py-2 text-sm text-white/75"
+                          className="flex items-baseline justify-between gap-6 text-sm text-white/75"
                         >
                           <span className="min-w-0">
                             {item.item_description}
@@ -356,23 +432,18 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
                               <span className="text-white/50 ml-2 text-xs">{item.part_number}</span>
                             )}
                           </span>
-                          {/*
-                            ⚠ Deliberately no per-line price. `total_cost` on a
-                            row is the *visit's* total repeated on every line —
-                            it is what the grouping above sums — so printing it
-                            here would show one figure several times and imply
-                            each item cost the whole visit. The invoice this
-                            came from has line prices; this table does not, and
-                            inventing the split is the precision this product
-                            refuses.
-                          */}
+                          {item.total_cost != null && (
+                            <span className="shrink-0 tabular-nums text-white/60">
+                              {currency.format(Number(item.total_cost))}
+                            </span>
+                          )}
                         </li>
                       ))}
                     </ul>
 
                     <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-white/15 pt-3">
                       <span className="label-uppercase">Total</span>
-                      <span className="num text-lg font-bold text-white">
+                      <span className="tabular-nums text-lg font-bold text-white">
                         {currency.format(visit.total)}
                       </span>
                     </div>

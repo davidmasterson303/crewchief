@@ -49,3 +49,27 @@ WHERE vehicle_id IN (
 -- real work in these strings — "Stage 1", "year/make/model", "ARP rod bolts" —
 -- and `replace` has no word boundaries. The spaced form is the one that is
 -- always a dash standing in for an em dash.
+--
+-- ── The service records carry the same hyphen, in two roles ─────────────────
+--
+-- `maintenance_line_items` holds it in `shop_name` ("Delicious Tuning -
+-- Burlingame CA", where it separates a shop from its city) and in
+-- `item_description` ("Cabin Air Filter - OEM Honda", where it separates a part
+-- from its brand). Both render on the maintenance page under a serif wordmark,
+-- and a design critique named the bare hyphen there specifically.
+--
+-- ⚠ The spaced-only rule earns its keep most here: "Front Differential Fluid -
+-- GL-5 75W-90" becomes "Front Differential Fluid — GL-5 75W-90". The grade and
+-- the viscosity keep their own hyphens because those are not spaced, which is
+-- exactly the distinction a naive replace would destroy.
+
+UPDATE maintenance_line_items
+SET
+  shop_name = replace(shop_name, ' - ', ' — '),
+  item_description = replace(item_description, ' - ', ' — ')
+WHERE vehicle_id IN (
+  'a1000000-0000-0000-0000-000000000001',
+  'a2000000-0000-0000-0000-000000000002',
+  'a3000000-0000-0000-0000-000000000003'
+)
+AND (shop_name LIKE '% - %' OR item_description LIKE '% - %');
