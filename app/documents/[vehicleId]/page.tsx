@@ -256,7 +256,14 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
           */}
           <Button
             variant="ghost"
-            className="h-auto self-start p-0 text-sm font-medium text-white/70 underline decoration-white/25 underline-offset-4 hover:bg-transparent hover:text-white hover:decoration-white/50"
+            /*
+              ⚠ Full-strength ink. As a link at 70% it was, in a critique's
+              words, "typographically invisible… the same visual grammar as the
+              data around it", and this is the page's one creation action.
+              Quiet is not the same as faint: it keeps the link's grammar and
+              stops whispering.
+            */
+            className="h-auto self-start p-0 text-sm font-semibold text-white underline decoration-white/35 underline-offset-4 hover:bg-transparent hover:decoration-white"
             onClick={() => router.push(`/consultant/${params.vehicleId}`)}
           >
             {/*
@@ -359,7 +366,7 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
                       it one level deeper cheapened both. Drift §10.1 says
                       titles and section heads; a record's subject is neither.
                     */}
-                    <h3 className="text-base font-semibold text-white flex items-center gap-2 flex-wrap">
+                    <h3 className="text-sm font-medium text-white/60 flex items-center gap-2 flex-wrap">
                       {visit.vendor}
                       {/*
                         The badge, back — and gated on data this time.
@@ -402,8 +409,25 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
                       The calendar glyph goes with it — a date needs no icon to
                       be recognised as a date.
                     */}
+                    {/*
+                      ── ⚠ The date leads, and the shop follows it ────────────
+
+                      The shop's name was the card's heading — bold, white — and
+                      on this car it is the same string on two consecutive
+                      visits, so a critique read them as "accidental
+                      duplicates" and pointed at the fix: "the *date* is the
+                      scannable key."
+
+                      It is also one fewer tracked-caps line, which the same
+                      critique counted five of on one screen: "the tell of a
+                      design leaning on a single trick." The date is a date
+                      now, set plainly, and the shop is the quieter half above
+                      it.
+                    */}
                     {visit.date && (
-                      <p className="label-uppercase mt-1.5">{formatDate(visit.date)}</p>
+                      <p className="mt-0.5 text-base font-semibold text-white">
+                        {formatDate(visit.date)}
+                      </p>
                     )}
                     {/*
                       ── ⚠ The line prices were here all along ────────────────

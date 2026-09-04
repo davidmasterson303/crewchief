@@ -62,7 +62,38 @@ export default function LandingHero({ onEnter }: LandingHeroProps) {
 
   return (
     <>
-      <div className="flex w-full max-w-4xl flex-col items-center">
+      {/*
+        ── ⚠ A scrim, because the door and the copy shared a tonal band ───────
+
+        `.garage-door` is a drawn gradient stack and a good one — mid-grey
+        metal with slat ribbing and section seams, lifted twelve points so the
+        headline has something to sit on. What it is not is a background: it is
+        high-frequency texture at the same tone as body copy, directly behind
+        body copy.
+
+        A design critique measured the consequence: "the paragraph is
+        gray-on-striped-gray… on a phone in daylight this paragraph will be
+        hard to read", and "vertical panel seams run straight through the
+        headline". Its remedy is the one taken here — "darken the door 30–40%
+        behind the content column, or scrim it".
+
+        ⚠ A radial rather than a flat wash. A rectangle of black over a
+        photographed-looking surface reads as a panel sitting on the door; an
+        ellipse centred on the content falls off before it reaches an edge, so
+        the door still turns the corner behind it and the metal is still
+        legible where nothing is written.
+
+        `pointer-events-none` — the opener beneath must stay pressable.
+      */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(ellipse 78% 62% at 50% 46%, rgba(8,8,9,0.86) 0%, rgba(8,8,9,0.72) 42%, rgba(8,8,9,0) 78%)',
+        }}
+      />
+      <div className="relative flex w-full max-w-4xl flex-col items-center">
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
@@ -276,12 +307,26 @@ export default function LandingHero({ onEnter }: LandingHeroProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.32, duration: 0.38, ease: 'easeOut' }}
         >
+          {/*
+            ⚠ Legible, because it is the only path to the pitch.
+
+            A critique: "the disclosure link is a dead end as captured…
+            low-contrast gray with a chevron is the only path to substance,
+            and it's styled to be missed. If the whole pitch below the hero
+            lives behind that toggle, the page's one navigational element is
+            its least visible one."
+
+            That is exactly the arrangement — everything explaining the product
+            is in this drawer. It stays a disclosure rather than becoming a
+            third button, because the hero's two choices are start and look
+            first; but a control nobody sees is not restraint.
+          */}
           <button
             onClick={() => setDrawerOpen(true)}
-            className="group inline-flex items-center gap-1.5 text-sm font-normal text-white/50 hover:text-white/75 underline decoration-white/20 hover:decoration-white/50 decoration-1 underline-offset-[5px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 rounded"
+            className="tap-target-44 group inline-flex items-center gap-1.5 text-[15px] font-medium text-white/80 hover:text-white underline decoration-white/35 hover:decoration-white decoration-1 underline-offset-[5px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 rounded"
           >
             What Well Kept does
-            <ChevronDown className="h-3.5 w-3.5 opacity-60 transition-transform duration-300 group-hover:translate-y-0.5" />
+            <ChevronDown className="h-4 w-4 transition-transform duration-300 group-hover:translate-y-0.5" />
           </button>
         </motion.div>
       </div>

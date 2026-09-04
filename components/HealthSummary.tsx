@@ -824,9 +824,16 @@ export default function HealthSummary({
               */}
               {healthSummary.recommendations.map((rec: string) => (
                 <li key={rec} className="text-sm text-white/75 flex items-start gap-2.5">
+                  {/*
+                    ⚠ Neutral. These were `bg-info` — a cool blue dot, counted
+                    by a critique as a fourth hue doing accent work on a page
+                    that should carry two: "the teal hairline under the nav and
+                    the blue dots read as leftovers from another theme." A
+                    bullet is punctuation, not a signal.
+                  */}
                   <span
                     aria-hidden="true"
-                    className="mt-[0.5em] h-1 w-1 shrink-0 rounded-full bg-info"
+                    className="mt-[0.5em] h-1 w-1 shrink-0 rounded-full bg-white/35"
                   />
                   <span className="leading-normal">{rec}</span>
                 </li>

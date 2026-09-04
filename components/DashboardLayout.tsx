@@ -499,7 +499,7 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                       same time. Visual weight is unchanged.
                     */
                     className={`relative flex items-center gap-1.5 px-2.5 sm:px-4 py-3 min-h-[44px] text-[13px] font-medium whitespace-nowrap transition-colors duration-150 ${
-                      isActive ? 'text-white' : 'text-white/50 hover:text-white/80 hover:bg-white/5'
+                      isActive ? 'text-white bg-white/[0.08]' : 'text-white/50 hover:text-white/80 hover:bg-white/5'
                     }`}
                   >
                     {/*
@@ -551,21 +551,32 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                       be the same colour and remain two things.
                     */}
                     {/*
-                      ⚠ On the top edge, not the bottom.
+                      ── ⚠ A fill, after two lines both failed ────────────────
 
-                      White stopped it being a second cyan, and two more
-                      critiques still reported it: "the active tab's white
-                      underline sits on top of a full-width teal hairline — two
-                      competing lines doing one job", "the one accent color,
-                      used twice in the same 2px of space". The colour was only
-                      half the problem; the other half was that both lines were
-                      on the same edge.
+                      Third mechanism for one state, and the first two are
+                      worth recording because each fixed the previous
+                      complaint and earned a new one.
 
-                      The batten owns the bottom of the nav — it is the room's
-                      light, and it runs the full width. The tab marks itself on
-                      the edge the batten does not use.
+                      It was a cyan underline beside the batten's cyan
+                      hairline: "the one accent color, used twice in the same
+                      2px of space". White fixed the colour and two critiques
+                      still called them "two competing lines doing one job" —
+                      the other half was that both sat on the same edge. Moving
+                      it to the top edge separated them and put it on the far
+                      side of the header divider from its own label: "a stray
+                      rule rather than an indicator… a fit-and-finish error no
+                      studio ships."
+
+                      A line was the wrong instrument. It has to live on an
+                      edge, and every edge here already belongs to something.
+                      A fill does not: it *is* the label's ground, so it cannot
+                      detach from the label, and it cannot be mistaken for the
+                      batten because it is not a line at all.
+
+                      ⚠ The fill alone. An earlier round objected to a fill
+                      *plus* cyan text *plus* an underline — three markings for
+                      one state. This is one.
                     */}
-                    {isActive && <span className="absolute top-0 left-0 right-0 h-0.5 bg-white rounded-b-full" />}
                   </Link>
                 );
             })}
@@ -681,7 +692,7 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                       One affordance, one meaning, on every input type — no
                       convention for the reader to guess at.
                     */}
-                    <span className="meta-edit text-xs font-medium text-white/55 underline decoration-white/25 underline-offset-2 group-hover/edit:text-white">
+                    <span className="meta-edit text-xs font-semibold text-white/75 underline decoration-white/35 underline-offset-2 group-hover/edit:text-white">
                       Edit
                     </span>
                   </button>
@@ -715,7 +726,7 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                   >
                     <span className="text-2xl font-bold text-white tabular-nums tracking-tight">{displayVehicle.avg_miles_per_month || '—'}</span>
                     <span className="text-sm text-white/50 font-normal">mi/mo</span>
-                    <span className="meta-edit text-xs font-medium text-white/55 underline decoration-white/25 underline-offset-2 group-hover/edit:text-white">
+                    <span className="meta-edit text-xs font-semibold text-white/75 underline decoration-white/35 underline-offset-2 group-hover/edit:text-white">
                       Edit
                     </span>
                   </button>
