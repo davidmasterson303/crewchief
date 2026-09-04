@@ -908,6 +908,50 @@ as a fault — "one of them is leftover". Neither is: the batten is the room's
 light and runs the full width, the underline marks one tab. They could not both
 be cyan and remain two things.
 
+## 11 · The accent, settled — 4 Sep
+
+⚠ **David's call, on the critic's conviction.** Five rounds across three pages
+named cyan as the thing standing between this product and studio work, in terms
+that sharpened each time: "kill the cyan"; "the teal hairline under the nav
+reads as a leftover from another theme"; "an accent so timid it reads as an
+artifact — give it to the actions or cut it."
+
+### 11.1 · The batten's line is cut, and the class with it
+
+`.bay-batten::after` had already been narrowed twice — §9.2 took its bloom,
+§10.3 flattened its five-stop gradient — and the critiques kept finding it. It is
+gone from the nav on every surface, and since that rule was the class's only
+declaration the class came off the markup too.
+
+### 11.2 · ⚠ "Chartreuse + red and stop" is declined, and the reason is invisible from a screenshot
+
+The critic's proposal was to promote the score's chartreuse to the interactive
+accent. **`#B9C77E` is `--ring-ok` — the health band for *Fair*.** Making it the
+accent would put a link and a middling score in one hue: precisely the collision
+that moved this band off cyan in §10.2, transposed rather than solved.
+
+Its own alternative stands instead — links are an underlined neutral — so the
+palette is three jobs and three hues:
+
+| job | hue |
+| --- | --- |
+| what you can act on | white, underlined |
+| what the car is doing | the health ramp |
+| an alarm | red |
+
+plus the mark, which is cyan and appears once per screen.
+
+### 11.3 · ⚠ The mark keeps its glow, and Design owns that
+
+`BRAND_COLOR.glow` is `#22D3EE`, pinned to Design's own SVG files by
+`brand.test.ts`. A critique called the plate's backlight "the AI tell". Whether
+the package follows this decision is Design's to make — it is not a thing to do
+to their files from here.
+
+The OG card also keeps its batten, deliberately: what was cut is a *chrome*
+element competing with a page's accents, and that card is a single composed
+frame with no chrome in it.
+
 ### Not design-system changes, listed so Design can see the whole pass
 
 Model as the card's name with year/make as the eyebrow · "67,400 mi mileage" →

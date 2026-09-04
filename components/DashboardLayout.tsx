@@ -296,16 +296,23 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
       }
     >
       {/*
-        `bay-batten` is the one ambient accent per screen — the same luminous
-        hairline the public garage carries on its nav, so the signed-in app and
-        the demo read as one product rather than two. See globals.css; on `/`
-        it doubles as the service bay's light fixture, which is where the shape
-        came from.
+        ⚠ `bay-batten` is gone from here, and the class with it.
+
+        It was "the one ambient accent per screen" — a luminous cyan hairline
+        along the nav's bottom edge, shared with the public garage so the two
+        surfaces read as one product. Successive design critiques kept naming
+        it, finally as "a leftover from another theme" and "an accent so timid
+        it reads as an artifact". It is cut; globals.css carries the argument
+        and what the palette is now.
+
+        The class had no rule but that line, so leaving it on the element would
+        be markup pointing at nothing — the same shape as the forced-colors rule
+        that outlived the gauge's hub.
       */}
       {/* `shrink-0` so the nav keeps its height when it is a flex child of the
           shell; `sticky` is inert inside a non-scrolling column but stays for
           the `md`+ document, where it is doing real work. */}
-      <nav className={`${appShell ? 'shrink-0 ' : ''}sticky top-0 z-40 bay-batten backdrop-blur-xl transition-all duration-200 ${scrolled ? 'bg-black/98 border-b border-white/10 shadow-lg shadow-black/50' : 'bg-black/90 border-b border-white/8'}`}>
+      <nav className={`${appShell ? 'shrink-0 ' : ''}sticky top-0 z-40 backdrop-blur-xl transition-all duration-200 ${scrolled ? 'bg-black/98 border-b border-white/10 shadow-lg shadow-black/50' : 'bg-black/90 border-b border-white/8'}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12">
           <div className={`flex items-center justify-between transition-all duration-200 ${scrolled ? 'py-3' : 'py-4'}`}>
             <div className="flex items-center gap-3">
@@ -541,8 +548,9 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                     {/*
                       ⚠ White, not cyan — there were two teal rules here.
 
-                      `.bay-batten` draws a cyan hairline along the bottom of
-                      this nav, and this underline sat a couple of pixels above
+                      The batten drew a cyan hairline along the bottom of this
+                      nav — it is cut now, but this history is why the marker is
+                      a fill — and the underline sat a couple of pixels above
                       it. Two critiques, on two different pages, read the pair
                       as a rendering fault: "one of them is leftover".
 

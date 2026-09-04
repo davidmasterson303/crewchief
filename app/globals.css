@@ -944,52 +944,39 @@ nav {
    * `relative`. It sits on top of the 1px border the navs already carry,
    * which is why it is 2px — 1px of light over 1px of border reads thin and
    * slightly grey. */
-  .bay-batten::after {
-    content: '';
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: -1px;
-    height: 2px;
-    pointer-events: none;
-    /*
-      ── ⚠ A flat rule, not a smear — 3 Sep, second cut ─────────────────────
+  /*
+    ── ⚠ The fixture's line is cut, and this is the accent decision ──────────
 
-      This was a five-stop gradient fading from transparent through cyan to a
-      near-white centre and back. Four consecutive critiques of the rendered
-      dashboard named it, the last one flatly: *"the full-viewport cyan
-      gradient under the tab bar is the most AI-generated element on the page —
-      a decorative flourish attached to nothing."*
+    `.bay-batten::after` drew a 2px cyan rule along the bottom of every nav. It
+    has been narrowed twice already — §9.2 took its bloom, §10.3 flattened its
+    five-stop gradient — and successive critiques kept finding it anyway, in
+    terms that got sharper each round: "the teal hairline under the nav… reads
+    as a leftover from another theme"; "an accent so timid it reads as an
+    artifact — give it to the actions or cut it."
 
-      The fixture stays — it is the room's one light and the whole `.service-bay`
-      idea rests on it — but a lit tube is an even line, and the horizontal
-      fade was doing nothing except reading as a highlight effect. Flat, dim,
-      and the full width of the bar it lights.
+    Cut. David's call, on the critic's conviction.
 
-      §9.2 already cut this element's bloom for the same reason. Logged again
-      in `docs/design-system-drift.md` §10.3.
-    */
-    background: rgb(34 211 238 / 0.34);
-    /*
-      ── ⚠ Bloom cut hard, 3 Sep — the halo was doing no work ────────────────
+    ⚠ **The critic's actual proposal was "chartreuse + red and stop", and that
+    half is declined for a reason it could not see.** `#B9C77E` is not a brand
+    colour: it is `--ring-ok`, the health band for *Fair*. Making it the
+    interactive accent would put a link and a middling score in one hue —
+    exactly the collision that moved this band off cyan in the first place
+    (§10.2), transposed. The critic's own alternative is what stands: links are
+    an underlined neutral.
 
-      This was `0 0 18px 2px / 0.28` plus a `70px 16px / 0.08` outer halo, and
-      the second one threw a soft cyan wash a third of the way down the page. A
-      design critique of the rendered result named it and the background seams
-      as the two most obviously generated elements on the page — a glow that
-      touches nothing interactive, in a product whose only accent colour should
-      mean *status*.
+    So the palette is now three jobs and three hues: **white** for what you can
+    act on, the **health ramp** for what the car is doing, **red** for an
+    alarm — plus the mark, which is cyan and appears once per screen.
 
-      The **line stays**: it is the fixture the room is lit by, and 2b's
-      "ambient hairline on the nav bottom edge" is the concept it collapses. The
-      halo around it does not. 8px at 0.16 keeps the sense of a lit edge and
-      stops it being a bloom.
+    ⚠ The mark keeps its glow, and that is not an oversight. `BRAND_COLOR.glow`
+    is Design's, pinned to their own SVG files by `brand.test.ts`. A critique
+    called the plate's backlight "the AI tell"; whether the package follows this
+    decision is Design's to make, not a thing to do to their files from here.
+    Logged in `docs/design-system-drift.md` §10.7.
 
-      ⚠ Logged in `docs/design-system-drift.md` §8 rather than changed quietly:
-      the batten is a v8 element and its intensity is Design's to set.
-    */
-    box-shadow: 0 0 8px 0 rgb(34 211 238 / 0.16);
-  }
+    The nav keeps its border. What went is the light on it.
+  */
+
 
   /* The signature photography treatment, as one class.
    *

@@ -38,10 +38,15 @@ import { isDemoSite } from '@/lib/site-role';
  * `repeating-linear-gradient`. The values are the stylesheet's; keep them in
  * step by hand, there are only nine.
  *
- * The batten is drawn here even though `.service-bay` no longer carries one —
- * in the app it lives on the nav's bottom edge (`.bay-batten`), and a share
- * card has no nav to mount it to. So it is placed as the concept drew it, a
- * fixture below an implied ceiling. This is the one surface where the
+ * The batten is drawn here even though `.service-bay` never carried one and the
+ * app no longer does either — the nav's cyan hairline was cut on 4 Sep after
+ * successive design critiques read it as "a leftover from another theme".
+ *
+ * ⚠ It survives on this card deliberately, and the distinction is the point:
+ * what was cut is a *chrome* element, a rule under a nav competing with the
+ * page's own accents. This is a single composed frame with no chrome in it, so
+ * the fixture reads as what the concept drew — a light below an implied
+ * ceiling — rather than as a stray line. It is the one surface where the
  * original single-layer composition is still the right one.
  */
 

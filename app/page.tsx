@@ -131,7 +131,7 @@ function GarageContents() {
       <div className="fixed inset-0 z-0 service-bay service-bay-dim" aria-hidden="true" />
 
       <div className="relative z-10">
-        <nav className="relative bay-batten border-b border-white/8 bg-black/80 backdrop-blur-xl">
+        <nav className="relative border-b border-white/8 bg-black/80 backdrop-blur-xl">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 py-4">
             <div className="flex items-center justify-between">
               <Link href="/" className="flex items-center group">
