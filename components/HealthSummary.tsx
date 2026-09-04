@@ -226,33 +226,38 @@ function HealthFactorRows({
                 className="num text-xl font-bold leading-none"
                 style={{
                   /*
-                    ── ⚠ A measured score does not wear a reassuring colour
-                       over a stated problem ────────────────────────────────
+                    ── ⚠ One contract: colour is the verdict, and there is
+                       only one verdict on this page ─────────────────────────
 
-                    Three rounds of a design critique called this the worst
-                    defect on the page, the third plainly: a green **97** with
-                    "Nothing overdue among the 6 we can check" sitting directly
-                    above "Brake fluid overdue". *"No studio ships a trust
-                    product that argues with itself two lines apart."*
+                    These numerals took their band's colour, and the result was
+                    a green **97** with "Nothing overdue among the 6 we can
+                    check" sitting directly above "Brake fluid overdue". Three
+                    rounds of a design critique called that the worst defect on
+                    the screen — "no studio ships a trust product that argues
+                    with itself two lines apart".
 
-                    The two are not strictly in conflict — the measured line
-                    names the set it checked, and brake fluid is not in it —
-                    but the green asserts a verdict over the whole subject, and
-                    a reader has no way to know the sets differ. The colour is
-                    making a claim the number cannot support, which is banding
-                    a `null` one step along.
+                    The first fix neutralised only the rows whose claim said
+                    attention, and the next round read the result exactly as it
+                    looked: "Maintenance 97 is grey, Mileage 91 is green,
+                    Recalls 35 is grey. Three scores, two treatments, zero
+                    logic." A rule nobody can infer from the screen is not a
+                    contract.
 
-                    So the band's ink is spent only where the row agrees with
-                    itself. Where the claim says attention the figure stays and
-                    goes neutral: the measurement is not hidden, it stops
-                    overruling the sentence beneath it.
+                    So the rule is the simple one, and it is true of the
+                    product rather than convenient for the layout: **the
+                    overall score is the verdict, and it is the only thing that
+                    carries the band's colour.** These are measurements that
+                    explain it — `health-drivers.ts` is emphatic that they are
+                    not terms in a sum — and a measurement painted in verdict
+                    ink is a second opinion the system never formed.
+
+                    `null` keeps its muted ink, because that is a different
+                    statement: not a quiet measurement, but no measurement.
                   */
                   color:
                     row.driver.score === null
                       ? 'rgb(255 255 255 / 0.38)'
-                      : row.claim?.state === 'attention'
-                        ? 'rgb(255 255 255 / 0.7)'
-                        : getHealthBand(row.driver.score).color,
+                      : 'rgb(255 255 255 / 0.92)',
                 }}
               >
                 {row.driver.score === null ? '—' : row.driver.score}
@@ -553,26 +558,18 @@ export default function HealthSummary({
           <div className="flex items-start gap-5">
             <div>
               {/*
-                ⚠ The pulse glyph that sat here is gone. It decorated the word
-                "score" and cost the title about 28px — enough that on a 390px
-                phone the heading wrapped to two lines with a decorative icon
-                beside the first and a refresh control hard against the right
-                edge of the second. A title framed by two icons and broken
-                across two lines is layout by accident.
+                ── ⚠ No title here. The section around it is the title ───────
 
-                The refresh button stays: it does something.
+                This card sits inside a `CollapsibleSection` whose header is
+                the heading for exactly this content, so the screen carried
+                "Health report" and "What's driving the score" as two headings
+                for one thing — and the hero's link to it said "What's driving
+                this score" as well, which a critique of the rendered page
+                counted as the same phrase appearing twice in one scroll.
+
+                The section takes the words; this card takes the content. The
+                refresh control stays, because it does something.
               */}
-              {/*
-                ⚠ `text-lg` below `sm`, against `CardTitle`'s 24px default.
-                "What's driving the score" is 24 characters; at 24px it needs
-                about 300px and the column is 290, so it wrapped — and a
-                two-line heading with a control pinned to the right of its
-                first line is the shape a reader parses as broken. 18px fits it
-                on one line with room to spare. Unchanged from `sm` up.
-              */}
-              <CardTitle className="display-serif text-xl sm:text-2xl font-normal text-white mb-1">
-                What&apos;s driving the score
-              </CardTitle>
               {/*
                 ── ⚠ D5, second half · the narrative was printed twice ───────
 

@@ -348,7 +348,13 @@ export default function DashboardPage({ params }: { params: { vehicleId: string 
           */}
           <div className="space-y-3">
             <CollapsibleSection
-              title="Health report"
+              /*
+                The section's header is the only heading for this content now —
+                the card inside used to carry "What's driving the score" as a
+                second one, and the hero links here with the same words. One
+                heading, and the link's text is its destination's name.
+              */
+              title="What's driving the score"
               storageKey={`dash:health:${params.vehicleId}`}
               /* The hero's "What's driving this score" link points here, and
                  the section opens itself when the hash names it. */

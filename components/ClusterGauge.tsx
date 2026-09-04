@@ -261,7 +261,15 @@ export function ClusterGauge({
     put its reading, so the pointer stops short there and the hub goes. The
     hero has the room and keeps both.
   */
-  const tickR = { minorFrom: 76, minorTo: 79.5, majorFrom: 76, majorTo: 84 };
+  /*
+    ⚠ Ticks against the track, not floating outside it. `majorFrom: 76` left a
+    visible gap between the arc's outer edge and the mark — a critique of the
+    rendered dial called them "stray tick marks floating at odd angles outside
+    the ring", which is what a mark separated from the thing it marks looks
+    like. The track is `R = 70` with a stroke either side of it, so 74 is its
+    outer edge.
+  */
+  const tickR = { minorFrom: 74, minorTo: 78, majorFrom: 74, majorTo: 81 };
 
   return (
     <div
@@ -371,11 +379,12 @@ export function ClusterGauge({
         {!isCard &&
           LABELLED.map((tick) => {
             /*
-              97, not 90. The major ticks end at 84 and the numerals were
-              centred at 90 — about six pixels of clearance for type whose own
-              half-height is seven, so "80" sat on its tick and read as "-80".
+              94, tracking the ticks. They end at 81 now, so this keeps the
+              same 13px of clearance the numerals needed when the marks reached
+              84 — the fix that stopped "80" reading as "-80". Moving one
+              without the other is how that collision comes back.
             */
-            const { x, y } = pointAt(tick, 97);
+            const { x, y } = pointAt(tick, 94);
             return (
               <text
                 key={`L${tick}`}

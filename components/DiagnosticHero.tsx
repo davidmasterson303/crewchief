@@ -243,10 +243,12 @@ export default function DiagnosticHero({
           trim={trim}
           height={height}
           /*
-            Taller than the default empty band, because here the plate is
-            standing beside the reading rather than lying above it — a column,
-            not a letterbox. `VehicleIdentity` would otherwise clamp it to
-            168px, which is right for the full-width case it defaults to.
+            One quiet row on a phone, a column beside the instrument above
+            `sm`. At 390px that is 64px — a line and a button, which is all the
+            empty state has to say — and it reaches 176 by the time the plate is
+            standing next to the reading rather than sitting between it and the
+            recall banner. A `clamp()` rather than a breakpoint because an
+            inline height cannot carry a media query.
           */
           /*
             176, down from 236. Below the reading on a phone it no longer has
@@ -254,7 +256,7 @@ export default function DiagnosticHero({
             button — a plate, not a stage. On `sm` and up it is the column
             beside the instrument, where the two heights meet.
           */
-          emptyHeight={176}
+          emptyHeight="clamp(64px, 13vw, 176px)"
           emptyAction={
             onAddPhoto ? (
               <button

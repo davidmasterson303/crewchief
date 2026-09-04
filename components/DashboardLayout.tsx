@@ -325,12 +325,22 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                 <span>Garage</span>
                 <span className="text-white/50" aria-hidden="true">·</span>
                 <span className="text-white/70 truncate max-w-[7.5rem]">{vehicle.model}</span>
-                {healthSummary?.health_score != null && (
-                  <>
-                    <span className="text-white/50" aria-hidden="true">·</span>
-                    {healthPill(healthSummary.health_score)}
-                  </>
-                )}
+                {/*
+                  ⚠ No score chip in the phone breadcrumb.
+
+                  It rendered unconditionally, and the dashboard's reading is
+                  now the first thing under the header — so "61 Fair" sat in a
+                  pill about 200px above a dial saying 61 Fair, in a 390px bar
+                  already holding the monogram, the wordmark and two crumbs. A
+                  critique of the rendered page counted it as redundancy and as
+                  crowding, and it was both.
+
+                  The desktop crumb keeps its chip because it appears **only
+                  once the hero has scrolled away** (`scrolled`), which is the
+                  case this chip was actually for: carrying the reading when
+                  the instrument is no longer on screen. On a phone the header
+                  is the only bar there is and it has no room to spare.
+                */}
               </button>
 
               <div className="hidden sm:flex items-center gap-1 text-white/50 text-sm">
@@ -531,12 +541,20 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                 lines in 279px before the trim appeared. The name alone does
                 not wrap.
               */}
+              {/*
+                ⚠ The trim is on the name, not in the eyebrow.
+
+                The eyebrow read "2019 BMW · COMPETITION" above "M3", and a
+                critique of the rendered page caught the grammar: the trim
+                modifies the model, and it was appearing before the word it
+                modifies. It is also how people say it — "M3 Competition" is
+                the car's name, "2019 BMW" is where to place it.
+              */}
               <p className="label-uppercase mb-2">
                 {[vehicle.year, vehicle.make].filter(Boolean).join(' ')}
-                {vehicle.trim ? ` · ${vehicle.trim}` : ''}
               </p>
               <h1 className="display-serif text-4xl sm:text-5xl lg:text-6xl text-white tracking-tight leading-none">
-                {vehicle.model}
+                {[vehicle.model, vehicle.trim].filter(Boolean).join(' ')}
               </h1>
             </div>
 

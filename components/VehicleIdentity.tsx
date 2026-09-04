@@ -75,7 +75,7 @@ interface VehicleIdentityProps {
    * it beside the reading rather than above it, where it is a column and wants
    * the extra height.
    */
-  emptyHeight?: number;
+  emptyHeight?: number | string;
   /**
    * What a viewer can do about the missing photograph.
    *
@@ -255,7 +255,17 @@ export function VehicleIdentity({
             arrived at by a broken link instead of an empty column.
           */
           ? {
-              height: `${src ? height : emptyHeight ?? Math.min(height, 168)}px`,
+              /*
+                A string passes straight through, so a caller can hand this a
+                `clamp()` and have the empty plate scale with the viewport —
+                which is the only way to make it a compact row on a phone and a
+                column beside the instrument on a desktop, since an inline
+                height cannot carry a media query.
+              */
+              height:
+                typeof emptyHeight === 'string' && !src
+                  ? emptyHeight
+                  : `${src ? height : (emptyHeight as number | undefined) ?? Math.min(height, 168)}px`,
               borderBottom: '1px solid rgb(255 255 255 / 0.08)',
             }
           /*
@@ -481,8 +491,33 @@ export function VehicleIdentity({
             So the empty band says the one thing the layout around it does not:
             that there is no photograph. Same line the card uses.
           */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-4">
-            <p className="font-mono text-xs uppercase tracking-[0.2em] text-white/55">
+          {/*
+            ⚠ A row on a phone, a column above it.
+
+            At 176px tall between the score and the recall banner, this was
+            "safety-critical content pushed a full viewport down by a
+            placeholder" — a design critique's heaviest penalty, twice. The
+            studio note it came with was explicit: empty states compressed to a
+            single quiet row. So on a phone the line and its action sit side by
+            side in about 64px, and from `sm` up — where the plate is a column
+            standing beside the instrument rather than a band above it — they
+            stack as before.
+          */}
+          <div className="absolute inset-0 flex flex-row items-center justify-center gap-3 px-4 sm:flex-col sm:gap-4">
+            {/*
+              ⚠ Hidden below `sm`, where the plate is one 64px row.
+
+              The row was carrying "NO PHOTOGRAPH YET" and a button reading
+              "Add a photograph" — the same fact twice, in 358px, with both of
+              them wrapping to two lines to fit. In a compact row the action
+              says everything the label said and offers the fix as well.
+
+              It stays in the DOM rather than being conditionally rendered, so
+              the plate keeps naming its own gap for a screen reader on every
+              viewport, and from `sm` up — where this is a column with room —
+              it is visible again.
+            */}
+            <p className="hidden sm:block font-mono text-xs uppercase tracking-[0.2em] text-white/55">
               No photograph yet
             </p>
             {emptyAction}
