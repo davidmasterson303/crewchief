@@ -86,12 +86,12 @@ const MAJORS = [0, 20, 40, 60, 80, 100];
   else, and those three are the only places on the scale where the answer
   changes. 20 is the one number that marks nothing.
 
-  The ticks are unchanged: every major still gets a mark, every 5 still gets a
-  hairline. What went is five characters of type, not the scale.
+  The majors all still get a mark — the scale is intact, it is the *type* that
+  thinned. The every-5 hairlines went too, in the same pass and for the same
+  reason; see the note where they were drawn.
 */
 const LABELLED = [0, 40, 60, 80, 100];
 const BOUNDARIES = new Set([40, 60, 80]);
-const MINORS = Array.from({ length: 21 }, (_, i) => i * 5).filter((t) => !MAJORS.includes(t));
 
 
 /**
@@ -331,21 +331,20 @@ export function ClusterGauge({
           />
         )}
 
-        {/* Minors — hairlines, every 5, hero only. */}
-        {!isCard &&
-          MINORS.map((tick) => (
-            <line
-              key={`m${tick}`}
-              className="gauge-tick"
-              x1={CX}
-              y1={CY - tickR.minorTo}
-              x2={CX}
-              y2={CY - tickR.minorFrom}
-              stroke="rgb(255 255 255 / 0.14)"
-              strokeWidth="1"
-              transform={`rotate(${angleFor(tick)} ${CX} ${CY})`}
-            />
-          ))}
+        {/*
+          ── ⚠ The every-5 hairlines are gone, and so is `MINORS` ─────────────
+
+          Twenty of them ringed a 160px arc, and a design critique of the
+          rendered page counted them as noise twice — "stray outer ticks", then
+          "drop raw ticks entirely". They read as texture rather than as a
+          scale: nobody measures a health score to the nearest five, and the
+          five marks that mean something were competing with fifteen that mean
+          nothing.
+
+          Deleted rather than switched off. A dead branch behind a constant is
+          how a reduction becomes a thing somebody restores by accident,
+          believing it was disabled for a release.
+        */}
 
         {/* Majors. On the card only the three band boundaries survive. */}
         {(isCard ? [40, 60, 80] : MAJORS).map((tick) => (

@@ -213,10 +213,27 @@ export default function DiagnosticHero({
       ref={containerRef}
       aria-label={vehicleName}
       className={`rounded-2xl overflow-hidden border border-white/8${
-        stacked ? '' : ' sm:flex sm:items-stretch'
+        stacked ? '' : ' flex flex-col sm:flex-row sm:items-stretch'
       }`}
     >
-      <div className={`relative${stacked ? '' : ' sm:w-[300px] sm:shrink-0 sm:border-r sm:border-white/8'}`}>
+      {/*
+        ── ⚠ On a phone the empty plate comes *after* the reading ────────────
+
+        It led, and a design critique of the rendered page called that the
+        single worst decision on the screen: about 500px of "no photograph
+        yet" standing between the top of the viewport and the score the page
+        exists to give. The product's own artefact started below the fold,
+        behind a placeholder for something the owner may never add.
+
+        `order` rather than a second element: one plate, one action, moved. The
+        photographed layout is untouched — a photograph earns the top of the
+        screen, and `stacked` is exactly that case.
+      */}
+      <div
+        className={`relative${
+          stacked ? '' : ' order-2 sm:order-none sm:w-[300px] sm:shrink-0 sm:border-r sm:border-white/8'
+        }`}
+      >
         <VehicleIdentity
           variant="band"
           photo={photo ?? null}
@@ -231,7 +248,13 @@ export default function DiagnosticHero({
             not a letterbox. `VehicleIdentity` would otherwise clamp it to
             168px, which is right for the full-width case it defaults to.
           */
-          emptyHeight={236}
+          /*
+            176, down from 236. Below the reading on a phone it no longer has
+            to hold the top of the screen, and what it holds is a line and a
+            button — a plate, not a stage. On `sm` and up it is the column
+            beside the instrument, where the two heights meet.
+          */
+          emptyHeight={176}
           emptyAction={
             onAddPhoto ? (
               <button
@@ -269,7 +292,7 @@ export default function DiagnosticHero({
       */}
       <div
         className={`bg-[#0f1318]/90 px-4 sm:px-6 sm:px-8 py-6${
-          stacked ? '' : ' sm:flex-1'
+          stacked ? '' : ' order-1 sm:order-none sm:flex-1'
         }`}
       >
         {/*

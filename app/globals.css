@@ -254,8 +254,27 @@ nav {
     /* ── health-ring band ramp ────────────────────────────────────────── *
      * Dedicated and ~15% desaturated versus the chip semantics, so a
      * mid-score ring never reads as "another issue chip". */
+    /*
+      ── ⚠ `ok` moved off cyan on 3 Sep — #5FAEC0 → #B9C77E ────────────────
+
+      Three consecutive critiques of the rendered dashboard reached the same
+      objection, the third stating it flatly: *"61 is 'Fair' but rendered in
+      brand cyan… Fair should not wear the hero color; cyan is doing brand and
+      state simultaneously."*
+
+      That was exactly true. `#5FAEC0` is a desaturated cyan, and cyan is this
+      product's accent — the active tab, every link, the focus ring, the
+      batten. A reader met the same hue meaning "this is interactive" and "this
+      car is middling", and the strongest instance was a 48px cyan **61** sitting
+      under a cyan tab.
+
+      The replacement makes the ramp a ramp: green → yellow-green → orange →
+      red, four steps a reader can order without a legend. 10.5:1 on
+      `--background`, so it clears the contrast floor by the same margin the
+      others do, and it frees cyan to mean one thing.
+    */
     --ring-good: #7FCE9C;             /* >= 80 */
-    --ring-ok: #5FAEC0;               /* >= 60 */
+    --ring-ok: #B9C77E;               /* >= 60 */
     --ring-warn: #E0A468;             /* >= 40 */
     --ring-bad: #E08882;              /* <  40 */
 
@@ -1493,8 +1512,23 @@ nav {
     }
   }
 
-  /* Editorial serif, for exactly one element per screen — a vehicle title or
-   * the single largest hero number. Never UI chrome, labels or tabular data. */
+  /* Editorial serif — the page's title and its section heads.
+   *
+   * ── ⚠ Widened 3 Sep, and the old rule is recorded because it was the
+   * problem. It read "for exactly one element per screen — a vehicle title or
+   * the single largest hero number", and held for a stretch where the only
+   * serif on a dashboard was the vehicle's name and the wordmark in the nav.
+   *
+   * Three consecutive critiques of the rendered page reached the same verdict
+   * independently, the third stating it plainly: the serif "appears exactly
+   * twice and nowhere else… that's not a pairing, it's a veneer. Commit the
+   * serif to section heads, or drop it." A typeface used once per screen is
+   * decoration applied to a product rather than a voice the product speaks in.
+   *
+   * So: titles and section heads. Still never UI chrome, never labels, and
+   * ⚠ **never tabular data** — the count-up on the cluster reading needs
+   * tabular figures or the digits reflow while they animate, which is the one
+   * place this must not go. Logged in `docs/design-system-drift.md` §10.1. */
   .display-serif {
     font-family: var(--font-display), Georgia, serif;
     font-weight: 500;

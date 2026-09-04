@@ -13,7 +13,7 @@ import { TABULAR, space, text, type } from '../theme';
  * `components/HealthHistoryChart.tsx` picks its line colour from four hexes
  * written into the component: `#4ade80`, `#22d3ee`, `#fb923c`, `#f87171` at 80
  * / 60 / 40. The thresholds happen to match `@wellkept/core/health-band`; **the
- * colours do not.** The band's own are `127,206,156`, `95,174,192`,
+ * colours do not.** The band's own are `127,206,156`, `185,199,126`,
  * `224,164,104`, `224,136,130`.
  *
  * So a web user reading 71 sees a cyan trend line beside a `ClusterGauge` in

@@ -145,7 +145,14 @@ describe('healthBandHex', () => {
   it('converts each band to six-digit hex for React Native', () => {
     // RN's StyleSheet has no rgba() string form, so the Expo garage needs this.
     expect(healthBandHex(getHealthBandJudgement(100))).toBe('#7fce9c');
-    expect(healthBandHex(getHealthBandJudgement(70))).toBe('#5faec0');
+    /*
+      ⚠ `#b9c77e`, moved off cyan on 3 Sep. The old value was a desaturated
+      cyan and cyan is the product's accent, so "Fair" wore the same hue as
+      every link and the active tab. See `--ring-ok` in `app/globals.css` for
+      the argument; this assertion exists so the web token and the value React
+      Native reads cannot drift apart.
+    */
+    expect(healthBandHex(getHealthBandJudgement(70))).toBe('#b9c77e');
     expect(healthBandHex(getHealthBandJudgement(50))).toBe('#e0a468');
     expect(healthBandHex(getHealthBandJudgement(10))).toBe('#e08882');
   });

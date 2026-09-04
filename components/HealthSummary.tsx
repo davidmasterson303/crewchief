@@ -186,9 +186,22 @@ function HealthFactorRows({
     claim?: HealthClaim;
   }[] = [
     { key: 'maintenance', label: 'Maintenance', driver: driverFor('maintenance'), claim: claims.maintenance },
-    { key: 'issues', label: 'Known issues', claim: claims.issues },
     { key: 'recalls', label: 'Recalls', driver: driverFor('recalls'), claim: claims.recalls },
     { key: 'mileage-load', label: driverFor('mileage-load')?.label ?? 'Mileage load', driver: driverFor('mileage-load') },
+    /*
+      ⚠ Last, and it is the only row with nothing in the score column.
+
+      It sat second, between two scored rows, and a design critique of the
+      rendered page read the empty column as a bug rather than a decision —
+      "the omission reads as a bug, not a decision". It is a decision: nothing
+      computes a number for known issues, and inventing one would be the
+      overclaim this whole card is built to avoid.
+
+      Ordering it after the measured rows is what makes that legible. A gap in
+      the middle of a column reads as missing; the column simply ending reads
+      as a different kind of row, which is what this is.
+    */
+    { key: 'issues', label: 'Known issues', claim: claims.issues },
   ].filter((row) => row.driver || row.claim);
 
   if (rows.length === 0) return null;
@@ -251,13 +264,22 @@ function HealthFactorRows({
               */
               checked={recallsChecked}
               trigger={
+                {/*
+                  ⚠ Same grammar as the hero's "What's driving this score":
+                  bold info-coloured text with one trailing glyph, no chrome.
+                  A design critique counted three treatments for one class of
+                  action on this page — a pill button, a chevron link and a
+                  bold arrow link — and it was right that only the pill earns
+                  its own: "Mark addressed" changes a record, these two move
+                  you to something.
+                */}
                 <button
                   type="button"
-                  className="tap-target-44 group mt-2 inline-flex items-center gap-1 text-xs font-medium text-info/80 transition-colors hover:text-info-strong"
+                  className="tap-target-44 group mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-info-strong transition-colors hover:text-info"
                 >
                   <span>View recall history</span>
                   <ChevronRight
-                    className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5"
+                    className="h-4 w-4 transition-transform group-hover:translate-x-0.5"
                     aria-hidden="true"
                   />
                 </button>
@@ -496,7 +518,7 @@ export default function HealthSummary({
                 first line is the shape a reader parses as broken. 18px fits it
                 on one line with room to spare. Unchanged from `sm` up.
               */}
-              <CardTitle className="text-lg sm:text-2xl text-white mb-1">
+              <CardTitle className="display-serif text-xl sm:text-2xl font-normal text-white mb-1">
                 What&apos;s driving the score
               </CardTitle>
               {/*

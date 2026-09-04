@@ -156,7 +156,13 @@ export default function CollapsibleSection({
             folded section growing a third line would defeat the fold.
           */}
           <span className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-3">
-            <span className="text-[15px] font-semibold text-white tracking-tight sm:flex-1 sm:min-w-0 truncate">
+            {/*
+              Serif, per the widened rule in `globals.css`. These are the
+              page's section heads, and a serif used only on the vehicle's name
+              was a veneer rather than a voice — three critiques of the
+              rendered page said so in a row.
+            */}
+            <span className="display-serif text-[17px] text-white tracking-tight sm:flex-1 sm:min-w-0 truncate">
               {title}
             </span>
             {summary && !open && (

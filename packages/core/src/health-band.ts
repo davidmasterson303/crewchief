@@ -62,7 +62,15 @@ export interface HealthBandJudgement {
  */
 const BANDS: ReadonlyArray<HealthBandJudgement & { min: number }> = [
   { min: 80, name: 'good', rgb: '127,206,156', label: 'Good', short: 'Good' },
-  { min: 60, name: 'ok', rgb: '95,174,192', label: 'Fair', short: 'Fair' },
+  /*
+    ⚠ `185,199,126`, not the old `95,174,192`. That was a desaturated cyan, and
+    cyan is the product's accent — so "Fair" wore the same hue as every link
+    and the active tab, and a 48px cyan score sat under a cyan tab meaning
+    something else entirely. The ramp now reads green → yellow-green → orange →
+    red without a legend. `app/globals.css` carries the full note at
+    `--ring-ok`, and the two must move together.
+  */
+  { min: 60, name: 'ok', rgb: '185,199,126', label: 'Fair', short: 'Fair' },
   { min: 40, name: 'warn', rgb: '224,164,104', label: 'Needs attention', short: 'Attention' },
   { min: -Infinity, name: 'bad', rgb: '224,136,130', label: 'Critical', short: 'Critical' },
 ];
