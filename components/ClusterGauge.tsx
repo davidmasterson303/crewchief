@@ -449,7 +449,24 @@ export function ClusterGauge({
           reading — but takes the muted ink so nothing on a dark face glows a
           judgement.
         */}
-        {!unknown && (
+        {/*
+          ── ⚠ The hero has no pointer. The card still does ─────────────────
+
+          A full needle met a hub in the middle and read as a toy speedometer;
+          shortening it to a marker inside the track fixed that and produced
+          the next complaint — "a stubby needle-nub at the arc's end that reads
+          as a rendering artifact".
+
+          Both are symptoms of the same redundancy. The arc's own filled length
+          *is* the reading, and its rounded cap already marks where the value
+          falls. A second mark at the same angle adds nothing but a shape to
+          misread.
+
+          ⚠ The card variant keeps it, and that is not an inconsistency: at
+          56px there is no room for a numeral in the well, so the pointer is
+          the only thing saying where on the scale the arc stopped.
+        */}
+        {!unknown && isCard && (
           <g transform={`rotate(${angleFor(clamped)} ${CX} ${CY})`}>
             {/*
               ── ⚠ A pointer, not a needle on a spindle ────────────────────
@@ -471,11 +488,11 @@ export function ClusterGauge({
             <line
               className="gauge-needle"
               x1={CX}
-              y1={isCard ? 42 : 34}
+              y1={42}
               x2={CX}
-              y2={isCard ? 62 : 50}
+              y2={62}
               stroke={band.color}
-              strokeWidth={isCard ? 3 : 2.5}
+              strokeWidth={3}
               strokeLinecap="round"
             />
           </g>
@@ -561,7 +578,22 @@ export function ClusterGauge({
               : 'block text-center font-semibold leading-none animate-fade-in'
           }
           style={{
-            color: ink,
+            /*
+              ── ⚠ Neutral on the hero, so something leads ──────────────────
+
+              The numeral, the arc and this word were all the band's colour, and
+              a critique of the rendered dial said the consequence plainly:
+              "nothing leads". Three elements at the same weight in the same
+              hue is a set, not a hierarchy.
+
+              The reading is the subject and keeps the colour. The arc is the
+              same fact drawn, and keeps it too. This is the caption — it names
+              the band the number already sits in — so it takes ordinary ink.
+
+              ⚠ The card keeps the band colour: at 56px there is no numeral in
+              the well, so this word *is* the reading rather than its caption.
+            */
+            color: isCard ? ink : 'rgb(255 255 255 / 0.7)',
             ...(isCard ? {} : { fontSize: size * 0.07, marginTop: size * 0.02 }),
           }}
         >

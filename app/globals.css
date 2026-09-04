@@ -1325,22 +1325,14 @@ nav {
     opacity: 1;
   }
   /*
-    ── ⚠ The editable value carries its own affordance ──────────────────────
+    ⚠ `.meta-value` was here — a dashed rule under the editable figure — and it
+    lasted one round. Two further critiques read it as "dead affordances…
+    tooltip styling on a touch device where no tooltip can exist" and "broken
+    tooltips/abbr styling", which is correct: a dashed underline means
+    *definition*, not *editable*. The control says "Edit" in words now; see
+    `DashboardLayout`.
 
-    A dashed rule under a number is the long-standing "you can change this"
-    convention, and unlike a glyph it cannot be mistaken for a status icon.
-    Two design critiques of the rendered pages reported the pencil beside
-    "67,400 mi" as "ambiguous grey glyphs… illegible as affordances" and
-    "unlabeled boxes" — on touch it is pinned visible (see below), so it sat
-    there permanently with nothing to explain it.
-
-    The pencil stays for pointer devices, where it appears on hover and the
-    hover itself is the explanation.
-  */
-  .meta-value {
-    border-bottom: 1px dashed rgb(255 255 255 / 0.22);
-    padding-bottom: 1px;
-  }
+*/
 
   @media (hover: none) {
     .reveal-on-hover,
@@ -1348,17 +1340,16 @@ nav {
       opacity: 1;
     }
     /*
-      ⚠ `.meta-edit` is deliberately **not** in that list any more.
+      ⚠ `.meta-edit` is back in the reveal list, and it is a word now.
 
-      It was, and correctly at the time: the rule exists because a hover-only
-      affordance is invisible on a phone, which is the audit finding this whole
-      block records. But the fix was to reveal the glyph, and the glyph is what
-      reads as noise once it can never hide. The row keeps its affordance —
-      the dashed rule above — and the phone stops carrying a pencil it cannot
-      explain.
+      The rule exists because a hover-only affordance is invisible on a phone —
+      that is the audit finding this whole block records, and it stands. What
+      briefly changed was hiding the affordance on touch instead, which left
+      the value with nothing to say it could be tapped. What actually needed
+      fixing was that the revealed thing was an unlabelled pencil.
     */
     .meta-edit {
-      opacity: 0;
+      opacity: 1;
     }
   }
 

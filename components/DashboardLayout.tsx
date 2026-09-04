@@ -531,7 +531,22 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                       full width; this marks one tab. They just could not both
                       be the same colour and remain two things.
                     */}
-                    {isActive && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-white rounded-t-full" />}
+                    {/*
+                      ⚠ On the top edge, not the bottom.
+
+                      White stopped it being a second cyan, and two more
+                      critiques still reported it: "the active tab's white
+                      underline sits on top of a full-width teal hairline — two
+                      competing lines doing one job", "the one accent color,
+                      used twice in the same 2px of space". The colour was only
+                      half the problem; the other half was that both lines were
+                      on the same edge.
+
+                      The batten owns the bottom of the nav — it is the room's
+                      light, and it runs the full width. The tab marks itself on
+                      the edge the batten does not use.
+                    */}
+                    {isActive && <span className="absolute top-0 left-0 right-0 h-0.5 bg-white rounded-b-full" />}
                   </Link>
                 );
             })}
@@ -625,9 +640,31 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                     className="meta-row flex items-center gap-1.5 group/edit"
                     aria-label="Edit mileage"
                   >
-                    <span className="meta-value text-2xl font-bold text-white tabular-nums tracking-tight">{displayVehicle.current_mileage?.toLocaleString() || '—'}</span>
+                    <span className="text-2xl font-bold text-white tabular-nums tracking-tight">{displayVehicle.current_mileage?.toLocaleString() || '—'}</span>
                     <span className="text-sm text-white/50 font-normal">mi</span>
-                    <Edit2 className="meta-edit h-3.5 w-3.5 text-white/30 group-hover/edit:text-cyan-400 transition-colors" />
+                    {/*
+                      ── ⚠ A word, after two conventions both failed ──────────
+
+                      This was a pencil, revealed on hover and pinned visible on
+                      touch — and two critiques called it "ambiguous grey
+                      glyphs" and "unlabeled boxes". Replacing it with a dashed
+                      rule under the value did no better: the next two called
+                      that "dead affordances… tooltip styling on a touch device
+                      where no tooltip can exist" and "broken tooltips/abbr
+                      styling".
+
+                      Both were right, and about the same thing. A dashed
+                      underline means *definition*, a bare pencil means
+                      *something*, and neither says what tapping does. The
+                      control already carries the answer in its `aria-label`;
+                      this is that label, made visible.
+
+                      One affordance, one meaning, on every input type — no
+                      convention for the reader to guess at.
+                    */}
+                    <span className="meta-edit text-xs font-medium text-white/55 underline decoration-white/25 underline-offset-2 group-hover/edit:text-white">
+                      Edit
+                    </span>
                   </button>
                 )}
               </div>
@@ -657,15 +694,28 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                     className="meta-row flex items-center gap-1.5 group/edit"
                     aria-label="Edit average monthly miles"
                   >
-                    <span className="meta-value text-2xl font-bold text-white tabular-nums tracking-tight">{displayVehicle.avg_miles_per_month || '—'}</span>
+                    <span className="text-2xl font-bold text-white tabular-nums tracking-tight">{displayVehicle.avg_miles_per_month || '—'}</span>
                     <span className="text-sm text-white/50 font-normal">mi/mo</span>
-                    <Edit2 className="meta-edit h-3.5 w-3.5 text-white/30 group-hover/edit:text-cyan-400 transition-colors" />
+                    <span className="meta-edit text-xs font-medium text-white/55 underline decoration-white/25 underline-offset-2 group-hover/edit:text-white">
+                      Edit
+                    </span>
                   </button>
                 )}
               </div>
 
+              {/*
+                ── ⚠ The label is gone; the chip names itself ────────────────
+
+                "STATUS" sat above a chip reading "Daily Driver", which is
+                already the label and the value in one — a critique called it
+                "doubled labeling… an AI-boilerplate tell", and on a phone the
+                pair took its own row with an empty column beside it.
+
+                The other three stats are label-over-value because their values
+                are bare numbers. This one is a word, and a word does not need
+                a word above it.
+              */}
               <div className="flex flex-col gap-1 relative">
-                <span className="label-uppercase">Status</span>
                 <div className="relative">
                   <button
                     onClick={() => !isDemo && setIsStatusOpen(o => !o)}

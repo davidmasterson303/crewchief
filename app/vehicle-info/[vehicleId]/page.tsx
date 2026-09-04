@@ -198,7 +198,7 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
           card a header gives the button somewhere to be and gives the first
           block on the page a name.
         */}
-        <Card className="bg-slate-900/60 border-white/10">
+        <Card className="border-white/10 bg-[#141720]">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between gap-4">
               <CardTitle className="display-serif text-white text-lg">Specification</CardTitle>
@@ -243,7 +243,7 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
           </CardContent>
         </Card>
 
-        <Card className="bg-slate-900/60 border-white/10">
+        <Card className="border-white/10 bg-[#141720]">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
               <CardTitle className="display-serif text-white text-lg">Performance</CardTitle>
@@ -365,7 +365,7 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
           </>
         )}
 
-        <Card className="bg-slate-900/60 border-white/10">
+        <Card className="border-white/10 bg-[#141720]">
           <CardHeader className="pb-4">
             <CardTitle className="display-serif flex items-center gap-2 text-white text-lg">
               <Droplets className="h-5 w-5 text-white/45" />
@@ -415,7 +415,7 @@ export default function VehicleInfoPage({ params }: { params: { vehicleId: strin
           </CardContent>
         </Card>
 
-        <Card className="bg-slate-900/60 border-white/10">
+        <Card className="border-white/10 bg-[#141720]">
           <CardHeader className="pb-4">
             <CardTitle className="display-serif flex items-center gap-2 text-white text-lg">
               {/*
