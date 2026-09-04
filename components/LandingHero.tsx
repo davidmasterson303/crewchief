@@ -85,23 +85,36 @@ export default function LandingHero({ onEnter }: LandingHeroProps) {
             */}
             <BrandLockup width={240} />
           </div>
-          <h1
-            className="text-6xl md:text-[5.25rem] font-bold text-white leading-tight"
-            style={{ letterSpacing: '-0.04em' }}
-          >
-            Your Personal Auto
+          {/*
+            ── ⚠ Three things were wrong here, and they were one thing ───────
+
+            **It was 60px on a phone.** "Your Personal Auto" at `text-6xl` in a
+            390px column is one word per line: the headline rendered as a
+            five-line word stack costing about 700px of the only screen most
+            visitors will see. A design critique called it "the single loudest
+            tell that no one typeset it".
+
+            **The break made it parse wrong.** "Your Personal Auto /
+            Ownership Consultant" reads "Your Personal Auto" as a unit before
+            "Ownership" arrives. The phrase is *auto-ownership*, hyphenated,
+            and breaking it there is the only place it can break.
+
+            **The gradient was the trope.** Animated cyan-to-blue clipped to
+            the last two words is the most recognisable AI-landing-page
+            treatment of the past two years, and this page ran three cyan
+            gradients at once — this one, the CTA pill and the plaque's glow.
+            It also spent the brand's own light on decoration, which is the
+            demotion the rest of the product just went through.
+
+            What replaces it is the face the mark is already set in. The plaque
+            above is Newsreader small caps; a grotesque headline underneath it
+            read, in the same critique, as "a foreign object… composited in".
+            One voice, sized to fit, breaking where the language breaks.
+          */}
+          <h1 className="display-serif text-4xl sm:text-5xl md:text-[4.5rem] text-white leading-[1.08] tracking-tight">
+            Your personal
             <br />
-            <span
-              className="text-transparent bg-clip-text gradient-text-animate"
-              style={{
-                backgroundImage:
-                  'linear-gradient(90deg, #22d3ee 0%, #38bdf8 25%, #60a5fa 50%, #38bdf8 75%, #22d3ee 100%)',
-                backgroundSize: '200% 100%',
-                letterSpacing: '-0.045em',
-              }}
-            >
-              Ownership Consultant
-            </span>
+            auto-ownership consultant
           </h1>
         </motion.div>
 
@@ -165,11 +178,22 @@ export default function LandingHero({ onEnter }: LandingHeroProps) {
             */
             <button
               onClick={onEnter}
-              className="enter-garage-btn group relative flex items-center justify-center gap-2 h-14 px-9 text-base font-semibold text-black rounded-xl overflow-hidden transition-all duration-300 hover:glow-cyan focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
-              style={{
-                background: 'linear-gradient(105deg, #22d3ee 0%, #38bdf8 50%, #3b82f6 100%)',
-                minWidth: '200px',
-              }}
+              className="enter-garage-btn group relative flex items-center justify-center gap-2 h-14 px-9 text-base font-semibold text-white rounded-xl overflow-hidden transition-all duration-300 hover:glow-cyan focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+              /*
+                ⚠ One colour, not a gradient. A cyan-to-blue pill is the second
+                half of the trope the headline just lost, and its lightest stop
+                sat under the first word so the label's contrast was weakest
+                exactly where reading starts. `--primary` is the fill every
+                other button in the product already uses — the same Sign In
+                button on the auth pages — which is what makes this the
+                product's primary action rather than the landing page's own.
+
+                ⚠ `hsl(...)` around it. The token holds **raw HSL channels**
+                (`193 82% 31%`), not a colour — Tailwind's config wraps it. Set
+                bare it resolves to nothing and the button renders with no
+                fill at all, which is exactly what happened on the first pass.
+              */
+              style={{ background: 'hsl(var(--primary))', minWidth: '200px' }}
             >
               <span className="shimmer-layer absolute inset-0 pointer-events-none" aria-hidden="true" />
               <span className="relative z-10 flex items-center gap-2">
@@ -180,11 +204,17 @@ export default function LandingHero({ onEnter }: LandingHeroProps) {
           ) : (
             <Link
               href="/signup"
-              className="enter-garage-btn group relative flex items-center justify-center gap-2 h-14 px-9 text-base font-semibold text-black rounded-xl overflow-hidden transition-all duration-300 hover:glow-cyan focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
-              style={{
-                background: 'linear-gradient(105deg, #22d3ee 0%, #38bdf8 50%, #3b82f6 100%)',
-                minWidth: '200px',
-              }}
+              className="enter-garage-btn group relative flex items-center justify-center gap-2 h-14 px-9 text-base font-semibold text-white rounded-xl overflow-hidden transition-all duration-300 hover:glow-cyan focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+              /*
+                ⚠ One colour, not a gradient. A cyan-to-blue pill is the second
+                half of the trope the headline just lost, and its lightest stop
+                sat under the first word so the label's contrast was weakest
+                exactly where reading starts. `--primary` is the fill every
+                other button in the product already uses — the same Sign In
+                button on the auth pages — which is what makes this the
+                product's primary action rather than the landing page's own.
+              */
+              style={{ background: 'hsl(var(--primary))', minWidth: '200px' }}
             >
               <span className="shimmer-layer absolute inset-0 pointer-events-none" aria-hidden="true" />
               <span className="relative z-10 flex items-center gap-2">
@@ -212,9 +242,20 @@ export default function LandingHero({ onEnter }: LandingHeroProps) {
             </button>
           )}
 
+          {/*
+            ── ⚠ A link, not a third button ─────────────────────────────────
+
+            Three centred buttons at three different widths stacked into what a
+            design critique called "a wedding-cake silhouette", and the third
+            one was a returning user's utility action taking hero real estate.
+            A hero offers two choices: start, or look first.
+
+            Signing in is neither — it is for someone who already decided, and
+            they will find it. Same tap target, none of the weight.
+          */}
           <Link
             href="/login"
-            className="flex items-center justify-center h-14 px-7 text-base font-medium text-white/70 hover:text-white rounded-xl border border-white/[0.14] bg-transparent hover:bg-white/[0.06] transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+            className="tap-target-44 flex items-center justify-center px-4 text-base font-medium text-white/70 underline decoration-white/25 underline-offset-4 transition-colors hover:text-white hover:decoration-white/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
           >
             Sign in
           </Link>
@@ -267,14 +308,13 @@ export default function LandingHero({ onEnter }: LandingHeroProps) {
           padding-right: 2.4rem;
         }
 
-        .gradient-text-animate {
-          animation: gradientShift 5s linear infinite;
-        }
-
-        @keyframes gradientShift {
-          0%   { background-position: 0% center; }
-          100% { background-position: 200% center; }
-        }
+        /* The gradient-text class and its keyframes are deleted with the
+         * gradient headline they drove. A five-second infinite animation left
+         * behind for nothing is the shape of thing that gets reattached to
+         * something later because it is already there.
+         *
+         * (No backticks in this block: it is inside a template literal, and a
+         * backtick here closes the string mid-comment.) */
       `}</style>
 
       <FeaturesDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />

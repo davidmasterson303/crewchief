@@ -713,20 +713,38 @@ nav {
       linear-gradient(180deg, rgb(255 255 255 / 0.028), rgb(255 255 255 / 0.007) 45%, transparent),
       /* wall/floor seam */
       linear-gradient(rgb(255 255 255 / 0.045), rgb(255 255 255 / 0.045)),
-      /* panel joins, wall only */
-      repeating-linear-gradient(90deg, transparent 0 139px, rgb(255 255 255 / 0.02) 139px 140px),
+      /*
+        ── ⚠ The panel joins are deleted — same defect as the belt's grain ────
+
+        `repeating-linear-gradient(90deg, transparent 0 139px, … 139px 140px)`:
+        a 1px line every 140px, full height, at 2% over a near-black wall.
+
+        It is the third instance of one mistake. A 1px repeating gradient
+        cannot survive a device pixel ratio it was not authored at — at 2x and
+        3x the phase shifts and the line resolves into visible banding — and
+        the period is fixed in pixels, so a 390px phone gets two or three of
+        them at arbitrary positions rather than the regular panelling the
+        concept describes. Successive design critiques named "the wall seams"
+        among the most obviously generated elements on screen; §9.2 cut this
+        element's bloom for the same class of reason and left these.
+
+        The **wall/floor seam above stays**: one horizontal line at a stated
+        horizon is geometry, and it is what makes the room read as a room.
+        These were texture.
+      */
       /* the room */
       linear-gradient(180deg, #0b0a09 0%, #131110 52%, #191713 64%, #15130f 100%);
     /*
-      Four lists, one order. Inserting the heat layer at position 4 shifts every
-      later entry, and getting that wrong is not cosmetic: `repeat-x` landing on
-      the wrong layer is how the beltline's brushed grain once climbed out of
-      its 11% band and textured the whole page. Counted rather than eyeballed —
-      8 layers, 8 entries in each list.
+      Four lists, one order. Removing a layer shifts every later entry, and
+      getting that wrong is not cosmetic: `repeat-x` landing on the wrong layer
+      is how the beltline's brushed grain once climbed out of its 11% band and
+      textured the whole page. Counted rather than eyeballed — **7 layers, 7
+      entries in each list** since the panel joins came out, and the `repeat-x`
+      that belonged to them went with it.
     */
-    background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, repeat-x, no-repeat;
-    background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 36%, 100% 1px, 100% 64%, 100% 100%;
-    background-position: 0 0, 0 0, 0 0, 0 0, 0 100%, 0 64%, 0 0, 0 0;
+    background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat;
+    background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 36%, 100% 1px, 100% 100%;
+    background-position: 0 0, 0 0, 0 0, 0 0, 0 100%, 0 64%, 0 0;
   }
 
   /* The cockpit beltline — concept 1c, and the dashboard's half of the rhyme.
