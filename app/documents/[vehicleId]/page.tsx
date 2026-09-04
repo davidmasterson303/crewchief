@@ -262,7 +262,15 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
             {visits!.map((visit) => (
               <div
                 key={visit.key}
-                className="rounded-xl border border-white/10 bg-white/[0.03] p-5 transition-colors hover:border-white/25"
+                className="rounded-xl border border-white/10 p-5 transition-colors hover:border-white/25"
+                /*
+                  ⚠ Opaque. At 3% the beltline's ambient strip — a 1px cyan
+                  hairline at `--belt-y` — crossed this card, and on the first
+                  record it landed straight through the shop's name. Same fault
+                  and same fix as the dashboard hero: a card sitting on the
+                  page's ground is a card, not a window.
+                */
+                style={{ background: '#15171b' }}
               >
                 {/*
                   ── ⚠ A record, not a tile with a bulleted list beside it ────
