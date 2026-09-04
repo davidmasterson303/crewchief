@@ -383,7 +383,7 @@ function HealthFactorRows({
                 */
                 <button
                   type="button"
-                  className="tap-target-44 group mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-cyan-400 transition-colors hover:text-cyan-300"
+                  className="tap-target-44 group mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-white/85 underline decoration-white/30 underline-offset-4 transition-colors hover:text-white hover:decoration-white/60"
                 >
                   <span>View recall history</span>
                   <ChevronRight

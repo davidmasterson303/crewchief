@@ -431,7 +431,7 @@ export default function DiagnosticHero({
                 driversHref && (
                   <a
                     href={driversHref}
-                    className="tap-target-44 inline-flex items-center gap-1.5 text-sm font-semibold text-cyan-400 transition-colors hover:text-cyan-300"
+                    className="tap-target-44 inline-flex items-center gap-1.5 text-sm font-semibold text-white/85 underline decoration-white/30 underline-offset-4 transition-colors hover:text-white hover:decoration-white/60"
                   >
                     What&apos;s driving this score
                     <span aria-hidden="true">↓</span>
@@ -457,12 +457,27 @@ export default function DiagnosticHero({
                 resolved.
               */}
               {/*
-                ⚠ Cyan, not the `info` family. A critique of the rendered page
-                counted six hues doing accent work and asked for two. Cyan is
-                already what "you can act on this" means here — the active tab,
-                the focus ring — and the links were a second, quieter blue
-                saying the same thing. One interactive colour; `info` keeps the
-                washes and the informational glyphs it was made for.
+                ── ⚠ An underlined neutral, and the reasoning moved twice ─────
+
+                This was `info` blue, then cyan, and is now neither. The first
+                move was right about the problem — two blues both meaning
+                "interactive" — and wrong about the fix.
+
+                ⚠ **Cyan is the mark, not an accent.** `#22D3EE` is
+                `BRAND_COLOR.glow` in Design's package: the plate's backlight,
+                asserted against their own SVGs by `brand.test.ts`. Spending it
+                on ordinary link text put the brand's light on every
+                "see more" on the page, and three consecutive critiques read
+                the result as a product with two competing signature colours —
+                the score's olive and a "default dark-dashboard teal".
+
+                So cyan goes back to being light: the mark, the batten, the
+                focus ring, the primary fill. Links are an underlined neutral,
+                which is what an editorial page uses and which cannot be
+                mistaken for a semantic state.
+
+                ⚠ This is a demotion, not a removal. Nothing in the brand
+                package changes and nothing about the mark moves.
               */}
               {caption && (
                 <p className="text-xs text-white/55 mt-3 leading-relaxed">{caption}</p>
