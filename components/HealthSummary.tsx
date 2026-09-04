@@ -303,6 +303,36 @@ function HealthFactorRows({
             </p>
           )}
 
+          {/*
+            ── ⚠ When this row's two voices disagree, it says so ──────────────
+
+            The measured line and the written claim are computed from the same
+            car by different means, and on a vehicle with a gap in its records
+            they can reach opposite conclusions: `nextDueMileage` counts a
+            service with no record from the next interval boundary above the
+            odometer, so a 40,000-mile item on a 67,400-mile car reads *later*,
+            while the model reads the same silence as "likely on original
+            fluid".
+
+            Four rounds of a design critique called the result the single
+            biggest failure on the page — a 97 and "Brake fluid overdue", one
+            line apart, in a product whose whole position is that it makes no
+            claim the data cannot support.
+
+            ⚠ Neither reading is wrong, so neither is suppressed. What was
+            missing is the sentence naming the disagreement and what closes it.
+            `nothingOutstanding` is a fact the driver states rather than a
+            threshold guessed at here — `health-drivers.ts` carries why that
+            distinction matters.
+          */}
+          {row.driver?.nothingOutstanding && row.claim?.state === 'attention' && (
+            <p className="mt-2.5 border-l-2 border-white/15 pl-3 text-sm leading-relaxed text-white/55">
+              These disagree. The schedule counts from your odometer and finds
+              nothing outstanding; the summary reads a service with no record as
+              never done. Adding that record settles it.
+            </p>
+          )}
+
           {row.key === 'recalls' && (
             <RecallHistoryModal
               recalls={recalls}

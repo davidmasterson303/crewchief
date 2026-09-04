@@ -52,6 +52,32 @@ export interface HealthDriver {
   score: number | null;
   /** One line saying what the number is made of. Always present, even at null. */
   detail: string;
+  /**
+   * Whether this driver found **nothing outstanding** on its subject.
+   *
+   * ── ⚠ Exists so a screen can notice two of its own voices disagreeing ─────
+   *
+   * The dashboard shows a computed driver and a model-written claim about the
+   * same subject, and on the seeded M3 they contradict each other in plain
+   * sight: "Maintenance 97 — nothing overdue among the 6 we can check" sits
+   * directly above "Brake fluid overdue", and four rounds of a design critique
+   * called that the single biggest failure on the page. For a product whose
+   * position is that it makes no claim the data cannot support, they were
+   * right.
+   *
+   * ⚠ **Neither side is wrong.** `nextDueMileage` counts a service with no
+   * record from the next interval boundary above the odometer — deliberately,
+   * because a car bought at 60,000 miles is not 52,500 miles overdue for an
+   * oil change — so a 40,000-mile item on a 67,400-mile car with no record is
+   * *later*, not overdue. The model reads the same missing record as "likely
+   * on original fluid". Two defensible readings of one absence.
+   *
+   * So the fix is not to silence either. It is to let the screen say they
+   * disagree and why, which needs a fact rather than a threshold: this is that
+   * fact, set by the driver that computed it. A UI guessing at it from
+   * `score >= 80` would be inventing the precision this file exists to refuse.
+   */
+  nothingOutstanding?: boolean;
 }
 
 /* ── Maintenance ─────────────────────────────────────────────────────────── */
@@ -172,7 +198,15 @@ export function maintenanceDriver(services: ServiceDue[]): HealthDriver {
         ? `${plural(unknown, 'service')} with no record to count from. Nothing overdue among the ${counted} we can check.`
         : `Nothing overdue, across ${plural(services.length, 'tracked service')}.`;
 
-    return { key: 'maintenance', label, score: clamp(100 - penalty), detail };
+    // Nothing overdue and nothing due: the only branch that reports a clear
+    // subject, and the only one a contradicting claim can be measured against.
+    return {
+      key: 'maintenance',
+      label,
+      score: clamp(100 - penalty),
+      detail,
+      nothingOutstanding: true,
+    };
   }
 
   let detail = `${parts.join(', ')}, across ${plural(services.length, 'tracked service')}.`;
@@ -238,7 +272,13 @@ export function recallDriver(raw: unknown): HealthDriver {
   const recalls: NormalisedRecall[] = normaliseRecalls(raw);
 
   if (recalls.length === 0) {
-    return { key: 'recalls', label, score: 100, detail: 'No recalls on record.' };
+    return {
+      key: 'recalls',
+      label,
+      score: 100,
+      detail: 'No recalls on record.',
+      nothingOutstanding: true,
+    };
   }
 
   const penalty = FIRST_RECALL + (recalls.length - 1) * EACH_FURTHER_RECALL;
