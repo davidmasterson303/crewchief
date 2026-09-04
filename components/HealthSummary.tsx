@@ -314,11 +314,11 @@ function HealthFactorRows({
             is what the sentence is carrying.
           */}
           {row.driver && (
-            <p className="text-sm text-white/65 leading-relaxed mt-1">{row.driver.detail}</p>
+            <p className="text-sm text-white/65 leading-normal mt-1">{row.driver.detail}</p>
           )}
 
           {row.claim && (
-            <p className="text-sm text-white/50 leading-relaxed mt-1.5 flex items-start gap-2">
+            <p className="text-sm text-white/50 leading-normal mt-1.5 flex items-start gap-2">
               <ClaimIcon claim={row.claim} />
               <span>{row.claim.text}</span>
             </p>
@@ -347,7 +347,7 @@ function HealthFactorRows({
             distinction matters.
           */}
           {row.driver?.nothingOutstanding && row.claim?.state === 'attention' && (
-            <p className="mt-2.5 border-l-2 border-white/15 pl-3 text-sm leading-relaxed text-white/55">
+            <p className="mt-2.5 border-l-2 border-white/15 pl-3 text-sm leading-normal text-white/55">
               These disagree. The schedule counts from your odometer and finds
               nothing outstanding; the summary reads a service with no record as
               never done. Adding that record settles it.
@@ -579,6 +579,15 @@ export default function HealthSummary({
 
   return (
     /*
+      ── ⚠ Body copy sets at `leading-normal`, not `leading-relaxed` ─────────
+
+      1.625 over a 300px column is six lines for a four-clause sentence, and a
+      critique of the rendered page counted the result: "one paragraph burns
+      half a screen", with the most decision-relevant rows — the sub-scores —
+      arriving several screens deep. 1.5 gives most of a line back per
+      paragraph without crowding; the report is dense reference text a reader
+      scans, not a pull quote.
+
       ── ⚠ No border and no fill, because the section around it has both ──────
 
       This was `bg-slate-900/60 border-white/10`, and its only caller renders
@@ -647,7 +656,7 @@ export default function HealthSummary({
                 card, under one disclosure.
               */}
               {healthSummary.summary && (
-                <p className="text-sm text-white/60 mt-1.5 max-w-xl leading-relaxed">{healthSummary.summary}</p>
+                <p className="text-sm text-white/60 mt-1.5 max-w-xl leading-normal">{healthSummary.summary}</p>
               )}
               {/*
                 ── ⚠ UX-16 / LEG-05 · this reads as an assessment ────────────
@@ -819,7 +828,7 @@ export default function HealthSummary({
                     aria-hidden="true"
                     className="mt-[0.5em] h-1 w-1 shrink-0 rounded-full bg-info"
                   />
-                  <span className="leading-relaxed">{rec}</span>
+                  <span className="leading-normal">{rec}</span>
                 </li>
               ))}
             </ul>
