@@ -1,6 +1,55 @@
 # Well Kept roadmap — image pipeline, backdrop, cockpit direction, and responsive web
 
-> ### ⚠ START HERE — 30 Aug 2026, the rebrand day
+> ### ⚠ START HERE — 4 Sep 2026, the design pass
+>
+> Two days of a design-critic loop: each page screenshotted at 390px and 1440px, handed
+> to a critic in a fresh context with **no code and no history**, scored against a studio
+> bar, fixed, re-judged. 39 commits, all on `main`, none deployed. Both suites green
+> (185 web / 26 mobile).
+>
+> | page | rounds | score |
+> |---|---|---|
+> | dashboard | 11 | 4 → 6 |
+> | consultant | 2 | 5 → 6 |
+> | vehicle info | 3 | 4 → 6 |
+> | maintenance | 5 | 4 → 6 |
+> | landing | 3 | 4 → 5 |
+>
+> `/garage`, `/settings`, `/onboard` are **unjudged** — they 307 without a session, so an
+> anonymous capture cannot reach them. That needs a test account or a signed-in capture.
+>
+> #### ⛔ Three shipped bugs the suite never saw
+>
+> - **No dashboard had ever shown a recall.** Three reads named `nhtsa_data.lookup_status`
+>   in their `select`; that column does not exist in production and PostgREST rejects the
+>   *whole query* for one unknown column, so the row came back null. The seeded M3 has two
+>   open campaigns. Fixed in `lib/nhtsa-row.ts` — and ⚠ **migration `20260824100000` is
+>   still unapplied**, so the fallback is what is carrying it.
+> - **Every service date rendered a day early** west of Greenwich — a date-only string
+>   parsed as UTC midnight. Fixed in `formatting-utils.ts`; the test pins a timezone,
+>   because in UTC (which is what CI runs) the bug is invisible.
+> - **`.field-sm` beat `pl-8`** — it sets the `padding` shorthand from `@layer utilities`,
+>   so the consultant's search icon printed on top of its own placeholder.
+>
+> #### Open, and David's
+>
+> - **`20260824100000`** (the recall column) and **`20260903120000`** (demo copy
+>   punctuation) both await the SQL editor.
+> - **The mark's cyan halo.** Successive critiques call the plate's backlight the page's
+>   remaining tell. It is `BRAND_COLOR.glow`, pinned to Design's SVGs by `brand.test.ts` —
+>   drift §11.3. Everything *else* cyan is gone: §11 settled the palette as white for
+>   actions, the health ramp for state, red for alarm.
+> - **The landing shutter.** A drawn gradient stack; the critic wants a real graded
+>   surface. Scrimmed for now so it stops competing with the copy.
+>
+> ⚠ Two fixes of mine created the next defect, both caught only by re-rendering: the
+> edit affordance (pencil → dashed rule → the word "Edit") and the active-tab marker
+> (cyan line → white line → top edge → a fill). If a change here looks obviously right,
+> screenshot it before believing it.
+>
+> ---
+>
+> ### START HERE — 30 Aug 2026, the rebrand day
 >
 > Written at the end of the 30 Aug session. **The product is now Well Kept, the advisor is
 > Jay, the operator is Southmoor Digital LLC, there is no free tier, and the demo makes no
