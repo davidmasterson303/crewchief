@@ -88,6 +88,25 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
   const [isStatusOpen, setIsStatusOpen] = useState(false);
   const isDemo = isDemoVehicleId(vehicle.id);
 
+  /*
+    ── ⚠ The beltline belongs to the dashboard, and only to it ───────────────
+
+    `.cockpit-belt` went on every page this layout wraps. Its own docblock is
+    narrower than that: *"the cockpit beltline — concept 1c, and **the
+    dashboard's** half of the rhyme… the signed-in dashboard stands in a car."*
+
+    On the other three it is a brushed band crossing content it has no relation
+    to, and four design critiques reported it there as a rendering defect —
+    "lighter horizontal bands slice across the background behind the first
+    card… that's not patina, it's a broken gradient". The phone was fixed by
+    moving the band out of the box; the desktop kept it, and the reports kept
+    coming from the pages that never wanted it.
+
+    So it lights the room it was drawn for. The others take the plain ground,
+    which is what they were being read as anyway.
+  */
+  const belt = currentPage === 'dashboard' ? ' cockpit-belt' : '';
+
   useEffect(() => {
     setDisplayVehicle(vehicle);
     setAvgMileage(vehicle.avg_miles_per_month?.toString() || '');
@@ -272,8 +291,8 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
     <div
       className={
         appShell
-          ? 'flex-1 min-h-0 overflow-hidden flex flex-col md:flex-none md:min-h-screen md:block md:overflow-visible cockpit-belt'
-          : 'min-h-screen cockpit-belt'
+          ? `flex-1 min-h-0 overflow-hidden flex flex-col md:flex-none md:min-h-screen md:block md:overflow-visible${belt}`
+          : `min-h-screen${belt}`
       }
     >
       {/*

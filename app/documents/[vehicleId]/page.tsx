@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
-import { FileText, CircleCheck as CheckCircle2, MessageSquare } from 'lucide-react';
+import { FileText, CircleCheck as CheckCircle2, MessageSquare, Plus } from 'lucide-react';
 import { formatDate } from '@wellkept/core/formatting-utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getClientSupabase } from '@/lib/supabase';
@@ -264,13 +264,23 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
               a button labelled "Upload Invoice" — a critique called it "the
               wrong icon entirely, that's a chat glyph". It is not wrong about
               where the button goes: uploading an invoice happens in the
-              consultant, by sending it. The label is what was misleading, so
-              the label names the tab it opens — "advisor" was a third word for
-              a feature already called Consultant in the nav and Jay in the
-              thread, and a critique caught the collision.
+              consultant, by sending it.
+
+              ⚠ Third wording, and the last two were both half right. "Upload
+              Invoice" with a speech-bubble glyph was called the wrong icon;
+              naming the destination instead — "Upload in Consultant" — fixed
+              the glyph and produced "feature-name jargon" and "a speech-bubble
+              icon that doesn't say upload".
+
+              Both notes were about the same confusion: the control was
+              describing its *route* rather than its *outcome*. What a person
+              wants is a service record on file; the consultant is how this
+              product does that, which is a detail of the path and not the point
+              of the button. So it names the outcome and the glyph agrees with
+              the outcome.
             */}
-            <MessageSquare className="w-4 h-4 mr-2" />
-            Upload in Consultant
+            <Plus className="w-4 h-4 mr-2" />
+            Add a service record
           </Button>
         </div>
 
@@ -292,7 +302,7 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
             </p>
             <Button
               variant="outline"
-              className="border-info-border text-info hover:bg-cyan-500/10 mt-6"
+              className="mt-6 border-white/20 text-white/80 hover:border-white/35 hover:bg-white/5 hover:text-white"
               onClick={() => router.push(`/consultant/${params.vehicleId}`)}
             >
               <MessageSquare className="w-4 h-4 mr-2" />
@@ -443,7 +453,24 @@ export default function DocumentsPage({ params }: { params: { vehicleId: string 
 
                     <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-white/15 pt-3">
                       <span className="label-uppercase">Total</span>
-                      <span className="tabular-nums text-lg font-bold text-white">
+                      {/*
+                        ⚠ Serif, and this is the one place on the page it earns
+                        the exception to "never tabular data".
+
+                        A critique: the serif "appears exactly three times…
+                        everything else is generic bold sans. '$1,015.00' in
+                        heavy grotesk is the loudest element on every card and
+                        belongs to a different, cheaper product." It is right —
+                        the total is the visit's headline, and it was set in the
+                        UI face.
+
+                        The rule it bends is `display-serif`'s ban on tabular
+                        data, which exists because the cluster reading counts up
+                        and Newsreader would reflow the digits mid-animation.
+                        Nothing here animates: this figure is printed once and
+                        never moves.
+                      */}
+                      <span className="display-serif text-xl text-white">
                         {currency.format(visit.total)}
                       </span>
                     </div>
