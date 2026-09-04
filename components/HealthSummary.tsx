@@ -264,7 +264,14 @@ function HealthFactorRows({
               */
               checked={recallsChecked}
               trigger={
-                {/*
+                /*
+                  ⚠ Not `{/* … *\/}` here — this is a prop expression, not JSX
+                  children, and a braced comment in this position is a syntax
+                  error. It compiled to nothing but a "Failed to compile"
+                  overlay, and the type check is what says so: `npm test` stayed
+                  green because every suite that touches this file reads it as
+                  text rather than compiling it.
+
                   ⚠ Same grammar as the hero's "What's driving this score":
                   bold info-coloured text with one trailing glyph, no chrome.
                   A design critique counted three treatments for one class of
@@ -272,7 +279,7 @@ function HealthFactorRows({
                   bold arrow link — and it was right that only the pill earns
                   its own: "Mark addressed" changes a record, these two move
                   you to something.
-                */}
+                */
                 <button
                   type="button"
                   className="tap-target-44 group mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-info-strong transition-colors hover:text-info"
