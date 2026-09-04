@@ -63,7 +63,27 @@ export interface AnswerLine {
    * A renderer that wants a receipt draws these in two columns; one that does
    * not ignores them and draws `tokens`.
    */
-  figure?: { label: AnswerToken[]; amount: AnswerToken[] };
+  figure?: {
+    label: AnswerToken[];
+    amount: AnswerToken[];
+    /**
+     * Whether this row is the one the others add up to.
+     *
+     * ── ⚠ Read from the label, never inferred from the number ──────────────
+     *
+     * A design critique of the rendered consultant put it exactly: "the total
+     * isn't a total" — "Bundled total ~$1,900-2,100" rendered at the same
+     * weight as a $115 brake flush, so "the punchline row of the whole answer
+     * has no promotion".
+     *
+     * The temptation is to find the largest figure and promote that. ⚠ Don't:
+     * a range beats a single number, an "all-in" line beats the subtotal it
+     * includes, and the biggest number in a list is not reliably its sum —
+     * that would be the app deciding what the advisor meant. The model wrote
+     * the word "total"; this reads the word.
+     */
+    total: boolean;
+  };
 }
 
 /** `* item`, `- item`, `• item` — with the marker removed. */
@@ -101,6 +121,9 @@ const BULLET = /^\s*[*\-•]\s+/;
  * safe answer, and this file's rule is that unmatched syntax is left alone.
  */
 const FIGURE = /^([^:*_\n]{1,60}):[ \t]+((?:~|≈)?\$[^:\n]{0,40})$/;
+
+/** The label of a summing row, as the advisor actually writes them. */
+const TOTAL_LABEL = /\btotals?\b/i;
 
 function splitFigure(content: string): { label: string; amount: string } | null {
   const match = FIGURE.exec(content);
@@ -263,6 +286,7 @@ export function parseAnswer(answer: string): AnswerLine[] {
           figure: {
             label: parseAnswerLine(figure.label),
             amount: parseAnswerLine(figure.amount),
+            total: TOTAL_LABEL.test(figure.label),
           },
         };
       }

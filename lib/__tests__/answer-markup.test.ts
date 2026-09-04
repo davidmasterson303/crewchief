@@ -296,3 +296,45 @@ describe('a labelled money figure is its own kind of line', () => {
     expect(kinds('Total: $')).toEqual(['text']);
   });
 });
+
+describe('the row the others add up to', () => {
+  /*
+    ── ⚠ Read from the label, never inferred from the number ─────────────────
+
+    "The total isn't a total" — a design critique of the rendered consultant,
+    on a breakdown where "Bundled total ~$1,900-2,100" carried the same weight
+    as a $115 brake flush.
+
+    The obvious implementation is to promote the largest figure. It is also
+    wrong: a range beats a single number, an "all-in" line beats the subtotal
+    it contains, and the biggest number in a list is not reliably its sum. That
+    would be the app deciding what the advisor meant. The model wrote the word;
+    this reads the word.
+  */
+  const totals = (answer: string) => parseAnswer(answer).map((l) => l.figure?.total);
+
+  it('marks a row whose label says total', () => {
+    expect(totals('Bundled total: ~$1,900-2,100')).toEqual([true]);
+    expect(totals('Total: $515')).toEqual([true]);
+  });
+
+  it('leaves the ordinary rows alone', () => {
+    expect(totals('Brake fluid flush: $115')).toEqual([false]);
+    expect(totals('Water pump + thermostat: $800 all-in')).toEqual([false]);
+  });
+
+  it('does not promote the largest figure', () => {
+    /*
+      The assertion that fails if somebody "improves" this into a max(). On the
+      seeded M3 answer the largest amount is the *last* line, "Add DCT + brake
+      fluid: ~$2,300-2,500 all-in", which is an addition to the total rather
+      than the total — and the row that says "total" is smaller than it.
+    */
+    const lines = parseAnswer(
+      ['Bundled total: ~$1,900-2,100', 'Add DCT + brake fluid: ~$2,300-2,500 all-in'].join('\n')
+    );
+
+    expect(lines[0].figure?.total).toBe(true);
+    expect(lines[1].figure?.total).toBe(false);
+  });
+});

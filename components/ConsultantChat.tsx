@@ -918,21 +918,53 @@ export default function ConsultantChat({
                     <div className="space-y-1.5">
                       {parseAnswer(msg.content).map((line, i: number) => {
                         if (line.kind === 'figure' && line.figure) {
+                          const { total } = line.figure;
                           return (
                             <p
                               key={i}
-                              className="flex items-baseline justify-between gap-4 border-b border-white/8 py-1 text-sm leading-normal last:border-b-0"
+                              /*
+                                ⚠ The summing row is promoted. A critique of the
+                                rendered page: "the total isn't a total" — it
+                                sat at the same weight as a $115 brake flush,
+                                so "the punchline row of the whole answer has
+                                no promotion". A heavier rule above it and a
+                                larger figure is what a printed estimate does,
+                                and `answer-markup` decides which row it is by
+                                reading the word the model wrote.
+                              */
+                              className={
+                                total
+                                  ? 'mt-1 flex items-baseline justify-between gap-4 border-t border-white/25 pt-2 text-sm leading-normal'
+                                  : 'flex items-baseline justify-between gap-4 border-b border-white/8 py-1 text-sm leading-normal last:border-b-0'
+                              }
                             >
                               <span className="min-w-0 break-words">
                                 <AnswerRuns tokens={line.figure.label} lineKey={i} />
                               </span>
                               {/*
-                                `num` is the house's tabular-figures class. It
-                                is the whole point of the treatment: figures
-                                that line up column-wise are readable as a set,
-                                and proportional ones are not.
+                                ⚠ Neither the house `.num` class nor
+                                `tabular-nums`, and the reason is what these
+                                amounts contain.
+
+                                They are not pure figures — they carry words
+                                and ranges: "$800 all-in", "~$1,900-2,100".
+                                Tabular figures give every glyph the width of a
+                                digit, **including the hyphen**, so "all-in"
+                                rendered with a gap either side of its dash and
+                                a critique reported it as "$800 all - in".
+                                `.num` adds the register's negative tracking on
+                                top, which was never meant for prose.
+
+                                Tabular buys decimal alignment, and these are
+                                right-aligned against a rule instead — the
+                                column lines up on its edge, which is what a
+                                printed estimate does with mixed amounts.
                               */}
-                              <span className="num shrink-0 font-semibold text-white">
+                              <span
+                                className={`shrink-0 text-white ${
+                                  total ? 'text-base font-bold' : 'font-semibold'
+                                }`}
+                              >
                                 <AnswerRuns tokens={line.figure.amount} lineKey={i} />
                               </span>
                             </p>
@@ -1251,7 +1283,12 @@ export default function ConsultantChat({
             textarea is borderless inside it. Canonical order is still
             [attach, input, send] — attach beside the field, send last.
           */}
-          <div className="composer-panel rounded-xl">
+          {/*
+            ⚠ `group` so the helper line below can wait for focus. See its own
+            note — at rest the composer was three stacked rows for an idle
+            input, and only one of them was the input.
+          */}
+          <div className="composer-panel group rounded-xl">
             <Textarea
               ref={textareaRef}
               placeholder="Ask me anything about your vehicle..."
@@ -1323,7 +1360,21 @@ export default function ConsultantChat({
             is the desktop layout squeezed", and it was exactly that. The
             attachment limit is true on every device, so it stays.
           */}
-          <p className="text-xs text-white/50 mt-2">
+          {/*
+            ── ⚠ Shown on focus, not at rest ─────────────────────────────────
+
+            A critique of the rendered page called the composer "a monument":
+            three stacked rows for an idle input — the field, the vehicle chip,
+            and this. It is instruction for someone about to type, and at rest
+            nobody is.
+
+            ⚠ Not conditionally rendered. It stays in the DOM so a screen
+            reader reaches it and so the composer's height does not jump when
+            the field takes focus; only its opacity moves. The placeholder's
+            own size is untouched — 16px is R2's iOS zoom floor, not a
+            typographic choice.
+          */}
+          <p className="mt-2 text-xs text-white/50 opacity-0 transition-opacity group-focus-within:opacity-100">
             <span className="hidden sm:inline">
               Enter to send &middot; Shift+Enter for new line &middot;{' '}
             </span>
