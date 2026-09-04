@@ -22,7 +22,7 @@ import {
   nextCheckDue,
   readRecallResponse,
   recallsWereChecked,
-} from '@wellkept/core/nhtsa-lookup';
+  recallsAreKnown,} from '@wellkept/core/nhtsa-lookup';
 import { recallsToRefresh, SWEEP_RECALL_REFRESH_CAP } from '@wellkept/core/notification-sweep';
 
 describe('readRecallResponse', () => {
@@ -172,5 +172,49 @@ describe('recallsToRefresh — FN-02', () => {
   it('re-fetches a row whose due date is unreadable rather than skipping it', () => {
     // A date we cannot parse is not a date in the future.
     expect(recallsToRefresh([car('matched', 'not a date')], NOW).send).toHaveLength(1);
+  });
+});
+
+describe('recall rows are evidence, an empty array is not', () => {
+  /*
+    ── ⚠ Why this exists, and it is a fact about production ──────────────────
+
+    `nhtsa_data.lookup_status` is not in the live database. The migration that
+    adds it has not been applied — PostgREST answers `42703` — so every read
+    resolves to `undefined` and `recallsWereChecked` is `false` for every
+    vehicle in the product.
+
+    The visible result on the seeded M3: the dashboard's recalls driver said
+    "Recalls have not been checked for this vehicle" directly above the model's
+    written status, "2 open recalls — fuel pump and electrical system", because
+    `healthClaim` deliberately lets a written finding win. One screen, two
+    statements, flatly contradicting each other.
+  */
+  it('treats a non-empty array as proof the check happened', () => {
+    expect(recallsAreKnown(undefined, [{ NHTSACampaignNumber: '21V702000' }])).toBe(true);
+    expect(recallsAreKnown(null, [{ NHTSACampaignNumber: '21V702000' }])).toBe(true);
+  });
+
+  it('never turns an unproven empty result into an all-clear', () => {
+    /*
+      The asymmetry is the whole point, and it is the FN-03 case: an
+      `nhtsa_data` row is written even for a lookup NHTSA did not recognise, so
+      `[]` is byte-identical to a genuinely clean vehicle. Rows prove a match;
+      the absence of rows proves nothing without the status.
+
+      ⚠ This is the assertion that fails if someone "simplifies" the function
+      to `recalls !== undefined`, which would score every unrecognised truck
+      100 and print "No recalls on record" under it.
+    */
+    expect(recallsAreKnown(undefined, [])).toBe(false);
+    expect(recallsAreKnown('no_match', [])).toBe(false);
+    expect(recallsAreKnown('failed', [])).toBe(false);
+    expect(recallsAreKnown('unknown', undefined)).toBe(false);
+  });
+
+  it('still honours a matched status with nothing found', () => {
+    // The case the migration exists for, and the one this cannot replace: a
+    // vehicle NHTSA genuinely cleared. Only the status can say so.
+    expect(recallsAreKnown('matched', [])).toBe(true);
   });
 });

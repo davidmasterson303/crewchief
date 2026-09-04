@@ -138,6 +138,18 @@ function blocker(file: string, seen = new Set<string>()): string | null {
  * Adding a name here without fixing the module fails the assertions below.
  */
 const PORTABLE: string[] = [
+  /*
+    Added 3 Sep. It takes its Supabase client as a parameter — deliberately, so
+    the browser client and the service-role one can both use it — and imports
+    nothing but core's logger, which is what makes it portable rather than an
+    exception. The judgement it feeds, `recallsAreKnown`, is already in core.
+
+    Not moved yet because the fallback it wraps is meant to be **deleted**: it
+    exists only until `nhtsa_data.lookup_status` is applied. Promoting a
+    module into the shared package on its way out invites a second client to
+    import it.
+  */
+  'lib/nhtsa-row.ts',
   // Every module that qualified has moved into packages/core/src.
   // A new portable module in lib/ belongs here until it moves.
   /*
@@ -300,6 +312,7 @@ const NOT_PORTABLE: Record<string, string> = {
   'lib/vehicle-photo.ts': 'mints signed URLs through a Supabase storage client',
   'lib/storage-objects.ts': 'reaches Supabase through lib/supabase',
   'lib/consultant-context.ts': 'queries Supabase — the shape it returns is portable, the loading is not',
+
   'lib/gemini.ts': 'client at module scope — a build-time server key (§19)',
   /*
     Server-only by construction, and deliberately so. It holds a service-role

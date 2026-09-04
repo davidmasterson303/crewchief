@@ -1,4 +1,5 @@
 import { timingSafeEqual } from 'node:crypto';
+import { selectNhtsaRow } from '@/lib/nhtsa-row';
 
 import { logger } from '@wellkept/core/logger';
 import type { NextRequest } from 'next/server';
@@ -588,7 +589,7 @@ async function collectRecalls(
    */
   refresh: Array<{ vehicle: VehicleRow; nextCheckDue: string | null; lookupStatus: string | null }>
 ) {
-  const [{ data: nhtsa }, { data: raised }] = await Promise.all([
+  const [nhtsa, { data: raised }] = await Promise.all([
     /*
       ⚠ `next_check_due` is read here for the first time since the table was
       created. It has been **written by every research run and consulted by
@@ -596,17 +597,17 @@ async function collectRecalls(
       exist, which is how a car researched in February keeps a green tick after
       NHTSA opens a campaign against it in April.
     */
-    client
-      .from('nhtsa_data')
-      .select('recalls,lookup_status,next_check_due')
-      .eq('vehicle_id', vehicle.id)
-      .maybeSingle(),
+    /*
+      Through `selectNhtsaRow`: the column is not applied in production, and a
+      select naming it is rejected whole. For this sweep that meant every row
+      read as "no nhtsa_data at all" — so every vehicle became a refresh
+      candidate and no recall was ever notified on.
+    */
+    selectNhtsaRow(client, vehicle.id, ['next_check_due']),
     client.from('recall_notifications').select('campaign_number').eq('vehicle_id', vehicle.id),
   ]);
 
-  const row = nhtsa as
-    | { recalls?: unknown; lookup_status?: string | null; next_check_due?: string | null }
-    | null;
+  const row = nhtsa;
 
   /*
     ⚠ **A car with no row at all is a refresh candidate too.** Its research may

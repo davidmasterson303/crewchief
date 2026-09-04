@@ -35,6 +35,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { selectNhtsaRow } from '@/lib/nhtsa-row';
 import { logger } from '@wellkept/core/logger';
 
 /*
@@ -181,8 +182,14 @@ export async function loadConsultantContext(
       .select('*')
       .eq('vehicle_id', vehicleId)
       .order('created_at', { ascending: false }),
-    /* `lookup_status` so the advisor can say "not checked" rather than "none". FN-03. */
-    client.from('nhtsa_data').select('recalls,lookup_status').eq('vehicle_id', vehicleId).maybeSingle(),
+    /*
+      `lookup_status` so the advisor can say "not checked" rather than "none".
+      FN-03 — and through `selectNhtsaRow`, because the column is not applied in
+      production and naming it in a select rejects the whole query. The advisor
+      losing every recall it could have cited is the same silent failure the
+      dashboard had.
+    */
+    selectNhtsaRow(client, vehicleId).then((data) => ({ data, error: null })),
     client.from('vehicle_health_summary').select('*').eq('vehicle_id', vehicleId).maybeSingle(),
   ]);
 

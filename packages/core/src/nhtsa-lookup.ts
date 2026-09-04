@@ -49,6 +49,50 @@ export function recallsWereChecked(status: string | null | undefined): boolean {
 }
 
 /**
+ * Whether this vehicle's recall picture may be treated as known.
+ *
+ * ── ⚠ Why the status alone is not enough, found by querying production ──────
+ *
+ * `nhtsa_data.lookup_status` **does not exist in the live database** — the
+ * migration that adds it has not been applied, and PostgREST answers `42703`
+ * for it. Every read therefore resolves to `undefined`, `recallsWereChecked`
+ * answers `false` for every vehicle, and the dashboard's recalls driver says
+ * *"Recalls have not been checked for this vehicle"* about cars whose
+ * `nhtsa_data` row is sitting there holding two recall campaigns.
+ *
+ * That is not a cosmetic disagreement. The same screen renders the model's
+ * written status beside it — `healthClaim` deliberately lets a written finding
+ * win, because suppressing a real one is the dangerous direction — so a reader
+ * met "have not been checked" directly above "2 open recalls — fuel pump and
+ * electrical system". A design critique of the rendered page called it fatal
+ * for a product whose position is that it makes no claim the data cannot
+ * support, and it was right.
+ *
+ * ── The asymmetry is the whole idea, and it is safe in one direction only ───
+ *
+ * Recall **rows are evidence in themselves**: something matched this vehicle
+ * to produce them. An **empty** array is not, and that is the case §10 and the
+ * `lookup_status` migration exist for — an `nhtsa_data` row is written even
+ * for a lookup NHTSA did not recognise, so a bare `[]` is indistinguishable
+ * from a genuinely clean truck.
+ *
+ * So: a non-empty array proves the check happened; an empty one proves nothing
+ * without the status. This never converts an unknown into an all-clear, which
+ * is the only direction that would be dangerous — it converts an unknown into
+ * a known *finding*.
+ *
+ * ⚠ This does not make the migration unnecessary. Without it, a vehicle NHTSA
+ * genuinely cleared still reads as unchecked, which is a real (if honest) loss
+ * of information. Apply it and this function keeps working unchanged.
+ */
+export function recallsAreKnown(
+  status: string | null | undefined,
+  recalls: unknown
+): boolean {
+  return recallsWereChecked(status) || (Array.isArray(recalls) && recalls.length > 0);
+}
+
+/**
  * How NHTSA's own response should be read.
  *
  * ⚠ `matched` requires **either** a recall to have come back, **or** the make
