@@ -44,14 +44,75 @@ export interface AnswerToken {
   italic: boolean;
 }
 
-/** One rendered line: either an ordinary paragraph or a bulleted item. */
+/** One rendered line: a paragraph, a bulleted item, or a labelled figure. */
 export interface AnswerLine {
-  kind: 'text' | 'bullet';
+  kind: 'text' | 'bullet' | 'figure';
+  /**
+   * The whole line, always — including for a `figure`.
+   *
+   * ⚠ Load-bearing for the client that has not been taught about the new kind.
+   * `AdvisorScreen` switches on `bullet` and falls through to text for
+   * everything else, so a figure renders there exactly as it did before this
+   * existed. A kind that broke an unaware renderer would be the "capability
+   * living in one client" defect this module was written to end.
+   */
   tokens: AnswerToken[];
+  /**
+   * Present only on `figure`: the two halves, already tokenised.
+   *
+   * A renderer that wants a receipt draws these in two columns; one that does
+   * not ignores them and draws `tokens`.
+   */
+  figure?: { label: AnswerToken[]; amount: AnswerToken[] };
 }
 
 /** `* item`, `- item`, `• item` — with the marker removed. */
 const BULLET = /^\s*[*\-•]\s+/;
+
+/**
+ * `Water pump + thermostat: $800 all-in` — a label and a money figure.
+ *
+ * ── ⚠ Why this is recognised at all ─────────────────────────────────────────
+ *
+ * The advisor's most useful answers are cost breakdowns, and they arrived as a
+ * run of identical paragraphs: "$115" carrying the same visual weight as the
+ * connective prose around it. A design critique of the rendered page called it
+ * the single biggest miss on the screen the product lives on — the whole value
+ * of the answer is the numbers, and nothing was letting them line up.
+ *
+ * ── ⚠ Why it is this strict ─────────────────────────────────────────────────
+ *
+ * This must never capture a sentence. Three conditions, all required:
+ *
+ *   - the label is short and ends at the **first** colon;
+ *   - the remainder is a money figure — optional `~`/`≈`, then `$`, then at
+ *     most 40 characters;
+ *   - the whole line ends there.
+ *
+ * Measured against the seeded M3 answer, that takes "DCT fluid change: $280"
+ * and "Bundled total: ~$1,900-2,100" and leaves "Rod bearing inspection: $180
+ * parts + $600 labor (bundled with water pump) = ~$780" as prose — because it
+ * *is* prose, and forcing it into a right-hand column would wrap 66 characters
+ * into a 390px gutter.
+ *
+ * ⚠ It also declines any line whose emphasis markers straddle the colon
+ * (`**Bundled total:** $x`), because splitting there would leave an unmatched
+ * `**` in each half and the tokeniser would render the asterisks. Prose is the
+ * safe answer, and this file's rule is that unmatched syntax is left alone.
+ */
+const FIGURE = /^([^:*_\n]{1,60}):[ \t]+((?:~|≈)?\$[^:\n]{0,40})$/;
+
+function splitFigure(content: string): { label: string; amount: string } | null {
+  const match = FIGURE.exec(content);
+  if (!match) return null;
+
+  const [, label, amount] = match;
+  // A label with no letters is not a label, and an amount with no digits is
+  // not an amount — "$: $" should stay the text it is.
+  if (!/[A-Za-z]/.test(label) || !/[0-9]/.test(amount)) return null;
+
+  return { label: label.trim(), amount: amount.trim() };
+}
 
 /**
  * ── ⚠ Why this is a scanner and not a regex (FN-14) ─────────────────────────
@@ -185,10 +246,31 @@ export function parseAnswer(answer: string): AnswerLine[] {
   return answer.split('\n').map((raw) => {
     const isBullet = BULLET.test(raw);
     const content = isBullet ? raw.replace(BULLET, '') : raw;
+    const tokens = parseAnswerLine(content);
+
+    /*
+      A bullet stays a bullet. A figure inside a list is still a list item, and
+      promoting it out of the list would silently reorder the model's own
+      structure — the marker is the model's statement that these belong
+      together.
+    */
+    if (!isBullet) {
+      const figure = splitFigure(content);
+      if (figure) {
+        return {
+          kind: 'figure' as const,
+          tokens,
+          figure: {
+            label: parseAnswerLine(figure.label),
+            amount: parseAnswerLine(figure.amount),
+          },
+        };
+      }
+    }
 
     return {
       kind: isBullet ? ('bullet' as const) : ('text' as const),
-      tokens: parseAnswerLine(content),
+      tokens,
     };
   });
 }

@@ -1,4 +1,4 @@
-import { parseAnswerLine } from '@wellkept/core/answer-markup';
+import { parseAnswerLine, type AnswerToken } from '@wellkept/core/answer-markup';
 
 /**
  * Draws the runs `@wellkept/core/answer-markup` identifies.
@@ -27,9 +27,21 @@ import { parseAnswerLine } from '@wellkept/core/answer-markup';
  * tokenising is in core and this is not.
  */
 export function AnswerLine({ line, lineKey }: { line: string; lineKey: number }) {
+  return <AnswerRuns tokens={parseAnswerLine(line)} lineKey={lineKey} />;
+}
+
+/**
+ * The same drawing, from tokens somebody else has already parsed.
+ *
+ * Split out when the consultant moved to `parseAnswer`, which hands back the
+ * two halves of a figure line pre-tokenised — there is no string left to
+ * re-parse at that point, and re-joining one so this could split it again is
+ * how a renderer starts disagreeing with its parser.
+ */
+export function AnswerRuns({ tokens, lineKey }: { tokens: AnswerToken[]; lineKey: number }) {
   return (
     <>
-      {parseAnswerLine(line).map((token, index) => {
+      {tokens.map((token, index) => {
         /*
           ⚠ Both flags can be set at once — `***urgent***` — and that case has to
           be first. Checking `bold` before the pair means the triple form renders

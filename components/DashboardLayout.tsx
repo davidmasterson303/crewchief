@@ -472,7 +472,7 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                       same time. Visual weight is unchanged.
                     */
                     className={`relative flex items-center gap-1.5 px-2.5 sm:px-4 py-3 min-h-[44px] text-[13px] font-medium whitespace-nowrap transition-colors duration-150 ${
-                      isActive ? 'text-cyan-400 bg-cyan-400/5' : 'text-white/50 hover:text-white/80 hover:bg-white/5'
+                      isActive ? 'text-white' : 'text-white/50 hover:text-white/80 hover:bg-white/5'
                     }`}
                   >
                     {/*
@@ -494,6 +494,23 @@ export default function DashboardLayout({ vehicle, knowledge, currentPage, child
                     */}
                     <Icon className={`hidden sm:block h-3.5 w-3.5 ${isActive ? 'text-cyan-400' : 'text-white/40'}`} />
                     {label}
+                    {/*
+                      ── ⚠ One active indicator, and the fill is the one that
+                         went ─────────────────────────────────────────────────
+
+                      The active tab carried a cyan fill, cyan text *and* this
+                      underline: three markings for one state, which a design
+                      critique flagged as doubled state-marking. The underline
+                      is the one that survives — it is the cheapest in ink, it
+                      cannot be mistaken for a hover wash, and it leaves the
+                      label to say what it says.
+
+                      The text goes plain white rather than cyan for the same
+                      reason the fill went. See the note on links below: cyan is
+                      this product's *mark*, and spending it on ordinary state
+                      is what made a critique read the page as having two
+                      competing accents.
+                    */}
                     {isActive && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400 rounded-t-full" />}
                   </Link>
                 );

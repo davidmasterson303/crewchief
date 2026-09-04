@@ -27,7 +27,8 @@ import { toast } from 'sonner';
 import { invalidateDashboardCache } from '@wellkept/core/query-invalidation';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
 import { CONTEXT_KIND_LABELS, type ContextKind } from '@wellkept/core/consultant-context-kinds';
-import { AnswerLine } from '@/components/AnswerLine';
+import { AnswerRuns } from '@/components/AnswerLine';
+import { parseAnswer } from '@wellkept/core/answer-markup';
 import { adviceDisclosure } from '@wellkept/core/advice-disclosure';
 
 /*
@@ -719,7 +720,23 @@ export default function ConsultantChat({
               placeholder="Search chats..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 text-xs"
+              className="text-xs"
+              /*
+                ⚠ Inline, because `pl-8` loses here and that is not obvious.
+
+                `.field-sm` lives in `@layer utilities` and sets the `padding`
+                **shorthand**. Same specificity as `pl-8`, declared later, so it
+                wins — measured live: `padding-left` resolved to 10px while the
+                icon's right edge sat at 26px, putting the glyph on top of the
+                first characters of its own placeholder. A design critique of
+                the rendered page saw it as a rendering fault, which it is.
+
+                The fix belongs in that class eventually — a component's padding
+                should not outrank a caller's utility — but moving `.field-sm`
+                out of the utilities layer changes every field in the app, and
+                this is one input.
+              */
+              style={{ paddingLeft: '2rem' }}
             />
           </div>
         </div>
@@ -879,12 +896,66 @@ export default function ConsultantChat({
                         ))}
                       </div>
                     )}
+                    {/*
+                      ── ⚠ `parseAnswer`, not `split('\n')` + `parseAnswerLine` ─
+
+                      Two things the line-at-a-time route could not do, both of
+                      which the phone has had for a while:
+
+                      **Bullets.** `parseAnswer` consumes the `-`/`*` marker and
+                      says the line is a bullet; splitting by hand left the
+                      marker in the text, so a list the advisor wrote rendered
+                      on the web as prose beginning with a hyphen.
+
+                      **Figures.** A cost breakdown arrived as a run of
+                      identical paragraphs — "$115" weighted the same as the
+                      sentence around it — and a design critique named it the
+                      biggest miss on this screen. `parseAnswer` hands back the
+                      label and the amount already tokenised, so the numbers can
+                      line up in a column without this component guessing at
+                      what a number looks like.
+                    */}
                     <div className="space-y-1.5">
-                      {msg.content.split('\n').map((line: string, i: number) => (
-                        <p key={i} className="text-sm leading-relaxed break-words">
-                          <AnswerLine line={line} lineKey={i} />
-                        </p>
-                      ))}
+                      {parseAnswer(msg.content).map((line, i: number) => {
+                        if (line.kind === 'figure' && line.figure) {
+                          return (
+                            <p
+                              key={i}
+                              className="flex items-baseline justify-between gap-4 border-b border-white/8 py-1 text-sm leading-normal last:border-b-0"
+                            >
+                              <span className="min-w-0 break-words">
+                                <AnswerRuns tokens={line.figure.label} lineKey={i} />
+                              </span>
+                              {/*
+                                `num` is the house's tabular-figures class. It
+                                is the whole point of the treatment: figures
+                                that line up column-wise are readable as a set,
+                                and proportional ones are not.
+                              */}
+                              <span className="num shrink-0 font-semibold text-white">
+                                <AnswerRuns tokens={line.figure.amount} lineKey={i} />
+                              </span>
+                            </p>
+                          );
+                        }
+
+                        if (line.kind === 'bullet') {
+                          return (
+                            <p key={i} className="flex gap-2.5 text-sm leading-normal break-words">
+                              <span aria-hidden="true" className="mt-[0.6em] h-1 w-1 shrink-0 rounded-full bg-white/40" />
+                              <span className="min-w-0">
+                                <AnswerRuns tokens={line.tokens} lineKey={i} />
+                              </span>
+                            </p>
+                          );
+                        }
+
+                        return (
+                          <p key={i} className="text-sm leading-normal break-words">
+                            <AnswerRuns tokens={line.tokens} lineKey={i} />
+                          </p>
+                        );
+                      })}
                     </div>
                     {msg.wishlistActions && msg.wishlistActions.length > 0 && (
                       <div className="mt-3 space-y-2 border-t border-white/10 pt-3">
@@ -1018,8 +1089,24 @@ export default function ConsultantChat({
                       {refusalCopy('demo', 'generate')}
                     </p>
                   )}
+                  {/*
+                    ⚠ Set as apparatus, not as a second paragraph.
+
+                    A design critique asked for this once per thread instead of
+                    under every turn — "a tax on every message" — and that is
+                    the one note here I am not taking. The comment above says
+                    why and it still holds: a person scrolling a long
+                    conversation reads the answer, not the header, and this is
+                    the sentence that limits liability.
+
+                    What the critique was right about is weight: three lines of
+                    body-sized copy after every answer competed with the answer.
+                    A hairline and a tighter setting make it read as a footnote
+                    to the turn, which is what it is. Same words, same
+                    frequency, less shout.
+                  */}
                   {msg.role === 'assistant' && msg.content && (
-                    <p className="measure text-xs text-white/50 mt-2">
+                    <p className="measure mt-3 border-t border-white/8 pt-2 text-xs leading-normal text-white/50">
                       {adviceDisclosure('consultant')}
                     </p>
                   )}
@@ -1227,8 +1314,20 @@ export default function ConsultantChat({
             onChange={handleFileSelect}
             className="hidden"
           />
+          {/*
+            ⚠ The keyboard half is desktop-only, and it was not.
+
+            "Enter to send · Shift+Enter for new line" rendered on a 390px
+            phone, where there is no Enter key doing that and no Shift at all —
+            a design critique called it "an instant tell that the mobile layout
+            is the desktop layout squeezed", and it was exactly that. The
+            attachment limit is true on every device, so it stays.
+          */}
           <p className="text-xs text-white/50 mt-2">
-            Enter to send &middot; Shift+Enter for new line &middot; Attach up to 3 files
+            <span className="hidden sm:inline">
+              Enter to send &middot; Shift+Enter for new line &middot;{' '}
+            </span>
+            Attach up to 3 files
           </p>
         </div>
       </div>

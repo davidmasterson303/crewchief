@@ -228,3 +228,71 @@ describe('emphasis, not asterisks', () => {
     ]);
   });
 });
+
+describe('a labelled money figure is its own kind of line', () => {
+  /*
+    ── ⚠ What this is for, and the line it must not cross ────────────────────
+
+    The advisor's cost answers arrived as a run of identical paragraphs, so
+    "$115" carried the same weight as the prose around it. A design critique of
+    the rendered consultant called it the biggest miss on the screen: the whole
+    value of the answer is the numbers, and nothing let them line up.
+
+    Recognising the shape is safe; *guessing* at it is not. Every assertion
+    below that expects `text` is the important half — a sentence forced into a
+    right-hand column is worse than a sentence.
+  */
+  const kinds = (answer: string) => parseAnswer(answer).map((line) => line.kind);
+
+  it('takes a short label and a money figure', () => {
+    expect(kinds('DCT fluid change: $280')).toEqual(['figure']);
+    expect(kinds('Bundled total: ~$1,900-2,100')).toEqual(['figure']);
+    expect(kinds('Water pump + thermostat: $800 all-in')).toEqual(['figure']);
+  });
+
+  it('splits it into halves a renderer can align', () => {
+    const [line] = parseAnswer('Brake fluid flush: $115');
+
+    expect(line.figure?.label.map((t) => t.text).join('')).toBe('Brake fluid flush');
+    expect(line.figure?.amount.map((t) => t.text).join('')).toBe('$115');
+    // The whole line survives too, for the client that does not know this kind.
+    expect(line.tokens.map((t) => t.text).join('')).toBe('Brake fluid flush: $115');
+  });
+
+  it('leaves a sentence alone, however much money is in it', () => {
+    /*
+      The real line from the seeded M3 answer. 66 characters after the colon:
+      it is prose, and a right-hand column would wrap it into a 390px gutter.
+    */
+    expect(
+      kinds('Rod bearing inspection: $180 parts + $600 labor (bundled with water pump) = ~$780')
+    ).toEqual(['text']);
+
+    expect(kinds('Bundled at a good independent Euro shop, here is the real number:')).toEqual([
+      'text',
+    ]);
+    expect(
+      kinds('For a 444hp car at 67k miles, that is genuinely reasonable preventive maintenance.')
+    ).toEqual(['text']);
+  });
+
+  it('declines a line whose emphasis straddles the colon', () => {
+    /*
+      Splitting `**Bundled total:** $x` leaves an unmatched `**` in each half
+      and the tokeniser would render the asterisks. This file's standing rule is
+      that unmatched syntax is left alone rather than mangled.
+    */
+    expect(kinds('**Bundled total:** $1,900')).toEqual(['text']);
+  });
+
+  it('leaves a bullet a bullet', () => {
+    // The marker is the model saying these belong together; promoting the item
+    // out of its list would reorder the model's own structure.
+    expect(kinds('- DCT fluid change: $280')).toEqual(['bullet']);
+  });
+
+  it('requires both a label and an amount, not merely the punctuation', () => {
+    expect(kinds('$: $')).toEqual(['text']);
+    expect(kinds('Total: $')).toEqual(['text']);
+  });
+});
