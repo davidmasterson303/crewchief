@@ -3,7 +3,7 @@
 import { RECALL_MATCH_CAVEAT } from '@wellkept/core/advice-disclosure';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ShieldAlert, ExternalLink, X, ChevronDown, ChevronUp, Check, Loader as Loader2 } from 'lucide-react';
+import { ShieldAlert, ExternalLink, ChevronDown, ChevronUp, Check, Loader as Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 
@@ -15,12 +15,11 @@ interface RecallAlertsProps {
 }
 
 export default function RecallAlerts({ recalls, vehicleId, addressedCampaigns = [], onRecallAddressed }: RecallAlertsProps) {
-  const [dismissed, setDismissed] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [addressingId, setAddressingId] = useState<string | null>(null);
   const [localAddressed, setLocalAddressed] = useState<string[]>(addressedCampaigns);
 
-  if (dismissed || !recalls || recalls.length === 0) {
+  if (!recalls || recalls.length === 0) {
     return null;
   }
 
@@ -89,13 +88,25 @@ export default function RecallAlerts({ recalls, vehicleId, addressedCampaigns = 
             <ExternalLink className="h-3.5 w-3.5" />
             NHTSA
           </Button>
-          <button
-            onClick={() => setDismissed(true)}
-            className="tap-target-44 w-7 h-7 flex items-center justify-center rounded-lg text-white/30 hover:text-white/60 hover:bg-white/8 transition-colors"
-            aria-label="Dismiss recalls"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
+          {/*
+            ── ⚠ There is no dismiss, and there should not be ─────────────────
+
+            A close button stood here and set `dismissed`, hiding every open
+            safety campaign on the vehicle for the rest of the session — one
+            tap, no confirmation, no way back short of a reload, on the one
+            panel in this product a reader must not miss. A design critique of
+            the rendered page flagged it as "a dismissible × on a
+            safety-critical recall banner".
+
+            The affordance a reader actually needs is already here and is a
+            statement about the world rather than about the panel: **Mark
+            addressed**, per campaign, which records that the work was done and
+            removes that campaign because it is genuinely finished. Dismiss
+            removes the notice while leaving the recall open, which is the same
+            distinction `health-claims.ts` draws between "checked, none found"
+            and "never checked" — an absence of the message is not an absence
+            of the thing.
+          */}
         </div>
       </div>
 

@@ -405,7 +405,7 @@ export default function DiagnosticHero({
                 driversHref && (
                   <a
                     href={driversHref}
-                    className="tap-target-44 inline-flex items-center gap-1.5 text-sm font-semibold text-info-strong transition-colors hover:text-info"
+                    className="tap-target-44 inline-flex items-center gap-1.5 text-sm font-semibold text-cyan-400 transition-colors hover:text-cyan-300"
                   >
                     What&apos;s driving this score
                     <span aria-hidden="true">↓</span>
@@ -429,6 +429,14 @@ export default function DiagnosticHero({
                 — it renders only when there is something true to say, and
                 `describeReadWork` still answers `null` when neither read
                 resolved.
+              */}
+              {/*
+                ⚠ Cyan, not the `info` family. A critique of the rendered page
+                counted six hues doing accent work and asked for two. Cyan is
+                already what "you can act on this" means here — the active tab,
+                the focus ring — and the links were a second, quieter blue
+                saying the same thing. One interactive colour; `info` keeps the
+                washes and the informational glyphs it was made for.
               */}
               {caption && (
                 <p className="text-xs text-white/55 mt-3 leading-relaxed">{caption}</p>

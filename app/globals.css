@@ -892,14 +892,24 @@ nav {
     bottom: -1px;
     height: 2px;
     pointer-events: none;
-    background: linear-gradient(
-      90deg,
-      transparent 0%,
-      rgb(34 211 238 / 0.55) 14%,
-      rgb(160 240 252 / 0.8) 50%,
-      rgb(34 211 238 / 0.55) 86%,
-      transparent 100%
-    );
+    /*
+      ── ⚠ A flat rule, not a smear — 3 Sep, second cut ─────────────────────
+
+      This was a five-stop gradient fading from transparent through cyan to a
+      near-white centre and back. Four consecutive critiques of the rendered
+      dashboard named it, the last one flatly: *"the full-viewport cyan
+      gradient under the tab bar is the most AI-generated element on the page —
+      a decorative flourish attached to nothing."*
+
+      The fixture stays — it is the room's one light and the whole `.service-bay`
+      idea rests on it — but a lit tube is an even line, and the horizontal
+      fade was doing nothing except reading as a highlight effect. Flat, dim,
+      and the full width of the bar it lights.
+
+      §9.2 already cut this element's bloom for the same reason. Logged again
+      in `docs/design-system-drift.md` §10.3.
+    */
+    background: rgb(34 211 238 / 0.34);
     /*
       ── ⚠ Bloom cut hard, 3 Sep — the halo was doing no work ────────────────
 

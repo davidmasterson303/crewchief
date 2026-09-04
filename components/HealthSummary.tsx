@@ -225,15 +225,60 @@ function HealthFactorRows({
               <span
                 className="num text-xl font-bold leading-none"
                 style={{
+                  /*
+                    ── ⚠ A measured score does not wear a reassuring colour
+                       over a stated problem ────────────────────────────────
+
+                    Three rounds of a design critique called this the worst
+                    defect on the page, the third plainly: a green **97** with
+                    "Nothing overdue among the 6 we can check" sitting directly
+                    above "Brake fluid overdue". *"No studio ships a trust
+                    product that argues with itself two lines apart."*
+
+                    The two are not strictly in conflict — the measured line
+                    names the set it checked, and brake fluid is not in it —
+                    but the green asserts a verdict over the whole subject, and
+                    a reader has no way to know the sets differ. The colour is
+                    making a claim the number cannot support, which is banding
+                    a `null` one step along.
+
+                    So the band's ink is spent only where the row agrees with
+                    itself. Where the claim says attention the figure stays and
+                    goes neutral: the measurement is not hidden, it stops
+                    overruling the sentence beneath it.
+                  */
                   color:
                     row.driver.score === null
                       ? 'rgb(255 255 255 / 0.38)'
-                      : getHealthBand(row.driver.score).color,
+                      : row.claim?.state === 'attention'
+                        ? 'rgb(255 255 255 / 0.7)'
+                        : getHealthBand(row.driver.score).color,
                 }}
               >
                 {row.driver.score === null ? '—' : row.driver.score}
               </span>
             )}
+
+            {/*
+              ⚠ The unscored row says so, rather than leaving the column empty.
+
+              "Known issues" is the one subject nothing computes a number for,
+              and a blank where its siblings carry figures read as a fault — a
+              critique of the rendered page said the omission "looks broken
+              next to its scored siblings rather than deliberately unscored".
+
+              Deliberately not an em dash: this codebase spends that on "we
+              looked and cannot say", which is a different statement and is
+              what the recalls row shows when its lookup never ran. Nothing
+              ever looked here, because nothing measures it.
+
+              ⚠ `label-uppercase` rather than a hand-rolled small caps: this
+              was 11px at white/40 and both floors caught it — `viewport-floors`
+              on the size, `text-contrast-floor` on the alpha. The house class
+              clears both, and it makes this label and the stat labels above
+              the hero the same thing.
+            */}
+            {!row.driver && <span className="label-uppercase">Not scored</span>}
           </div>
 
           {/*
@@ -282,7 +327,7 @@ function HealthFactorRows({
                 */
                 <button
                   type="button"
-                  className="tap-target-44 group mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-info-strong transition-colors hover:text-info"
+                  className="tap-target-44 group mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-cyan-400 transition-colors hover:text-cyan-300"
                 >
                   <span>View recall history</span>
                   <ChevronRight

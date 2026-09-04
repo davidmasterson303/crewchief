@@ -863,6 +863,25 @@ carry. `packages/core/src/health-band.ts` and `health-band.test.ts`'s React
 Native pin move with it — the web token and the value the Expo app reads cannot
 drift apart.
 
+### 10.3 · ⚠ The batten is a flat rule, not a gradient
+
+`.bay-batten::after` was a five-stop gradient — transparent, cyan, a near-white
+centre, cyan, transparent — under every nav. Four consecutive critiques named
+it, the last flatly: *"the full-viewport cyan gradient under the tab bar is the
+most AI-generated element on the page — a decorative flourish attached to
+nothing."*
+
+The **fixture stays**; the whole `.service-bay` idea rests on one light. A lit
+tube is an even line, so it is now flat cyan at 0.34 across the bar it lights.
+§9.2 cut this element's bloom for the same reason.
+
+### 10.4 · ⚠ Interactive text is cyan, not the `info` family
+
+The same critique counted six hues doing accent work. Cyan already meant "you
+can act on this" — the active tab, the focus ring — and links were a second,
+quieter blue saying the same thing. Links take the accent; `info` keeps the
+washes and informational glyphs it was made for.
+
 ### Not design-system changes, listed so Design can see the whole pass
 
 Model as the card's name with year/make as the eyebrow · "67,400 mi mileage" →

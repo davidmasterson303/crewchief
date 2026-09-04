@@ -73,24 +73,28 @@ function pointAt(score: number, radius: number): { x: number; y: number } {
 */
 const MAJORS = [0, 20, 40, 60, 80, 100];
 /*
-  ── ⚠ Which majors get a number, and why it is not all of them ─────────────
+  ── ⚠ Two numerals, and the second attempt at this ────────────────────────
 
-  Six numerals around a 160px arc is a scale competing with its own reading. A
-  design critique of the rendered dashboard called the dial "the default AI
-  premium dashboard trope" and named the clutter first.
+  Six numerals around a 160px arc is a scale competing with its own reading,
+  and a critique of the rendered dashboard named the clutter first.
 
-  The set that survives is not a trim for looks: it is the two ends of the
-  scale, plus the three points where the *verdict* changes. `health-band.ts`
-  puts those at 40, 60 and 80, and the linear track this replaced made the same
-  argument in its own comment — a bare fill says "more is better" and nothing
-  else, and those three are the only places on the scale where the answer
-  changes. 20 is the one number that marks nothing.
+  The first reduction kept the *meaningful* points — the two ends plus the
+  three where the verdict changes, 40/60/80 — and dropped 20. The next round of
+  the same critique caught what that did: "tick labels sit at irregular
+  positions (40/60 crowding the top, 80 alone on the right)". Of course they
+  do. Removing one number from an evenly spaced set does not make the set
+  meaningful, it makes it look mismeasured, and on an instrument face — where
+  regularity *is* the craft — that is worse than the clutter it fixed.
 
-  The majors all still get a mark — the scale is intact, it is the *type* that
-  thinned. The every-5 hairlines went too, in the same pass and for the same
-  reason; see the note where they were drawn.
+  So the numerals are the two ends of the scale, which is what a scale's
+  numerals are for, and the band boundaries keep saying what they say the way
+  an instrument says it: with a heavier tick. The verdict is written out under
+  the dial in words, which is more legible than a number a reader has to
+  compare against three remembered thresholds.
+
+  Every major still gets a mark, so the geometry is even all the way round.
 */
-const LABELLED = [0, 40, 60, 80, 100];
+const LABELLED = [0, 100];
 const BOUNDARIES = new Set([40, 60, 80]);
 
 
